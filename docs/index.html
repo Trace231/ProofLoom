@@ -1,10 +1,73 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ProofLoom: Algorithms in ML, FORMALIZED.</title>
+<meta name="theme-color" content="#03080c">
+<style>html{background:#03080c}body{margin:0}.site-header{min-height:64px;background:#050b0f}.hero{min-height:560px;height:calc(100svh - 64px);background:#03080c}@media(max-width:700px){.site-header{min-height:58px}.hero{min-height:540px;height:calc(100svh - 58px)}}</style>
+<script>(() => {
+  'use strict';
+  const root = document.documentElement;
+  root.dataset.entry = 'pending';
+  root.dataset.image = 'pending';
+  root.dataset.scene = 'pending';
+  let textReady = false;
+  let imageReady = false;
+  let sceneReady = false;
+  let fontsReady = false;
+
+  function showScene() {
+    if (!textReady || !imageReady || sceneReady) return;
+    sceneReady = true;
+    root.dataset.image = 'ready';
+    root.dataset.scene = 'ready';
+    document.dispatchEvent(new Event('proofloom:scene-ready'));
+  }
+  function showText() {
+    if (textReady) return;
+    textReady = true;
+    if (!fontsReady) root.dataset.entryFont = 'fallback';
+    root.dataset.entry = 'ready';
+    showScene();
+  }
+  // Reading never waits indefinitely for a font or the decorative image.
+  const safety = setTimeout(showText, 1600);
+  document.addEventListener('DOMContentLoaded', () => {
+    const fonts = document.fonts
+      ? Promise.all([400, 600, 700].map(weight => document.fonts.load(weight + ' 16px Manrope')))
+          .then(() => { fontsReady = true; })
+      : Promise.resolve();
+    let deadline;
+    Promise.race([fonts.catch(() => {}), new Promise(resolve => { deadline = setTimeout(resolve, 650); })])
+      .then(() => requestAnimationFrame(() => requestAnimationFrame(() => {
+        clearTimeout(safety);
+        clearTimeout(deadline);
+        showText();
+      })));
+
+    const picture = document.querySelector('.hero-image');
+    const decoded = picture?.decode
+      ? picture.decode().catch(() => {})
+      : new Promise(resolve => {
+          if (!picture || picture.complete) resolve();
+          else {
+            picture.addEventListener('load', resolve, { once: true });
+            picture.addEventListener('error', resolve, { once: true });
+          }
+        });
+    decoded.then(() => requestAnimationFrame(() => {
+      imageReady = true;
+      showScene();
+    }));
+  }, { once: true });
+})();
+</script>
+<link rel="preload" href="blog-assets/fonts/Manrope-Regular.ttf" as="font" type="font/ttf" crossorigin>
+<link rel="preload" href="blog-assets/fonts/Manrope-Semibold.ttf" as="font" type="font/ttf" crossorigin>
+<link rel="preload" href="blog-assets/fonts/Manrope-Bold.ttf" as="font" type="font/ttf" crossorigin>
+<link rel="preload" href="blog-assets/proofloom-galaxy.png" as="image" fetchpriority="high">
 <meta name="description" content="From research papers to Lean proofs, reusable optimization theory, and checked evidence of gaps in the original mathematics.">
 <link rel="canonical" href="https://trace231.github.io/ProofLoom/">
 <link rel="stylesheet" href="blog-assets/katex.min.css"><link rel="stylesheet" href="blog-assets/blog.css">
-<link rel="stylesheet" href="blog-assets/celestial.css?v=20260929-3"><script src="blog-assets/celestial.js?v=20260929-3" defer></script>
+<link rel="stylesheet" href="blog-assets/celestial.css?v=20260929-4"><script src="blog-assets/celestial.js?v=20260929-4" defer></script>
 <link rel="stylesheet" href="blog-assets/editorial.css?v=20260929-2"><script src="blog-assets/editorial.js?v=20260929-1" defer></script>
 </head><body id="top">
 <a class="skip-link" href="#story">Skip to article</a>
@@ -12,7 +75,7 @@
 <canvas class="lattice-field" aria-hidden="true"></canvas>
 <section class="hero" aria-labelledby="article-title">
   <div class="hero-art" data-motion="still">
-    <img class="hero-image" src="blog-assets/proofloom-galaxy.png" width="2014" height="780" alt="" fetchpriority="high">
+    <img class="hero-image" src="blog-assets/proofloom-galaxy.png" width="2014" height="780" alt="" fetchpriority="high" decoding="async">
     <div class="galaxy-aura" aria-hidden="true"></div>
     <canvas class="celestial-field" aria-hidden="true"></canvas>
   </div>
@@ -44,7 +107,7 @@
 \quad\text{almost surely}.</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathbb">E</span><span class="mopen">[</span><span class="mord mathnormal">G</span><span class="mopen">(</span><span class="mord"><span class="mord mathnormal">x</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.04601em;">ξ</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:-0.046em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">∣</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord"><span class="mord mathcal" style="margin-right:0.09931em;">F</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:-0.0993em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">t</span><span class="mbin mtight">−</span><span class="mord mtight">1</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2083em;"><span></span></span></span></span></span></span><span class="mclose">]</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.03588em;">g</span><span class="mopen">(</span><span class="mord"><span class="mord mathnormal">x</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mclose">)</span><span class="mspace" style="margin-right:1em;"></span><span class="mord text"><span class="mord">almost surely</span></span><span class="mord">.</span></span></span></span></span></p>
 <p>Here, the iterate depends on earlier samples, while the current sample must be fresh relative to that history. To justify the step, the formal model needs to express those relationships, together with the relevant measurability and integrability conditions.</p>
 <p>If the initial Lean model omitted the sampling history, searching harder for a proof will eventually run into that omission. The open goal identifies the missing structure: how the iterate depends on the past, how the next sample is drawn, and the bridge from a fixed-query expectation to a conditional one.</p>
-<figure class="diagram" data-figure-title="Constructing the theory" data-figure-number="1"><a class="figure-link" href="blog-assets/paper-construction-order.png" target="_blank" rel="noopener" aria-label="Enlarge figure 1"><span class="figure-open" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M7 3H3v4m10-4h4v4M3 13v4h4m6 0h4v-4"/></svg></span><img src="blog-assets/paper-construction-order.png" alt="Two construction orders: building theory from the foundations, and constructing the definitions and lemmas required by the target proof."></a><figcaption><span class="figure-label"><span>Figure</span><span>01</span></span><span class="caption-copy">The target proof selects the mathematical infrastructure to construct. The resulting definitions and lemmas can then support the next algorithm.</span></figcaption></figure>
+<figure class="diagram" data-figure-title="Constructing the theory" data-figure-number="1"><a class="figure-link" href="blog-assets/paper-construction-order.png" target="_blank" rel="noopener" aria-label="Enlarge figure 1"><span class="figure-open" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M7 3H3v4m10-4h4v4M3 13v4h4m6 0h4v-4"/></svg></span><img loading="lazy" decoding="async" width="2700" height="945" src="blog-assets/paper-construction-order.png" alt="Two construction orders: building theory from the foundations, and constructing the definitions and lemmas required by the target proof."></a><figcaption><span class="figure-label"><span>Figure</span><span>01</span></span><span class="caption-copy">The target proof selects the mathematical infrastructure to construct. The resulting definitions and lemmas can then support the next algorithm.</span></figcaption></figure>
 <p>This is <strong>proof-obligation-driven theory construction</strong>. The target theorem provides a concrete test for whether an interface is useful, whether a lemma is strong enough, and whether the algorithm model expresses the dependencies its proof requires.</p>
 <h2 id="how-proofloom-constructs-the-theory"><span class="section-number">02</span>How ProofLoom constructs the theory</h2>
 <p>The workflow has three stages: <strong>Model → Construct → Learn</strong>.</p>
@@ -56,7 +119,7 @@
 <p>For the stochastic-oracle example, adding a sampling history can make an implicit source dependency explicit. The conditional expectation identity then remains a theorem to establish. This separation lets the representation improve while keeping the mathematical work visible.</p>
 <h3 id="learn-make-the-construction-useful-again">Learn: make the construction useful again</h3>
 <p>After certification, ProofLoom extracts reusable definitions and lemmas, generalizes their interfaces, and checks them in the original development. Accepted additions enter <strong>SOptLib</strong>, together with records of modeling decisions, successful proof routes, failed attempts, and conditions for reuse.</p>
-<figure class="diagram" data-figure-title="How ProofLoom works" data-figure-number="2"><a class="figure-link" href="blog-assets/paper-system-overview.png" target="_blank" rel="noopener" aria-label="Enlarge figure 2"><span class="figure-open" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M7 3H3v4m10-4h4v4M3 13v4h4m6 0h4v-4"/></svg></span><img src="blog-assets/paper-system-overview.png" alt="ProofLoom workflow: algorithm modeling, Planner–Prover–Audit construction, source-reviewed reconstruction, and certification and extraction into SOptLib."></a><figcaption><span class="figure-label"><span>Figure</span><span>02</span></span><span class="caption-copy">Proof construction and model revision interact throughout the development. Completed, reviewed mathematics feeds back into SOptLib.</span></figcaption></figure>
+<figure class="diagram" data-figure-title="How ProofLoom works" data-figure-number="2"><a class="figure-link" href="blog-assets/paper-system-overview.png" target="_blank" rel="noopener" aria-label="Enlarge figure 2"><span class="figure-open" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M7 3H3v4m10-4h4v4M3 13v4h4m6 0h4v-4"/></svg></span><img loading="lazy" decoding="async" width="2700" height="1806" src="blog-assets/paper-system-overview.png" alt="ProofLoom workflow: algorithm modeling, Planner–Prover–Audit construction, source-reviewed reconstruction, and certification and extraction into SOptLib."></a><figcaption><span class="figure-label"><span>Figure</span><span>02</span></span><span class="caption-copy">Proof construction and model revision interact throughout the development. Completed, reviewed mathematics feeds back into SOptLib.</span></figcaption></figure>
 <h3 id="a-concrete-example-connecting-two-gaussian-representations">A concrete example: connecting two Gaussian representations</h3>
 <p>SAM&#39;s generalization argument needs a Gaussian KL calculation. An available theorem expresses the distributions in Euclidean coordinates; the algorithm development represents them as affine transformations of a standard Gaussian on an inner-product space.</p>
 <p>Using the theorem requires a mathematical bridge between those representations. ProofLoom makes the Euclidean measurable structure explicit, identifies the Gaussian laws under an orthonormal coordinate map, and proves that KL divergence is preserved by that change of coordinates. The resulting identity supplies the Gaussian calculation used downstream in the proof.</p>
@@ -146,7 +209,7 @@
 <h2 id="the-artifacts-a-growing-body-of-optimization-theory"><span class="section-number">04</span>The artifacts: a growing body of optimization theory</h2>
 <p>The broader research collection contains <strong>33 algorithm developments</strong>: <strong>22 from FOML, eight from research papers, and three from research notes</strong>. It includes all 15 benchmark tasks and 18 additional developments.</p>
 <p>The paper&#39;s census records <strong>490,693 lines of algorithm-local Lean source</strong>. Separately, its SOptLib snapshot contains <strong>109,634 source lines</strong>, with <strong>2,399 declarations</strong>, including <strong>1,983 theorems</strong>. These physical-line counts include comments and blank lines; algorithm code and shared library code are counted separately.</p>
-<figure class="atlas" data-figure-title="Construction atlas" data-figure-number="3"><a class="figure-link" href="blog-assets/paper-artifact-atlas.png" target="_blank" rel="noopener" aria-label="Enlarge figure 3"><span class="figure-open" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M7 3H3v4m10-4h4v4M3 13v4h4m6 0h4v-4"/></svg></span><img src="blog-assets/paper-artifact-atlas.png" alt="Construction atlas of 33 algorithm developments. Outer bars show algorithm-local Lean code; inner bars show reused SOptLib support. Colors distinguish textbook chapters, research papers, and unpublished research notes."></a><figcaption><span class="figure-label"><span>Figure</span><span>03</span></span><span class="caption-copy">Algorithm code and reused library support across 33 archived construction snapshots. Bars count code-bearing lines, excluding blank and comment-only lines, with support deduplicated within each development. The atlas uses archived per-algorithm snapshots and square-root radial scales. <a href="blog-assets/paper-artifact-atlas.pdf">Open the full-resolution figure</a> or inspect its <a href="blog-assets/paper-artifact-atlas-data.json">data and counting rules</a>.</span></figcaption></figure>
+<figure class="atlas" data-figure-title="Construction atlas" data-figure-number="3"><a class="figure-link" href="blog-assets/paper-artifact-atlas.png" target="_blank" rel="noopener" aria-label="Enlarge figure 3"><span class="figure-open" aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M7 3H3v4m10-4h4v4M3 13v4h4m6 0h4v-4"/></svg></span><img loading="lazy" decoding="async" width="1600" height="1600" src="blog-assets/paper-artifact-atlas.png" alt="Construction atlas of 33 algorithm developments. Outer bars show algorithm-local Lean code; inner bars show reused SOptLib support. Colors distinguish textbook chapters, research papers, and unpublished research notes."></a><figcaption><span class="figure-label"><span>Figure</span><span>03</span></span><span class="caption-copy">Algorithm code and reused library support across 33 archived construction snapshots. Bars count code-bearing lines, excluding blank and comment-only lines, with support deduplicated within each development. The atlas uses archived per-algorithm snapshots and square-root radial scales. <a href="blog-assets/paper-artifact-atlas.pdf">Open the full-resolution figure</a> or inspect its <a href="blog-assets/paper-artifact-atlas-data.json">data and counting rules</a>.</span></figcaption></figure>
 <p>The collection reaches from stochastic mirror descent, accelerated methods, and variance reduction to adaptive optimizers such as <strong>AMSGrad, Lion, and MARS</strong>, as well as distributed methods and research-note developments such as <strong>Push–Pull, Heavy-Ball, and R/C-DGD</strong>.</p>
 <p>The inner bars make the shared mathematics visible. A development can draw on previously constructed probability interfaces, oracle bounds, proximal inequalities, or analytical transport results. Extraction checks those results in their original setting before making them available to later proofs.</p>
 <div class="table-scroll" role="region" aria-label="Research results table" tabindex="0"><table>

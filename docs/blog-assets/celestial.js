@@ -26,6 +26,7 @@
   let height = 0;
   let mobile = false;
   let visible = false;
+  let sceneReady = document.documentElement.dataset.scene !== 'pending';
   let paused = false;
   let frame = 0;
   let lastFrame = 0;
@@ -277,8 +278,8 @@
     cancelAnimationFrame(frame);
     frame = 0;
     lastFrame = 0;
-    const run = (visible || reading) && !document.hidden && !paused && !reduced.matches;
-    art.dataset.motion = reduced.matches ? 'reduced' : (run && visible ? 'running' : 'paused');
+    const run = (reading || (visible && sceneReady)) && !document.hidden && !paused && !reduced.matches;
+    art.dataset.motion = !sceneReady ? 'waiting' : (reduced.matches ? 'reduced' : (run && visible ? 'running' : 'paused'));
     document.body.dataset.motion = reduced.matches ? 'reduced' : (paused ? 'paused' : 'running');
     toggle.hidden = reduced.matches;
     toggle.setAttribute('aria-pressed', String(paused));
@@ -427,6 +428,11 @@
     }
   }, { rootMargin: '-12% 0px -12% 0px', threshold: .15 });
   document.querySelectorAll('.article h2').forEach(heading => headingObserver.observe(heading));
+  document.addEventListener('proofloom:scene-ready', () => {
+    sceneReady = true;
+    resize();
+    updateMotion();
+  }, { once: true });
   picture.addEventListener('load', resize);
   document.fonts?.ready.then(resize);
   new IntersectionObserver(entries => {
