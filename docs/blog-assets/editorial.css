@@ -5,7 +5,11 @@
 .hero-eyebrow:before{content:"";width:23px;height:1px;margin-right:16px;background:#d1b583}
 .hero-copy h1{letter-spacing:-.06em}
 .hero-meta{border-top:1px solid #c7a7751c}
+.site-header .brand{font-size:17px;letter-spacing:-.4px;font-weight:600;flex:none}
 .site-header nav{position:relative}
+.site-header .nav-paper{border-left:1px solid #53605e;padding-left:26px}
+.site-header .nav-paper span{padding-left:5px}
+.site-header .nav-code{border-left:0;padding-left:0}
 .site-header nav a:after{display:none}
 .site-header nav a[aria-current]{color:#f4ddae}
 .nav-indicator{position:absolute;bottom:4px;left:0;height:1px;width:0;pointer-events:none;opacity:0;background:linear-gradient(90deg,#b39460,#f5dfb5 75%,#b3946000);box-shadow:0 0 10px #c7a77535;transition:transform .36s cubic-bezier(.22,.75,.2,1),width .36s cubic-bezier(.22,.75,.2,1),opacity .2s}
@@ -70,6 +74,10 @@ body.figure-is-open{overflow:hidden}
 @media(hover:none){.figure-open{opacity:.9;transform:none}}
 @media(max-width:1150px){.layout{padding-top:66px}.article>p:not(.article-deck),.article>ul,.article>h3{max-width:none}.article-deck{font-size:59px}.article h2{font-size:39px}}
 @media(max-width:700px){
+  .nav-inner{gap:16px}
+  .site-header .brand{font-size:15px}
+  .site-header nav{gap:14px}
+  .site-header .nav-paper{padding-left:0;border:0}
   .hero-eyebrow:before{width:16px;margin-right:10px}
   .layout{padding-top:46px}
   .article-deck{font-size:44px;line-height:1.08;margin-bottom:25px}
@@ -92,3 +100,5 @@ body.figure-is-open{overflow:hidden}
 }
 @media(prefers-reduced-motion:reduce){.figure-viewer[open]{animation:none}.nav-indicator{transition:none}}
 @media print{.nav-indicator,.figure-open,.figure-viewer{display:none!important}.article>p:not(.article-deck),.article>ul{max-width:none}.article h2{font-size:25pt}}
+
+@media(max-width:370px){.site-header nav a:nth-child(4){display:none}}
