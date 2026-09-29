@@ -1,0 +1,1263 @@
+{
+  "algorithm": "RandomPrimalDualGradient",
+  "full_name": "Randomized primal-dual gradient method for strongly convex finite-sum optimization",
+  "source_reference": "Lan, First-order and Stochastic Optimization Methods for Machine Learning, Springer 2020, Section 5.1, Theorem 5.1",
+  "setup": {
+    "problem": {
+      "math": "\\Psi^* := \\min_{x\\in X}\\left\\{\\Psi(x):=\\frac{1}{m}\\sum_{i=1}^m f_i(x)+h(x)+\\mu\\nu(x)\\right\\}.",
+      "ref": "Eq. (5.1.1)",
+      "description": "Convex finite-sum problem reformulated as a multi-dual-player saddle point problem for the RPDG method."
+    },
+    "variable_space": {
+      "math": "X\\subseteq\\mathbb{R}^n\\text{ is a closed convex set},\\quad Y:=Y_1\\times Y_2\\times\\cdots\\times Y_m,\\quad Z\\equiv X\\times Y.",
+      "ref": "Section 5.1 and Eq. (5.1.12)"
+    },
+    "saddle_reformulation": {
+      "math": "\\Psi^*:=\\min_{x\\in X}\\left\\{h(x)+\\mu\\nu(x)+\\max_{y\\in Y}\\langle x,Uy\\rangle-J(y)\\right\\},\\qquad U:=[I,I,\\ldots,I],\\qquad J(y):=\\sum_{i=1}^m J_i(y_i).",
+      "ref": "Eqs. (5.1.12)--(5.1.13)"
+    },
+    "dual_conjugate_definition": {
+      "math": "\\text{Let }J_i:Y_i\\to\\mathbb{R}\\text{ be the conjugate functions of }f_i/m\\text{ and }Y_i,\\ i=1,\\ldots,m,\\text{ denote the dual spaces where the gradients of }f_i/m\\text{ reside. For the sake of notational convenience, let us denote }J(y):=\\sum_{i=1}^m J_i(y_i),\\ Y:=Y_1\\times Y_2\\times\\ldots\\times Y_m,\\text{ and }y=(y_1;y_2;\\ldots;y_m)\\text{ for any }y_i\\in Y_i,\\ i=1,\\ldots,m.",
+      "ref": "Section 5.1.1; PDF lines 12814--12818"
+    },
+    "gap_function": {
+      "math": "Q(\\bar z,z):=[h(\\bar x)+\\mu\\nu(\\bar x)+\\langle\\bar x,Uy\\rangle-J(y)]-[h(x)+\\mu\\nu(x)+\\langle x,U\\bar y\\rangle-J(\\bar y)].",
+      "ref": "Eq. (5.1.14)"
+    }
+  },
+  "assumptions": [
+    {
+      "name": "component_smoothness",
+      "math": "\\|\\nabla f_i(x_1)-\\nabla f_i(x_2)\\|_*\\le L_i\\|x_1-x_2\\|,\\quad \\forall x_1,x_2\\in\\mathbb{R}^n,",
+      "ref": "Eq. (5.1.2)",
+      "parameters": [
+        "L_i\\ge 0",
+        "i=1,\\ldots,m"
+      ]
+    },
+    {
+      "name": "simple_term_convexity",
+      "math": "h\\text{ is a relatively simple convex function,}",
+      "ref": "Section 5.1 before Eq. (5.1.2); PDF lines 12615--12616",
+      "parameters": [
+        "h"
+      ]
+    },
+    {
+      "name": "component_convexity",
+      "math": "f_i:\\mathbb{R}^n\\to\\mathbb{R},\\ i=1,\\ldots,m,\\text{ are smooth convex functions with Lipschitz continuous gradient,}",
+      "ref": "Section 5.1 before Eq. (5.1.2); PDF lines 12615--12617",
+      "parameters": [
+        "f_i",
+        "i=1,\\ldots,m"
+      ]
+    },
+    {
+      "name": "nu_strong_convexity",
+      "math": "\\langle\\nu'(x_1)-\\nu'(x_2),x_1-x_2\\rangle\\ge \\frac{1}{2}\\|x_1-x_2\\|^2,\\quad \\forall x_1,x_2\\in X,",
+      "ref": "Eq. (5.1.3)",
+      "parameters": [
+        "\\nu:X\\to\\mathbb{R}",
+        "modulus 1"
+      ]
+    },
+    {
+      "name": "mu_nonnegative",
+      "math": "\\mu\\ge 0\\text{ is a given constant.}",
+      "ref": "Section 5.1 after Eq. (5.1.3); PDF lines 12621--12622",
+      "parameters": [
+        "\\mu"
+      ]
+    },
+    {
+      "name": "average_smoothness",
+      "math": "\\|\\nabla f(x_1)-\\nabla f(x_2)\\|_*\\le L_f\\|x_1-x_2\\|\\le L\\|x_1-x_2\\|,\\quad \\forall x_1,x_2\\in\\mathbb{R}^n.",
+      "ref": "Eq. (5.1.4)",
+      "parameters": [
+        "f(x)\\equiv \\frac{1}{m}\\sum_{i=1}^m f_i(x)",
+        "L\\equiv \\frac{1}{m}\\sum_{i=1}^m L_i",
+        "L_f\\ge 0"
+      ]
+    },
+    {
+      "name": "easy_primal_subproblem",
+      "math": "\\operatorname*{argmin}_{x\\in X}\\langle g,x\\rangle+h(x)+\\mu\\nu(x)",
+      "ref": "Eq. (5.1.5)",
+      "parameters": [
+        "g\\in\\mathbb{R}^n",
+        "\\mu\\ge 0"
+      ]
+    },
+    {
+      "name": "primal_bregman_lower_bound",
+      "math": "V(x^0,x)\\ge \\frac{1}{2}\\|x-x^0\\|^2,\\quad \\forall x,x^0\\in X.",
+      "ref": "Eq. (5.1.16)",
+      "parameters": [
+        "V(x^0,x)\\equiv V_\\nu(x^0,x)"
+      ]
+    },
+    {
+      "name": "prox_mapping_with_bregman",
+      "math": "\\operatorname*{argmin}_{x\\in X}\\left\\{\\langle g,x\\rangle+h(x)+\\mu\\nu(x)+\\eta V(x^0,x)\\right\\},",
+      "ref": "Eq. (5.1.17)",
+      "parameters": [
+        "x^0\\in X",
+        "g\\in\\mathbb{R}^n",
+        "\\mu\\ge 0",
+        "\\eta>0"
+      ]
+    },
+    {
+      "name": "dual_bregman_definition",
+      "math": "W_i(y_i^0,y_i):=J_i(y_i)-[J_i(y_i^0)+\\langle J_i'(y_i^0),y_i-y_i^0\\rangle],",
+      "ref": "Eq. (5.1.18)",
+      "parameters": [
+        "J_i:Y_i\\to\\mathbb{R}",
+        "i=1,\\ldots,m"
+      ]
+    },
+    {
+      "name": "dual_conjugate_definition",
+      "math": "\\text{Let }J_i:Y_i\\to\\mathbb{R}\\text{ be the conjugate functions of }f_i/m\\text{ and }Y_i,\\ i=1,\\ldots,m,\\text{ denote the dual spaces where the gradients of }f_i/m\\text{ reside. For the sake of notational convenience, let us denote }J(y):=\\sum_{i=1}^m J_i(y_i),\\ Y:=Y_1\\times Y_2\\times\\ldots\\times Y_m,\\text{ and }y=(y_1;y_2;\\ldots;y_m)\\text{ for any }y_i\\in Y_i,\\ i=1,\\ldots,m.",
+      "ref": "Section 5.1.1; PDF lines 12814--12818",
+      "parameters": [
+        "J_i",
+        "Y_i",
+        "f_i/m",
+        "J",
+        "Y"
+      ]
+    },
+        {
+            "name": "dual_strong_convexity",
+            "math": "J_i,\\ i=1,\\ldots,m,\\text{ are strongly convex with modulus }\\sigma_i=m/L_i\\text{ w.r.t. }\\|\\cdot\\|_*,",
+            "ref": "Section 5.1.1 before Eq. (5.1.18); PDF lines 12875--12876",
+            "parameters": [
+                "\\sigma_i=m/L_i"
+            ]
+        },
+    {
+      "name": "mu_positive",
+      "math": "\\mu>0",
+      "ref": "Section 5.1.3",
+      "parameters": [
+        "\\mu"
+      ]
+    },
+    {
+      "name": "proposition_condition_5_1_46",
+      "math": "\\theta_t[p_i^{-1}(1+\\tau_t)-1]\\le p_i^{-1}\\theta_{t-1}(1+\\tau_{t-1}),\\quad i=1,\\ldots,m;\\ t=2,\\ldots,k,",
+      "ref": "Eq. (5.1.46)",
+      "parameters": [
+        "\\theta_t",
+        "p_i",
+        "\\tau_t"
+      ]
+    },
+    {
+      "name": "proposition_condition_5_1_47",
+      "math": "\\theta_t\\eta_t\\le\\theta_{t-1}(\\mu+\\eta_{t-1}),\\quad t=2,\\ldots,k,",
+      "ref": "Eq. (5.1.47)",
+      "parameters": [
+        "\\theta_t",
+        "\\eta_t",
+        "\\mu"
+      ]
+    },
+    {
+      "name": "proposition_condition_5_1_48",
+      "math": "\\frac{\\eta_k}{4}\\ge\\frac{L_i(1-p_i)^2}{m\\tau_kp_i},\\quad i=1,\\ldots,m,",
+      "ref": "Eq. (5.1.48)",
+      "parameters": [
+        "\\eta_k",
+        "L_i",
+        "p_i",
+        "\\tau_k"
+      ]
+    },
+    {
+      "name": "proposition_condition_5_1_49",
+      "math": "\\frac{\\eta_{t-1}}{2}\\ge\\frac{L_i\\alpha_t}{m\\tau_tp_i}+\\frac{(1-p_j)^2L_j}{m\\tau_{t-1}p_j},\\quad i,j\\in\\{1,\\ldots,m\\};\\ t=2,\\ldots,k,",
+      "ref": "Eq. (5.1.49)",
+      "parameters": [
+        "\\eta_{t-1}",
+        "L_i",
+        "\\alpha_t",
+        "\\tau_t",
+        "p_i"
+      ]
+    },
+    {
+      "name": "proposition_condition_5_1_50",
+      "math": "\\frac{\\eta_k}{2}\\ge\\frac{\\sum_{i=1}^m(p_iL_i)}{m(1+\\tau_k)},",
+      "ref": "Eq. (5.1.50)",
+      "parameters": [
+        "\\eta_k",
+        "p_i",
+        "L_i",
+        "\\tau_k"
+      ]
+    },
+    {
+      "name": "proposition_condition_5_1_51",
+      "math": "\\alpha_t\\theta_t=\\theta_{t-1},\\quad t=2,\\ldots,k,",
+      "ref": "Eq. (5.1.51)",
+      "parameters": [
+        "\\alpha_t",
+        "\\theta_t"
+      ]
+    },
+    {
+      "name": "proposition_theta_nonnegative",
+      "math": "\\theta_t\\ge0,\\quad t=1,\\ldots,k.",
+      "ref": "Proposition 5.1; PDF lines 13294--13295",
+      "parameters": [
+        "\\theta_t"
+      ]
+    },
+    {
+      "name": "constant_parameter_policy",
+      "math": "\\tau_t=\\tau,\\quad \\eta_t=\\eta,\\quad \\text{and}\\quad \\alpha_t=\\alpha,",
+      "ref": "Eq. (5.1.59)",
+      "parameters": [
+        "\\tau",
+        "\\eta",
+        "\\alpha"
+      ]
+    },
+    {
+      "name": "constant_parameter_condition_probability",
+      "math": "(1-\\alpha)(1+\\tau)\\le p_i,\\quad i=1,\\ldots,m,",
+      "ref": "Eq. (5.1.60)",
+      "parameters": [
+        "p_i",
+        "\\alpha",
+        "\\tau"
+      ]
+    },
+    {
+      "name": "constant_parameter_condition_eta",
+      "math": "\\eta\\le \\alpha(\\mu+\\eta),",
+      "ref": "Eq. (5.1.61)",
+      "parameters": [
+        "\\eta",
+        "\\alpha",
+        "\\mu"
+      ]
+    },
+        {
+            "name": "constant_parameter_condition_lipschitz",
+            "math": "\\eta\\tau p_i\\ge 4L_i/m,\\quad i=1,\\ldots,m,",
+            "ref": "Eq. (5.1.62)",
+            "parameters": [
+                "\\eta",
+                "\\tau",
+                "p_i",
+                "L_i"
+            ]
+        },
+        {
+            "name": "alpha_range",
+            "math": "\\alpha\\in(0,1)",
+            "ref": "Theorem 5.1, after Eq. (5.1.62)",
+            "parameters": [
+                "\\alpha"
+            ]
+        },
+        {
+            "name": "sampling_probabilities",
+            "math": "\\operatorname{Prob}\\{i_t=i\\}=p_i,\\quad i=1,\\ldots,m.",
+            "ref": "Algorithm 5.1",
+            "parameters": [
+                "p_i",
+                "i_t"
+            ]
+        },
+        {
+            "name": "theta_policy",
+            "math": "\\theta_t=\\frac{1}{\\alpha^t},\\quad \\forall t=1,\\ldots,k,",
+            "ref": "Eq. (5.1.65)",
+            "parameters": [
+        "\\theta_t",
+        "\\alpha"
+      ]
+    }
+  ],
+  "algorithm_spec": {
+        "ref": "Algorithm 5.1",
+        "initialization": {
+            "math": "x^0=x^{-1}\\in X,\\text{ and the nonnegative parameters }\\{\\tau_t\\},\\{\\eta_t\\},\\text{ and }\\{\\alpha_t\\}\\text{ be given. Set }y_i^0=\\frac{1}{m}\\nabla f_i(x^0),\\quad i=1,\\ldots,m.",
+            "ref": "Algorithm 5.1"
+        },
+    "steps": [
+      {
+        "step": 1,
+        "name": "random_block",
+        "math": "\\operatorname{Prob}\\{i_t=i\\}=p_i,\\quad i=1,\\ldots,m.",
+        "ref": "Algorithm 5.1"
+      },
+      {
+        "step": 2,
+        "name": "primal_prediction",
+        "math": "\\tilde x^t=\\alpha_t(x^{t-1}-x^{t-2})+x^{t-1}.",
+        "ref": "Eq. (5.1.21)"
+      },
+      {
+        "step": 3,
+        "name": "dual_update",
+        "math": "y_i^t=\\begin{cases}\\operatorname*{argmin}_{y_i\\in Y_i}\\{\\langle-\\tilde x^t,y_i\\rangle+J_i(y_i)+\\tau_t W_i(y_i^{t-1},y_i)\\},&i=i_t,\\\\ y_i^{t-1},&i\\ne i_t,\\end{cases}",
+        "ref": "Eq. (5.1.22)"
+      },
+      {
+        "step": 4,
+        "name": "dual_prediction",
+        "math": "\\tilde y_i^t=\\begin{cases}p_i^{-1}(y_i^t-y_i^{t-1})+y_i^{t-1},&i=i_t,\\\\ y_i^{t-1},&i\\ne i_t.\\end{cases}",
+        "ref": "Eq. (5.1.23)"
+      },
+      {
+        "step": 5,
+        "name": "primal_update",
+        "math": "x^t=\\operatorname*{argmin}_{x\\in X}\\left\\{\\left\\langle\\sum_{i=1}^m\\tilde y_i^t,x\\right\\rangle+h(x)+\\mu\\nu(x)+\\eta_tV(x^{t-1},x)\\right\\}.",
+        "ref": "Eq. (5.1.24)"
+      }
+    ],
+    "output": {
+        "math": "\\bar x^k=\\left(\\sum_{t=1}^k\\theta_t\\right)^{-1}\\sum_{t=1}^k(\\theta_t x^t),\\qquad \\theta_t=\\frac{1}{\\alpha^t},\\quad \\forall t=1,\\ldots,k.",
+      "ref": "Eq. (5.1.65)",
+      "type": "weighted_average"
+    },
+    "parameters": [
+      {
+        "name": "candidate_dual_update",
+        "math": "\\hat y_i^t:=\\operatorname*{argmin}_{y_i\\in Y_i}\\{\\langle-\\tilde x^t,y_i\\rangle+J_i(y_i)+\\tau_t W_i(y_i^{t-1},y_i)\\},\\quad i=1,\\ldots,m;\\ t=1,\\ldots,k.",
+        "ref": "Eq. (5.1.25)"
+      },
+      {
+        "name": "dual_prediction_unbiasedness",
+        "math": "\\mathbb{E}_t[\\tilde y_i^t]=\\hat y_i^t.",
+        "ref": "Eq. (5.1.26)"
+      },
+      {
+        "name": "primal_bregman",
+        "math": "V(x^0,x)\\equiv V_\\nu(x^0,x):=\\nu(x)-[\\nu(x^0)+\\langle\\nu'(x^0),x-x^0\\rangle],",
+        "ref": "Eq. (5.1.15)"
+      },
+      {
+        "name": "dual_bregman_sum",
+        "math": "W(\\tilde y,y):=\\sum_{i=1}^m W_i(\\tilde y_i,y_i).",
+        "ref": "Eq. (5.1.20)"
+      }
+    ]
+  },
+  "main_theorem": {
+    "ref": "Theorem 5.1",
+    "source_pdf_lines": [
+      13587,
+      13708
+    ],
+    "statement_math": "\\text{Suppose that }\\{\\tau_t\\},\\{\\eta_t\\},\\text{ and }\\{\\alpha_t\\}\\text{ in the RPDG method are set to }\\tau_t=\\tau,\\eta_t=\\eta,\\text{ and }\\alpha_t=\\alpha\\text{ for any }t\\ge 1\\text{ such that }(1-\\alpha)(1+\\tau)\\le p_i,\\ i=1,\\ldots,m,\\ \\eta\\le\\alpha(\\mu+\\eta),\\ \\eta\\tau p_i\\ge 4L_i/m,\\ i=1,\\ldots,m,\\text{ for some }\\alpha\\in(0,1).\\text{ Then, for any }k\\ge 1,\\ \\mathbb{E}[V(x^k,x^*)]\\le\\left(1+\\frac{L_f\\alpha}{(1-\\alpha)\\eta}\\right)\\alpha^kV(x^0,x^*),\\quad \\mathbb{E}[\\Psi(\\bar x^k)-\\Psi(x^*)]\\le\\alpha^{k/2}\\left(\\alpha^{-1}\\eta+\\frac{3-2\\alpha}{1-\\alpha}L_f+\\frac{2L_f^2\\alpha}{(1-\\alpha)\\eta}\\right)V(x^0,x^*),\\text{ where }\\bar x^k=\\left(\\sum_{t=1}^k\\theta_t\\right)^{-1}\\sum_{t=1}^k(\\theta_t x^t)\\text{ with }\\theta_t=1/\\alpha^t,\\ \\forall t=1,\\ldots,k,\\text{ and }x^*\\text{ denotes the optimal solution of problem (5.1.1), and the expectation is taken w.r.t. }i_1,\\ldots,i_k.",
+    "rate": "Linear in the Bregman distance: O(alpha^k); linear up to square-root exponent for the ergodic primal gap: O(alpha^{k/2}).",
+        "measure": "Expected Bregman distance to x^* and expected primal optimality gap of the weighted average \\bar x^k.",
+        "proof": [
+            {
+                "step": 1,
+                "description": "Verify the Proposition 5.1 hypothesis (5.1.46) under the constant policy: substituting tau_t=tau and theta_t=alpha^{-t} reduces the displayed condition to (1-alpha)(1+tau)<=p_i.",
+                "ref": "Eq. (5.1.46) checked from Eqs. (5.1.59), (5.1.60), (5.1.65)",
+                "source_pdf_lines": [
+                    13280,
+                    13281
+                ],
+                "math": "\\theta_t[p_i^{-1}(1+\\tau_t)-1]\\le p_i^{-1}\\theta_{t-1}(1+\\tau_{t-1}),\\quad i=1,\\ldots,m;\\ t=2,\\ldots,k,",
+                "uses": [
+                    "constant_parameter_policy",
+                    "constant_parameter_condition_probability",
+                    "theta_policy"
+                ],
+                "produces": "Condition (5.1.46) for the invocation of Proposition 5.1."
+            },
+            {
+                "step": 2,
+                "description": "Verify the Proposition 5.1 hypothesis (5.1.47): after substituting eta_t=eta and theta_t=alpha^{-t}, the displayed condition is exactly eta<=alpha(mu+eta).",
+                "ref": "Eq. (5.1.47) checked from Eqs. (5.1.59), (5.1.61), (5.1.65)",
+                "source_pdf_lines": [
+                    13282,
+                    13282
+                ],
+                "math": "\\theta_t\\eta_t\\le\\theta_{t-1}(\\mu+\\eta_{t-1}),\\quad t=2,\\ldots,k,",
+                "uses": [
+                    "constant_parameter_policy",
+                    "constant_parameter_condition_eta",
+                    "theta_policy"
+                ],
+                "produces": "Condition (5.1.47) for the invocation of Proposition 5.1."
+            },
+            {
+                "step": 3,
+                "description": "Verify the Proposition 5.1 hypothesis (5.1.48): substituting eta_k=eta and tau_k=tau, (5.1.62) gives eta/4>=L_i/(m tau p_i), hence the printed condition follows using (1-p_i)^2<=1.",
+                "ref": "Eq. (5.1.48) checked from Eqs. (5.1.59), (5.1.62)",
+                "source_pdf_lines": [
+                    13283,
+                    13284
+                ],
+                "math": "\\frac{\\eta_k}{4}\\ge\\frac{L_i(1-p_i)^2}{m\\tau_kp_i},\\quad i=1,\\ldots,m,",
+                "uses": [
+                    "constant_parameter_policy",
+                    "constant_parameter_condition_lipschitz",
+                    "sampling_probabilities"
+                ],
+                "produces": "Condition (5.1.48) for the invocation of Proposition 5.1."
+            },
+            {
+                "step": 4,
+                "description": "Verify the Proposition 5.1 hypothesis (5.1.49): with eta_{t-1}=eta, tau_t=tau_{t-1}=tau, and alpha_t=alpha, the two summands are bounded by eta/4 and eta/4 using (5.1.62), alpha in (0,1), and (1-p_j)^2<=1.",
+                "ref": "Eq. (5.1.49) checked from Eqs. (5.1.59), (5.1.62)",
+                "source_pdf_lines": [
+                    13285,
+                    13286
+                ],
+                "math": "\\frac{\\eta_{t-1}}{2}\\ge\\frac{L_i\\alpha_t}{m\\tau_tp_i}+\\frac{(1-p_j)^2L_j}{m\\tau_{t-1}p_j},\\quad i,j\\in\\{1,\\ldots,m\\};\\ t=2,\\ldots,k,",
+                "uses": [
+                    "constant_parameter_policy",
+                    "constant_parameter_condition_lipschitz",
+                    "alpha_range",
+                    "sampling_probabilities"
+                ],
+                "produces": "Condition (5.1.49) for the invocation of Proposition 5.1."
+            },
+            {
+                "step": 5,
+                "description": "Verify the Proposition 5.1 hypothesis (5.1.50): after substituting eta_k=eta and tau_k=tau, (5.1.62) and the sampling-probability bounds imply the printed aggregate Lipschitz condition.",
+                "ref": "Eq. (5.1.50) checked from Eqs. (5.1.59), (5.1.62)",
+                "source_pdf_lines": [
+                    13287,
+                    13290
+                ],
+                "math": "\\frac{\\eta_k}{2}\\ge\\frac{\\sum_{i=1}^m(p_iL_i)}{m(1+\\tau_k)},",
+                "uses": [
+                    "constant_parameter_policy",
+                    "constant_parameter_condition_lipschitz",
+                    "sampling_probabilities"
+                ],
+                "produces": "Condition (5.1.50) for the invocation of Proposition 5.1."
+            },
+            {
+                "step": 6,
+                "description": "Verify the Proposition 5.1 hypothesis (5.1.51) directly from theta_t=alpha^{-t} and alpha_t=alpha.",
+                "ref": "Eq. (5.1.51) checked from Eqs. (5.1.59), (5.1.65)",
+                "source_pdf_lines": [
+                    13291,
+                    13291
+                ],
+                "math": "\\alpha_t\\theta_t=\\theta_{t-1},\\quad t=2,\\ldots,k,",
+                "uses": [
+                    "constant_parameter_policy",
+                    "theta_policy"
+                ],
+                "produces": "Condition (5.1.51) for the invocation of Proposition 5.1."
+            },
+            {
+                "step": 7,
+                "description": "Derive the remaining Proposition 5.1 hypothesis theta_t >= 0 from theta_t=alpha^{-t} and alpha in (0,1).",
+                "ref": "Eq. (5.1.65) and Proposition 5.1 hypothesis",
+                "source_pdf_lines": [
+                    13609,
+                    13615
+                ],
+                "math": "\\theta_t=\\frac{1}{\\alpha^t},\\quad \\forall t=1,\\ldots,k,",
+                "uses": [
+                    "theta_policy",
+                    "alpha_range"
+                ],
+                "produces": "Condition theta_t >= 0, t=1,...,k, for invoking Proposition 5.1."
+            },
+            {
+                "step": 8,
+                "description": "Use Q((x^t,\\hat y^t),z^*) >= 0 and apply Proposition 5.1 with x=x^* and y=y^* to isolate the terminal Bregman distance. The coefficient alpha/(1-alpha) comes from (5.1.60) under the constant parameter policy.",
+                "ref": "Proof of Theorem 5.1 before Eq. (5.1.63)",
+                "source_pdf_lines": [
+                    13620,
+                    13629
+                ],
+                "math": "\\mathbb{E}[V(x^k,x^*)]\\le \\frac{1}{\\theta_k(\\mu+\\eta)}\\left[\\theta_1\\eta V(x^0,x^*)+\\frac{\\theta_1\\alpha}{1-\\alpha}W(y^0,y^*)\\right],",
+                "uses": [
+                    "previous_step:1",
+                    "previous_step:2",
+                    "previous_step:3",
+                    "previous_step:4",
+                    "previous_step:5",
+                    "previous_step:6",
+                    "previous_step:7",
+                    "Saddle_gap_nonnegative_at_solution",
+                    "constant_parameter_policy",
+                    "constant_parameter_condition_probability",
+                    "theta_policy",
+                    "Proposition_5_1_weighted_RPDG_bound"
+                ],
+                "produces": "First inequality in the displayed proof of (5.1.63), before applying (5.1.61) and (5.1.33)."
+            },
+            {
+                "step": 9,
+                "description": "Justify the second inequality in the displayed distance bound using eta <= alpha(mu+eta) and Lemma 5.1(a), which bounds W(y^0,y^*) by L_f V(x^0,x^*) for y_i^*=m^{-1}nabla f_i(x^*).",
+                "ref": "Proof of Theorem 5.1 after distance display",
+                "source_pdf_lines": [
+                    13625,
+                    13633
+                ],
+                "math": "\\mathbb{E}[V(x^k,x^*)]\\le \\left(1+\\frac{L_f\\alpha}{(1-\\alpha)\\eta}\\right)\\alpha^kV(x^0,x^*),",
+                "uses": [
+                    "previous_step:8",
+                    "constant_parameter_condition_eta",
+                    "theta_policy",
+                    "Lemma_5_1_dual_diameter_bounds"
+                ],
+                "produces": "Equation (5.1.63)."
+            },
+            {
+                "step": 10,
+                "description": "Define the weighted dual average and the averaged saddle point used to convert the saddle gap into primal suboptimality.",
+                "ref": "Proof of Theorem 5.1, definition before Eq. (5.1.66)",
+                "source_pdf_lines": [
+                    13634,
+                    13638
+                ],
+                "math": "\\bar y^k\\equiv\\left(\\sum_{t=1}^k\\theta_t\\right)^{-1}\\sum_{t=1}^k(\\theta_t\\hat y^t),\\qquad \\bar z^k=(\\bar x^k,\\bar y^k).",
+                "uses": [
+                    "theta_policy"
+        ],
+                "produces": "Definitions of \\bar y^k and \\bar z^k."
+            },
+            {
+                "step": 11,
+                "description": "Apply Lemma 5.2 to (\\bar x^k,\\bar y^k), then use convexity of the squared norm and the lower bound (5.1.16) to replace the squared norm average by a weighted average of V(x^t,x^*).",
+                "ref": "Eq. (5.1.66)",
+                "source_pdf_lines": [
+                    13638,
+                    13648
+                ],
+                "math": "\\mathbb{E}[\\Psi(\\bar x^k)-\\Psi(x^*)]\\le \\mathbb{E}[Q(\\bar z^k,z^*)]+\\frac{L_f}{2}\\left(\\sum_{t=1}^k\\theta_t\\right)^{-1}\\mathbb{E}\\left[\\sum_{t=1}^k\\theta_t\\|x^t-x^*\\|^2\\right]\\le \\mathbb{E}[Q(\\bar z^k,z^*)]+L_f\\left(\\sum_{t=1}^k\\theta_t\\right)^{-1}\\mathbb{E}\\left[\\sum_{t=1}^k\\theta_t V(x^t,x^*)\\right].",
+                "uses": [
+                    "Lemma_5_2_primal_gap_from_saddle_gap",
+                    "primal_bregman_lower_bound",
+                    "previous_step:10"
+                ],
+                "produces": "Equation (5.1.66)."
+            },
+            {
+                "step": 12,
+                "description": "Bound the averaged saddle gap by convexity of Q in its first argument, Proposition 5.1 with x=x^*, y=y^*, nonnegativity of V(x^k,x^*), and theta_t=alpha^{-t}.",
+                "ref": "Proof of Theorem 5.1 after Eq. (5.1.66)",
+                "source_pdf_lines": [
+                    13650,
+                    13659
+                ],
+                "math": "\\mathbb{E}[Q(\\bar z^k,z^*)]\\le \\left(\\sum_{t=1}^k\\theta_t\\right)^{-1}\\sum_{t=1}^k\\theta_t\\mathbb{E}[Q((x^t,\\hat y^t),z^*)]\\le \\alpha^k\\left(\\alpha^{-1}\\eta+\\frac{L_f}{1-\\alpha}\\right)V(x^0,x^*).",
+                "uses": [
+                    "previous_step:1",
+                    "previous_step:2",
+                    "previous_step:3",
+                    "previous_step:4",
+                    "previous_step:5",
+                    "previous_step:6",
+                    "previous_step:7",
+                    "previous_step:10",
+                    "theta_policy",
+                    "Proposition_5_1_weighted_RPDG_bound",
+                    "Lemma_5_1_dual_diameter_bounds"
+        ],
+                "produces": "Saddle-gap contribution for the primal gap proof."
+            },
+            {
+                "step": 13,
+                "description": "Start the weighted Bregman-average bound by substituting theta_t=alpha^{-t} and applying (5.1.63) termwise.",
+                "ref": "Proof of Theorem 5.1, weighted V-average display, first equality",
+                "source_pdf_lines": [
+                    13663,
+                    13677
+                ],
+                "math": "\\left(\\sum_{t=1}^k\\theta_t\\right)^{-1}\\mathbb{E}\\left[\\sum_{t=1}^k\\theta_tV(x^t,x^*)\\right]=\\left(\\sum_{t=1}^k\\alpha^{-t}\\right)^{-1}\\sum_{t=1}^k\\alpha^{-t}\\left(1+\\frac{L_f\\alpha}{(1-\\alpha)\\eta}\\right)\\alpha^tV(x^0,x^*).",
+                "uses": [
+                    "previous_step:9",
+                    "theta_policy"
+                ],
+                "produces": "Weighted Bregman average rewritten with theta_t=alpha^{-t} and the (5.1.63) bound."
+            },
+            {
+                "step": 14,
+                "description": "Bound the finite sum by replacing each unit summand with alpha^t/alpha^{3t/2} and using the closed form for the denominator sum.",
+                "ref": "Proof of Theorem 5.1, weighted V-average display, finite-sum bound",
+                "source_pdf_lines": [
+                    13678,
+                    13685
+                ],
+                "math": "\\le \\frac{1-\\alpha}{\\alpha^{-k}-1}\\sum_{t=1}^k\\frac{\\alpha^t}{\\alpha^{3t/2}}\\left(1+\\frac{L_f\\alpha}{(1-\\alpha)\\eta}\\right)V(x^0,x^*)",
+                "uses": [
+                    "previous_step:13"
+                ],
+                "produces": "Finite geometric-sum upper bound before evaluating the sum."
+            },
+            {
+                "step": 15,
+                "description": "Evaluate the finite geometric sum of alpha^{-t/2}.",
+                "ref": "Proof of Theorem 5.1, weighted V-average display, geometric-sum evaluation",
+                "source_pdf_lines": [
+                    13683,
+                    13687
+                ],
+                "math": "=\\frac{1-\\alpha}{\\alpha^{-k}-1}\\frac{\\alpha^{-k/2}-1}{1-\\alpha^{1/2}}\\left(1+\\frac{L_f\\alpha}{(1-\\alpha)\\eta}\\right)V(x^0,x^*)",
+                "uses": [
+                    "previous_step:14"
+                ],
+                "produces": "Closed form of the finite geometric-sum bound."
+            },
+            {
+                "step": 16,
+                "description": "Algebraically simplify the preceding closed form to the printed ratio involving 1+alpha^{1/2}.",
+                "ref": "Proof of Theorem 5.1, weighted V-average display, ratio simplification",
+                "source_pdf_lines": [
+                    13689,
+                    13694
+                ],
+                "math": "=\\frac{1+\\alpha^{1/2}}{1+\\alpha^{-k/2}}\\left(1+\\frac{L_f\\alpha}{(1-\\alpha)\\eta}\\right)V(x^0,x^*)",
+                "uses": [
+                    "previous_step:15"
+                ],
+                "produces": "Simplified ratio form of the weighted Bregman-average bound."
+            },
+            {
+                "step": 17,
+                "description": "Use alpha in (0,1) to loosen the simplified ratio to the final 2 alpha^{k/2} weighted-average bound.",
+                "ref": "Proof of Theorem 5.1, weighted V-average display, final inequality",
+                "source_pdf_lines": [
+                    13693,
+                    13695
+                ],
+                "math": "\\left(\\sum_{t=1}^k\\theta_t\\right)^{-1}\\mathbb{E}\\left[\\sum_{t=1}^k\\theta_t V(x^t,x^*)\\right]\\le 2\\alpha^{k/2}\\left(1+\\frac{L_f\\alpha}{(1-\\alpha)\\eta}\\right)V(x^0,x^*).",
+                "uses": [
+                    "previous_step:16",
+                    "alpha_range"
+                ],
+                "produces": "Weighted Bregman-average contribution for Eq. (5.1.66)."
+            },
+            {
+                "step": 18,
+                "description": "Insert the saddle-gap bound and the weighted Bregman-average bound into (5.1.66).",
+                "ref": "Proof of Theorem 5.1, final display",
+                "source_pdf_lines": [
+                    13697,
+                    13700
+                ],
+                "math": "\\mathbb{E}[\\Psi(\\bar x^k)-\\Psi(x^*)]\\le \\alpha^k\\left(\\alpha^{-1}\\eta+\\frac{L_f}{1-\\alpha}\\right)V(x^0,x^*)+L_f\\,2\\alpha^{k/2}\\left(1+\\frac{L_f\\alpha}{(1-\\alpha)\\eta}\\right)V(x^0,x^*)",
+                "uses": [
+                    "previous_step:11",
+                    "previous_step:12",
+                    "previous_step:17"
+                ],
+                "produces": "Two-term primal optimality bound before final simplification."
+            },
+            {
+                "step": 19,
+                "description": "Use alpha in (0,1) to dominate the alpha^k term by alpha^{k/2} and simplify coefficients exactly as printed to obtain (5.1.64).",
+                "ref": "Eq. (5.1.64)",
+                "source_pdf_lines": [
+                    13702,
+                    13705
+                ],
+                "math": "\\mathbb{E}[\\Psi(\\bar x^k)-\\Psi(x^*)]\\le \\alpha^{k/2}\\left(\\alpha^{-1}\\eta+\\frac{3-2\\alpha}{1-\\alpha}L_f+\\frac{2L_f^2\\alpha}{(1-\\alpha)\\eta}\\right)V(x^0,x^*).",
+                "uses": [
+                    "previous_step:18",
+                    "alpha_range"
+                ],
+                "produces": "Equation (5.1.64)."
+            }
+        ]
+  },
+  "key_lemmas": [
+    {
+      "name": "Lemma_5_1_dual_diameter_bounds",
+      "ref": "Lemma 5.1",
+      "source_pdf_lines": [
+        13092,
+        13124
+      ],
+      "statement_math": "\\text{Let }x^0\\in X\\text{ be given, and }y_i^0=\\frac{1}{m}\\nabla f_i(x^0),\\ i=1,\\ldots,m.\\text{ Assume that }J_i'(y_i^0)=x^0\\text{ in the definition of }W(y^0,y)\\text{ in (5.1.18). (a) For any }x\\in X\\text{ and }y_i=\\frac{1}{m}\\nabla f_i(x),\\ i=1,\\ldots,m,\\ W(y^0,y)\\le \\frac{L_f}{2}\\|x^0-x\\|^2\\le L_fV(x^0,x).\\text{ (b) If }x^*\\in X\\text{ is an optimal solution of (5.1.1) and }y_i^*=\\frac{1}{m}\\nabla f_i(x^*),\\ i=1,\\ldots,m,\\text{ then }W(y^0,y^*)\\le \\Psi(x^0)-\\Psi(x^*).",
+      "role": "Controls the initial dual Bregman term in Proposition 5.1 by primal quantities in Theorem 5.1.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Expand W(y^0,y) from the definitions of W and J, using J_i'(y_i^0)=x^0 and the conjugacy relation for J_i.",
+          "ref": "Proof of Lemma 5.1, first displayed chain",
+          "source_pdf_lines": [
+            13104,
+            13114
+          ],
+          "math": "W(y^0,y)=J(y)-J(y^0)-\\sum_{i=1}^m\\langle J_i'(y_i^0),y_i-y_i^0\\rangle=f(x^0)-f(x)-\\langle Uy,x^0-x\\rangle\\le \\frac{L_f}{2}\\|x^0-x\\|^2\\le L_fV(x^0,x),",
+          "uses": [
+            "dual_bregman_definition",
+            "dual_conjugate_definition",
+            "average_smoothness",
+            "primal_bregman_lower_bound"
+          ],
+          "produces": "Equation (5.1.33)."
+        },
+        {
+          "step": 2,
+          "description": "For part (b), specialize the expansion to y^* and insert the optimality relation for x^* by adding and subtracting h'(x^*)+mu nu'(x^*).",
+          "ref": "Proof of Lemma 5.1, second displayed chain",
+          "source_pdf_lines": [
+            13116,
+            13123
+          ],
+          "math": "W(y^0,y^*)=f(x^0)-f(x^*)-\\langle Uy^*,x^0-x^*\\rangle=f(x^0)-f(x^*)+\\langle h'(x^*)+\\mu\\nu'(x^*),x^0-x^*\\rangle-\\langle Uy^*+h'(x^*)+\\mu\\nu'(x^*),x^0-x^*\\rangle\\le \\Psi(x^0)-\\Psi(x^*).",
+          "uses": [
+            "previous_step:1",
+            "simple_term_convexity",
+            "nu_strong_convexity",
+            "mu_nonnegative"
+          ],
+          "produces": "Equation (5.1.34)."
+        }
+      ]
+    },
+    {
+      "name": "Lemma_5_2_primal_gap_from_saddle_gap",
+      "ref": "Lemma 5.2",
+      "source_pdf_lines": [
+        13126,
+        13150
+      ],
+      "statement_math": "\\text{Let }(\\bar x,\\bar y)\\in Z\\text{ be a given pair of feasible solutions of (5.1.12), and }z^*=(x^*,y^*)\\text{ be a pair of optimal solutions of (5.1.12). Then, we have }\\Psi(\\bar x)-\\Psi(x^*)\\le Q((\\bar x,\\bar y),z^*)+\\frac{L_f}{2}\\|\\bar x-x^*\\|^2.",
+      "role": "Converts the averaged saddle-point gap obtained from Proposition 5.1 into a primal optimality gap.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Define \\bar y^*=(m^{-1}\\nabla f_1(\\bar x);\\ldots;m^{-1}\\nabla f_m(\\bar x)) and expand Q((\\bar x,\\bar y),z^*) using the definition of Q and the max representation of f(x^*).",
+          "ref": "Proof of Lemma 5.2, first part of displayed chain",
+          "source_pdf_lines": [
+            13131,
+            13141
+          ],
+          "math": "Q((\\bar x,\\bar y),z^*)\\ge [h(\\bar x)+\\mu\\nu(\\bar x)+\\langle\\bar x,U\\bar y^*\\rangle-J(\\bar y^*)]+\\langle\\bar x,U(y^*-\\bar y^*)\\rangle-J(y^*)+J(\\bar y^*)-[h(x^*)+\\mu\\nu(x^*)+\\max_{y\\in Y}\\{\\langle x^*,Uy\\rangle-J(y)\\}]",
+          "uses": [
+            "component_convexity",
+            "average_smoothness"
+          ],
+          "produces": "Lower bound for Q before using conjugacy."
+        },
+        {
+          "step": 2,
+          "description": "Use that J_i are the conjugate functions of f_i to simplify the lower-bound expression from the preceding display; this preserves Q((\\bar x,\\bar y),z^*) as a lower bound, not an equality.",
+          "ref": "Proof of Lemma 5.2, second part of displayed chain",
+          "source_pdf_lines": [
+            13141,
+            13147
+          ],
+          "math": "\\Psi(\\bar x)-\\Psi(x^*)+\\langle\\bar x,U(y^*-\\bar y^*)\\rangle-\\langle x^*,Uy^*\\rangle+f(x^*)+\\langle\\bar x,U\\bar y^*\\rangle-f(\\bar x)=\\Psi(\\bar x)-\\Psi(x^*)+f(x^*)-f(\\bar x)+\\langle\\bar x-x^*,\\nabla f(x^*)\\rangle\\ge \\Psi(\\bar x)-\\Psi(x^*)-\\frac{L_f}{2}\\|\\bar x-x^*\\|^2,",
+          "uses": [
+            "previous_step:1",
+            "dual_conjugate_definition",
+            "component_convexity",
+            "average_smoothness"
+          ],
+          "produces": "Equation (5.1.35) after rearrangement."
+        }
+      ]
+    },
+    {
+      "name": "Saddle_gap_nonnegative_at_solution",
+      "ref": "Proof of Theorem 5.1; PDF lines 13620-13623",
+      "source_pdf_lines": [
+        13620,
+        13623
+      ],
+      "statement_math": "Q((x^t,\\hat y^t),z^*)\\ge0",
+      "role": "Supplies the optimal-saddle-gap nonnegativity used before applying Proposition 5.1 to isolate V(x^k,x^*).",
+      "proof": "cited"
+    },
+    {
+      "name": "Lemma_5_3_generalized_prox_inequality",
+      "ref": "Lemma 5.3",
+      "source_pdf_lines": [
+        13156,
+        13193
+      ],
+      "statement_math": "\\text{Let }U\\text{ be a closed convex set and a point }\\tilde u\\in U\\text{ be given. Also let }w:U\\to\\mathbb{R}\\text{ be a convex function and }W(\\tilde u,u)=w(u)-w(\\tilde u)-\\langle w'(\\tilde u),u-\\tilde u\\rangle\\text{ for some }w'(\\tilde u)\\in\\partial w(\\tilde u).\\text{ Assume that }q(u_1)-q(u_2)-\\langle q'(u_2),u_1-u_2\\rangle\\ge \\mu_0W(u_2,u_1),\\ \\forall u_1,u_2\\in U,\\text{ for some }\\mu_0\\ge0.\\text{ Also assume that }\\mu_0+\\mu_1+\\mu_2\\ge0.\\text{ If }u^*\\in\\operatorname{Argmin}\\{q(u)+\\mu_1w(u)+\\mu_2W(\\tilde u,u):u\\in U\\},\\text{ then for any }u\\in U,\\text{ we have }q(u^*)+\\mu_1w(u^*)+\\mu_2W(\\tilde u,u^*)+(\\mu_0+\\mu_1+\\mu_2)W(u^*,u)\\le q(u)+\\mu_1w(u)+\\mu_2W(\\tilde u,u).",
+      "role": "Supplies the primal and dual one-step inequalities (5.1.43) and (5.1.44).",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Set phi(u):=q(u)+mu_1 w(u)+mu_2 W(tilde u,u) and write the two Bregman identities used to compare phi at u_1 and u_2.",
+          "ref": "Proof of Lemma 5.3, Bregman identities",
+          "source_pdf_lines": [
+            13174,
+            13182
+          ],
+          "math": "W(\\tilde u,u_1)=W(\\tilde u,u_2)+\\langle W'(\\tilde u,u_2),u_1-u_2\\rangle+W(u_2,u_1),\\qquad w(u_1)=w(u_2)+\\langle w'(u_2),u_1-u_2\\rangle+W(u_2,u_1).",
+          "uses": [],
+          "produces": "Bregman three-point identities for W and w."
+        },
+        {
+          "step": 2,
+          "description": "Combine the Bregman identities with the assumed relative strong convexity of q to obtain the displayed lower bound on phi.",
+          "ref": "Eq. (5.1.39)",
+          "source_pdf_lines": [
+            13182,
+            13186
+          ],
+          "math": "\\phi(u_1)-\\phi(u_2)-\\langle\\phi'(u_2),u_1-u_2\\rangle\\ge (\\mu_0+\\mu_1+\\mu_2)W(u_2,u_1)",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "Equation (5.1.39) and convexity of phi when mu_0+mu_1+mu_2 >= 0."
+        },
+        {
+          "step": 3,
+          "description": "Use optimality of u^* for (5.1.38), namely <phi'(u^*),u-u^*> >= 0, and combine it with (5.1.39) at (u_1,u_2)=(u,u^*) to derive the prox inequality.",
+          "ref": "Proof of Lemma 5.3, final display",
+          "source_pdf_lines": [
+            13187,
+            13193
+          ],
+          "math": "\\phi(u)-\\phi(u^*)\\ge (\\mu_0+\\mu_1+\\mu_2)W(u^*,u),",
+          "uses": [
+            "previous_step:2"
+          ],
+          "produces": "The conclusion of Lemma 5.3 after expanding phi."
+        }
+      ]
+    },
+    {
+      "name": "Lemma_5_4_conditional_expectation_identities",
+      "ref": "Lemma 5.4",
+      "source_pdf_lines": [
+        13196,
+        13210
+      ],
+      "statement_math": "\\text{Let }y^t,\\tilde y^t,\\text{ and }\\hat y^t\\text{ be defined in (5.1.22), (5.1.23), and (5.1.25), respectively. Then we have, for any }i=1,\\ldots,m\\text{ and }t=1,\\ldots,k,\\quad \\mathbb{E}_t[W_i(y_i^{t-1},y_i^t)]=p_iW_i(y_i^{t-1},\\hat y_i^t),\\quad \\mathbb{E}_t[W_i(y_i^t,y_i)]=p_iW_i(\\hat y_i^t,y_i)+(1-p_i)W_i(y_i^{t-1},y_i),\\text{ for any }y\\in Y.",
+      "role": "Turns the randomized dual update terms into deterministic weighted Bregman terms in the proof of Lemma 5.5.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "For (5.1.40), condition on the event i_t=i: y_i^t=\\hat y_i^t with conditional probability p_i and y_i^t=y_i^{t-1} with conditional probability 1-p_i; W_i(y_i^{t-1},y_i^{t-1})=0.",
+          "ref": "Proof of Lemma 5.4",
+          "source_pdf_lines": [
+            13208,
+            13210
+          ],
+          "uses": [],
+          "produces": "Equation (5.1.40)."
+        },
+        {
+          "step": 2,
+          "description": "The same conditioning on i_t=i versus i_t\\ne i gives the weighted identity for E_t[W_i(y_i^t,y_i)].",
+          "ref": "Proof of Lemma 5.4",
+          "source_pdf_lines": [
+            13209,
+            13210
+          ],
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "Equation (5.1.41)."
+        }
+      ]
+    },
+    {
+      "name": "Lemma_5_5_one_step_RPDG_recursion",
+      "ref": "Lemma 5.5",
+      "source_pdf_lines": [
+        13213,
+        13275
+      ],
+      "statement_math": "\\mathbb{E}[Q((x^t,\\hat y^t),z)]\\le \\mathbb{E}[\\eta_tV(x^{t-1},x)-(\\mu+\\eta_t)V(x^t,x)-\\eta_tV(x^{t-1},x^t)]+\\sum_{i=1}^m\\mathbb{E}[(p_i^{-1}(1+\\tau_t)-1)W_i(y_i^{t-1},y_i)-p_i^{-1}(1+\\tau_t)W_i(y_i^t,y_i)]+\\mathbb{E}[\\langle\\tilde x^t-x^t,U(\\tilde y^t-y)\\rangle-\\tau_t p_{i_t}^{-1}W_{i_t}(y_{i_t}^{t-1},y_{i_t}^t)],\\quad \\forall z\\in Z.",
+      "role": "The per-iteration recursion telescoped in Proposition 5.1.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Apply Lemma 5.3 to the primal update (5.1.24) to get the primal descent inequality.",
+          "ref": "Eq. (5.1.43)",
+          "source_pdf_lines": [
+            13227,
+            13231
+          ],
+          "math": "\\langle x^t-x,U\\tilde y^t\\rangle+h(x^t)+\\mu\\nu(x^t)-h(x)-\\mu\\nu(x)\\le \\eta_tV(x^{t-1},x)-(\\mu+\\eta_t)V(x^t,x)-\\eta_tV(x^{t-1},x^t).",
+          "uses": [
+            "Lemma_5_3_generalized_prox_inequality",
+            "prox_mapping_with_bregman"
+          ],
+          "produces": "Equation (5.1.43)."
+        },
+        {
+          "step": 2,
+          "description": "Apply Lemma 5.3 to the full candidate dual prox update (5.1.25), for each block i.",
+          "ref": "Proof of Lemma 5.5 before Eq. (5.1.44)",
+          "source_pdf_lines": [
+            13233,
+            13239
+          ],
+          "math": "\\langle-\\tilde x^t,\\hat y_i^t-y_i\\rangle+J_i(\\hat y_i^t)-J_i(y_i)\\le \\tau_tW_i(y_i^{t-1},y_i)-(1+\\tau_t)W_i(\\hat y_i^t,y_i)-\\tau_tW_i(y_i^{t-1},\\hat y_i^t).",
+          "uses": [
+            "Lemma_5_3_generalized_prox_inequality",
+            "dual_bregman_definition"
+          ],
+          "produces": "Blockwise dual prox inequality."
+        },
+        {
+          "step": 3,
+          "description": "Sum the blockwise dual inequalities over i=1,...,m.",
+          "ref": "Eq. (5.1.44)",
+          "source_pdf_lines": [
+            13240,
+            13247
+          ],
+          "math": "\\langle-\\tilde x^t,U(\\hat y^t-y)\\rangle+J(\\hat y^t)-J(y)\\le \\sum_{i=1}^m[\\tau_tW_i(y_i^{t-1},y_i)-(1+\\tau_t)W_i(\\hat y_i^t,y_i)-\\tau_tW_i(y_i^{t-1},\\hat y_i^t)].",
+          "uses": [
+            "previous_step:2"
+          ],
+          "produces": "Equation (5.1.44)."
+        },
+        {
+          "step": 4,
+          "description": "Combine the primal inequality, the summed dual inequality, and the definition of Q. The mismatch terms involving \\tilde y^t and \\hat y^t are kept explicitly.",
+          "ref": "Eq. (5.1.45)",
+          "source_pdf_lines": [
+            13248,
+            13258
+          ],
+          "math": "Q((x^t,\\hat y^t),z)\\le \\eta_tV(x^{t-1},x)-(\\mu+\\eta_t)V(x^t,x)-\\eta_tV(x^{t-1},x^t)+\\sum_{i=1}^m[\\tau_tW_i(y_i^{t-1},y_i)-(1+\\tau_t)W_i(\\hat y_i^t,y_i)-\\tau_tW_i(y_i^{t-1},\\hat y_i^t)]+\\langle\\tilde x^t,U(\\hat y^t-y)\\rangle-\\langle x^t,U(\\tilde y^t-y)\\rangle+\\langle x,U(\\tilde y^t-\\hat y^t)\\rangle.",
+          "uses": [
+            "previous_step:1",
+            "previous_step:3"
+          ],
+          "produces": "Equation (5.1.45)."
+        },
+        {
+          "step": 5,
+          "description": "Record the expectation identities used to convert the hat-y terms and eliminate the final x-coupling term.",
+          "ref": "Observations after Eq. (5.1.45)",
+          "source_pdf_lines": [
+            13259,
+            13272
+          ],
+          "math": "W_i(y_i^{t-1},y_i^t)=0,\\ \\forall i\\ne i_t,\\quad \\mathbb{E}[\\langle x,U(\\tilde y^t-\\hat y^t)\\rangle]=0,\\quad \\mathbb{E}[\\langle\\tilde x^t,U\\hat y^t\\rangle]=\\mathbb{E}[\\langle\\tilde x^t,U\\tilde y^t\\rangle],\\quad \\mathbb{E}[W_i(y_i^{t-1},\\hat y_i^t)]=\\mathbb{E}[p_i^{-1}W_i(y_i^{t-1},y_i^t)],\\quad \\mathbb{E}[W_i(\\hat y_i^t,y_i)]=p_i^{-1}\\mathbb{E}[W_i(y_i^t,y_i)]-(p_i^{-1}-1)\\mathbb{E}[W_i(y_i^{t-1},y_i)].",
+          "uses": [
+            "dual_update",
+            "dual_prediction",
+            "dual_prediction_unbiasedness",
+            "Lemma_5_4_conditional_expectation_identities"
+          ],
+          "produces": "Expectation substitutions for Eq. (5.1.45)."
+        },
+        {
+          "step": 6,
+          "description": "Take expectation in (5.1.45) and substitute the observations to obtain the one-step recursion.",
+          "ref": "Conclusion of Lemma 5.5, Eq. (5.1.42)",
+          "source_pdf_lines": [
+            13272,
+            13275
+          ],
+          "uses": [
+            "previous_step:4",
+            "previous_step:5"
+          ],
+          "produces": "Equation (5.1.42)."
+        }
+      ]
+    },
+    {
+      "name": "Young_Cauchy_bound_5_1_58",
+      "ref": "Eq. (5.1.58)",
+      "source_pdf_lines": [
+        13545,
+        13548
+      ],
+      "statement_math": "b\\langle u,v\\rangle+a\\|v\\|^2/2\\ge -b^2\\|u\\|^2/(2a),\\quad \\forall a>0.",
+      "role": "Controls coupling inner-products in the proof of Proposition 5.1.",
+      "proof": "cited"
+    },
+    {
+      "name": "Proposition_5_1_weighted_RPDG_bound",
+      "ref": "Proposition 5.1",
+      "source_pdf_lines": [
+        13278,
+        13582
+      ],
+      "statement_math": "\\text{Suppose that }\\{\\tau_t\\},\\{\\eta_t\\},\\text{ and }\\{\\alpha_t\\}\\text{ in the RPDG method satisfy }\\theta_t[p_i^{-1}(1+\\tau_t)-1]\\le p_i^{-1}\\theta_{t-1}(1+\\tau_{t-1}),\\ i=1,\\ldots,m;\\ t=2,\\ldots,k,\\quad \\theta_t\\eta_t\\le\\theta_{t-1}(\\mu+\\eta_{t-1}),\\ t=2,\\ldots,k,\\quad \\frac{\\eta_k}{4}\\ge\\frac{L_i(1-p_i)^2}{m\\tau_kp_i},\\ i=1,\\ldots,m,\\quad \\frac{\\eta_{t-1}}{2}\\ge\\frac{L_i\\alpha_t}{m\\tau_t p_i}+\\frac{(1-p_j)^2L_j}{m\\tau_{t-1}p_j},\\ i,j\\in\\{1,\\ldots,m\\};\\ t=2,\\ldots,k,\\quad \\frac{\\eta_k}{2}\\ge\\frac{\\sum_{i=1}^m(p_iL_i)}{m(1+\\tau_k)},\\quad \\alpha_t\\theta_t=\\theta_{t-1},\\ t=2,\\ldots,k,\\text{ for some }\\theta_t\\ge0,\\ t=1,\\ldots,k.\\text{ Then, for any }k\\ge1\\text{ and any given }z\\in Z,\\ \\sum_{t=1}^k\\theta_t\\mathbb{E}[Q((x^t,\\hat y^t),z)]\\le \\eta_1\\theta_1V(x^0,x)-(\\mu+\\eta_k)\\theta_k\\mathbb{E}[V(x^k,x)]+\\sum_{i=1}^m\\theta_1[p_i^{-1}(1+\\tau_1)-1]W_i(y_i^0,y_i).",
+      "role": "Weighted telescoping result used directly in Theorem 5.1.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Multiply the one-step recursion (5.1.42) by theta_t and sum over t=1,...,k.",
+          "ref": "Proof of Proposition 5.1, first displayed inequality",
+          "source_pdf_lines": [
+            13304,
+            13322
+          ],
+          "math": "\\mathbb{E}\\left[\\sum_{t=1}^k\\theta_tQ((x^t,\\hat y^t),z)\\right]\\le \\mathbb{E}\\left[\\sum_{t=1}^k\\theta_t(\\eta_tV(x^{t-1},x)-(\\mu+\\eta_t)V(x^t,x)-\\eta_tV(x^{t-1},x^t))\\right]+\\sum_{i=1}^m\\mathbb{E}\\left[\\sum_{t=1}^k\\theta_t((p_i^{-1}(1+\\tau_t)-1)W_i(y_i^{t-1},y_i)-p_i^{-1}(1+\\tau_t)W_i(y_i^t,y_i))\\right]+\\mathbb{E}\\left[\\sum_{t=1}^k\\theta_t(\\langle\\tilde x^t-x^t,U(\\tilde y^t-y)\\rangle-\\tau_tp_{i_t}^{-1}W_{i_t}(y_{i_t}^{t-1},y_{i_t}^t))\\right],",
+          "uses": [
+            "Lemma_5_5_one_step_RPDG_recursion",
+            "proposition_theta_nonnegative"
+          ],
+          "produces": "Summed weighted recursion before telescoping."
+        },
+        {
+          "step": 2,
+          "description": "Use the coefficient conditions (5.1.47) and (5.1.46) to telescope the primal and dual Bregman terms, and introduce Delta_t as the remaining coupling/error term.",
+          "ref": "Eq. (5.1.53)",
+          "source_pdf_lines": [
+            13323,
+            13339
+          ],
+          "math": "\\mathbb{E}\\left[\\sum_{t=1}^k\\theta_tQ((x^t,\\hat y^t),z)\\right]\\le \\eta_1\\theta_1V(x^0,x)-(\\mu+\\eta_k)\\theta_k\\mathbb{E}[V(x^k,x)]+\\sum_{i=1}^m\\mathbb{E}\\left[\\theta_1(p_i^{-1}(1+\\tau_1)-1)W_i(y_i^0,y_i)-p_i^{-1}\\theta_k(1+\\tau_k)W_i(y_i^k,y_i)\\right]-\\mathbb{E}\\left[\\sum_{t=1}^k\\theta_t\\Delta_t\\right],",
+          "uses": [
+            "previous_step:1",
+            "proposition_condition_5_1_46",
+            "proposition_condition_5_1_47"
+          ],
+          "produces": "Equation (5.1.53)."
+        },
+        {
+          "step": 3,
+          "description": "Define the residual Delta_t exactly as in the proof.",
+          "ref": "Eq. (5.1.54)",
+          "source_pdf_lines": [
+            13340,
+            13345
+          ],
+          "math": "\\Delta_t:=\\eta_tV(x^{t-1},x^t)-\\langle\\tilde x^t-x^t,U(\\tilde y^t-y)\\rangle+\\tau_tp_{i_t}^{-1}W_{i_t}(y_{i_t}^{t-1},y_{i_t}^t).",
+          "uses": [
+            "previous_step:2"
+          ],
+          "produces": "Definition of Delta_t."
+        },
+        {
+          "step": 4,
+          "description": "Expand the coupling inner product using the primal extrapolation formula (5.1.21), separating the y-tilde increment.",
+          "ref": "Eq. (5.1.55), first three lines",
+          "source_pdf_lines": [
+            13346,
+            13361
+          ],
+          "math": "\\langle\\tilde x^t-x^t,U(\\tilde y^t-y)\\rangle=\\langle x^{t-1}-x^t,U(\\tilde y^t-y)\\rangle-\\alpha_t\\langle x^{t-2}-x^{t-1},U(\\tilde y^{t-1}-y)\\rangle-\\alpha_t\\langle x^{t-2}-x^{t-1},U(\\tilde y^t-\\tilde y^{t-1})\\rangle.",
+          "uses": [
+            "previous_step:3",
+            "primal_prediction"
+          ],
+          "produces": "First expansion of the coupling term."
+        },
+        {
+          "step": 5,
+          "description": "Use the definitions of y^t and \\tilde y^t in (5.1.22)--(5.1.23) to rewrite U(\\tilde y^t-\\tilde y^{t-1}) and finish (5.1.55).",
+          "ref": "Eq. (5.1.55) and following observation",
+          "source_pdf_lines": [
+            13363,
+            13391
+          ],
+          "math": "U(\\tilde y^t-\\tilde y^{t-1})=p_{i_t}^{-1}(y_{i_t}^t-y_{i_t}^{t-1})+(p_{i_{t-1}}^{-1}-1)(y_{i_{t-1}}^{t-2}-y_{i_{t-1}}^{t-1}).",
+          "uses": [
+            "previous_step:4",
+            "dual_update",
+            "dual_prediction"
+          ],
+          "produces": "Last identity used in Eq. (5.1.55)."
+        },
+        {
+          "step": 6,
+          "description": "Substitute the coupling expansion into the definition of Delta_t and sum theta_t Delta_t.",
+          "ref": "Eq. (5.1.56)",
+          "source_pdf_lines": [
+            13394,
+            13416
+          ],
+          "math": "\\sum_{t=1}^k\\theta_t\\Delta_t=\\sum_{t=1}^k\\theta_t\\big[\\eta_tV(x^{t-1},x^t)-\\langle x^{t-1}-x^t,U(\\tilde y^t-y)\\rangle+\\alpha_t\\langle x^{t-2}-x^{t-1},U(\\tilde y^{t-1}-y)\\rangle+\\alpha_tp_{i_t}^{-1}\\langle x^{t-2}-x^{t-1},y_{i_t}^t-y_{i_t}^{t-1}\\rangle+\\alpha_t(p_{i_{t-1}}^{-1}-1)\\langle x^{t-2}-x^{t-1},y_{i_{t-1}}^{t-2}-y_{i_{t-1}}^{t-1}\\rangle+p_{i_t}^{-1}\\tau_tW_{i_t}(y_{i_t}^{t-1},y_{i_t}^t)\\big].",
+          "uses": [
+            "previous_step:3",
+            "previous_step:4",
+            "previous_step:5"
+          ],
+          "produces": "Equation (5.1.56)."
+        },
+        {
+          "step": 7,
+          "description": "Use alpha_t theta_t=theta_{t-1} and x^{-1}=x^0 to telescope the first two coupling sums, leaving only the terminal term at k.",
+          "ref": "Proof after Eq. (5.1.56), telescoping display",
+          "source_pdf_lines": [
+            13418,
+            13429
+          ],
+          "math": "\\sum_{t=1}^k\\theta_t[\\langle x^{t-1}-x^t,U(\\tilde y^t-y)\\rangle-\\alpha_t\\langle x^{t-2}-x^{t-1},U(\\tilde y^{t-1}-y)\\rangle]=\\theta_k\\langle x^{k-1}-x^k,U(y^k-y)\\rangle+\\theta_k(p_{i_k}^{-1}-1)\\langle x^{k-1}-x^k,y_{i_k}^k-y_{i_k}^{k-1}\\rangle.",
+          "uses": [
+            "previous_step:6",
+            "proposition_condition_5_1_51"
+          ],
+          "produces": "Terminal coupling decomposition."
+        },
+        {
+          "step": 8,
+          "description": "Insert strong convexity lower bounds for V and W_i before regrouping terms.",
+          "ref": "Proof after telescoping display",
+          "source_pdf_lines": [
+            13432,
+            13436
+          ],
+          "math": "V(x^{t-1},x^t)\\ge \\frac{1}{2}\\|x^{t-1}-x^t\\|^2\\quad\\text{and}\\quad W_{i_t}(y_{i_t}^{t-1},y_{i_t}^t)\\ge \\frac{m}{2L_{i_t}}\\|y_{i_t}^{t-1}-y_{i_t}^t\\|_*^2.",
+                    "uses": [
+                        "primal_bregman_lower_bound",
+                        "dual_strong_convexity",
+                        "previous_step:7"
+                    ],
+                    "produces": "Quadratic lower bounds for the Delta_t sum."
+        },
+        {
+          "step": 9,
+          "description": "Use the previous three relations in (5.1.56): substitute the terminal coupling telescope and the strong-convexity lower bounds into the Delta_t sum, leaving the two historical inner-product terms and the terminal sampled-block inner product explicit.",
+          "ref": "Proof after Eq. (5.1.56), first lower-bound display",
+          "source_pdf_lines": [
+            13430,
+            13463
+          ],
+          "math": "\\sum_{t=1}^k\\theta_t\\Delta_t\\ge\\sum_{t=1}^k\\theta_t\\left[\\frac{\\eta_t}{2}\\|x^{t-1}-x^t\\|^2+\\alpha_t p_{i_t}^{-1}\\langle x^{t-2}-x^{t-1},y_{i_t}^t-y_{i_t}^{t-1}\\rangle+\\alpha_t(p_{i_{t-1}}^{-1}-1)\\langle x^{t-2}-x^{t-1},y_{i_{t-1}}^{t-2}-y_{i_{t-1}}^{t-1}\\rangle+\\frac{m\\tau_t}{2L_{i_t}p_{i_t}}\\|y_{i_t}^{t-1}-y_{i_t}^t\\|_*^2\\right]-\\theta_k\\langle x^{k-1}-x^k,U(y^k-y)\\rangle-\\theta_k(p_{i_k}^{-1}-1)\\langle x^{k-1}-x^k,y_{i_k}^k-y_{i_k}^{k-1}\\rangle.",
+          "uses": [
+            "previous_step:6",
+            "previous_step:7",
+            "previous_step:8"
+          ],
+          "produces": "Lower bound for the Delta_t sum before regrouping."
+        },
+        {
+          "step": 10,
+          "description": "Regroup the terminal and historical terms, split off eta_k/4 at the terminal primal norm, and use x^{-1}=x^0 to align the historical primal norms.",
+          "ref": "Proof before Eq. (5.1.57), regrouping display",
+          "source_pdf_lines": [
+            13465,
+            13507
+          ],
+          "math": "\\sum_{t=1}^k\\theta_t\\Delta_t\\ge\\theta_k\\left[\\frac{\\eta_k}{4}\\|x^{k-1}-x^k\\|^2-\\langle x^{k-1}-x^k,U(y^k-y)\\rangle\\right]+\\theta_k\\left[\\frac{\\eta_k}{4}\\|x^{k-1}-x^k\\|^2-(p_{i_k}^{-1}-1)\\langle x^{k-1}-x^k,y_{i_k}^k-y_{i_k}^{k-1}\\rangle+\\frac{m\\tau_k}{4L_{i_k}p_{i_k}}\\|y_{i_k}^{k-1}-y_{i_k}^k\\|_*^2\\right]+\\sum_{t=2}^k\\theta_t\\left[\\frac{\\alpha_t}{p_{i_t}}\\langle x^{t-2}-x^{t-1},y_{i_t}^t-y_{i_t}^{t-1}\\rangle+\\frac{m\\tau_t}{4L_{i_t}p_{i_t}}\\|y_{i_t}^{t-1}-y_{i_t}^t\\|_*^2\\right]+\\sum_{t=2}^k\\left[\\alpha_t\\theta_t(p_{i_{t-1}}^{-1}-1)\\langle x^{t-2}-x^{t-1},y_{i_{t-1}}^{t-2}-y_{i_{t-1}}^{t-1}\\rangle+\\frac{m\\tau_{t-1}\\theta_{t-1}}{4L_{i_{t-1}}p_{i_{t-1}}}\\|y_{i_{t-1}}^{t-2}-y_{i_{t-1}}^{t-1}\\|_*^2\\right]+\\sum_{t=2}^k\\frac{\\theta_{t-1}\\eta_{t-1}}{2}\\|x^{t-2}-x^{t-1}\\|^2.",
+          "uses": [
+            "previous_step:9"
+          ],
+          "produces": "Regrouped Delta_t lower bound before applying the Cauchy/Young bound."
+        },
+        {
+          "step": 11,
+          "description": "Apply the printed Young/Cauchy inequality (5.1.58) to the terminal sampled-block inner product and to both historical inner-product blocks, producing coefficient corrections in front of the primal norms.",
+          "ref": "Proof before Eq. (5.1.57), second inequality",
+          "source_pdf_lines": [
+            13510,
+            13522
+          ],
+          "math": "\\sum_{t=1}^k\\theta_t\\Delta_t\\ge\\theta_k\\left[\\frac{\\eta_k}{4}\\|x^{k-1}-x^k\\|^2-\\langle x^{k-1}-x^k,U(y^k-y)\\rangle\\right]+\\theta_k\\left(\\frac{\\eta_k}{4}-\\frac{L_{i_k}(1-p_{i_k})^2}{m\\tau_kp_{i_k}}\\right)\\|x^{k-1}-x^k\\|^2+\\sum_{t=2}^k\\left(\\frac{\\theta_{t-1}\\eta_{t-1}}{2}-\\frac{L_{i_t}\\alpha_t^2\\theta_t}{m\\tau_tp_{i_t}}-\\frac{\\alpha_t^2\\theta_t^2(1-p_{i_{t-1}})^2L_{i_{t-1}}}{m\\tau_{t-1}\\theta_{t-1}p_{i_{t-1}}}\\right)\\|x^{t-2}-x^{t-1}\\|^2.",
+          "uses": [
+            "previous_step:10",
+            "Young_Cauchy_bound_5_1_58"
+          ],
+          "produces": "Delta_t lower bound with Young/Cauchy coefficient corrections."
+        },
+        {
+          "step": 12,
+          "description": "Use alpha_t theta_t=theta_{t-1} from (5.1.51) to simplify the historical coefficient corrections.",
+          "ref": "Proof before Eq. (5.1.57), equality after the second inequality",
+          "source_pdf_lines": [
+            13524,
+            13535
+          ],
+          "math": "\\sum_{t=1}^k\\theta_t\\Delta_t\\ge\\theta_k\\left[\\frac{\\eta_k}{4}\\|x^{k-1}-x^k\\|^2-\\langle x^{k-1}-x^k,U(y^k-y)\\rangle\\right]+\\theta_k\\left(\\frac{\\eta_k}{4}-\\frac{L_{i_k}(1-p_{i_k})^2}{m\\tau_kp_{i_k}}\\right)\\|x^{k-1}-x^k\\|^2+\\sum_{t=2}^k\\theta_{t-1}\\left(\\frac{\\eta_{t-1}}{2}-\\frac{L_{i_t}\\alpha_t}{m\\tau_tp_{i_t}}-\\frac{(1-p_{i_{t-1}})^2L_{i_{t-1}}}{m\\tau_{t-1}p_{i_{t-1}}}\\right)\\|x^{t-2}-x^{t-1}\\|^2.",
+          "uses": [
+            "previous_step:11",
+            "proposition_condition_5_1_51"
+          ],
+          "produces": "Regrouped Delta_t lower bound before applying (5.1.48)--(5.1.49)."
+        },
+        {
+          "step": 13,
+          "description": "Apply the coefficient conditions (5.1.48) and (5.1.49) to drop the nonnegative quadratic blocks, producing the printed lower bound (5.1.57).",
+          "ref": "Eq. (5.1.57)",
+          "source_pdf_lines": [
+            13537,
+            13550
+          ],
+          "math": "\\sum_{t=1}^k\\theta_t\\Delta_t\\ge\\theta_k\\left[\\frac{\\eta_k}{4}\\|x^{k-1}-x^k\\|^2-\\langle x^{k-1}-x^k,U(y^k-y)\\rangle\\right].",
+          "uses": [
+            "previous_step:12",
+            "proposition_condition_5_1_48",
+            "proposition_condition_5_1_49"
+          ],
+          "produces": "Equation (5.1.57)."
+        },
+        {
+          "step": 14,
+          "description": "Plug (5.1.57) into (5.1.53), keeping the terminal residual bracket that still contains W_i(y_i^k,y_i).",
+          "ref": "Proof after Eq. (5.1.57)",
+          "source_pdf_lines": [
+            13551,
+            13559
+          ],
+          "math": "\\sum_{t=1}^k\\theta_t\\mathbb{E}[Q((x^t,\\hat y^t),z)]\\le \\theta_1\\eta_1V(x^0,x)-\\theta_k(\\mu+\\eta_k)\\mathbb{E}[V(x^k,x)]+\\sum_{i=1}^m\\theta_1[p_i^{-1}(1+\\tau_1)-1]W_i(y_i^0,y_i)-\\theta_k\\mathbb{E}\\left[\\frac{\\eta_k}{4}\\|x^{k-1}-x^k\\|^2-\\langle x^{k-1}-x^k,U(y^k-y)\\rangle+\\sum_{i=1}^mp_i^{-1}(1+\\tau_k)W_i(y_i^k,y_i)\\right].",
+          "uses": [
+            "previous_step:2",
+            "previous_step:13"
+          ],
+          "produces": "Proposition bound with a terminal residual."
+        },
+        {
+          "step": 15,
+          "description": "Use the dual strong-convexity lower bound for W_i and expand U(y^k-y) as the sum of dual blocks, obtaining the printed first lower bound on the terminal residual.",
+          "ref": "Proof after terminal residual, first inequality",
+          "source_pdf_lines": [
+            13562,
+            13572
+          ],
+          "math": "\\frac{\\eta_k}{4}\\|x^{k-1}-x^k\\|^2-\\langle x^{k-1}-x^k,U(y^k-y)\\rangle+\\sum_{i=1}^mp_i^{-1}(1+\\tau_k)W_i(y_i^k,y_i)\\ge \\frac{\\eta_k}{4}\\|x^{k-1}-x^k\\|^2+\\sum_{i=1}^m\\left[-\\langle x^{k-1}-x^k,y_i^k-y_i\\rangle+\\frac{m(1+\\tau_k)}{2L_ip_i}\\|y_i^k-y_i\\|_*^2\\right].",
+          "uses": [
+            "previous_step:14",
+            "dual_strong_convexity"
+          ],
+          "produces": "Terminal residual lower bound with the W_i terms replaced by quadratic dual-block norms."
+        },
+        {
+          "step": 16,
+          "description": "Apply the printed Young/Cauchy inequality (5.1.58) to each dual-block summand in the terminal residual lower bound.",
+          "ref": "Proof after terminal residual, second inequality",
+          "source_pdf_lines": [
+            13568,
+            13576
+          ],
+          "math": "\\frac{\\eta_k}{4}\\|x^{k-1}-x^k\\|^2+\\sum_{i=1}^m\\left[-\\langle x^{k-1}-x^k,y_i^k-y_i\\rangle+\\frac{m(1+\\tau_k)}{2L_ip_i}\\|y_i^k-y_i\\|_*^2\\right]\\ge \\left[\\frac{\\eta_k}{4}-\\frac{\\sum_{i=1}^m(p_iL_i)}{2m(1+\\tau_k)}\\right]\\|x^{k-1}-x^k\\|^2.",
+          "uses": [
+            "previous_step:15",
+            "Young_Cauchy_bound_5_1_58"
+          ],
+          "produces": "Terminal residual lower bound reduced to a primal quadratic coefficient."
+        },
+        {
+          "step": 17,
+          "description": "Apply (5.1.50) to prove the terminal residual bracket is nonnegative.",
+          "ref": "Proof after terminal residual, final inequality",
+          "source_pdf_lines": [
+            13573,
+            13576
+          ],
+          "math": "\\left[\\frac{\\eta_k}{4}-\\frac{\\sum_{i=1}^m(p_iL_i)}{2m(1+\\tau_k)}\\right]\\|x^{k-1}-x^k\\|^2\\ge 0.",
+          "uses": [
+            "previous_step:16",
+            "proposition_condition_5_1_50"
+          ],
+          "produces": "Nonnegativity of the terminal residual."
+        },
+        {
+          "step": 18,
+          "description": "Drop the nonnegative terminal residual from the previous step to obtain the stated weighted RPDG bound.",
+          "ref": "Eq. (5.1.52)",
+          "source_pdf_lines": [
+            13579,
+            13582
+          ],
+          "uses": [
+            "previous_step:14",
+            "previous_step:17"
+          ],
+          "produces": "Equation (5.1.52)."
+        }
+      ]
+    }
+  ]
+}

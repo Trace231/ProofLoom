@@ -1,0 +1,171 @@
+{
+  "algorithm": "StochasticBlockMirrorDescent",
+  "full_name": "Stochastic Block Mirror Descent for Nonsmooth Convex Stochastic Optimization",
+  "source_reference": "Lan, First-order and Stochastic Optimization Methods for Machine Learning, Springer 2020 (Theorem 4.12)",
+  "setup": {
+    "problem": {
+      "math": "f^* := \\min_{x \\in X} \\left\\{ f(x) := \\mathbb{E}[F(x, \\xi)] \\right\\}",
+      "ref": "Eq. (4.6.1)",
+      "description": "Stochastic convex optimization with block-decomposable feasible set"
+    },
+    "variable_space": {
+      "math": "X = X_1 \\times X_2 \\times \\cdots \\times X_b \\subseteq \\mathbb{R}^n, \\text{ each } X_i \\subseteq \\mathbb{R}^{n_i} \\text{ closed convex, } \\sum_{i=1}^{b} n_i = n",
+      "ref": "Eq. (4.6.2)"
+    }
+  },
+  "assumptions": [
+    {
+      "name": "Convexity",
+      "math": "f(\\cdot) \\text{ is convex on } X",
+      "ref": "Section 4.6.1",
+      "parameters": []
+    },
+    {
+      "name": "Unbiased stochastic subgradient",
+      "math": "\\mathbb{E}[G(x, \\xi)] = g(x) \\in \\partial f(x), \\quad \\forall x \\in X",
+      "ref": "Eq. (4.6.3)",
+      "parameters": []
+    },
+    {
+      "name": "Block second-moment bound",
+      "math": "\\mathbb{E}\\left[\\|G_i(x, \\xi)\\|_{i,*}^2\\right] \\le M_i^2, \\quad i = 1, 2, \\ldots, b",
+      "ref": "Eq. (4.6.4)",
+      "parameters": ["M_i > 0, \\; i = 1, \\ldots, b"]
+    },
+    {
+      "name": "Block distance generating functions",
+      "math": "v_i : X_i \\to \\mathbb{R} \\text{ is continuously differentiable and 1-strongly convex w.r.t. } \\|\\cdot\\|_i; \\; V_i(z, x) = v_i(x) - [v_i(z) + \\langle \\nabla v_i(z), x - z \\rangle], \\; \\forall x, z \\in X_i",
+      "ref": "Eq. (4.6.7)",
+      "parameters": []
+    },
+    {
+      "name": "Block sampling distribution",
+      "math": "\\operatorname{Prob}\\{i_k = i\\} = p_i, \\; i = 1, \\ldots, b, \\quad \\sum_{i=1}^{b} p_i = 1",
+      "ref": "Eq. (4.6.12)",
+      "parameters": ["p_i \\in (0, 1]"]
+    },
+    {
+      "name": "Averaging weight condition",
+      "math": "\\theta_k = \\gamma_k, \\quad k = 1, \\ldots, N",
+      "ref": "Eq. (4.6.16)",
+      "parameters": []
+    }
+  ],
+  "algorithm_spec": {
+    "ref": "Algorithm 4.5",
+    "initialization": {
+      "math": "x_1 \\in X, \\; s_1 = 0, \\; u_i = 1 \\text{ for } i = 1, \\ldots, b",
+      "ref": "Algorithm 4.5"
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "Sample block index",
+        "math": "\\text{Generate } i_k \\text{ with } \\operatorname{Prob}\\{i_k = i\\} = p_i, \\; i = 1, \\ldots, b",
+        "ref": "Eq. (4.6.12)"
+      },
+      {
+        "step": 2,
+        "name": "Incremental averaging update",
+        "math": "s_{k+1}^{(i)} = \\begin{cases} s_k^{(i)} + x_k^{(i)} \\sum_{j=u_i}^{k} \\theta_j, & i = i_k, \\\\ s_k^{(i)}, & i \\ne i_k \\end{cases}, \\quad \\text{then set } u_{i_k} = k + 1",
+        "ref": "Eq. (4.6.13)"
+      },
+      {
+        "step": 3,
+        "name": "Block mirror descent update",
+        "math": "x_{k+1}^{(i)} = \\begin{cases} \\operatorname{argmin}_{u \\in X_i} \\left\\{ \\langle G_i(x_k, \\xi_k), u \\rangle + \\frac{1}{\\gamma_k} V_i(x_k^{(i)}, u) \\right\\}, & i = i_k, \\\\ x_k^{(i)}, & i \\ne i_k \\end{cases}",
+        "ref": "Eq. (4.6.14)"
+      }
+    ],
+    "output": {
+      "math": "\\text{After completing } k=1,\\ldots,N, \\text{ form the output blockwise from the incremental average state: } \\bar{x}_N^{(i)} = \\left( \\sum_{k=1}^{N} \\theta_k \\right)^{-1} \\left[s_{N+1}^{(i)} + x_{N+1}^{(i)} \\sum_{j=u_i}^{N} \\theta_j\\right], \\quad i=1,\\ldots,b. \\text{ Equivalently, } \\bar{x}_N = \\left( \\sum_{k=1}^{N} \\theta_k \\right)^{-1} \\sum_{k=1}^{N} (\\theta_k x_k)",
+      "state_math": "\\bar{x}_N^{(i)} = \\left( \\sum_{k=1}^{N} \\theta_k \\right)^{-1} \\left[s_{N+1}^{(i)} + x_{N+1}^{(i)} \\sum_{j=u_i}^{N} \\theta_j\\right], \\quad i=1,\\ldots,b",
+      "closed_form_math": "\\bar{x}_N = \\left( \\sum_{k=1}^{N} \\theta_k \\right)^{-1} \\sum_{k=1}^{N} (\\theta_k x_k)",
+      "ref": "Eq. (4.6.15)",
+      "type": "weighted_average"
+    },
+    "parameters": [
+      {
+        "name": "\\gamma_k",
+        "math": "\\gamma_k > 0 \\text{ (positive stepsizes)}",
+        "ref": "Algorithm 4.5"
+      },
+      {
+        "name": "G_i(x_k, \\xi_k)",
+        "math": "G_i(x_k, \\xi_k) \\equiv U_i^T G(x_k, \\xi_k) \\text{ (i-th block of the stochastic subgradient)}",
+        "ref": "Section 4.6.1"
+      },
+      {
+        "name": "V(z, x)",
+        "math": "V(z, x) = \\sum_{i=1}^{b} p_i^{-1} V_i(z^{(i)}, x^{(i)}) \\text{ (weighted aggregate Bregman divergence)}",
+        "ref": "Proof of Theorem 4.12"
+      }
+    ]
+  },
+  "main_theorem": {
+    "ref": "Theorem 4.12",
+    "statement_math": "\\mathbb{E}[f(\\bar{x}_N) - f(x_*)] \\le \\left( \\sum_{k=1}^{N} \\gamma_k \\right)^{-1} \\left[ \\sum_{i=1}^{b} p_i^{-1} V_i(x_1^{(i)}, x_*^{(i)}) + \\frac{1}{2} \\sum_{k=1}^{N} \\gamma_k^2 \\sum_{i=1}^{b} M_i^2 \\right]",
+    "rate": "O(1/\\sqrt{N})",
+    "measure": "expected suboptimality",
+    "proof": [
+      {
+        "step": 1,
+        "description": "Apply Lemma 4.3 to the sampled block prox update (4.6.14), then lift the one-block descent bound to the aggregate potential V(z, x) = sum p_i^{-1} V_i(z, x)",
+        "math": "V(x_{k+1}, x) \\le V(x_k, x) + \\gamma_k \\langle g(x_k), x - x_k \\rangle + \\gamma_k \\delta_k + \\frac{1}{2} \\gamma_k^2 \\bar{\\delta}_k",
+        "uses": ["Lemma 4.3"]
+      },
+      {
+        "step": 2,
+        "description": "Use convexity of f to bound gamma_k [f(x_k) - f(x)] by gamma_k <g(x_k), x_k - x>, substitute the aggregate recursion (4.6.18), and telescope V(x_k, x) - V(x_{k+1}, x) over k = 1 to N",
+        "math": "f(\\bar{x}_N) - f(x) \\le \\left( \\sum_{k=1}^{N} \\gamma_k \\right)^{-1} \\left[ V(x_1, x) + \\sum_{k=1}^{N} \\left( \\gamma_k \\delta_k + \\frac{1}{2} \\gamma_k^2 \\bar{\\delta}_k \\right) \\right]",
+        "uses": []
+      },
+      {
+        "step": 3,
+        "description": "Take conditional expectation: E[delta_k | zeta_{[k-1]}] = 0 by independence of i_k and xi_k combined with the unbiased oracle condition (4.6.3)",
+        "math": "\\mathbb{E}[\\delta_k \\mid \\zeta_{[k-1]}] = 0",
+        "uses": []
+      },
+      {
+        "step": 4,
+        "description": "Bound the quadratic stochastic term E[delta_bar_k] by expanding over the block sampling distribution and applying the block second-moment bound (4.6.4)",
+        "math": "\\mathbb{E}[\\bar{\\delta}_k] = \\sum_{i=1}^{b} p_i \\cdot p_i^{-1} \\mathbb{E}[\\|G_i(x_k, \\xi_k)\\|_{i,*}^2] \\le \\sum_{i=1}^{b} M_i^2",
+        "uses": []
+      },
+      {
+        "step": 5,
+        "description": "Take full expectation of the summed inequality (4.6.20), replace x by x_*, use E[delta_k] = 0 and E[delta_bar_k] <= sum M_i^2",
+        "math": "\\mathbb{E}[f(\\bar{x}_N) - f(x_*)] \\le \\left( \\sum_{k=1}^{N} \\gamma_k \\right)^{-1} \\left[ \\sum_{i=1}^{b} p_i^{-1} V_i(x_1^{(i)}, x_*^{(i)}) + \\frac{1}{2} \\sum_{k=1}^{N} \\gamma_k^2 \\sum_{i=1}^{b} M_i^2 \\right]",
+        "uses": []
+      }
+    ]
+  },
+  "key_lemmas": [
+    {
+      "name": "Lemma 4.3",
+      "ref": "Lemma 4.3",
+      "statement_math": "\\text{Let } \\zeta_1, \\ldots, \\zeta_j \\text{ be a sequence of elements of } \\mathbb{R}^n. \\text{ Define } v_1 \\in X^o \\text{ and } v_{t+1} = \\operatorname{argmin}_{x \\in X} \\{ \\langle \\zeta_t, x \\rangle + V(v_t, x) \\}. \\text{ Then } \\forall x \\in X: \\; \\langle \\zeta_t, v_t - x \\rangle \\le V(v_t, x) - V(v_{t+1}, x) + \\frac{1}{2} \\|\\zeta_t\\|_*^2, \\quad \\sum_{t=1}^{j} \\langle \\zeta_t, v_t - x \\rangle \\le V(v_1, x) + \\frac{1}{2} \\sum_{t=1}^{j} \\|\\zeta_t\\|_*^2",
+      "role": "Provides the single-step Bregman descent estimate for a prox update that is applied to each sampled block",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Apply the three-point lemma (Lemma 3.4) to the prox update defining v_{t+1}",
+          "math": "\\langle \\zeta_t, v_{t+1} - x \\rangle + V(v_t, v_{t+1}) \\le V(v_t, x) - V(v_{t+1}, x)",
+          "uses": []
+        },
+        {
+          "step": 2,
+          "description": "Bound <zeta_t, v_t - v_{t+1}> - V(v_t, v_{t+1}) using Cauchy-Schwarz and strong convexity V(v_t, v_{t+1}) >= (1/2)||v_t - v_{t+1}||^2",
+          "math": "\\langle \\zeta_t, v_t - v_{t+1} \\rangle - V(v_t, v_{t+1}) \\le \\frac{1}{2} \\|\\zeta_t\\|_*^2",
+          "uses": []
+        },
+        {
+          "step": 3,
+          "description": "Combine steps 1 and 2 to get the per-step bound (4.1.41), then sum over t = 1 to j and telescope the V-terms to get (4.1.42)",
+          "math": "\\langle \\zeta_t, v_t - x \\rangle \\le V(v_t, x) - V(v_{t+1}, x) + \\frac{1}{2} \\|\\zeta_t\\|_*^2",
+          "uses": []
+        }
+      ]
+    }
+  ]
+}

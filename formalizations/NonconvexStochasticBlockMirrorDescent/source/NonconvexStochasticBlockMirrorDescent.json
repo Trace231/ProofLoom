@@ -1,0 +1,939 @@
+{
+  "algorithm": "NonconvexStochasticBlockMirrorDescent",
+  "full_name": "Nonconvex Stochastic Block Mirror Descent (SBMD) for stochastic composite block optimization",
+  "source_reference": "Lan, First-order and Stochastic Optimization Methods for Machine Learning, Springer 2020, Section 6.3 (Theorem 6.9)",
+  "setup": {
+    "problem": {
+      "math": "\\phi^*:=\\min_{x\\in X}\\{\\phi(x):=f(x)+\\chi(x)\\}.",
+      "ref": "Eq. (6.3.1), lines 20750-20753",
+      "description": "The nonconvex stochastic composite block problem studied in Section 6.3."
+    },
+    "variable_space": {
+      "math": "X=X_1\\times X_2\\times\\cdots\\times X_b,\\quad\\text{where }X_i\\subseteq\\mathbb{R}^{n_i},\\ i=1,\\ldots,b,\\text{ are closed convex sets with }n_1+n_2+\\cdots+n_b=n.",
+      "ref": "Eq. (6.3.5), lines 20767-20770"
+    }
+  },
+  "assumptions": [
+    {
+      "name": "Problem_6_3_1",
+      "math": "\\phi^*:=\\min_{x\\in X}\\{\\phi(x):=f(x)+\\chi(x)\\}.",
+      "ref": "Eq. (6.3.1), lines 20750-20753",
+      "parameters": [
+        "\\phi^*",
+        "\\phi",
+        "f",
+        "\\chi",
+        "X"
+      ]
+    },
+    {
+      "name": "Block_Lipschitz_gradients_6_3_2",
+      "math": "\\|\\nabla f_i(x+U_i\\rho_i)-\\nabla f_i(x)\\|_{i,*}\\le L_i\\|\\rho_i\\|_i\\quad \\forall\\rho_i\\in\\mathbb{R}^{n_i},\\ i=1,2,\\ldots,b.",
+      "ref": "Eq. (6.3.2), lines 20755-20757",
+      "parameters": [
+        "L_i"
+      ]
+    },
+    {
+      "name": "Block_descent_model_6_3_3",
+      "math": "f(x+U_i\\rho_i)\\le f(x)+\\langle\\nabla f_i(x),\\rho_i\\rangle+\\frac{L_i}{2}\\|\\rho_i\\|_i^2\\quad \\forall\\rho_i\\in\\mathbb{R}^{n_i},\\ x\\in X.",
+      "ref": "Eq. (6.3.3), lines 20759-20761",
+      "parameters": [
+        "L_i"
+      ]
+    },
+    {
+      "name": "Separable_chi_6_3_4",
+      "math": "\\text{Moreover, the nonsmooth component }\\chi(\\cdot)\\text{ is still convex and separable, i.e. }\\chi(x)=\\sum_{i=1}^b\\chi_i(x^{(i)})\\quad \\forall x\\in X,\\quad\\text{where }\\chi_i:\\mathbb{R}^{n_i}\\to\\mathbb{R}\\text{ are closed and convex.}",
+      "ref": "Eq. (6.3.4), lines 20763-20767",
+      "parameters": [
+        "\\chi_i"
+      ]
+    },
+    {
+      "name": "Product_space_6_3_5",
+      "math": "X=X_1\\times X_2\\times\\cdots\\times X_b,\\quad\\text{where }X_i\\subseteq\\mathbb{R}^{n_i},\\ i=1,\\ldots,b,\\text{ are closed convex sets with }n_1+n_2+\\cdots+n_b=n.",
+      "ref": "Eq. (6.3.5), lines 20767-20770",
+      "parameters": [
+        "X_i",
+        "n_i"
+      ]
+    },
+    {
+      "name": "Block_embedding_and_norms_section_6_3",
+      "math": "(U_1,U_2,\\ldots,U_b)=I_n,\\quad x^{(i)}=U_i^Tx,\\quad x=U_1x^{(1)}+\\cdots+U_bx^{(b)},\\quad \\|x\\|^2=\\|x^{(1)}\\|_1^2+\\cdots+\\|x^{(b)}\\|_b^2.",
+      "ref": "Section 6.3, lines 20774-20782",
+      "parameters": [
+        "U_i",
+        "\\|\\cdot\\|_i",
+        "\\|\\cdot\\|_{i,*}"
+      ]
+    },
+    {
+      "name": "DGF_strong_convexity_section_6_3",
+      "math": "\\nu_i:X_i\\to\\mathbb{R}\\text{ be the distance generating function with modulus }1\\text{ with respect to }\\|\\cdot\\|_i,\\text{ and }V_i\\text{ be the associated prox-function.}",
+      "ref": "Section 6.3, lines 20783-20786",
+      "parameters": [
+        "\\nu_i",
+        "V_i"
+      ]
+    },
+    {
+      "name": "Prox_mapping_6_3_6",
+      "math": "\\operatorname*{argmin}_{z\\in X_i}\\langle y,z-x\\rangle+\\frac{1}{\\gamma}V_i(x,z)+\\chi_i(z).",
+      "ref": "Eq. (6.3.6), lines 20783-20787",
+      "parameters": [
+        "\\nu_i",
+        "V_i",
+        "\\gamma"
+      ]
+    },
+    {
+      "name": "Prox_quadratic_growth_6_3_7",
+      "math": "V_i(x^{(i)},z^{(i)})\\le \\frac{Q}{2}\\|z^{(i)}-x^{(i)}\\|_i^2\\quad \\forall z^{(i)},x^{(i)}\\in X_i,\\quad\\text{for some }Q>0.",
+      "ref": "Eq. (6.3.7), lines 20788-20791",
+      "parameters": [
+        "Q"
+      ]
+    },
+    {
+      "name": "Composite_projected_gradient_6_3_8",
+      "math": "P_{X_i}(x,y,\\gamma):=\\frac{1}{\\gamma}[x_i-x_i^+],\\quad i=1,\\ldots,b,\\quad x_i^+:=\\operatorname*{argmin}_{z\\in X_i}\\langle y,z-x_i\\rangle+\\frac{1}{\\gamma}V_i(x_i,z)+\\chi_i(z).",
+      "ref": "Eq. (6.3.8), lines 20797-20804",
+      "parameters": [
+        "P_X",
+        "P_{X_i}"
+      ]
+    },
+    {
+      "name": "Algorithm_6_1_stepsize_condition",
+      "math": "x_1\\in X,\\quad \\{\\gamma_k\\}_{k\\ge 1}\\ \\text{s.t.}\\ \\gamma_k<2/L_i,\\ i=1,\\ldots,b,\\quad p_i\\in[0,1],\\ i=1,\\ldots,b,\\quad \\sum_{i=1}^b p_i=1.",
+      "ref": "Algorithm 6.1 input, lines 20850-20852",
+      "parameters": [
+        "x_1",
+        "\\gamma_k",
+        "p_i"
+      ]
+    },
+    {
+      "name": "Stochastic_gradient_of_f_context_6_3_12",
+      "math": "\\text{Compute the }i_k\\text{-th block of the (stochastic) gradient }G_{i_k}\\text{ of }f(\\cdot)\\text{ at }x_k\\text{ satisfying }\\mathbb{E}[G_{i_k}]=U_{i_k}^Tg(x_k)\\text{ and }\\mathbb{E}[\\|G_{i_k}-U_{i_k}^Tg(x_k)\\|_{i_k,*}^2]\\le \\bar{\\sigma}_k^2.",
+      "ref": "Algorithm 6.1 step 2 and Eq. (6.3.12), lines 20858-20860",
+      "parameters": [
+        "G_{i_k}",
+        "g(x_k)",
+        "\\bar{\\sigma}_k"
+      ]
+    },
+    {
+      "name": "Block_sampling_6_3_11",
+      "math": "\\operatorname{Prob}\\{i_k=i\\}=p_i,\\quad i=1,\\ldots,b.",
+      "ref": "Eq. (6.3.11), lines 20853-20857",
+      "parameters": [
+        "i_k",
+        "p_i"
+      ]
+    },
+    {
+      "name": "Stochastic_block_gradient_6_3_12",
+      "math": "\\mathbb{E}[G_{i_k}]=U_{i_k}^Tg(x_k)\\quad\\text{and}\\quad \\mathbb{E}[\\|G_{i_k}-U_{i_k}^Tg(x_k)\\|_{i_k,*}^2]\\le \\bar{\\sigma}_k^2,",
+      "ref": "Eq. (6.3.12), lines 20858-20860",
+      "parameters": [
+        "G_{i_k}",
+        "\\bar{\\sigma}_k"
+      ]
+    },
+    {
+      "name": "SBMD_update_6_3_13",
+      "math": "x_{k+1}^{(i)}=\\begin{cases}P_{X_i}(x_k,G_{i_k}(x_k,\\xi_k),\\gamma_k),& i=i_k,\\\\ x_k^{(i)},& i\\ne i_k,\\end{cases}",
+      "ref": "Eq. (6.3.13), lines 20862-20866",
+      "parameters": [
+        "x_{k+1}",
+        "G_{i_k}",
+        "\\xi_k"
+      ]
+    },
+    {
+      "name": "Random_output_6_3_14",
+      "math": "\\operatorname{Prob}(R=k)=\\frac{\\gamma_k\\min_{i=1,\\ldots,b}p_i\\left(1-\\frac{L_i}{2}\\gamma_k\\right)}{\\sum_{k=1}^N\\gamma_k\\min_{i=1,\\ldots,b}p_i\\left(1-\\frac{L_i}{2}\\gamma_k\\right)},\\quad k=1,\\ldots,N.",
+      "ref": "Eq. (6.3.14), lines 20868-20877",
+      "parameters": [
+        "R",
+        "\\bar{x}_N"
+      ]
+    }
+  ],
+  "algorithm_spec": {
+    "ref": "Algorithm 6.1, lines 20850-20877",
+    "initialization": {
+      "math": "x_1\\in X,\\quad \\{\\gamma_k\\}_{k\\ge 1}\\ \\text{s.t.}\\ \\gamma_k<2/L_i,\\ i=1,\\ldots,b,\\quad p_i\\in[0,1],\\ i=1,\\ldots,b,\\quad \\sum_{i=1}^b p_i=1.",
+      "ref": "Algorithm 6.1 input, lines 20850-20852"
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "Sample block",
+        "math": "\\operatorname{Prob}\\{i_k=i\\}=p_i,\\quad i=1,\\ldots,b.",
+        "ref": "Eq. (6.3.11), lines 20853-20857"
+      },
+      {
+        "step": 2,
+        "name": "Compute stochastic block gradient",
+        "math": "\\mathbb{E}[G_{i_k}]=U_{i_k}^Tg(x_k)\\quad\\text{and}\\quad \\mathbb{E}[\\|G_{i_k}-U_{i_k}^Tg(x_k)\\|_{i_k,*}^2]\\le \\bar{\\sigma}_k^2,",
+        "ref": "Eq. (6.3.12), lines 20858-20860"
+      },
+      {
+        "step": 3,
+        "name": "Update sampled block",
+        "math": "x_{k+1}^{(i)}=\\begin{cases}P_{X_i}(x_k,G_{i_k}(x_k,\\xi_k),\\gamma_k),& i=i_k,\\\\ x_k^{(i)},& i\\ne i_k,\\end{cases}",
+        "ref": "Eq. (6.3.13), lines 20862-20866"
+      }
+    ],
+    "output": {
+      "math": "\\bar{x}_N=x_R,\\quad \\operatorname{Prob}(R=k)=\\frac{\\gamma_k\\min_{i=1,\\ldots,b}p_i\\left(1-\\frac{L_i}{2}\\gamma_k\\right)}{\\sum_{k=1}^N\\gamma_k\\min_{i=1,\\ldots,b}p_i\\left(1-\\frac{L_i}{2}\\gamma_k\\right)},\\quad k=1,\\ldots,N.",
+      "ref": "Eq. (6.3.14), lines 20868-20877",
+      "type": "random_iterate"
+    },
+    "parameters": [
+      {
+        "name": "g_k",
+        "math": "g_k\\equiv P_X(x_k,\\nabla f(x_k),\\gamma_k)",
+        "ref": "Lemma 6.7 and Theorem 6.9 notation, lines 20893-20895 and 21003-21005"
+      },
+      {
+        "name": "gtilde_k",
+        "math": "\\tilde{g}_k\\equiv P_{X_{i_k}}(x_k,U_{i_k}G_{i_k},\\gamma_k)",
+        "ref": "Lemma 6.7 and Theorem 6.9 notation, lines 20893-20895 and 21003-21005"
+      },
+      {
+        "name": "delta_k",
+        "math": "\\delta_k\\equiv G_{i_k}-U_{i_k}^T\\nabla f(x_k)",
+        "ref": "Theorem 6.9 proof, lines 21003-21005"
+      }
+    ]
+  },
+  "main_theorem": {
+    "ref": "Theorem 6.9, Eq. (6.3.20), lines 20992-21002",
+    "statement_math": "\\mathbb{E}[\\|P_X(x_R,g(x_R),\\gamma_R)\\|^2]\\le \\frac{\\phi(x_1)-\\phi^*+2\\sum_{k=1}^N\\gamma_k\\bar{\\sigma}_k^2}{\\sum_{k=1}^N\\gamma_k\\min_{i=1,\\ldots,b}p_i\\left(1-\\frac{L_i}{2}\\gamma_k\\right)}\\quad\\text{for any }N\\ge 1,",
+    "rate": "Finite-N expected squared composite projected-gradient bound; under deterministic uniform sampling and gamma_k = 1 / max_i L_i, Corollary 6.12 gives an O(b max_i L_i / N) bound.",
+    "measure": "expected squared composite projected-gradient norm, with expectation taken w.r.t. i_k, G_{i_k}, and R",
+    "proof": [
+      {
+        "step": 1,
+        "description": "Introduce the residual, exact composite projected gradient, and stochastic sampled-block projected gradient used throughout the proof.",
+        "ref": "Theorem 6.9 proof, lines 21003-21005",
+        "source_pdf_lines": [
+          21003,
+          21005
+        ],
+        "math": "\\delta_k\\equiv G_{i_k}-U_{i_k}^T\\nabla f(x_k),\\quad g_k\\equiv P_X(x_k,\\nabla f(x_k),\\gamma_k),\\quad \\tilde{g}_k\\equiv P_{X_{i_k}}(x_k,U_{i_k}G_{i_k},\\gamma_k).",
+        "uses": [
+          "Composite_projected_gradient_6_3_8",
+          "Stochastic_block_gradient_6_3_12"
+        ],
+        "produces": "Definitions of delta_k, g_k, and tilde_g_k."
+      },
+      {
+        "step": 2,
+        "description": "Record the source-local update/prox-mapping mismatch before the displacement identity. Eq. (6.3.8) defines P_{X_i}(x,y,gamma) as the scaled displacement (1/gamma)[x_i-x_i^+], while Eq. (6.3.13) prints x_{k+1}^{(i)}=P_{X_i}(x_k,G_{i_k}(x_k,xi_k),gamma_k) for i=i_k; the subsequent identity x_{k+1}-x_k=-gamma_k U_{i_k} tilde{g}_k requires the unprinted prox-point update x_{k+1}^{(i_k)}=x_k^{(i_k)}-gamma_k tilde{g}_k. This step is a source_gap, not a derivation of the displacement identity from (6.3.13) and (6.3.8) alone.",
+        "ref": "Eq. (6.3.8), lines 20797-20804; Eq. (6.3.13), lines 20862-20866; Theorem 6.9 proof, lines 21003-21006",
+        "source_pdf_lines": [
+          20797,
+          21006
+        ],
+        "uses": [
+          "Composite_projected_gradient_6_3_8",
+          "SBMD_update_6_3_13",
+          "previous_step:1"
+        ],
+        "produces": "source_gap:update_printed_as_projected_gradient_value_but_displacement_identity_requires_prox_point_update."
+      },
+      {
+        "step": 3,
+        "description": "Record the PDF-asserted displacement identity after the update/prox source gap has been made explicit. The identity is consumed exactly as printed in the proof, but it is not encoded as following from SBMD_update_6_3_13 and Composite_projected_gradient_6_3_8 alone.",
+        "ref": "Theorem 6.9 proof, lines 21003-21006",
+        "source_pdf_lines": [
+          21003,
+          21006
+        ],
+        "math": "x_{k+1}-x_k=-\\gamma_kU_{i_k}\\tilde{g}_k.",
+        "uses": [
+          "previous_step:2"
+        ],
+        "produces": "Source-asserted displacement identity for x_{k+1}-x_k."
+      },
+      {
+        "step": 4,
+        "description": "Apply the block descent model to f at the displacement x_{k+1}-x_k.",
+        "ref": "Theorem 6.9 proof, lines 21005-21009",
+        "source_pdf_lines": [
+          21005,
+          21009
+        ],
+        "math": "f(x_{k+1})\\le f(x_k)+\\langle\\nabla f(x_k),x_{k+1}-x_k\\rangle+\\frac{L_{i_k}}{2}\\|x_{k+1}-x_k\\|^2.",
+        "uses": [
+          "Block_descent_model_6_3_3",
+          "previous_step:3"
+        ],
+        "produces": "First f-descent inequality before substituting the block displacement."
+      },
+      {
+        "step": 5,
+        "description": "Substitute x_{k+1}-x_k=-gamma_k U_{i_k} tilde_g_k into the block descent inequality.",
+        "ref": "Theorem 6.9 proof, lines 21008-21011",
+        "source_pdf_lines": [
+          21008,
+          21011
+        ],
+        "math": "f(x_{k+1})\\le f(x_k)-\\gamma_k\\langle\\nabla f(x_k),U_{i_k}\\tilde{g}_k\\rangle+\\frac{L_{i_k}}{2}\\gamma_k^2\\|\\tilde{g}_k\\|_{i_k}^2.",
+        "uses": [
+          "Block_embedding_and_norms_section_6_3",
+          "previous_step:3",
+          "previous_step:4"
+        ],
+        "produces": "Block-displacement form of the descent inequality."
+      },
+      {
+        "step": 6,
+        "description": "Replace the exact gradient block by the stochastic block gradient plus the residual delta_k.",
+        "ref": "Theorem 6.9 proof, lines 21010-21012",
+        "source_pdf_lines": [
+          21010,
+          21012
+        ],
+        "math": "f(x_{k+1})\\le f(x_k)-\\gamma_k\\langle G_{i_k},\\tilde{g}_k\\rangle+\\frac{L_{i_k}}{2}\\gamma_k^2\\|\\tilde{g}_k\\|_{i_k}^2+\\gamma_k\\langle\\delta_k,\\tilde{g}_k\\rangle.",
+        "uses": [
+          "previous_step:1",
+          "previous_step:5"
+        ],
+        "produces": "Stochastic-gradient form of the one-step f inequality."
+      },
+      {
+        "step": 7,
+        "description": "Invoke Lemma 6.7, specifically (6.3.15), to lower-bound <G_{i_k}, tilde_g_k> and obtain the printed f inequality containing the chi difference.",
+        "ref": "Theorem 6.9 proof, lines 21014-21018",
+        "source_pdf_lines": [
+          21014,
+          21018
+        ],
+        "math": "f(x_{k+1})\\le f(x_k)-\\gamma_k\\left(\\|\\tilde{g}_k\\|_{i_k}^2+\\frac{1}{\\gamma_k}[\\chi(x_{k+1})-\\chi(x_k)]\\right)+\\frac{L_{i_k}}{2}\\gamma_k^2\\|\\tilde{g}_k\\|_{i_k}^2+\\gamma_k\\langle\\delta_k,\\tilde{g}_k\\rangle.",
+        "uses": [
+          "Lemma_6_7_prox_inequalities",
+          "previous_step:6"
+        ],
+        "produces": "One-step f inequality after substituting the prox lower bound."
+      },
+      {
+        "step": 8,
+        "description": "Use phi(x)=f(x)+chi(x) to absorb the chi difference and obtain the descent inequality (6.3.21).",
+        "ref": "Eq. (6.3.21), lines 21019-21022",
+        "source_pdf_lines": [
+          21019,
+          21022
+        ],
+        "math": "\\phi(x_{k+1})\\le \\phi(x_k)-\\gamma_k\\left(1-\\frac{L_{i_k}}{2}\\gamma_k\\right)\\|\\tilde{g}_k\\|_{i_k}^2+\\gamma_k\\langle\\delta_k,\\tilde{g}_k\\rangle.",
+        "uses": [
+          "Problem_6_3_1",
+          "previous_step:7"
+        ],
+        "produces": "Descent inequality (6.3.21)."
+      },
+      {
+        "step": 9,
+        "description": "Use Lemma 6.7, the definition of tilde_g_k, and U_{i_k}^T g_k=P_{X_{i_k}}(x_k,nabla f(x_k),gamma_k) to compare the stochastic and exact block projected gradients.",
+        "ref": "Theorem 6.9 proof, lines 21023-21027",
+        "source_pdf_lines": [
+          21023,
+          21027
+        ],
+        "math": "\\|\\tilde{g}_k-U_{i_k}^Tg_k\\|_{i_k}\\le \\|G_{i_k}-U_{i_k}^T\\nabla f(x_k)\\|_{i_k,*}=\\|\\delta_k\\|_{i_k,*}.",
+        "uses": [
+          "Composite_projected_gradient_6_3_8",
+          "Lemma_6_7_prox_inequalities",
+          "previous_step:1"
+        ],
+        "produces": "Block projected-gradient comparison by delta_k."
+      },
+      {
+        "step": 10,
+        "description": "Use the preceding comparison and the printed two-squares estimate to upper-bound the exact block projected-gradient norm by the stochastic block norm plus residual variance.",
+        "ref": "Theorem 6.9 proof, lines 21028-21031",
+        "source_pdf_lines": [
+          21028,
+          21031
+        ],
+        "math": "\\|U_{i_k}^Tg_k\\|_{i_k}^2=\\|\\tilde{g}_k+U_{i_k}^Tg_k-\\tilde{g}_k\\|_{i_k}^2\\le 2\\|\\tilde{g}_k\\|_{i_k}^2+2\\|U_{i_k}^Tg_k-\\tilde{g}_k\\|_{i_k}^2\\le 2\\|\\tilde{g}_k\\|_{i_k}^2+2\\|\\delta_k\\|_{i_k,*}^2.",
+        "uses": [
+          "previous_step:9"
+        ],
+        "produces": "Inequality relating ||U_i^T g_k||^2 to ||tilde_g_k||^2 and ||delta_k||^2."
+      },
+      {
+        "step": 11,
+        "description": "Decompose <delta_k, tilde_g_k> around U_{i_k}^T g_k and use the residual comparison to bound the error term.",
+        "ref": "Theorem 6.9 proof, lines 21031-21033",
+        "source_pdf_lines": [
+          21031,
+          21033
+        ],
+        "math": "\\langle\\delta_k,\\tilde{g}_k\\rangle=\\langle\\delta_k,U_{i_k}^Tg_k\\rangle+\\langle\\delta_k,\\tilde{g}_k-U_{i_k}^Tg_k\\rangle\\le \\langle\\delta_k,U_{i_k}^Tg_k\\rangle+\\|\\delta_k\\|_{i_k,*}\\|\\tilde{g}_k-U_{i_k}^Tg_k\\|_{i_k}\\le \\langle\\delta_k,U_{i_k}^Tg_k\\rangle+\\|\\delta_k\\|_{i_k,*}^2.",
+        "uses": [
+          "previous_step:9"
+        ],
+        "produces": "Inner-product residual bound."
+      },
+      {
+        "step": 12,
+        "description": "Substitute the two residual bounds into (6.3.21).",
+        "ref": "Theorem 6.9 proof, lines 21035-21038",
+        "source_pdf_lines": [
+          21035,
+          21038
+        ],
+        "math": "\\phi(x_{k+1})\\le \\phi(x_k)-\\gamma_k\\left(1-\\frac{L_{i_k}}{2}\\gamma_k\\right)\\left(\\frac{1}{2}\\|U_{i_k}^Tg_k\\|_{i_k}^2-\\|\\delta_k\\|_{i_k,*}^2\\right)+\\gamma_k\\langle\\delta_k,U_{i_k}^Tg_k\\rangle+\\gamma_k\\|\\delta_k\\|_{i_k,*}^2.",
+        "uses": [
+          "previous_step:8",
+          "previous_step:10",
+          "previous_step:11"
+        ],
+        "produces": "One-step phi inequality in exact-gradient block norm and residual terms."
+      },
+      {
+        "step": 13,
+        "description": "Sum the one-step inequalities over k=1,...,N and rearrange the terms to isolate the exact block projected-gradient norms; the math field quotes the PDF display with its printed boundary term phi(x_{k+1}).",
+        "ref": "Theorem 6.9 proof, lines 21039-21045",
+        "source_pdf_lines": [
+          21039,
+          21045
+        ],
+        "math": "\\sum_{k=1}^N\\frac{\\gamma_k}{2}\\left(1-\\frac{L_{i_k}}{2}\\gamma_k\\right)\\|U_{i_k}^Tg_k\\|_{i_k}^2\\le \\phi(x_1)-\\phi(x_{k+1})+\\sum_{k=1}^N\\left(\\gamma_k\\langle\\delta_k,U_{i_k}^Tg_k\\rangle+\\gamma_k\\|\\delta_k\\|_{i_k,*}^2\\right)+\\sum_{k=1}^N\\gamma_k\\left(1-\\frac{L_{i_k}}{2}\\gamma_k\\right)\\|\\delta_k\\|_{i_k,*}^2.",
+        "uses": [
+          "previous_step:12"
+        ],
+        "produces": "Source-printed summed and rearranged inequality before replacing the displayed phi(x_{k+1}) term by phi^* and simplifying residual coefficients."
+      },
+      {
+        "step": 14,
+        "description": "Use the source-stated bound phi(x_{k+1}) >= phi^* and nonnegativity of the printed L_{i_k} gamma_k^2 residual term to obtain the simplified residual sum.",
+        "ref": "Theorem 6.9 proof, lines 21046-21049",
+        "source_pdf_lines": [
+          21046,
+          21049
+        ],
+        "math": "\\sum_{k=1}^N\\frac{\\gamma_k}{2}\\left(1-\\frac{L_{i_k}}{2}\\gamma_k\\right)\\|U_{i_k}^Tg_k\\|_{i_k}^2\\le \\phi(x_1)-\\phi^*+\\sum_{k=1}^N\\left(\\gamma_k\\langle\\delta_k,U_{i_k}^Tg_k\\rangle+2\\gamma_k\\|\\delta_k\\|_{i_k,*}^2\\right).",
+        "uses": [
+          "Problem_6_3_1",
+          "Algorithm_6_1_stepsize_condition",
+          "Block_Lipschitz_gradients_6_3_2",
+          "previous_step:13"
+        ],
+        "produces": "Summed inequality ready for expectation."
+      },
+      {
+        "step": 15,
+        "description": "Introduce the conditioning notation used to take expectations: zeta_k=G_{i_k}, zeta_[k]={zeta_1,...,zeta_k}, and i_[k]={i_1,...,i_k}.",
+        "ref": "Theorem 6.9 proof, lines 21049-21051",
+        "source_pdf_lines": [
+          21049,
+          21051
+        ],
+        "math": "\\zeta_k=G_{i_k},\\quad \\zeta_{[k]}=\\{\\zeta_1,\\ldots,\\zeta_k\\},\\quad i_{[k]}=\\{i_1,\\ldots,i_k\\}.",
+        "uses": [
+          "Stochastic_block_gradient_6_3_12"
+        ],
+        "produces": "Conditioning sigma-field notation for the expectation step."
+      },
+      {
+        "step": 16,
+        "description": "Expand the conditional cross term using the definition of delta_k. This records the first equality in the PDF's conditional-expectation display before the asserted equality to zero.",
+        "ref": "Theorem 6.9 proof, lines 21051-21054",
+        "source_pdf_lines": [
+          21051,
+          21054
+        ],
+        "math": "\\mathbb{E}_{\\zeta_k}[\\langle\\delta_k,U_{i_k}^Tg_k\\rangle\\mid i_{[k]},\\zeta_{[k-1]}]=\\mathbb{E}_{\\zeta_k}[\\langle G_{i_k}-U_{i_k}^T\\nabla f(x_k),U_{i_k}^Tg_k\\rangle\\mid i_{[k]},\\zeta_{[k-1]}].",
+        "uses": [
+          "previous_step:1",
+          "previous_step:15"
+        ],
+        "produces": "Expanded conditional cross term with delta_k unfolded."
+      },
+      {
+        "step": 17,
+        "description": "Record the paper-local centering mismatch needed for the next two displayed stochastic assertions. Eq. (6.3.12) centers G_{i_k} at U_{i_k}^T g(x_k), while the proof has defined delta_k centered at U_{i_k}^T\\nabla f(x_k); the PDF gives no separate line in this proof window defining g(x_k)=\\nabla f(x_k), so this step flags an unresolved source gap rather than a usable proof bridge.",
+        "ref": "Algorithm 6.1 step 2 and Eq. (6.3.12), lines 20858-20860; Theorem 6.9 proof, lines 21003-21005 and 21051-21054",
+        "source_pdf_lines": [
+          20858,
+          20860
+        ],
+        "math": "\\mathbb{E}[G_{i_k}]=U_{i_k}^Tg(x_k)\\quad\\text{and}\\quad \\mathbb{E}[\\|G_{i_k}-U_{i_k}^Tg(x_k)\\|_{i_k,*}^2]\\le \\bar{\\sigma}_k^2,",
+        "uses": [
+          "Stochastic_gradient_of_f_context_6_3_12",
+          "Stochastic_block_gradient_6_3_12",
+          "previous_step:1",
+          "previous_step:16"
+        ],
+        "produces": "source_gap:g_to_nabla_f_centering_unresolved_not_a_sufficient_dependency_for_zero_cross_term_or_variance_bound."
+      },
+      {
+        "step": 18,
+        "description": "Record the PDF's conditional zero cross term after unfolding delta_k. Because Eq. (6.3.12) is g(x_k)-centered while this display is nabla-f-centered, this is preserved as an unresolved source assertion, not as a consequence of the source_gap in previous_step:17.",
+        "ref": "Theorem 6.9 proof, lines 21051-21054",
+        "source_pdf_lines": [
+          21051,
+          21054
+        ],
+        "math": "\\mathbb{E}_{\\zeta_k}[\\langle G_{i_k}-U_{i_k}^T\\nabla f(x_k),U_{i_k}^Tg_k\\rangle\\mid i_{[k]},\\zeta_{[k-1]}]=0.",
+        "uses": [
+          "previous_step:16"
+        ],
+        "produces": "source_assertion_unresolved:nabla_f_centered_conditional_zero_cross_term."
+      },
+      {
+        "step": 19,
+        "description": "Record the PDF's expected residual-square bound. Since delta_k was defined with U_{i_k}^T\\nabla f(x_k) but Eq. (6.3.12) bounds deviations from U_{i_k}^Tg(x_k), this is preserved as an unresolved source assertion rather than as a consequence of the g-centered oracle condition.",
+        "ref": "Theorem 6.9 proof, lines 21053-21055; Eq. (6.3.12), lines 20858-20860",
+        "source_pdf_lines": [
+          21053,
+          21055
+        ],
+        "math": "\\mathbb{E}_{\\zeta_{[N]},i_{[N]}}[\\|\\delta_k\\|_{i_k,*}^2]\\le \\bar{\\sigma}_k^2.",
+        "uses": [
+          "previous_step:1",
+          "previous_step:15"
+        ],
+        "produces": "source_assertion_unresolved:nabla_f_centered_residual_square_bound."
+      },
+      {
+        "step": 20,
+        "description": "Take expectation over the sampled block and expand it using the block sampling probabilities.",
+        "ref": "Theorem 6.9 proof, lines 21055-21057",
+        "source_pdf_lines": [
+          21055,
+          21057
+        ],
+        "math": "\\mathbb{E}_{i_k}\\left[\\left(1-\\frac{L_{i_k}}{2}\\gamma_k\\right)\\|U_{i_k}^Tg_k\\|^2\\mid \\zeta_{[k-1]},i_{[k-1]}\\right]=\\sum_{i=1}^bp_i\\left(1-\\frac{L_i}{2}\\gamma_k\\right)\\|U_i^Tg_k\\|^2.",
+        "uses": [
+          "Block_sampling_6_3_11",
+          "previous_step:15"
+        ],
+        "produces": "Expanded block-sampling expectation."
+      },
+      {
+        "step": 21,
+        "description": "Lower-bound the sampled-block expectation by the minimum block probability-weighted stepsize factor and use the block norm decomposition.",
+        "ref": "Theorem 6.9 proof, lines 21057-21062",
+        "source_pdf_lines": [
+          21057,
+          21062
+        ],
+        "math": "\\sum_{i=1}^bp_i\\left(1-\\frac{L_i}{2}\\gamma_k\\right)\\|U_i^Tg_k\\|^2\\ge \\sum_{i=1}^b\\|U_i^Tg_k\\|^2\\min_{i=1,\\ldots,b}p_i\\left(1-\\frac{L_i}{2}\\gamma_k\\right)=\\|g_k\\|^2\\min_{i=1,\\ldots,b}p_i\\left(1-\\frac{L_i}{2}\\gamma_k\\right).",
+        "uses": [
+          "Algorithm_6_1_stepsize_condition",
+          "Block_embedding_and_norms_section_6_3",
+          "previous_step:20"
+        ],
+        "produces": "Lower bound for the block-sampled left side in terms of ||g_k||^2."
+      },
+      {
+        "step": 22,
+        "description": "Take expectation of the half-weighted summed inequality from previous_step:14 using the conditional zero cross term, the residual-square bound, and the sampled-block lower bound. This half-weighted expected bound is the dependency flow obtained from the printed preceding displays; it is not itself printed as the final displayed conclusion.",
+        "ref": "Theorem 6.9 proof, lines 21039-21069",
+        "source_pdf_lines": [
+          21039,
+          21069
+        ],
+        "uses": [
+          "Problem_6_3_1",
+          "Algorithm_6_1_stepsize_condition",
+          "previous_step:14",
+          "previous_step:18",
+          "previous_step:19",
+          "previous_step:21"
+        ],
+        "produces": "Derived, not PDF-printed: \\sum_{k=1}^N\\frac{\\gamma_k}{2}\\min_{i=1,\\ldots,b}p_i\\left(1-\\frac{L_i}{2}\\gamma_k\\right)\\mathbb{E}_{\\zeta_{[N]},i_{[N]}}[\\|g_k\\|^2]\\le \\phi(x_1)-\\phi^*+2\\sum_{k=1}^N\\gamma_k\\bar{\\sigma}_k^2."
+      },
+      {
+        "step": 23,
+        "description": "Record the PDF's printed no-half expected weighted-sum display after the words \"we conclude that\". Relative to the derivable half-weighted bound in previous_step:22, the factor 1/2 on the left has disappeared; the PDF gives no algebraic line in this proof window justifying this factor change, so this step is a separate source_jump:missing_factor_two and is not represented as a consequence of previous_step:22.",
+        "ref": "Theorem 6.9 proof, lines 21049-21069",
+        "source_pdf_lines": [
+          21049,
+          21069
+        ],
+        "math": "\\sum_{k=1}^N\\gamma_k\\min_{i=1,\\ldots,b}p_i\\left(1-\\frac{L_i}{2}\\gamma_k\\right)\\mathbb{E}_{\\zeta_{[N]},i_{[N]}}[\\|g_k\\|^2]\\le \\phi(x_1)-\\phi^*+2\\sum_{k=1}^N\\gamma_k\\bar{\\sigma}_k^2.",
+        "uses": [
+          "previous_step:14",
+          "previous_step:18",
+          "previous_step:19",
+          "previous_step:21"
+        ],
+        "produces": "source_jump:missing_factor_two_no_half_expected_bound; PDF-printed expected weighted-sum inequality immediately preceding the final division."
+      },
+      {
+        "step": 24,
+        "description": "Following the source, divide the PDF-printed no-half expected weighted-sum bound by the denominator in the output distribution and use the randomized choice of R in (6.3.14) to obtain the theorem statement (6.3.20). The step depends on the paper-asserted no-half source jump in previous_step:23; the identification of g_k=P_X(x_k,\\nabla f(x_k),\\gamma_k) with the theorem statement's P_X(x_k,g(x_k),\\gamma_k) remains part of the source-local g/\\nabla f notation gap flagged in previous_step:17.",
+        "ref": "Eq. (6.3.14), lines 20868-20877; Eq. (6.3.20), lines 20992-21002; Theorem 6.9 proof, lines 21072-21074",
+        "source_pdf_lines": [
+          21072,
+          21074
+        ],
+        "math": "\\mathbb{E}[\\|P_X(x_R,g(x_R),\\gamma_R)\\|^2]\\le \\frac{\\phi(x_1)-\\phi^*+2\\sum_{k=1}^N\\gamma_k\\bar{\\sigma}_k^2}{\\sum_{k=1}^N\\gamma_k\\min_{i=1,\\ldots,b}p_i\\left(1-\\frac{L_i}{2}\\gamma_k\\right)}\\quad\\text{for any }N\\ge 1,",
+        "uses": [
+          "Random_output_6_3_14",
+          "Composite_projected_gradient_6_3_8",
+          "previous_step:17",
+          "previous_step:23"
+        ],
+        "produces": "Theorem 6.9 / Eq. (6.3.20)."
+      }
+    ]
+  },
+  "key_lemmas": [
+    {
+      "name": "Proposition_6_2_composite_projected_gradient_optimality",
+      "ref": "Proposition 6.2 and Eq. (6.3.9), lines 20810-20817",
+      "statement_math": "\\text{Let }x\\in X\\text{ be given and }P_X(x,y,\\gamma)\\text{ be defined as in (6.3.8) for some }\\gamma>0.\\text{ Also let us denote }x^+:=x-\\gamma P_X(x,g(x),\\gamma).\\text{ Then there exists }p_i\\in\\partial\\chi_i(U_i^Tx^+)\\text{ s.t. }U_i^Tg(x^+)+p_i\\in -N_{X_i}(U_i^Tx^+)+B_i((L_i\\gamma+Q)\\|P_X(x,g(x),\\gamma)\\|_i),\\ i=1,\\ldots,b,\\text{ where }B_i(\\epsilon):=\\{v\\in\\mathbb{R}^{n_i}:\\|v\\|_{i,*}\\le \\epsilon\\}\\text{ and }N_{X_i}(U_i^Tx^+)\\text{ denotes the normal cone of }X_i\\text{ at }U_i^Tx^+.",
+      "role": "Relates small composite projected gradient to an approximate first-order optimality inclusion for the block composite problem; it motivates the stationarity measure used in Theorem 6.9.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Record the source-local P_{X_i} notation mismatch before the proof identity. Eq. (6.3.8) defines P_{X_i}(x,y,gamma)=(1/gamma)[x_i-x_i^+] as a composite projected-gradient mapping, while Proposition 6.2 proof lines 20819-20821 state U_i^T x^+=P_{X_i}(U_i^T x,U_i^T g(x),gamma), which would identify P_{X_i} with the prox point x_i^+. This step flags source_gap:prox_point_vs_gradient_mapping rather than deriving the identity from (6.3.6) and (6.3.8).",
+          "ref": "Eq. (6.3.8), lines 20797-20804; Proposition 6.2 proof, lines 20819-20821",
+          "source_pdf_lines": [
+            20797,
+            20821
+          ],
+          "uses": [
+            "Composite_projected_gradient_6_3_8",
+            "Prox_mapping_6_3_6"
+          ],
+          "produces": "source_gap:Proposition_6_2_PXi_prox_point_vs_gradient_mapping."
+        },
+        {
+          "step": 2,
+          "description": "Record the PDF's printed block identity for U_i^T x^+. Because of the P_{X_i} notation mismatch flagged in previous_step:1, this identity is treated as a source assertion, not as a consequence of Composite_projected_gradient_6_3_8 and Prox_mapping_6_3_6 alone.",
+          "ref": "Proposition 6.2 proof, lines 20819-20821",
+          "source_pdf_lines": [
+            20819,
+            20821
+          ],
+          "math": "U_i^Tx^+=P_{X_i}(U_i^Tx,U_i^Tg(x),\\gamma).",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "Source-asserted block prox identity for U_i^T x^+."
+        },
+        {
+          "step": 3,
+          "description": "Apply the optimality condition of the block prox problem to obtain the printed variational inequality for some p_i in the subdifferential.",
+          "ref": "Proposition 6.2 proof, lines 20820-20824",
+          "source_pdf_lines": [
+            20820,
+            20824
+          ],
+          "math": "\\left\\langle U_i^Tg(x)+\\frac{1}{\\gamma}\\left[\\nabla\\nu_i(U_i^Tx^+)-\\nabla\\nu_i(U_i^Tx)\\right]+p_i,u-U_i^Tx^+\\right\\rangle\\ge 0,\\quad \\forall u\\in X_i.",
+          "uses": [
+            "Prox_mapping_6_3_6",
+            "previous_step:2"
+          ],
+          "produces": "Optimality variational inequality at U_i^T x^+."
+        },
+        {
+          "step": 4,
+          "description": "Define the residual zeta and convert the variational inequality into a normal-cone inclusion.",
+          "ref": "Proposition 6.2 proof, lines 20825-20827",
+          "source_pdf_lines": [
+            20825,
+            20827
+          ],
+          "math": "\\zeta=U_i^T[g(x)-g(x^+)]+\\frac{1}{\\gamma}\\left[\\nabla\\nu_i(U_i^Tx^+)-\\nabla\\nu_i(U_i^Tx)\\right],\\quad U_i^Tg(x^+)+p_i+\\zeta\\in -N_{X_i}(U_i^Tx^+).",
+          "uses": [
+            "previous_step:3"
+          ],
+          "produces": "Normal-cone inclusion with residual zeta."
+        },
+        {
+          "step": 5,
+          "description": "Record the two Lipschitz-type estimates for the gradient and the distance-generating function gradient.",
+          "ref": "Proposition 6.2 proof, lines 20827-20829",
+          "source_pdf_lines": [
+            20827,
+            20829
+          ],
+          "math": "\\|U_i^T[g(x^+)-g(x)]\\|_{i,*}\\le L_i\\|U_i^T(x^+-x)\\|_i\\quad\\text{and}\\quad \\|\\nabla\\nu_i(U_i^Tx^+)-\\nabla\\nu_i(U_i^Tx)\\|_{i,*}\\le Q\\|U_i^T(x^+-x)\\|_i.",
+          "uses": [
+            "Block_Lipschitz_gradients_6_3_2",
+            "Prox_quadratic_growth_6_3_7"
+          ],
+          "produces": "Two residual component bounds."
+        },
+        {
+          "step": 6,
+          "description": "Combine the two component bounds with the definition of x^+ to bound the residual zeta.",
+          "ref": "Proposition 6.2 proof, lines 20830-20833",
+          "source_pdf_lines": [
+            20830,
+            20833
+          ],
+          "math": "\\|\\zeta\\|_{i,*}\\le \\left(L_i+\\frac{Q}{\\gamma}\\right)\\|U_i^T(x^+-x)\\|_i=\\left(L_i+\\frac{Q}{\\gamma}\\right)\\gamma\\|U_i^TP_X(x,g(x),\\gamma)\\|_i=(L_i\\gamma+Q)\\|U_i^TP_X(x,g(x),\\gamma)\\|_i.",
+          "uses": [
+            "Composite_projected_gradient_6_3_8",
+            "previous_step:4",
+            "previous_step:5"
+          ],
+          "produces": "Residual-radius bound for zeta."
+        },
+        {
+          "step": 7,
+          "description": "Combine the normal-cone inclusion with the zeta norm bound to obtain (6.3.9).",
+          "ref": "Eq. (6.3.9), lines 20814-20817, and Proposition 6.2 proof, line 20834",
+          "source_pdf_lines": [
+            20814,
+            20834
+          ],
+          "math": "U_i^Tg(x^+)+p_i\\in -N_{X_i}(U_i^Tx^+)+B_i((L_i\\gamma+Q)\\|P_X(x,g(x),\\gamma)\\|_i),\\quad i=1,\\ldots,b.",
+          "uses": [
+            "previous_step:4",
+            "previous_step:6"
+          ],
+          "produces": "Proposition 6.2 inclusion (6.3.9)."
+        }
+      ]
+    },
+    {
+      "name": "Lemma_6_7_prox_inequalities",
+      "ref": "Lemma 6.7 and Eqs. (6.3.15)-(6.3.16), lines 20893-20900",
+      "statement_math": "\\text{Let }x_{k+1}\\text{ be defined in (6.3.13), and denote }g_k\\equiv P_X(x_k,\\nabla f(x_k),\\gamma_k)\\text{ and }\\tilde{g}_k\\equiv P_{X_{i_k}}(x_k,U_{i_k}G_{i_k},\\gamma_k).\\text{ We have }\\langle G_{i_k},\\tilde{g}_k\\rangle\\ge \\|\\tilde{g}_k\\|^2+\\frac{1}{\\gamma_k}[\\chi(x_{k+1})-\\chi(x_k)],\\quad \\|\\tilde{g}_k-U_{i_k}^Tg_k\\|_{i_k}\\le \\|G_{i_k}-U_{i_k}^T\\nabla f(x_k)\\|_{i_k,*}.",
+      "role": "Supplies the one-step prox lower bound and the stochastic-vs-exact block projected-gradient comparison used in Theorem 6.9.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Record the source-local update/prox-point mismatch before using the sampled-block update as a prox optimality condition. Eq. (6.3.8) defines P_{X_i}(x,y,gamma) as the scaled displacement (1/gamma)[x_i-x_i^+], while Eq. (6.3.13) prints x_{k+1}^{(i)}=P_{X_i}(x_k,G_{i_k}(x_k,xi_k),gamma_k) for i=i_k. The proof then treats x_{k+1}^{(i_k)} as the prox point solving (6.3.6) and later asserts gamma_k tilde{g}_k=U_{i_k}^T(x_k-x_{k+1}); this step records that source_gap rather than deriving those facts from (6.3.8) and (6.3.13) alone.",
+          "ref": "Eq. (6.3.8), lines 20797-20804; Eq. (6.3.13), lines 20862-20866; Lemma 6.7 proof, lines 20902-20907 and 20930-20934",
+          "source_pdf_lines": [
+            20797,
+            20934
+          ],
+          "uses": [
+            "Composite_projected_gradient_6_3_8",
+            "Prox_mapping_6_3_6",
+            "SBMD_update_6_3_13"
+          ],
+          "produces": "source_gap:Lemma_6_7_uses_printed_PXi_update_as_prox_point_and_scaled_displacement."
+        },
+        {
+          "step": 2,
+          "description": "Apply the optimality condition of (6.3.6) to the sampled-block update through the source_gap in previous_step:1 to get the printed witness and variational inequality (6.3.17).",
+          "ref": "Eq. (6.3.17), lines 20902-20907",
+          "source_pdf_lines": [
+            20902,
+            20907
+          ],
+          "math": "\\left\\langle G_{i_k}+\\frac{1}{\\gamma_k}[\\nabla\\nu_{i_k}(U_{i_k}^Tx_{k+1})-\\nabla\\nu_{i_k}(U_{i_k}^Tx_k)]+p,\\frac{1}{\\gamma_k}(u-U_{i_k}^Tx_{k+1})\\right\\rangle\\ge 0,\\quad \\forall u\\in X_{i_k}.",
+          "uses": [
+            "Prox_mapping_6_3_6",
+            "previous_step:1"
+          ],
+          "produces": "There exists p\\in\\partial\\chi_{i_k}(x_{k+1}) such that the variational inequality (6.3.17) holds."
+        },
+        {
+          "step": 3,
+          "description": "Set u=U_{i_k}^T x_k in (6.3.17) and rearrange terms to start the chain (6.3.18).",
+          "ref": "Eq. (6.3.18), lines 20908-20914",
+          "source_pdf_lines": [
+            20908,
+            20914
+          ],
+          "math": "\\left\\langle G_{i_k},\\frac{1}{\\gamma_k}U_{i_k}^T(x_k-x_{k+1})\\right\\rangle\\ge \\frac{1}{\\gamma_k^2}\\left\\langle\\nabla\\nu_{i_k}(U_{i_k}^Tx_{k+1})-\\nabla\\nu_{i_k}(U_{i_k}^Tx_k),U_{i_k}^T(x_{k+1}-x_k)\\right\\rangle+\\left\\langle p,\\frac{1}{\\gamma_k}U_{i_k}^T(x_{k+1}-x_k)\\right\\rangle.",
+          "uses": [
+            "previous_step:2"
+          ],
+          "produces": "First inequality in the (6.3.18) chain."
+        },
+        {
+          "step": 4,
+          "description": "Use the witness p\\in\\partial\\chi_{i_k}(x_{k+1}) from previous_step:2 and convexity of chi_{i_k} to replace the p inner product by the chi difference.",
+          "ref": "Eq. (6.3.18), lines 20916-20922",
+          "source_pdf_lines": [
+            20916,
+            20922
+          ],
+          "math": "\\ge \\frac{1}{\\gamma_k^2}\\left\\langle\\nabla\\nu_{i_k}(U_{i_k}^Tx_{k+1})-\\nabla\\nu_{i_k}(U_{i_k}^Tx_k),U_{i_k}^T(x_{k+1}-x_k)\\right\\rangle+\\frac{1}{\\gamma_k}\\left[\\chi_{i_k}(U_{i_k}^Tx_{k+1})-\\chi_{i_k}(U_{i_k}^Tx_k)\\right].",
+          "uses": [
+            "Separable_chi_6_3_4",
+            "previous_step:2",
+            "previous_step:3"
+          ],
+          "produces": "Convexity replacement in (6.3.18)."
+        },
+        {
+          "step": 5,
+          "description": "Use the strong convexity of the distance-generating function nu to lower-bound the Bregman-gradient inner product by the squared block displacement.",
+          "ref": "Eq. (6.3.18), lines 20923-20925",
+          "source_pdf_lines": [
+            20923,
+            20925
+          ],
+          "math": "\\ge \\frac{1}{\\gamma_k^2}\\|U_{i_k}^T(x_{k+1}-x_k)\\|^2+\\frac{1}{\\gamma_k}\\left[\\chi_{i_k}(U_{i_k}^Tx_{k+1})-\\chi_{i_k}(U_{i_k}^Tx_k)\\right].",
+          "uses": [
+            "DGF_strong_convexity_section_6_3",
+            "previous_step:4"
+          ],
+          "produces": "Strong-convexity lower bound in (6.3.18)."
+        },
+        {
+          "step": 6,
+          "description": "Use the source_gap update interpretation from previous_step:1 and separability of chi to turn the sampled-block chi difference into chi(x_{k+1})-chi(x_k).",
+          "ref": "Eq. (6.3.18), lines 20926-20933",
+          "source_pdf_lines": [
+            20926,
+            20933
+          ],
+          "math": "\\frac{1}{\\gamma_k^2}\\|U_{i_k}^T(x_{k+1}-x_k)\\|^2+\\frac{1}{\\gamma_k}[\\chi_{i_k}(U_{i_k}^Tx_{k+1})-\\chi_{i_k}(U_{i_k}^Tx_k)]=\\frac{1}{\\gamma_k^2}\\|U_{i_k}^T(x_{k+1}-x_k)\\|^2+\\frac{1}{\\gamma_k}[\\chi(x_{k+1})-\\chi(x_k)].",
+          "uses": [
+            "previous_step:1",
+            "Separable_chi_6_3_4",
+            "previous_step:5"
+          ],
+          "produces": "Last identity in (6.3.18)."
+        },
+        {
+          "step": 7,
+          "description": "Record the PDF-asserted displacement identity gamma_k tilde_g_k=U_{i_k}^T(x_k-x_{k+1}) after the source_gap in previous_step:1 has been made explicit.",
+          "ref": "Lemma 6.7 proof, lines 20930-20934",
+          "source_pdf_lines": [
+            20930,
+            20934
+          ],
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "Source-asserted sampled-block displacement identity."
+        },
+        {
+          "step": 8,
+          "description": "Use the completed (6.3.18) chain and the PDF-asserted displacement identity to convert the sampled-block descent inequality into (6.3.15).",
+          "ref": "Eq. (6.3.15), lines 20893-20897, and Lemma 6.7 proof, lines 20930-20934",
+          "source_pdf_lines": [
+            20893,
+            20934
+          ],
+          "math": "\\langle G_{i_k},\\tilde{g}_k\\rangle\\ge \\|\\tilde{g}_k\\|^2+\\frac{1}{\\gamma_k}[\\chi(x_{k+1})-\\chi(x_k)].",
+          "uses": [
+            "previous_step:6",
+            "previous_step:7"
+          ],
+          "produces": "First assertion of Lemma 6.7, Eq. (6.3.15)."
+        },
+        {
+          "step": 9,
+          "description": "Introduce the exact-gradient prox point used to compare against the stochastic sampled-block prox point.",
+          "ref": "Lemma 6.7 proof, lines 20935-20938",
+          "source_pdf_lines": [
+            20935,
+            20938
+          ],
+          "uses": [
+            "Composite_projected_gradient_6_3_8"
+          ],
+          "produces": "Definition from the source text: x_{k+1}^+ = x_k-\\gamma_k g_k."
+        },
+        {
+          "step": 10,
+          "description": "Apply the prox optimality condition to the exact-gradient prox point to get the witness q\\in\\partial\\chi_{i_k}(x_{k+1}^+) and the printed inequality (6.3.19).",
+          "ref": "Eq. (6.3.19), lines 20935-20944",
+          "source_pdf_lines": [
+            20935,
+            20944
+          ],
+          "math": "\\left\\langle U_{i_k}^T\\nabla f(x_k)+\\frac{1}{\\gamma_k}[\\nabla\\nu_{i_k}(U_{i_k}^Tx_{k+1}^+)-\\nabla\\nu_{i_k}(U_{i_k}^Tx_k)]+q,\\frac{1}{\\gamma_k}(u-U_{i_k}^Tx_{k+1}^+)\\right\\rangle\\ge 0,\\quad \\forall u\\in X_{i_k}.",
+          "uses": [
+            "Composite_projected_gradient_6_3_8",
+            "Prox_mapping_6_3_6",
+            "previous_step:9"
+          ],
+          "produces": "There exists q\\in\\partial\\chi_{i_k}(x_{k+1}^+) such that the exact-gradient variational inequality (6.3.19) holds."
+        },
+        {
+          "step": 11,
+          "description": "In (6.3.17), set u=U_{i_k}^T x_{k+1}^+ and repeat the same convexity argument as in (6.3.18).",
+          "ref": "Lemma 6.7 proof, lines 20945-20953",
+          "source_pdf_lines": [
+            20945,
+            20953
+          ],
+          "math": "\\left\\langle G_{i_k},\\frac{1}{\\gamma_k}U_{i_k}^T(x_{k+1}^+-x_{k+1})\\right\\rangle\\ge \\frac{1}{\\gamma_k^2}\\left\\langle\\nabla\\nu_{i_k}(U_{i_k}^Tx_{k+1})-\\nabla\\nu_{i_k}(U_{i_k}^Tx_k),U_{i_k}^T(x_{k+1}-x_{k+1}^+)\\right\\rangle+\\frac{1}{\\gamma_k}\\left[\\chi_{i_k}(U_{i_k}^Tx_{k+1})-\\chi_{i_k}(U_{i_k}^Tx_{k+1}^+)\\right].",
+          "uses": [
+            "Separable_chi_6_3_4",
+            "previous_step:2",
+            "previous_step:9"
+          ],
+          "produces": "Noisy-prox comparison inequality."
+        },
+        {
+          "step": 12,
+          "description": "In (6.3.19), set u=U_{i_k}^T x_{k+1} and obtain the analogous exact-prox comparison inequality.",
+          "ref": "Lemma 6.7 proof, lines 20956-20965",
+          "source_pdf_lines": [
+            20956,
+            20965
+          ],
+          "math": "\\left\\langle U_{i_k}^T\\nabla f(x_k),\\frac{1}{\\gamma_k}U_{i_k}^T(x_{k+1}-x_{k+1}^+)\\right\\rangle\\ge \\frac{1}{\\gamma_k^2}\\left\\langle\\nabla\\nu_{i_k}(U_{i_k}^Tx_{k+1}^+)-\\nabla\\nu_{i_k}(U_{i_k}^Tx_k),U_{i_k}^T(x_{k+1}^+-x_{k+1})\\right\\rangle+\\frac{1}{\\gamma_k}\\left[\\chi_{i_k}(U_{i_k}^Tx_{k+1}^+)-\\chi_{i_k}(U_{i_k}^Tx_{k+1})\\right].",
+          "uses": [
+            "Separable_chi_6_3_4",
+            "previous_step:10"
+          ],
+          "produces": "Exact-prox comparison inequality."
+        },
+        {
+          "step": 13,
+          "description": "Sum the two comparison inequalities; the chi terms cancel and strong convexity of nu gives the squared-distance lower bound.",
+          "ref": "Lemma 6.7 proof, lines 20966-20972",
+          "source_pdf_lines": [
+            20966,
+            20972
+          ],
+          "math": "\\langle G_{i_k}-U_{i_k}^T\\nabla f(x_k),U_{i_k}^T(x_{k+1}^+-x_{k+1})\\rangle\\ge \\frac{1}{\\gamma_k}\\left\\langle\\nabla\\nu_{i_k}(U_{i_k}^Tx_{k+1})-\\nabla\\nu_{i_k}(U_{i_k}^Tx_{k+1}^+),U_{i_k}^T(x_{k+1}-x_{k+1}^+)\\right\\rangle\\ge \\frac{1}{\\gamma_k}\\|U_{i_k}^T(x_{k+1}-x_{k+1}^+)\\|_{i_k}^2.",
+          "uses": [
+            "DGF_strong_convexity_section_6_3",
+            "previous_step:11",
+            "previous_step:12"
+          ],
+          "produces": "Strong monotonicity comparison between noisy and exact prox points."
+        },
+        {
+          "step": 14,
+          "description": "Apply Cauchy-Schwarz to the preceding inner-product lower bound.",
+          "ref": "Lemma 6.7 proof, lines 20974-20978",
+          "source_pdf_lines": [
+            20974,
+            20978
+          ],
+          "math": "\\frac{1}{\\gamma_k}\\|U_{i_k}^T(x_{k+1}-x_{k+1}^+)\\|_{i_k}\\le \\|G_{i_k}-U_{i_k}^T\\nabla f(x_k)\\|_{i_k,*}.",
+          "uses": [
+            "previous_step:13"
+          ],
+          "produces": "Distance between noisy and exact block prox points is bounded by gradient noise."
+        },
+        {
+          "step": 15,
+          "description": "Use the source_gap update interpretation from previous_step:1, the exact prox-point definition from previous_step:9, and (6.3.8) to rewrite the prox-point distance as tilde_g_k-U_{i_k}^T g_k, giving (6.3.16).",
+          "ref": "Lemma 6.7 proof, lines 20979-20986",
+          "source_pdf_lines": [
+            20979,
+            20986
+          ],
+          "math": "\\|\\tilde{g}_k-U_{i_k}^Tg_k\\|_{i_k}=\\left\\|\\frac{1}{\\gamma_k}U_{i_k}^T(x_k-x_{k+1})-\\frac{1}{\\gamma_k}U_{i_k}^T(x_k-x_{k+1}^+)\\right\\|_{i_k}=\\frac{1}{\\gamma_k}\\|U_{i_k}^T(x_{k+1}^+-x_{k+1})\\|_{i_k}\\le \\|G_{i_k}-U_{i_k}^T\\nabla f(x_k)\\|_{i_k,*}.",
+          "uses": [
+            "Composite_projected_gradient_6_3_8",
+            "previous_step:1",
+            "previous_step:9",
+            "previous_step:14"
+          ],
+          "produces": "Second assertion of Lemma 6.7, Eq. (6.3.16)."
+        }
+      ]
+    }
+  ]
+}

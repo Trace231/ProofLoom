@@ -1,0 +1,219 @@
+{
+  "title": "Lean artifact construction atlas",
+  "design_date": "2026-09-28",
+  "statistics_update_utc": "2026-09-25T15:07:57.347010+00:00",
+  "snapshot_scope": "AMSGrad and MARS source/dependency snapshots verified on 2026-09-25T15:07:57.347010+00:00. The other 31 previously charted rows retain their prior snapshots.",
+  "artifact_count": 33,
+  "unit": "Code-bearing source lines, excluding blank and comment-only lines",
+  "outer_definition": "Algorithm-local code-bearing Lean lines in the audited source files.",
+  "inner_definition": "Per-artifact deduplicated code-bearing line union of explicitly referenced SOptLib declarations and their recursively named library dependencies, including the Gaussian KL extension.",
+  "aggregation": "Deduplicated within each artifact. Do not interpret the sum across artifacts as globally unique library LOC.",
+  "amsgrad_extraction_scope": "AMSGrad includes 525 code-bearing lines of imported Phase3 extraction modules under Staging, already called by its compiling proof and awaiting final library consolidation, plus 29 canonical SOptLib support lines. Unimplemented extraction candidates and whole unused imported modules are excluded.",
+  "scale": {
+    "transform": "square root",
+    "outer_length_px": "288 * sqrt(algorithm_code_lines / 80000)",
+    "inner_length_px": "1.15 * 288 * sqrt(library_support_code_lines / 80000)",
+    "zero_radius_px": 280,
+    "angle_and_area": "Do not encode quantity"
+  },
+  "rows": [
+    {
+      "algorithm": "AMSGrad",
+      "source_group": "research_paper",
+      "algorithm_code_lines": 7392,
+      "library_support_code_lines": 554
+    },
+    {
+      "algorithm": "Heavy-Ball",
+      "source_group": "research_notes",
+      "algorithm_code_lines": 15282,
+      "library_support_code_lines": 392
+    },
+    {
+      "algorithm": "Lion",
+      "source_group": "research_paper",
+      "algorithm_code_lines": 5572,
+      "library_support_code_lines": 897
+    },
+    {
+      "algorithm": "RSAGD",
+      "source_group": "FOML",
+      "algorithm_code_lines": 5909,
+      "library_support_code_lines": 1281
+    },
+    {
+      "algorithm": "NC-SBMD",
+      "source_group": "FOML",
+      "algorithm_code_lines": 2891,
+      "library_support_code_lines": 1798
+    },
+    {
+      "algorithm": "2-RSGD",
+      "source_group": "FOML",
+      "algorithm_code_lines": 3783,
+      "library_support_code_lines": 845
+    },
+    {
+      "algorithm": "2-RSMD",
+      "source_group": "FOML",
+      "algorithm_code_lines": 10441,
+      "library_support_code_lines": 203
+    },
+    {
+      "algorithm": "NC-VRMD",
+      "source_group": "FOML",
+      "algorithm_code_lines": 3666,
+      "library_support_code_lines": 3426
+    },
+    {
+      "algorithm": "PAGE",
+      "source_group": "research_paper",
+      "algorithm_code_lines": 6221,
+      "library_support_code_lines": 1083
+    },
+    {
+      "algorithm": "PULM-DGD",
+      "source_group": "research_paper",
+      "algorithm_code_lines": 3304,
+      "library_support_code_lines": 483
+    },
+    {
+      "algorithm": "RSGF",
+      "source_group": "FOML",
+      "algorithm_code_lines": 7402,
+      "library_support_code_lines": 5056
+    },
+    {
+      "algorithm": "RGEM",
+      "source_group": "FOML",
+      "algorithm_code_lines": 11663,
+      "library_support_code_lines": 4170
+    },
+    {
+      "algorithm": "RPDG",
+      "source_group": "FOML",
+      "algorithm_code_lines": 13879,
+      "library_support_code_lines": 3799
+    },
+    {
+      "algorithm": "RapGrad",
+      "source_group": "FOML",
+      "algorithm_code_lines": 15800,
+      "library_support_code_lines": 3386
+    },
+    {
+      "algorithm": "SAM",
+      "source_group": "research_paper",
+      "algorithm_code_lines": 12522,
+      "library_support_code_lines": 2272
+    },
+    {
+      "algorithm": "SPIDER-SFO",
+      "source_group": "research_paper",
+      "algorithm_code_lines": 8647,
+      "library_support_code_lines": 2638
+    },
+    {
+      "algorithm": "AC-SA",
+      "source_group": "FOML",
+      "algorithm_code_lines": 8807,
+      "library_support_code_lines": 4578
+    },
+    {
+      "algorithm": "SAMP",
+      "source_group": "FOML",
+      "algorithm_code_lines": 7795,
+      "library_support_code_lines": 2401
+    },
+    {
+      "algorithm": "SAPD",
+      "source_group": "FOML",
+      "algorithm_code_lines": 12302,
+      "library_support_code_lines": 10518
+    },
+    {
+      "algorithm": "SBMD",
+      "source_group": "FOML",
+      "algorithm_code_lines": 3797,
+      "library_support_code_lines": 4174
+    },
+    {
+      "algorithm": "SCGS",
+      "source_group": "FOML",
+      "algorithm_code_lines": 4859,
+      "library_support_code_lines": 1326
+    },
+    {
+      "algorithm": "SMD-SP",
+      "source_group": "FOML",
+      "algorithm_code_lines": 7877,
+      "library_support_code_lines": 4377
+    },
+    {
+      "algorithm": "SGS",
+      "source_group": "FOML",
+      "algorithm_code_lines": 53702,
+      "library_support_code_lines": 1685
+    },
+    {
+      "algorithm": "SMD",
+      "source_group": "FOML",
+      "algorithm_code_lines": 3130,
+      "library_support_code_lines": 3612
+    },
+    {
+      "algorithm": "NC-SCGS",
+      "source_group": "FOML",
+      "algorithm_code_lines": 5578,
+      "library_support_code_lines": 3999
+    },
+    {
+      "algorithm": "NC-VRCG",
+      "source_group": "FOML",
+      "algorithm_code_lines": 20600,
+      "library_support_code_lines": 1513
+    },
+    {
+      "algorithm": "STORM",
+      "source_group": "research_paper",
+      "algorithm_code_lines": 15163,
+      "library_support_code_lines": 3604
+    },
+    {
+      "algorithm": "2-RSGF",
+      "source_group": "FOML",
+      "algorithm_code_lines": 11470,
+      "library_support_code_lines": 5299
+    },
+    {
+      "algorithm": "Push–Pull",
+      "source_group": "research_notes",
+      "algorithm_code_lines": 68983,
+      "library_support_code_lines": 1292
+    },
+    {
+      "algorithm": "VRAGD",
+      "source_group": "FOML",
+      "algorithm_code_lines": 26257,
+      "library_support_code_lines": 6904
+    },
+    {
+      "algorithm": "VRMD",
+      "source_group": "FOML",
+      "algorithm_code_lines": 29001,
+      "library_support_code_lines": 1170
+    },
+    {
+      "algorithm": "R/C-DGD",
+      "source_group": "research_notes",
+      "algorithm_code_lines": 5611,
+      "library_support_code_lines": 183
+    },
+    {
+      "algorithm": "MARS",
+      "source_group": "research_paper",
+      "algorithm_code_lines": 8895,
+      "library_support_code_lines": 930
+    }
+  ]
+}

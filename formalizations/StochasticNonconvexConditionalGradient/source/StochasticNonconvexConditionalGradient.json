@@ -1,0 +1,211 @@
+{
+  "algorithm": "StochasticNonconvexConditionalGradient",
+  "full_name": "Nonconvex Variance-Reduced Conditional Gradient for Stochastic Optimization",
+  "source_reference": "Lan, First-order and Stochastic Optimization Methods for Machine Learning, Springer 2020 (Algorithm 7.13, Theorem 7.17, and Corollary 7.12)",
+  "formalization_notes": [
+    "Corrected 2026-06-10: the previous JSON incorrectly promoted Corollary 7.12's constant stepsize and sqrt-batch specialization into the Algorithm 7.13/Theorem 7.17 object layer.",
+    "The repaired source model keeps Algorithm 7.13 and Theorem 7.17 general in the stepsize sequence {alpha_k} and batch-size condition b >= T.",
+    "Eq. (7.4.15) and b = T = sqrt(m) are recorded only as the Corollary 7.12 specialization, not as primitive data for Theorem 7.17."
+  ],
+  "setup": {
+    "problem": {
+      "math": "f^* := \\min_{x \\in X} f(x)",
+      "ref": "Eq. (7.4.1)",
+      "description": "Nonconvex stochastic optimization over a compact convex set"
+    },
+    "variable_space": {
+      "math": "X \\subseteq \\mathbb{R}^n \\text{ closed compact convex}; \\; f(x) = \\mathbb{E}[F(x, \\xi)], \\; \\xi \\in \\Xi \\subseteq \\mathbb{R}^d",
+      "ref": "Eqs. (7.4.1), (7.4.12)"
+    }
+  },
+  "assumptions": [
+    {
+      "name": "Almost sure L-smoothness",
+      "math": "F(\\cdot, \\xi) \\text{ is a smooth function with Lipschitz constant } L \\text{ for any } \\xi \\in \\Xi \\text{ almost surely}",
+      "ref": "Section 7.4.2",
+      "parameters": ["L > 0"]
+    },
+    {
+      "name": "Paired gradient access",
+      "math": "\\text{It is possible to generate a realization } \\xi \\in \\Xi, \\text{ and to compute } \\nabla F(x, \\xi) \\text{ and } \\nabla F(y, \\xi) \\text{ for any given two points } x, y \\in X \\text{ for a fixed realization } \\xi",
+      "ref": "Section 7.4.2"
+    },
+    {
+      "name": "Unbiased gradient",
+      "math": "\\mathbb{E}[\\nabla F(x, \\xi)] = \\nabla f(x), \\quad \\forall x \\in X",
+      "ref": "Section 7.4.2"
+    },
+    {
+      "name": "Bounded variance",
+      "math": "\\mathbb{E}[\\|\\nabla F(x, \\xi) - \\nabla f(x)\\|^2] \\le \\sigma^2",
+      "ref": "Eq. (7.4.13)",
+      "parameters": ["\\sigma^2 \\ge 0"]
+    }
+  ],
+  "algorithm_spec": {
+    "ref": "Algorithm 7.13",
+    "initialization": {
+      "math": "x_1 \\in X, \\; T, \\; \\{\\alpha_k\\}, \\; \\text{refresh sample size } m, \\; \\text{recursive mini-batch size } b",
+      "ref": "Algorithm 7.13"
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "Epoch refresh (if k % T == 1)",
+        "math": "\\text{Generate i.i.d. sample } H^s = \\{\\xi_1^s, \\ldots, \\xi_m^s\\}, \\quad G_k = \\frac{1}{m} \\sum_{i=1}^{m} \\nabla F(x_k, \\xi_i^s), \\quad s \\leftarrow s + 1",
+        "ref": "Algorithm 7.13"
+      },
+      {
+        "step": 2,
+        "name": "Recursive gradient update (otherwise)",
+        "math": "\\text{Generate i.i.d. sample } I^k = \\{\\xi_1^k, \\ldots, \\xi_b^k\\}, \\quad G_k = \\frac{1}{b} \\sum_{i=1}^{b} \\left( \\nabla F(x_k, \\xi_i^k) - \\nabla F(x_{k-1}, \\xi_i^k) \\right) + G_{k-1}",
+        "ref": "Algorithm 7.13"
+      },
+      {
+        "step": 3,
+        "name": "Linear minimization oracle",
+        "math": "y_k = \\operatorname{argmin}_{x \\in X} \\langle G_k, x \\rangle",
+        "ref": "Algorithm 7.13"
+      },
+      {
+        "step": 4,
+        "name": "Convex combination update",
+        "math": "x_{k+1} = (1 - \\alpha_k) x_k + \\alpha_k y_k",
+        "ref": "Algorithm 7.13"
+      }
+    ],
+    "output": {
+      "math": "x_R, \\quad \\text{where } \\operatorname{Prob}\\{R = k\\} = \\frac{\\alpha_k}{\\sum_{k=1}^{N} \\alpha_k}, \\; k = 1, \\ldots, N",
+      "ref": "Algorithm 7.13",
+      "type": "random_iterate"
+    },
+    "parameters": [
+      {
+        "name": "\\{\\alpha_k\\}",
+        "math": "\\{\\alpha_k\\}_{k=1}^{N} \\text{ is the general stepsize sequence used by Algorithm 7.13 and Theorem 7.17}",
+        "ref": "Algorithm 7.13; Theorem 7.17"
+      },
+      {
+        "name": "b, T",
+        "math": "b \\ge T",
+        "ref": "Theorem 7.17"
+      },
+      {
+        "name": "\\bar{D}_X",
+        "math": "\\bar{D}_X := \\max_{x, y \\in X} \\|x - y\\|",
+        "ref": "Eq. (7.1.18)"
+      },
+      {
+        "name": "\\delta_k",
+        "math": "\\delta_k := G_k - \\nabla f(x_k)",
+        "ref": "Section 7.4"
+      },
+      {
+        "name": "\\operatorname{gap}(\\bar{x})",
+        "math": "\\operatorname{gap}(\\bar{x}) := \\max_{x \\in X} \\langle \\nabla f(\\bar{x}), \\bar{x} - x \\rangle",
+        "ref": "Eq. (7.3.3)"
+      }
+    ]
+  },
+  "main_theorem": {
+    "ref": "Theorem 7.17",
+    "statement_math": "\\mathbb{E}[\\operatorname{gap}(x_R)] \\le \\frac{f(x_1)-f^*}{\\sum_{k=1}^{N} \\alpha_k} + \\frac{L \\bar{D}_X^2}{\\sum_{k=1}^{N} \\alpha_k} \\left[ \\frac{3}{2}\\sum_{k=1}^{N}\\alpha_k^2 + \\sum_{s=0}^{S}\\left(\\sum_{j=1}^{T}\\alpha_{s,j}\\max_{j=2,\\ldots,T}\\alpha_{s,j}\\right) \\right] + \\frac{N\\sigma^2}{2Lm\\sum_{k=1}^{N}\\alpha_k}, \\quad S=\\lceil N/T\\rceil",
+    "rate": "Theorem 7.17 is the general convergence bound. Complexity rates are obtained only after the Corollary 7.12 specialization.",
+    "measure": "expected Wolfe gap",
+    "proof": [
+      {
+        "step": 1,
+        "description": "Use smoothness of f with the convex combination update x_{k+1} = (1 - alpha_k)x_k + alpha_k y_k to derive the one-step descent inequality",
+        "math": "f(x_{k+1}) \\le f(x_k) + \\alpha_k \\langle G_k, y_k - x_k \\rangle + \\frac{1}{2L} \\|\\delta_k\\|^2 + L \\alpha_k^2 \\|y_k - x_k\\|^2",
+        "uses": []
+      },
+      {
+        "step": 2,
+        "description": "Combine the descent inequality with the Wolfe-gap surrogate (7.4.2) to bound gap(x_k) by the linear oracle term plus estimator error",
+        "math": "\\operatorname{gap}(x_k) \\le \\max_{x \\in X} \\langle G_k, x_k - x \\rangle + \\|\\delta_k\\| \\bar{D}_X",
+        "uses": ["Wolfe-gap upper bound"]
+      },
+      {
+        "step": 3,
+        "description": "Apply the stochastic estimator variance bound (Lemma 7.5) to replace (6.5.16) in the Theorem 7.16 proof, obtaining the stochastic bound of Theorem 7.17",
+        "math": "\\mathbb{E}[\\operatorname{gap}(x_R)] \\le \\frac{f(x_1) - f^*}{\\sum_{k=1}^{N} \\alpha_k} + \\frac{L \\bar{D}_X^2}{\\sum_{k=1}^{N} \\alpha_k} \\left[ \\frac{3}{2} \\sum_{k=1}^{N} \\alpha_k^2 + \\sum_{s=0}^{S} \\left( \\sum_{j=1}^{T} \\alpha_{s,j} \\max_{j=2,\\ldots,T} \\alpha_{s,j} \\right) \\right] + \\frac{N \\sigma^2}{2 L m \\sum_{k=1}^{N} \\alpha_k}",
+        "uses": ["Epochwise estimator variance bound (Lemma 7.5)", "Finite-sum nonconvex CG bound (Theorem 7.16)"]
+      }
+    ]
+  },
+  "corollary_specializations": [
+    {
+      "name": "Corollary 7.12",
+      "ref": "Corollary 7.12; Eq. (7.4.15); Eq. (7.4.7)",
+      "parameter_regime": {
+        "stepsize": "\\alpha_k = \\alpha := \\left[ \\left( \\frac{1}{N} + \\frac{\\sigma^2}{Lm} \\right) \\frac{1}{L \\bar{D}_X^2} \\right]^{1/2}",
+        "batch": "b = T = \\sqrt{m}"
+      },
+      "statement_math_printed": "\\mathbb{E}[\\operatorname{gap}(x_R)] \\le \\frac{f(x_1) - f^*}{\\sqrt{N}} + \\frac{7 L \\bar{D}_X^2}{2\\sqrt{N}} + \\frac{4 \\sigma \\bar{D}_X}{\\sqrt{m}}",
+      "proof_role": "Specializes Theorem 7.17 by substituting Eq. (7.4.15), using \\sum_{k=1}^{N}\\alpha_k=N\\alpha, \\sum_{k=1}^{N}\\alpha_k^2=N\\alpha^2, and bounding the epoch maximum term by 2N\\alpha^2.",
+      "formalization_warning": "This specialization must not be used as the definition of Algorithm 7.13 or Theorem 7.17. It is a corollary-level parameter regime."
+    }
+  ],
+  "key_lemmas": [
+    {
+      "name": "Wolfe-gap upper bound",
+      "ref": "Eq. (7.4.2)",
+      "statement_math": "\\operatorname{gap}(x_k) \\le \\max_{x \\in X} \\langle G_k, x_k - x \\rangle + \\|\\delta_k\\| \\bar{D}_X",
+      "role": "Bounds the true Wolfe gap by the linear oracle model gap plus the estimator error times the diameter",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Start from the Wolfe-gap definition and write nabla f(x_k) = G_k - delta_k",
+          "math": "\\operatorname{gap}(x_k) = \\max_{x \\in X} \\langle \\nabla f(x_k), x_k - x \\rangle = \\max_{x \\in X} \\langle G_k - \\delta_k, x_k - x \\rangle",
+          "uses": []
+        },
+        {
+          "step": 2,
+          "description": "Bound the perturbation term using the feasible-set diameter",
+          "math": "\\langle \\delta_k, x - x_k \\rangle \\le \\|\\delta_k\\| \\|x - x_k\\| \\le \\|\\delta_k\\| \\bar{D}_X",
+          "uses": []
+        }
+      ]
+    },
+    {
+      "name": "Epochwise estimator variance bound (Lemma 7.5)",
+      "ref": "Lemma 7.5 / Eq. (7.4.14)",
+      "statement_math": "\\mathbb{E}[\\|\\delta_k\\|^2] \\equiv \\mathbb{E}[\\|\\delta_{(s,t)}\\|^2] \\le \\frac{L^2}{b} \\sum_{i=2}^{t} \\mathbb{E}[\\|x_{(s,i)} - x_{(s,i-1)}\\|^2] + \\frac{\\sigma^2}{m}",
+      "role": "Bounds the expected squared error of the recursive gradient estimator within each epoch for the stochastic setting",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Within one epoch, expand the recursive definition of G_k and isolate the centered mini-batch gradient-difference noise plus the batch-refresh noise from the epoch start",
+          "math": "\\delta_{(s,t)} = \\frac{1}{b} \\sum_{i=1}^{b} [\\nabla F(x_{(s,t)}, \\xi_i^{(s,t)}) - \\nabla F(x_{(s,t-1)}, \\xi_i^{(s,t)})] - [\\nabla f(x_{(s,t)}) - \\nabla f(x_{(s,t-1)})] + \\delta_{(s,t-1)}",
+          "uses": []
+        },
+        {
+          "step": 2,
+          "description": "Use almost sure L-smoothness, independence of the fresh samples, and the variance bound (7.4.13) to control the recursive term by iterate differences and the refresh term by sigma^2/m",
+          "math": "\\mathbb{E}[\\|\\delta_{(s,t)}\\|^2] \\le \\frac{L^2}{b} \\sum_{i=2}^{t} \\mathbb{E}[\\|x_{(s,i)} - x_{(s,i-1)}\\|^2] + \\frac{\\sigma^2}{m}",
+          "uses": []
+        }
+      ]
+    },
+    {
+      "name": "Finite-sum nonconvex CG bound (Theorem 7.16)",
+      "ref": "Theorem 7.16",
+      "statement_math": "\\mathbb{E}[\\operatorname{gap}(x_R)] \\le \\frac{f(x_1) - f^*}{\\sum_{k=1}^{N} \\alpha_k} + \\frac{L \\bar{D}_X^2}{\\sum_{k=1}^{N} \\alpha_k} \\left[ \\frac{3}{2} \\sum_{k=1}^{N} \\alpha_k^2 + \\sum_{s=0}^{S} \\left( \\sum_{j=1}^{T} \\alpha_{s,j} \\max_{j=2,\\ldots,T} \\alpha_{s,j} \\right) \\right]",
+      "role": "Provides the finite-sum nonconvex conditional gradient convergence bound that serves as the template for the stochastic extension",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Use smoothness of f with the update x_{k+1} = (1 - alpha_k)x_k + alpha_k y_k to derive the one-step inequality (7.4.5), then combine with the Wolfe-gap surrogate (7.4.2)",
+          "math": "f(x_{k+1}) \\le f(x_k) + \\alpha_k \\langle G_k, y_k - x_k \\rangle + \\frac{1}{2L}\\|\\delta_k\\|^2 + L\\alpha_k^2 \\bar{D}_X^2",
+          "uses": ["Wolfe-gap upper bound"]
+        },
+        {
+          "step": 2,
+          "description": "Substitute the finite-sum estimator variance bound (Lemma 7.4), sum over iterations inside an epoch, control the double sums, and telescope over epochs",
+          "math": "\\sum_{j=1}^{T} \\alpha_{s,j} \\mathbb{E}[\\operatorname{gap}(x_{s,j})] \\le \\mathbb{E}[f(x_{s,1})] - \\mathbb{E}[f(x_{s,t+1})] + L \\bar{D}_X^2 \\left[ \\frac{3}{2} \\sum_{j=1}^{T} \\alpha_{s,j}^2 + \\sum_{j=1}^{T} \\alpha_{s,j} \\max_{j=2,\\ldots,T} \\alpha_{s,j} \\right]",
+          "uses": []
+        }
+      ]
+    }
+  ]
+}

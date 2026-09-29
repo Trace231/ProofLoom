@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ProofLoom: Algorithms in ML, FORMALIZED.</title>
+<meta name="description" content="From research papers to Lean proofs, reusable optimization theory, and checked evidence of gaps in the original mathematics.">
+<link rel="canonical" href="https://trace231.github.io/ProofLoom/">
+<link rel="stylesheet" href="blog-assets/katex.min.css"><link rel="stylesheet" href="blog-assets/blog.css">
+<link rel="stylesheet" href="blog-assets/celestial.css?v=20260929-3"><script src="blog-assets/celestial.js?v=20260929-3" defer></script>
+</head><body id="top">
+<a class="skip-link" href="#story">Skip to article</a>
+<header class="site-header"><canvas class="header-sky" aria-hidden="true"></canvas><div class="nav-inner"><a class="brand" href="https://pkumelon.com/blog" aria-label="MELON research blog">MELON<span>RESEARCH</span></a><nav aria-label="Article navigation"><a href="#story">Overview</a><a href="#how-proofloom-constructs-the-theory">Method</a><a href="#results-across-textbook-and-research-paper-tasks">Results</a><a href="#the-artifacts-a-growing-body-of-optimization-theory">Artifacts</a><a href="https://github.com/Trace231/ProofLoom" class="nav-code">GitHub <span aria-hidden="true">↗</span></a></nav></div><div class="reading-progress" aria-hidden="true"></div></header>
+<canvas class="lattice-field" aria-hidden="true"></canvas>
+<section class="hero" aria-labelledby="article-title">
+  <div class="hero-art" data-motion="still">
+    <img class="hero-image" src="blog-assets/proofloom-galaxy.png" width="2014" height="780" alt="" fetchpriority="high">
+    <div class="galaxy-aura" aria-hidden="true"></div>
+    <canvas class="celestial-field" aria-hidden="true"></canvas>
+  </div>
+  <div class="hero-copy"><p class="hero-eyebrow">MELON GROUP <span>/</span> PKU CMLR</p><h1 id="article-title">ProofLoom</h1><p class="hero-tagline">Algorithms in ML,<br><strong>FORMALIZED.</strong></p><p class="hero-description">From mathematical sources to Lean proofs.</p></div>
+  <div class="hero-meta"><span>September 28, 2026</span><span>10 min read</span><div class="hero-actions"><button class="motion-toggle" type="button" aria-label="Pause celestial animation" aria-pressed="false" title="Pause celestial animation" hidden><svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><g class="motion-pause"><path d="M7 5v10M13 5v10" /></g><path class="motion-play" d="m7 4 8 6-8 6Z" /></svg></button><a href="#story">Read the story <span aria-hidden="true">↓</span></a></div></div>
+</section>
+<main id="story" class="layout">
+<aside class="toc"><p>IN THIS ARTICLE</p><a href="#a-proof-can-reveal-what-the-model-is-missing"><span>01</span>The missing mathematics</a>
+<a href="#how-proofloom-constructs-the-theory"><span>02</span>How ProofLoom works</a>
+<a href="#results-across-textbook-and-research-paper-tasks"><span>03</span>Benchmark results</a>
+<a href="#the-artifacts-a-growing-body-of-optimization-theory"><span>04</span>Artifacts & SOptLib</a>
+<a href="#what-formalization-reveals-about-the-source-mathematics"><span>05</span>Source findings</a>
+<a href="#explore-the-mathematics"><span>06</span>Explore the proofs</a><a class="toc-github" href="https://github.com/Trace231/ProofLoom">Explore the code ↗</a></aside>
+<article class="article">
+<p class="article-deck">From research proofs<br><em>to reusable theory.</em></p>
+<div class="article-meta"><span>MELON Research Group</span><span>Center for Machine Learning Research, Peking University</span></div>
+<div class="tags"><span>Autoformalization</span><span>Lean 4</span><span>Stochastic optimization</span><span>LLM agents</span></div>
+<blockquote class="abstract">
+<span class="abstract-label">In brief</span><p>ProofLoom turns stochastic optimization papers into Lean developments by building the mathematics demanded by their proofs. It achieves human ratings of <strong>6.3/7 on textbook tasks and 6.4/7 on research-paper tasks</strong>, ahead of six baselines. The broader collection spans <strong>33 developments and roughly 490,000 lines of algorithm-local Lean source</strong>, grows a reusable theory library, and exposes <strong>28 source discrepancies across 22 developments</strong>.</p>
+</blockquote>
+<p>A convergence proof may occupy only a few pages. Making it checkable by a proof assistant can require thousands of lines of mathematics: probability spaces, sampling histories, stochastic oracles, analytical inequalities, and the arguments connecting them. Much of this infrastructure is implicit in the paper.</p>
+<p><strong>ProofLoom starts from the result we want to prove.</strong> Each open Lean goal helps decide which definition, interface, or lemma to build next. As the proof develops, the system can repair its mathematical model, check the repair against the source, and turn the resulting theory into reusable infrastructure for later algorithms.</p>
+<p>The output is an inspectable body of mathematics: algorithm definitions, formal proofs, shared library results, and evidence about steps in the original argument that need clarification or correction.</p>
+<h2 id="a-proof-can-reveal-what-the-model-is-missing"><span class="section-number">01</span>A proof can reveal what the model is missing</h2>
+<p>Consider a familiar step in stochastic optimization. An oracle is unbiased at every fixed query:</p>
+<p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><msub><mi mathvariant="double-struck">E</mi><mi>ξ</mi></msub><mo stretchy="false">[</mo><mi>G</mi><mo stretchy="false">(</mo><mi>x</mi><mo separator="true">,</mo><mi>ξ</mi><mo stretchy="false">)</mo><mo stretchy="false">]</mo><mo>=</mo><mi>g</mi><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">\mathbb{E}_{\xi}[G(x,\xi)] = g(x).</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1.0361em;vertical-align:-0.2861em;"></span><span class="mord"><span class="mord mathbb">E</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3361em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight" style="margin-right:0.04601em;">ξ</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2861em;"><span></span></span></span></span></span></span><span class="mopen">[</span><span class="mord mathnormal">G</span><span class="mopen">(</span><span class="mord mathnormal">x</span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal" style="margin-right:0.04601em;">ξ</span><span class="mclose">)]</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.03588em;">g</span><span class="mopen">(</span><span class="mord mathnormal">x</span><span class="mclose">)</span><span class="mord">.</span></span></span></span></span></p>
+<p>The convergence proof needs the corresponding identity at the <strong>random iterate</strong>:</p>
+<p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mi mathvariant="double-struck">E</mi><mo stretchy="false">[</mo><mi>G</mi><mo stretchy="false">(</mo><msub><mi>x</mi><mi>t</mi></msub><mo separator="true">,</mo><msub><mi>ξ</mi><mi>t</mi></msub><mo stretchy="false">)</mo><mo>∣</mo><msub><mi mathvariant="script">F</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo stretchy="false">]</mo><mo>=</mo><mi>g</mi><mo stretchy="false">(</mo><msub><mi>x</mi><mi>t</mi></msub><mo stretchy="false">)</mo><mspace width="1em"/><mtext>almost surely</mtext><mi mathvariant="normal">.</mi></mrow><annotation encoding="application/x-tex">\mathbb{E}[G(x_t,\xi_t)\mid\mathcal{F}_{t-1}] = g(x_t)
+\quad\text{almost surely}.</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathbb">E</span><span class="mopen">[</span><span class="mord mathnormal">G</span><span class="mopen">(</span><span class="mord"><span class="mord mathnormal">x</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mpunct">,</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.04601em;">ξ</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:-0.046em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">∣</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord"><span class="mord mathcal" style="margin-right:0.09931em;">F</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.3011em;"><span style="top:-2.55em;margin-left:-0.0993em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight"><span class="mord mathnormal mtight">t</span><span class="mbin mtight">−</span><span class="mord mtight">1</span></span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.2083em;"><span></span></span></span></span></span></span><span class="mclose">]</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.03588em;">g</span><span class="mopen">(</span><span class="mord"><span class="mord mathnormal">x</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.2806em;"><span style="top:-2.55em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">t</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mclose">)</span><span class="mspace" style="margin-right:1em;"></span><span class="mord text"><span class="mord">almost surely</span></span><span class="mord">.</span></span></span></span></span></p>
+<p>Here, the iterate depends on earlier samples, while the current sample must be fresh relative to that history. To justify the step, the formal model needs to express those relationships, together with the relevant measurability and integrability conditions.</p>
+<p>If the initial Lean model omitted the sampling history, searching harder for a proof will eventually run into that omission. The open goal identifies the missing structure: how the iterate depends on the past, how the next sample is drawn, and the bridge from a fixed-query expectation to a conditional one.</p>
+<figure class="diagram"><a href="blog-assets/paper-construction-order.png" target="_blank" rel="noopener" aria-label="Open figure at full resolution"><img src="blog-assets/paper-construction-order.png" alt="Two construction orders: building theory from the foundations, and constructing the definitions and lemmas required by the target proof."></a><figcaption><span class="figure-label"><span>Figure</span><span>01</span></span><span class="caption-copy">The target proof selects the mathematical infrastructure to construct. The resulting definitions and lemmas can then support the next algorithm.</span></figcaption></figure>
+<p>This is <strong>proof-obligation-driven theory construction</strong>. The target theorem provides a concrete test for whether an interface is useful, whether a lemma is strong enough, and whether the algorithm model expresses the dependencies its proof requires.</p>
+<h2 id="how-proofloom-constructs-the-theory"><span class="section-number">02</span>How ProofLoom constructs the theory</h2>
+<p>The workflow has three stages: <strong>Model → Construct → Learn</strong>.</p>
+<h3 id="model-represent-the-algorithm-and-its-target-result">Model: represent the algorithm and its target result</h3>
+<p>ProofLoom begins with the source algorithm, its assumptions, its theorem, and its supporting argument. It builds Lean objects for the updates and randomness, then states the result to be proved. Source review checks that these objects represent the intended mathematics.</p>
+<h3 id="construct-let-the-proof-guide-the-next-step">Construct: let the proof guide the next step</h3>
+<p>Planner expands the source argument into intermediate claims. Prover constructs the corresponding Lean proofs. Audit traces the actual dependencies of the formal proof back through those claims, locating missing links or proof branches that do not support the intended argument.</p>
+<p>When an obligation blocks progress, the system investigates what is missing: a supporting lemma, a better proof route, or a change to the mathematical model. Model changes pass through <strong>signature contracts</strong>. A contract records the declarations being changed, the supporting source passage, and the new facts that still need proofs. An independent Judge reviews the proposed change against that contract and the original result.</p>
+<p>For the stochastic-oracle example, adding a sampling history can make an implicit source dependency explicit. The conditional expectation identity then remains a theorem to establish. This separation lets the representation improve while keeping the mathematical work visible.</p>
+<h3 id="learn-make-the-construction-useful-again">Learn: make the construction useful again</h3>
+<p>After certification, ProofLoom extracts reusable definitions and lemmas, generalizes their interfaces, and checks them in the original development. Accepted additions enter <strong>SOptLib</strong>, together with records of modeling decisions, successful proof routes, failed attempts, and conditions for reuse.</p>
+<figure class="diagram"><a href="blog-assets/paper-system-overview.png" target="_blank" rel="noopener" aria-label="Open figure at full resolution"><img src="blog-assets/paper-system-overview.png" alt="ProofLoom workflow: algorithm modeling, Planner–Prover–Audit construction, source-reviewed reconstruction, and certification and extraction into SOptLib."></a><figcaption><span class="figure-label"><span>Figure</span><span>02</span></span><span class="caption-copy">Proof construction and model revision interact throughout the development. Completed, reviewed mathematics feeds back into SOptLib.</span></figcaption></figure>
+<h3 id="a-concrete-example-connecting-two-gaussian-representations">A concrete example: connecting two Gaussian representations</h3>
+<p>SAM&#39;s generalization argument needs a Gaussian KL calculation. An available theorem expresses the distributions in Euclidean coordinates; the algorithm development represents them as affine transformations of a standard Gaussian on an inner-product space.</p>
+<p>Using the theorem requires a mathematical bridge between those representations. ProofLoom makes the Euclidean measurable structure explicit, identifies the Gaussian laws under an orthonormal coordinate map, and proves that KL divergence is preserved by that change of coordinates. The resulting identity supplies the Gaussian calculation used downstream in the proof.</p>
+<p>This is the kind of infrastructure a short paper calculation can conceal: a familiar formula becomes usable only after the representations, assumptions, and transport argument fit together. The <a href="https://github.com/Trace231/ProofLoom/tree/main/formalizations/SAM">SAM development</a> contains the formal construction.</p>
+<h2 id="results-across-textbook-and-research-paper-tasks"><span class="section-number">03</span>Results across textbook and research-paper tasks</h2>
+<p>We compare seven systems on <strong>15 tasks</strong>: ten algorithms from Lan&#39;s <em>First-order and Stochastic Optimization Methods for Machine Learning</em> (FOML), and five research-paper algorithms — <strong>AMSGrad, STORM, SPIDER, PAGE, and SAM</strong>. Their target results include regret bounds, convergence guarantees, and a PAC-Bayes generalization bound.</p>
+<p>Each system–task pair receives a cumulative <strong>48-hour generation budget</strong>, including resumed runs. For the five research-paper tasks, ProofLoom uses one fixed SOptLib snapshot containing only mathematics and construction records accumulated from FOML developments.</p>
+<h3 id="human-evaluation">Human evaluation</h3>
+<p>Human evaluation uses a <strong>1–7 rubric</strong> for source faithfulness and proof completeness, with blind assessment and expert adjudication of disagreements.</p>
+<div class="table-scroll" role="region" aria-label="Research results table" tabindex="0"><table>
+<thead>
+<tr>
+<th align="left">System</th>
+<th align="right">FOML · 10 tasks</th>
+<th align="right">Research papers · 5 tasks</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">Raw Codex</td>
+<td align="right">2.8</td>
+<td align="right">2.8</td>
+</tr>
+<tr>
+<td align="left">Raw Codex (Goals)</td>
+<td align="right">3.0</td>
+<td align="right">3.0</td>
+</tr>
+<tr>
+<td align="left">OpenGauss</td>
+<td align="right">3.5</td>
+<td align="right">3.8</td>
+</tr>
+<tr>
+<td align="left">LeanMarathon</td>
+<td align="right">4.4</td>
+<td align="right">4.2</td>
+</tr>
+<tr>
+<td align="left">Trellis</td>
+<td align="right">4.5</td>
+<td align="right">4.8</td>
+</tr>
+<tr>
+<td align="left">Archon</td>
+<td align="right">4.9</td>
+<td align="right">5.0</td>
+</tr>
+<tr class="highlight"><td align="left"><strong>ProofLoom</strong></td>
+<td align="right"><strong>6.3</strong></td>
+<td align="right"><strong>6.4</strong></td>
+</tr>
+</tbody></table></div>
+<p><em>Table 1. Mean human ratings; higher is better.</em></p>
+<p>ProofLoom improves on the strongest baseline by <strong>1.4 points in each source group</strong>. The research-paper results show that the full system remains effective when moving beyond the textbook algorithms used to build its shared library.</p>
+<p>Model-based evaluation gives a consistent group-level result: ProofLoom achieves the highest mean in <strong>all 16 combinations</strong> of source group, evaluation protocol, and judge. The two protocols, G-Eval and FidelityEval, use a 0–100 scale; each is applied by four model judges. The <a href="https://github.com/Trace231/ProofLoom/blob/main/docs/PAPER.md#evaluation-reported-in-the-paper">evaluation documentation</a> contains the full score tables.</p>
+<h3 id="what-the-two-review-mechanisms-contribute">What the two review mechanisms contribute</h3>
+<p>An ablation examines <strong>43 recorded obstructions</strong> under three configurations, for 129 runs. Reviewers assess whether the system correctly diagnoses the obstruction and proposes a repair faithful to the source.</p>
+<div class="table-scroll" role="region" aria-label="Research results table" tabindex="0"><table>
+<thead>
+<tr>
+<th align="left">Configuration</th>
+<th align="right">Correct diagnosis and repair direction</th>
+<th align="right">Unresolved</th>
+<th align="right">Incorrect repair</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">Without Judge</td>
+<td align="right">29</td>
+<td align="right">8</td>
+<td align="right">6</td>
+</tr>
+<tr>
+<td align="left">Without Planner–Audit</td>
+<td align="right">29</td>
+<td align="right">13</td>
+<td align="right">1</td>
+</tr>
+<tr class="highlight"><td align="left"><strong>Full ProofLoom</strong></td>
+<td align="right"><strong>33</strong></td>
+<td align="right"><strong>9</strong></td>
+<td align="right"><strong>1</strong></td>
+</tr>
+</tbody></table></div>
+<p><em>Table 2. Counts across the same 43 cases. The labels assess diagnosis and proposed repair.</em></p>
+<p>Removing Judge increases incorrect repairs from one to six. Removing Planner–Audit leaves more cases unresolved. Together, the mechanisms help the system identify the mathematical obstacle and keep its proposed solution tied to the intended result.</p>
+<h2 id="the-artifacts-a-growing-body-of-optimization-theory"><span class="section-number">04</span>The artifacts: a growing body of optimization theory</h2>
+<p>The broader research collection contains <strong>33 algorithm developments</strong>: <strong>22 from FOML, eight from research papers, and three from research notes</strong>. It includes all 15 benchmark tasks and 18 additional developments.</p>
+<p>The paper&#39;s census records <strong>490,693 lines of algorithm-local Lean source</strong>. Separately, its SOptLib snapshot contains <strong>109,634 source lines</strong>, with <strong>2,399 declarations</strong>, including <strong>1,983 theorems</strong>. These physical-line counts include comments and blank lines; algorithm code and shared library code are counted separately.</p>
+<figure class="atlas"><a href="blog-assets/paper-artifact-atlas.png" target="_blank" rel="noopener" aria-label="Open figure at full resolution"><img src="blog-assets/paper-artifact-atlas.png" alt="Construction atlas of 33 algorithm developments. Outer bars show algorithm-local Lean code; inner bars show reused SOptLib support. Colors distinguish textbook chapters, research papers, and unpublished research notes."></a><figcaption><span class="figure-label"><span>Figure</span><span>03</span></span><span class="caption-copy">Algorithm code and reused library support across 33 archived construction snapshots. Bars count code-bearing lines, excluding blank and comment-only lines, with support deduplicated within each development. The atlas uses archived per-algorithm snapshots and square-root radial scales. <a href="blog-assets/paper-artifact-atlas.pdf">Open the full-resolution figure</a> or inspect its <a href="blog-assets/paper-artifact-atlas-data.json">data and counting rules</a>.</span></figcaption></figure>
+<p>The collection reaches from stochastic mirror descent, accelerated methods, and variance reduction to adaptive optimizers such as <strong>AMSGrad, Lion, and MARS</strong>, as well as distributed methods and research-note developments such as <strong>Push–Pull, Heavy-Ball, and R/C-DGD</strong>.</p>
+<p>The inner bars make the shared mathematics visible. A development can draw on previously constructed probability interfaces, oracle bounds, proximal inequalities, or analytical transport results. Extraction checks those results in their original setting before making them available to later proofs.</p>
+<div class="table-scroll" role="region" aria-label="Research results table" tabindex="0"><table>
+<thead>
+<tr>
+<th align="left">SOptLib layer</th>
+<th align="left">What it provides</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">Glue</td>
+<td align="left">Connections to Mathlib&#39;s probability, integration, martingale, and analysis interfaces</td>
+</tr>
+<tr>
+<td align="left">Model</td>
+<td align="left">Shared objects such as sampling histories, stochastic oracles, and Bregman divergences</td>
+</tr>
+<tr>
+<td align="left">Layer 0</td>
+<td align="left">Problem properties and oracle estimates, including noise bounds</td>
+</tr>
+<tr>
+<td align="left">Layer 1</td>
+<td align="left">Descent arguments, proximal inequalities, telescoping steps, and complexity bounds</td>
+</tr>
+</tbody></table></div>
+<p>Construction records preserve the reasoning behind the code: which sampling relation justified a conditional identity, why a representation failed, and which assumptions make a lemma reusable. Later developments can retrieve both a theorem and the experience needed to apply it.</p>
+<p>The public repository contains <strong>32 developments</strong>, with source files and per-development verification records. The atlas additionally includes the unpublished Push–Pull research development.</p>
+<h2 id="what-formalization-reveals-about-the-source-mathematics"><span class="section-number">05</span>What formalization reveals about the source mathematics</h2>
+<p>Making every dependency explicit also tests the original argument. Across the collection, the source audit records <strong>28 independent discrepancies affecting 22 developments</strong>: 25 in original sources and three in revised versions. They include incorrect formulas, missing proof steps, and mismatches between an algorithm and the assumptions used in its analysis.</p>
+<p>Two examples show the level at which these findings arise.</p>
+<h3 id="sam-a-premise-at-one-noise-scale-is-used-at-another">SAM: a premise at one noise scale is used at another</h3>
+<p>SAM&#39;s generalization theorem assumes that Gaussian perturbations at scale <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>ρ</mi></mrow><annotation encoding="application/x-tex">\rho</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.625em;vertical-align:-0.1944em;"></span><span class="mord mathnormal">ρ</span></span></span></span> do not reduce the population loss. The proof later chooses a smaller scale,</p>
+<p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mi>σ</mi><mo>=</mo><mfrac><mi>ρ</mi><mrow><msqrt><mi>k</mi></msqrt><mrow><mo fence="true">(</mo><mn>1</mn><mo>+</mo><msqrt><mrow><mi>log</mi><mo>⁡</mo><mo stretchy="false">(</mo><mi>n</mi><mo stretchy="false">)</mo><mi mathvariant="normal">/</mi><mi>k</mi></mrow></msqrt><mo fence="true">)</mo></mrow></mrow></mfrac><mo separator="true">,</mo></mrow><annotation encoding="application/x-tex">\sigma=\frac{\rho}{\sqrt{k}\left(1+\sqrt{\log(n)/k}\right)},</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord mathnormal" style="margin-right:0.03588em;">σ</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:2.7976em;vertical-align:-1.69em;"></span><span class="mord"><span class="mopen nulldelimiter"></span><span class="mfrac"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.1076em;"><span style="top:-2.11em;"><span class="pstrut" style="height:3.15em;"></span><span class="mord"><span class="mord sqrt"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.9322em;"><span class="svg-align" style="top:-3em;"><span class="pstrut" style="height:3em;"></span><span class="mord" style="padding-left:0.833em;"><span class="mord mathnormal" style="margin-right:0.03148em;">k</span></span></span><span style="top:-2.8922em;"><span class="pstrut" style="height:3em;"></span><span class="hide-tail" style="min-width:0.853em;height:1.08em;"><svg xmlns="http://www.w3.org/2000/svg" width="400em" height="1.08em" viewBox="0 0 400000 1080" preserveAspectRatio="xMinYMin slice"><path d="M95,702
+c-2.7,0,-7.17,-2.7,-13.5,-8c-5.8,-5.3,-9.5,-10,-9.5,-14
+c0,-2,0.3,-3.3,1,-4c1.3,-2.7,23.83,-20.7,67.5,-54
+c44.2,-33.3,65.8,-50.3,66.5,-51c1.3,-1.3,3,-2,5,-2c4.7,0,8.7,3.3,12,10
+s173,378,173,378c0.7,0,35.3,-71,104,-213c68.7,-142,137.5,-285,206.5,-429
+c69,-144,104.5,-217.7,106.5,-221
+l0 -0
+c5.3,-9.3,12,-14,20,-14
+H400000v40H845.2724
+s-225.272,467,-225.272,467s-235,486,-235,486c-2.7,4.7,-9,7,-19,7
+c-6,0,-10,-1,-12,-3s-194,-422,-194,-422s-65,47,-65,47z
+M834 80h400000v40h-400000z"/></svg></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.1078em;"><span></span></span></span></span></span><span class="mspace" style="margin-right:0.1667em;"></span><span class="minner"><span class="mopen delimcenter" style="top:0em;"><span class="delimsizing size2">(</span></span><span class="mord">1</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mord sqrt"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.935em;"><span class="svg-align" style="top:-3.2em;"><span class="pstrut" style="height:3.2em;"></span><span class="mord" style="padding-left:1em;"><span class="mop">lo<span style="margin-right:0.01389em;">g</span></span><span class="mopen">(</span><span class="mord mathnormal">n</span><span class="mclose">)</span><span class="mord">/</span><span class="mord mathnormal" style="margin-right:0.03148em;">k</span></span></span><span style="top:-2.895em;"><span class="pstrut" style="height:3.2em;"></span><span class="hide-tail" style="min-width:1.02em;height:1.28em;"><svg xmlns="http://www.w3.org/2000/svg" width="400em" height="1.28em" viewBox="0 0 400000 1296" preserveAspectRatio="xMinYMin slice"><path d="M263,681c0.7,0,18,39.7,52,119
+c34,79.3,68.167,158.7,102.5,238c34.3,79.3,51.8,119.3,52.5,120
+c340,-704.7,510.7,-1060.3,512,-1067
+l0 -0
+c4.7,-7.3,11,-11,19,-11
+H40000v40H1012.3
+s-271.3,567,-271.3,567c-38.7,80.7,-84,175,-136,283c-52,108,-89.167,185.3,-111.5,232
+c-22.3,46.7,-33.8,70.3,-34.5,71c-4.7,4.7,-12.3,7,-23,7s-12,-1,-12,-1
+s-109,-253,-109,-253c-72.7,-168,-109.3,-252,-110,-252c-10.7,8,-22,16.7,-34,26
+c-22,17.3,-33.3,26,-34,26s-26,-26,-26,-26s76,-59,76,-59s76,-60,76,-60z
+M1001 80h400000v40h-400000z"/></svg></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.305em;"><span></span></span></span></span></span><span class="mclose delimcenter" style="top:0em;"><span class="delimsizing size2">)</span></span></span></span></span><span style="top:-3.38em;"><span class="pstrut" style="height:3.15em;"></span><span class="frac-line" style="border-bottom-width:0.04em;"></span></span><span style="top:-3.827em;"><span class="pstrut" style="height:3.15em;"></span><span class="mord"><span class="mord mathnormal">ρ</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:1.69em;"><span></span></span></span></span></span><span class="mclose nulldelimiter"></span></span><span class="mpunct">,</span></span></span></span></span></p>
+<p>and needs the same property at <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>σ</mi></mrow><annotation encoding="application/x-tex">\sigma</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord mathnormal" style="margin-right:0.03588em;">σ</span></span></span></span>. That implication can fail.</p>
+<p>For the smooth bounded loss</p>
+<p><span class="katex-display"><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML" display="block"><semantics><mrow><mi mathvariant="normal">ℓ</mi><mo stretchy="false">(</mo><mi>x</mi><mo stretchy="false">)</mo><mo>=</mo><mn>0.5</mn><mo>−</mo><mn>0.2</mn><mi>cos</mi><mo>⁡</mo><mi>x</mi><mo>+</mo><mn>0.1</mn><mi>cos</mi><mo>⁡</mo><mo stretchy="false">(</mo><mn>2</mn><mi>x</mi><mo stretchy="false">)</mo><mo separator="true">,</mo></mrow><annotation encoding="application/x-tex">\ell(x)=0.5-0.2\cos x+0.1\cos(2x),</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">ℓ</span><span class="mopen">(</span><span class="mord mathnormal">x</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">0.5</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:0.7278em;vertical-align:-0.0833em;"></span><span class="mord">0.2</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mop">cos</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mord mathnormal">x</span><span class="mspace" style="margin-right:0.2222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord">0.1</span><span class="mspace" style="margin-right:0.1667em;"></span><span class="mop">cos</span><span class="mopen">(</span><span class="mord">2</span><span class="mord mathnormal">x</span><span class="mclose">)</span><span class="mpunct">,</span></span></span></span></span></p>
+<p>the value at zero is <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mn>0.4</mn></mrow><annotation encoding="application/x-tex">0.4</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">0.4</span></span></span></span>. With <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">k=1</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.6944em;"></span><span class="mord mathnormal" style="margin-right:0.03148em;">k</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">1</span></span></span></span>, <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>n</mi><mo>=</mo><mn>16</mn></mrow><annotation encoding="application/x-tex">n=16</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord mathnormal">n</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">16</span></span></span></span>, and <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>ρ</mi><mo>=</mo><mn>2</mn></mrow><annotation encoding="application/x-tex">\rho=2</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.625em;vertical-align:-0.1944em;"></span><span class="mord mathnormal">ρ</span><span class="mspace" style="margin-right:0.2778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2778em;"></span></span><span class="base"><span class="strut" style="height:0.6444em;"></span><span class="mord">2</span></span></span></span>, the Gaussian averages are:</p>
+<div class="table-scroll" role="region" aria-label="Research results table" tabindex="0"><table>
+<thead>
+<tr>
+<th align="left">Quantity</th>
+<th align="right">Value</th>
+<th align="left">Comparison with the unperturbed loss</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">Unperturbed loss</td>
+<td align="right">0.400</td>
+<td align="left">Reference</td>
+</tr>
+<tr>
+<td align="left">Average at the assumed scale <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>ρ</mi></mrow><annotation encoding="application/x-tex">\rho</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.625em;vertical-align:-0.1944em;"></span><span class="mord mathnormal">ρ</span></span></span></span></td>
+<td align="right">≈ 0.473</td>
+<td align="left">Higher</td>
+</tr>
+<tr>
+<td align="left">Average at the scale <span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>σ</mi></mrow><annotation encoding="application/x-tex">\sigma</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.4306em;"></span><span class="mord mathnormal" style="margin-right:0.03588em;">σ</span></span></span></span> used in the proof</td>
+<td align="right">≈ 0.382</td>
+<td align="left">Lower</td>
+</tr>
+</tbody></table></div>
+<p>The stated premise holds at the first scale, while the proof needs it at the second. The corrected formulation makes the selected-scale premise explicit. This pinpoints the missing condition in the argument and supplies a concrete counterexample to the cross-scale implication.</p>
+<h3 id="a-smoothness-argument-steps-outside-its-domain">A smoothness argument steps outside its domain</h3>
+<p>A lemma used in Lan&#39;s variance-reduced analysis introduces a gradient step that can leave the feasible set. The argument then uses smoothness at that point, although smoothness was only assumed on the original set.</p>
+<p>For variance-reduced mirror descent, the formal repair constructs a cocoercivity argument on the relative interior, derives the required Bregman inequality, and extends it to the boundary. The repair states an additional condition: each component gradient&#39;s image on the relative interior is convex.</p>
+<p>The <a href="https://github.com/Trace231/ProofLoom/tree/main/formalizations/VarianceReducedMirrorDescent">VRMD development</a> makes the new condition and the proof of the bridge inspectable. Formalization identifies the exact step that exceeds the stated hypotheses and provides a checked route to a corrected result.</p>
+<h2 id="explore-the-mathematics"><span class="section-number">06</span>Explore the mathematics</h2>
+<p>The <a href="https://github.com/Trace231/ProofLoom">ProofLoom repository</a> brings together the agent workflow, algorithm developments, source specifications, and SOptLib. Useful starting points include:</p>
+<ul>
+<li><strong>A familiar algorithm:</strong> inspect <a href="https://github.com/Trace231/ProofLoom/tree/main/formalizations/AMSGrad">AMSGrad</a>, <a href="https://github.com/Trace231/ProofLoom/tree/main/formalizations/MARS">MARS</a>, or <a href="https://github.com/Trace231/ProofLoom/tree/main/formalizations/PAGE">PAGE</a>.</li>
+<li><strong>A detailed mathematical bridge:</strong> follow <a href="https://github.com/Trace231/ProofLoom/blob/main/docs/PAPER.md#worked-example-sams-gaussian-kl-bridge">SAM&#39;s Gaussian construction</a>.</li>
+<li><strong>Reusable theory:</strong> browse <a href="https://github.com/Trace231/ProofLoom/tree/main/soptlib">SOptLib</a> and the <a href="https://github.com/Trace231/ProofLoom/blob/main/formalizations/CATALOG.md">algorithm catalog</a>.</li>
+</ul>
+<p>Lean checks the formal derivations; source correspondence is assessed through the system&#39;s review process. The experiments study stochastic optimization, and extension to other mathematical domains remains an open direction.</p>
+<p>The longer-term opportunity is cumulative: each research proof can leave behind reusable definitions, checked lemmas, and a more precise account of the mathematics on which the next proof will depend.</p>
+
+<div class="article-end"><span class="end-mark">∎</span><a href="https://github.com/Trace231/ProofLoom">Explore ProofLoom on GitHub <span aria-hidden="true">↗</span></a></div>
+</article></main>
+<footer><a href="https://pkumelon.com">MELON Research Group</a><span>Center for Machine Learning Research · Peking University</span><a href="#top">Back to top ↑</a></footer>
+<script>
+const sectionLinks = [...document.querySelectorAll('.toc a[href^="#"]')];
+const sections = [...document.querySelectorAll('article h2')];
+const progress = document.querySelector('.reading-progress');
+let scheduled = false;
+function updateReadingPosition(){
+ const max = document.documentElement.scrollHeight - window.innerHeight;
+ progress.style.transform = 'scaleX(' + (max > 0 ? window.scrollY / max : 0) + ')';
+ let active = '';
+ for(const section of sections) if(section.getBoundingClientRect().top < 170) active = section.id;
+ for(const link of sectionLinks){
+  const isActive = link.getAttribute('href') === '#' + active;
+  link.classList.toggle('active', isActive);
+  if(isActive) link.setAttribute('aria-current', 'location'); else link.removeAttribute('aria-current');
+ }
+ scheduled = false;
+}
+window.addEventListener('scroll',()=>{if(!scheduled){scheduled=true;requestAnimationFrame(updateReadingPosition);}}, {passive:true});
+updateReadingPosition();
+</script></body></html>

@@ -1,0 +1,3828 @@
+{
+  "algorithm": "MARS",
+  "algorithm_spec": {
+    "initialization": {
+      "math": "m_0\\leftarrow 0\\text{ and }x_1\\leftarrow x_0",
+      "ref": "Algorithm 1, line 2"
+    },
+    "output": {
+      "ref": "Algorithms 1-4",
+      "type": "iterate sequence",
+      "description": "The algorithms print initialization, loop bodies, and end-for lines, but no separate output line; this object records only that convention and intentionally contains no source-math field."
+    },
+    "parameters": [
+      {
+        "math": "\\text{input: }x_0,\\beta_1,\\{\\gamma_t\\},\\{\\eta_t\\}",
+        "name": "Algorithm1_MARS_input",
+        "ref": "Algorithm 1, line 1"
+      },
+      {
+        "math": "\\text{input: }x_0,\\lambda,\\beta_1,\\beta_2,\\{\\gamma_t\\},\\{\\eta_t\\}",
+        "name": "Algorithm2_MARS_AdamW_input",
+        "ref": "Algorithm 2, line 1"
+      },
+      {
+        "math": "\\gamma_t\\text{ is a scaling parameter that controls the strength of gradient correction}",
+        "name": "gamma_t",
+        "ref": "Section 3.1"
+      },
+      {
+        "math": "H_t:=\\sqrt{\\operatorname{diag}(v_t)}\\cdot\\frac{1-\\beta_1^t}{\\sqrt{1-\\beta_2^t}}",
+        "name": "H_t",
+        "ref": "(3.11)"
+      },
+      {
+        "math": "H_t:=\\operatorname{diag}\\left(\\sqrt{m_t^2}\\right)",
+        "name": "Lion_preconditioner",
+        "ref": "(3.18)"
+      }
+    ],
+    "steps": [
+      {
+        "math": "\\text{Sample }\\xi_t\\text{ and let }c_t=\\nabla f(x_t,\\xi_t)+\\gamma_t\\frac{\\beta_1}{1-\\beta_1}\\left(\\nabla f(x_t,\\xi_t)-\\nabla f(x_{t-1},\\xi_t)\\right)",
+        "name": "Algorithm1_MARS_sample_and_gradient_estimator",
+        "ref": "Algorithm 1, line 4; (3.5) context",
+        "step": 1
+      },
+      {
+        "math": "\\widetilde c_t=\\operatorname{Clip}(c_t,1)=\\begin{cases}c_t/\\|c_t\\|_2,&\\text{if }\\|c_t\\|_2>1,\\\\ c_t,&\\text{otherwise,}\\end{cases}",
+        "name": "Algorithm1_clipping",
+        "ref": "(3.5); Algorithm 1, line 5",
+        "step": 2
+      },
+      {
+        "math": "m_t=\\beta_1m_{t-1}+(1-\\beta_1)\\widetilde c_t",
+        "name": "Algorithm1_momentum",
+        "ref": "Algorithm 1, line 6",
+        "step": 3
+      },
+      {
+        "math": "x_{t+1}=\\arg\\min_x\\left\\{\\eta_t\\langle m_t,x\\rangle+\\frac12\\|x-x_t\\|_{H_t}^2\\right\\}",
+        "name": "Algorithm1_mirror_descent_update",
+        "ref": "Algorithm 1, line 7; (3.4)",
+        "step": 4
+      },
+      {
+        "math": "m_0\\leftarrow 0,\\ v_0\\leftarrow 0\\text{ and }x_1\\leftarrow x_0",
+        "name": "Algorithm2_MARS_AdamW_initialization",
+        "ref": "Algorithm 2, line 2",
+        "step": 5
+      },
+      {
+        "math": "c_t:=\\nabla f(x_t,\\xi_t)+\\gamma_t\\frac{\\beta_1}{1-\\beta_1}\\left(\\nabla f(x_t,\\xi_t)-\\nabla f(x_{t-1},\\xi_t)\\right)",
+        "name": "Algorithm2_gradient_estimator",
+        "ref": "(3.12); Algorithm 2, line 4",
+        "step": 6
+      },
+      {
+        "math": "\\text{if }\\|c_t\\|_2>1,\\text{ then }\\widetilde c_t=c_t/\\|c_t\\|_2\\text{ else }\\widetilde c_t=c_t",
+        "name": "Algorithm2_clipping",
+        "ref": "Algorithm 2, line 5",
+        "step": 7
+      },
+      {
+        "math": "m_t=\\beta_1m_{t-1}+(1-\\beta_1)\\widetilde c_t",
+        "name": "Algorithm2_first_moment",
+        "ref": "(3.13); Algorithm 2, line 6",
+        "step": 8
+      },
+      {
+        "math": "v_t=\\beta_2v_{t-1}+(1-\\beta_2)\\widetilde c_t^2",
+        "name": "Algorithm2_second_moment",
+        "ref": "(3.14); Algorithm 2, line 7",
+        "step": 9
+      },
+      {
+        "math": "\\widehat m_t=\\frac{m_t}{1-\\beta_1^t},\\quad \\widehat v_t=\\frac{v_t}{1-\\beta_2^t}",
+        "name": "Algorithm2_bias_correction",
+        "ref": "Algorithm 2, line 8",
+        "step": 10
+      },
+      {
+        "math": "x_{t+1}=x_t-\\eta_t\\left(\\frac{\\widehat m_t}{\\sqrt{\\widehat v_t}+\\epsilon}+\\lambda x_t\\right)",
+        "name": "Algorithm2_weight_decay_update",
+        "ref": "Algorithm 2, line 9",
+        "step": 11
+      },
+      {
+        "math": "c_t\\approx\\nabla f(x_t,\\xi_t)+\\gamma_t\\frac{\\beta_1}{1-\\beta_1}\\left(\\nabla f(x_t,\\xi_t)-\\nabla f(x_{t-1},\\xi_{t-1})\\right)",
+        "name": "MARS_approx_estimator",
+        "ref": "Remark 3.3",
+        "step": 12
+      },
+      {
+        "math": "\\text{input: }x_0,\\lambda,\\beta_1,\\{\\gamma_t\\},\\{\\eta_t\\}",
+        "name": "Algorithm3_MARS_Lion_input",
+        "ref": "Algorithm 3, line 1",
+        "step": 13
+      },
+      {
+        "math": "m_0\\leftarrow0\\text{ and }x_1\\leftarrow x_0",
+        "name": "Algorithm3_MARS_Lion_initialization",
+        "ref": "Algorithm 3, line 2",
+        "step": 14
+      },
+      {
+        "math": "\\text{for }t=1,\\text{ to }n\\text{ do}",
+        "name": "Algorithm3_MARS_Lion_loop",
+        "ref": "Algorithm 3, line 3",
+        "step": 15
+      },
+      {
+        "math": "\\text{Sample }\\xi_t\\text{ and let }c_t=\\nabla f(x_t,\\xi_t)+\\gamma_t\\frac{\\beta_1}{1-\\beta_1}\\left(\\nabla f(x_t,\\xi_t)-\\nabla f(x_{t-1},\\xi_t)\\right)",
+        "name": "Algorithm3_MARS_Lion_gradient_estimator",
+        "ref": "Algorithm 3, line 4",
+        "step": 16
+      },
+      {
+        "math": "\\text{if }\\|c_t\\|_2>1,\\text{ then }\\widetilde c_t=c_t/\\|c_t\\|_2\\text{ else }\\widetilde c_t=c_t",
+        "name": "Algorithm3_MARS_Lion_clipping",
+        "ref": "Algorithm 3, line 5",
+        "step": 17
+      },
+      {
+        "math": "m_t=\\beta_1m_{t-1}+(1-\\beta_1)\\widetilde c_t",
+        "name": "Algorithm3_MARS_Lion_momentum",
+        "ref": "Algorithm 3, line 6",
+        "step": 18
+      },
+      {
+        "math": "x_{t+1}=x_t-\\eta_t\\left(\\operatorname{sign}(m_t)+\\lambda x_t\\right)",
+        "name": "Algorithm3_MARS_Lion_update",
+        "ref": "Algorithm 3, line 7",
+        "step": 19
+      },
+      {
+        "math": "\\text{end for}",
+        "name": "Algorithm3_MARS_Lion_end_for",
+        "ref": "Algorithm 3, line 8",
+        "step": 20
+      },
+      {
+        "math": "\\text{input: }x_0,\\lambda,\\beta_1,\\{\\gamma_t\\},\\{\\eta_t\\}",
+        "name": "Algorithm4_MARS_Shampoo_input",
+        "ref": "Algorithm 4, line 1",
+        "step": 21
+      },
+      {
+        "math": "m_0\\leftarrow0\\text{ and }x_1\\leftarrow x_0",
+        "name": "Algorithm4_MARS_Shampoo_initialization",
+        "ref": "Algorithm 4, line 2",
+        "step": 22
+      },
+      {
+        "math": "\\text{for }t=1,\\text{ to }n\\text{ do}",
+        "name": "Algorithm4_MARS_Shampoo_loop",
+        "ref": "Algorithm 4, line 3",
+        "step": 23
+      },
+      {
+        "math": "\\text{sample }\\xi_t\\text{ and let }c_t=\\nabla f(x_t,\\xi_t)+\\gamma_t\\frac{\\beta_1}{1-\\beta_1}\\left(\\nabla f(x_t,\\xi_t)-\\nabla f(x_{t-1},\\xi_t)\\right)",
+        "name": "Algorithm4_MARS_Shampoo_gradient_estimator",
+        "ref": "Algorithm 4, line 4",
+        "step": 24
+      },
+      {
+        "math": "m_t=\\beta_1m_{t-1}+(1-\\beta_1)c_t",
+        "name": "Algorithm4_MARS_Shampoo_momentum",
+        "ref": "Algorithm 4, line 5",
+        "step": 25
+      },
+      {
+        "math": "U_t,\\Sigma_t,V_t=\\operatorname{SVD}(m_t)",
+        "name": "Algorithm4_MARS_Shampoo_svd",
+        "ref": "Algorithm 4, line 6",
+        "step": 26
+      },
+      {
+        "math": "x_{t+1}=x_t-\\eta_t(U_tV_t^\\top+\\lambda x_t)",
+        "name": "Algorithm4_MARS_Shampoo_update",
+        "ref": "Algorithm 4, line 7",
+        "step": 27
+      },
+      {
+        "math": "\\text{end for}",
+        "name": "Algorithm4_MARS_Shampoo_end_for",
+        "ref": "Algorithm 4, line 8",
+        "step": 28
+      }
+    ]
+  },
+  "assumptions": [
+    {
+      "math": "\\mathbb{E}[f(x,\\xi_t)\\mid x]=F(x)\\quad\\forall x,\\forall t",
+      "name": "unbiased_objective_oracle",
+      "parameters": [
+        "F",
+        "f",
+        "\\xi_t",
+        "x"
+      ],
+      "ref": "Notations, p.2"
+    },
+    {
+      "math": "\\mathbb{E}[\\nabla f(x,\\xi)]=\\nabla F(x)",
+      "name": "unbiased_gradient_oracle",
+      "parameters": [
+        "F",
+        "f",
+        "\\xi",
+        "x"
+      ],
+      "ref": "Section 2, p.2"
+    },
+    {
+      "math": "\\epsilon_t\\text{ is independent of }\\xi_{t+1}\\text{ and the expectations of }\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1})\\text{ and }\\Delta_t-\\mathbb{E}\\Delta_t\\text{ are all }0",
+      "name": "D4_fresh_sample_independence_and_centering",
+      "parameters": [
+        "\\epsilon_t",
+        "\\xi_{t+1}",
+        "\\Delta_t"
+      ],
+      "ref": "D.4 before (D.11)"
+    },
+    {
+      "math": "|\\sqrt{x}-\\sqrt{y}|\\le\\sqrt{|x-y|},\\quad\\forall x,y\\ge0",
+      "name": "scalar_sqrt_difference_inequality",
+      "parameters": [
+        "x",
+        "y"
+      ],
+      "ref": "D.3 before final display"
+    },
+    {
+      "math": "\\mathbb{E}\\left[\\|\\nabla f(x,\\xi)-\\nabla F(x)\\|_2^2\\right]\\le \\sigma^2",
+      "name": "bounded_variance_B_1",
+      "parameters": [
+        "\\sigma",
+        "x",
+        "\\xi"
+      ],
+      "ref": "(B.1)"
+    },
+    {
+      "math": "\\|\\nabla f(x,\\xi)-\\nabla f(y,\\xi)\\|_2\\le L\\|x-y\\|_2,\\ \\forall x,y",
+      "name": "L_smoothness_B_2",
+      "parameters": [
+        "L",
+        "x",
+        "y",
+        "\\xi"
+      ],
+      "ref": "(B.2)"
+    },
+    {
+      "math": "\\text{there is a constant }\\rho>0\\text{ such that for all }H_t,\\ t>0,\\ H_t\\succ\\rho I",
+      "name": "H_lower_bounded_B_3",
+      "parameters": [
+        "H_t",
+        "\\rho",
+        "t"
+      ],
+      "ref": "Assumption B.3"
+    },
+    {
+      "math": "\\eta_t=(s+t)^{-1/3},\\quad s\\ge 8L^3/\\rho^3",
+      "name": "B5_stepsize_schedule",
+      "parameters": [
+        "\\eta_t",
+        "s",
+        "L",
+        "\\rho"
+      ],
+      "ref": "Theorem B.5"
+    },
+    {
+      "math": "c\\ge 32L^2\\rho^{-2}+1,\\quad \\beta_{1,t+1}=1-c\\eta_t^2,\\quad \\beta_{2,t+1}=1-\\eta_t^6",
+      "name": "B5_beta_schedule",
+      "parameters": [
+        "c",
+        "\\beta_{1,t+1}",
+        "\\beta_{2,t+1}",
+        "\\eta_t"
+      ],
+      "ref": "Theorem B.5"
+    },
+    {
+      "math": "\\eta_t=(s+t)^{-1/3},\\quad s\\ge \\max(8L^3/\\rho^3,64\\lambda^3)",
+      "name": "B6_stepsize_schedule",
+      "parameters": [
+        "\\eta_t",
+        "s",
+        "L",
+        "\\rho",
+        "\\lambda"
+      ],
+      "ref": "Theorem B.6"
+    },
+    {
+      "math": "\\|x_t\\|_2\\le D",
+      "name": "B6_bounded_iterates",
+      "parameters": [
+        "x_t",
+        "D"
+      ],
+      "ref": "Theorem B.6"
+    },
+    {
+      "math": "c\\ge 32L^2\\rho^{-2}+1,\\quad \\beta_{1,t+1}=1-c\\eta_t^2,\\quad \\beta_{2,t+1}=1-\\eta_t^6",
+      "name": "B6_beta_schedule",
+      "parameters": [
+        "c",
+        "\\beta_{1,t+1}",
+        "\\beta_{2,t+1}",
+        "\\eta_t"
+      ],
+      "ref": "Theorem B.6"
+    },
+    {
+      "math": "\\eta_t=(s+t)^{-1/3},\\quad s\\ge1,\\quad \\forall t\\ge0",
+      "name": "lemma_C_5_stepsize_hypothesis",
+      "parameters": [
+        "\\eta_t",
+        "s",
+        "t"
+      ],
+      "ref": "Lemma C.5"
+    },
+    {
+      "math": "\\gamma_{t+1}=1-\\frac{G_{t+1}+\\beta_{1,t+1}(\\mathbb{E}\\|\\Delta_t\\|_2^2-\\|\\mathbb{E}\\Delta_t\\|_2^2)}{\\beta_{1,t+1}\\mathbb{E}\\|\\Delta_t\\|_2^2}=\\frac{\\|\\mathbb{E}\\Delta_t\\|_2^2-G_{t+1}}{\\beta_{1,t+1}\\mathbb{E}\\|\\Delta_t\\|_2^2}",
+      "name": "C2_gamma_choice",
+      "parameters": [
+        "\\gamma_{t+1}",
+        "G_{t+1}",
+        "\\Delta_t",
+        "\\beta_{1,t+1}"
+      ],
+      "ref": "(D.12)"
+    },
+    {
+      "math": "m_t=\\beta_1m_{t-1}+(1-\\beta_1)\\widetilde c_t",
+      "name": "Algorithm1_momentum",
+      "parameters": [
+        "m_t",
+        "\\beta_1",
+        "\\widetilde c_t"
+      ],
+      "ref": "Algorithm 1, line 6"
+    },
+    {
+      "math": "x_{t+1}=\\arg\\min_x\\left\\{\\eta_t\\langle m_t,x\\rangle+\\frac12\\|x-x_t\\|_{H_t}^2\\right\\}",
+      "name": "Algorithm1_mirror_descent_update",
+      "parameters": [
+        "x_{t+1}",
+        "\\eta_t",
+        "m_t",
+        "H_t"
+      ],
+      "ref": "Algorithm 1, line 7; (3.4)"
+    },
+    {
+      "math": "x_{t+1}=x_t-\\eta_t\\left(\\frac{\\widehat m_t}{\\sqrt{\\widehat v_t}+\\epsilon}+\\lambda x_t\\right)",
+      "name": "Algorithm2_weight_decay_update",
+      "parameters": [
+        "x_{t+1}",
+        "\\eta_t",
+        "\\widehat m_t",
+        "\\widehat v_t",
+        "\\epsilon",
+        "\\lambda"
+      ],
+      "ref": "Algorithm 2, line 9"
+    },
+    {
+      "math": "m_{t+1}=\\beta_{1,t+1}m_t+(1-\\beta_{1,t+1})\\left(\\nabla f(x_{t+1},\\xi_{t+1})+\\gamma_{t+1}\\frac{\\beta_{1,t+1}}{1-\\beta_{1,t+1}}(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla f(x_t,\\xi_{t+1}))\\right)",
+      "name": "D4_unclipped_momentum_expansion",
+      "parameters": [
+        "m_{t+1}",
+        "m_t",
+        "\\beta_{1,t+1}",
+        "\\gamma_{t+1}",
+        "\\xi_{t+1}"
+      ],
+      "ref": "D.4 first display"
+    },
+    {
+      "math": "m_0\\leftarrow0,\\ v_0\\leftarrow0\\text{ and }x_1\\leftarrow x_0",
+      "name": "Algorithm2_MARS_AdamW_initialization",
+      "parameters": [
+        "m_0",
+        "v_0",
+        "x_1",
+        "x_0"
+      ],
+      "ref": "Algorithm 2, line 2"
+    },
+    {
+      "math": "\\text{if }\\|c_t\\|_2>1,\\text{ then }\\widetilde c_t=c_t/\\|c_t\\|_2\\text{ else }\\widetilde c_t=c_t",
+      "name": "Algorithm2_clipping",
+      "parameters": [
+        "c_t",
+        "\\widetilde c_t"
+      ],
+      "ref": "Algorithm 2, line 5"
+    },
+    {
+      "math": "m_t=\\beta_1m_{t-1}+(1-\\beta_1)\\widetilde c_t",
+      "name": "Algorithm2_first_moment",
+      "parameters": [
+        "m_t",
+        "\\beta_1",
+        "\\widetilde c_t"
+      ],
+      "ref": "Algorithm 2, line 6"
+    },
+    {
+      "math": "v_t=\\beta_2v_{t-1}+(1-\\beta_2)\\widetilde c_t^2",
+      "name": "Algorithm2_second_moment",
+      "parameters": [
+        "v_t",
+        "\\beta_2",
+        "\\widetilde c_t"
+      ],
+      "ref": "Algorithm 2, line 7"
+    },
+    {
+      "math": "0\\le\\beta_{2,t}\\le1,\\quad0\\le\\beta_{1,t}\\le1",
+      "name": "Algorithm2_beta_bounds",
+      "parameters": [
+        "\\beta_{1,t}",
+        "\\beta_{2,t}"
+      ],
+      "ref": "Lemma C.1 proof, D.3"
+    },
+    {
+      "name": "lemma_C_3_stepsize_hypothesis",
+      "math": "\\eta_t\\le\\rho\\cdot(2L)^{-1},\\ \\forall t\\ge1",
+      "ref": "Lemma C.3",
+      "parameters": [
+        "\\eta_t",
+        "\\rho",
+        "L",
+        "t"
+      ]
+    },
+    {
+      "name": "lemma_C_4_stepsize_hypothesis",
+      "math": "\\eta_t\\le\\min\\{(4\\lambda)^{-1},\\rho\\cdot(2L)^{-1}\\},\\ \\forall t\\ge1",
+      "ref": "Lemma C.4",
+      "parameters": [
+        "\\eta_t",
+        "\\lambda",
+        "\\rho",
+        "L",
+        "t"
+      ]
+    },
+    {
+      "name": "B5_horizon_condition",
+      "math": "\\forall T\\ge s",
+      "ref": "Theorem B.5",
+      "parameters": [
+        "T",
+        "s"
+      ]
+    },
+    {
+      "name": "B6_horizon_condition",
+      "math": "\\forall T\\ge s",
+      "ref": "Theorem B.6",
+      "parameters": [
+        "T",
+        "s"
+      ]
+    }
+  ],
+  "full_name": "MARS: Make vAriance Reduction Shine",
+  "key_lemmas": [
+    {
+      "name": "theorem_B_5",
+      "proof": [
+        {
+          "description": "Define the Algorithm 1 Lyapunov function.",
+          "math": "\\Phi_t=\\mathbb{E}\\left[F(x_t)+\\frac{\\rho}{16L^2\\eta_{t-1}}\\cdot\\|\\nabla F(x_t)-m_t\\|_2^2\\right],\\quad\\forall t\\ge 1.",
+          "ref": "C.1",
+          "source_pdf_lines": [
+            1183,
+            1188
+          ],
+          "step": 1,
+          "uses": []
+        },
+        {
+          "description": "Expand the one-step Lyapunov difference and name the objective part I1 and estimator part I2.",
+          "math": "\\Phi_{t+1}-\\Phi_t=\\mathbb{E}[F(x_{t+1})-F(x_t)]+\\mathbb{E}\\left[\\frac{\\rho}{16L^2\\eta_t}\\|\\nabla F(x_{t+1})-m_{t+1}\\|_2^2-\\frac{\\rho}{16L^2\\eta_{t-1}}\\|\\nabla F(x_t)-m_t\\|_2^2\\right].",
+          "ref": "(C.3)",
+          "source_pdf_lines": [
+            1189,
+            1195
+          ],
+          "step": 2,
+          "uses": []
+        },
+        {
+          "description": "Bound I1 using Lemma C.3 after the B.5 stepsize schedule supplies eta_t <= rho*(2L)^(-1). The implication from the B.5 schedule to this eta-side-condition is recorded here only as a derived application-boundary check, not as a source lemma.",
+          "math": "I_1\\le \\mathbb{E}\\left[-\\frac{\\rho}{2\\eta_t}\\cdot\\|x_t-x_{t+1}\\|_2^2+\\frac{\\eta_t}{\\rho}\\cdot\\|\\nabla F(x_t)-m_t\\|_2^2\\right].",
+          "ref": "(C.4)",
+          "source_pdf_lines": [
+            1196,
+            1199
+          ],
+          "step": 3,
+          "uses": [
+            "lemma_C_3",
+            "B5_stepsize_schedule",
+            "lemma_C_3_stepsize_hypothesis"
+          ],
+          "produces": "derived: from B5_stepsize_schedule, the Lemma C.3 eta-side-condition \\eta_t\\le\\rho\\cdot(2L)^{-1} is available for this application."
+        },
+        {
+          "description": "Source-gap/prerequisite check before invoking Lemma C.2: Lemma C.2 requires 1 >= beta_{1,t+1} >= 0 for all t, while Theorem B.5 prints only the lower-bound schedule c >= 32L^2 rho^{-2}+1 and beta_{1,t+1}=1-c eta_t^2. The nonnegativity beta_{1,t+1} >= 0 is not derivable from the printed assumptions without an additional upper bound on c or other side condition.",
+          "math": "1\\ge\\beta_{1,t+1}\\ge0,\\ \\forall t",
+          "produces": "B5_C2_beta_admissibility_source_gap",
+          "ref": "Theorem B.5 statement and Lemma C.2 prerequisite",
+          "source_pdf_lines": [
+            1078,
+            1137
+          ],
+          "step": 4,
+          "uses": [
+            "lemma_C_2",
+            "B5_beta_schedule"
+          ]
+        },
+        {
+          "description": "Theorem B.5 source-gap/prerequisite check before invoking Lemma C.2 for I2: Lemma C.2 also requires the approximate choice of gamma_{t+1} as in (D.12), while Theorem B.5 prints only the eta and beta schedules and no gamma-choice hypothesis. This records the missing prerequisite rather than silently adding it to the theorem statement.",
+          "math": "\\gamma_{t+1}=1-\\frac{G_{t+1}+\\beta_{1,t+1}(\\mathbb{E}\\|\\Delta_t\\|_2^2-\\|\\mathbb{E}\\Delta_t\\|_2^2)}{\\beta_{1,t+1}\\mathbb{E}\\|\\Delta_t\\|_2^2}=\\frac{\\|\\mathbb{E}\\Delta_t\\|_2^2-G_{t+1}}{\\beta_{1,t+1}\\mathbb{E}\\|\\Delta_t\\|_2^2}",
+          "produces": "B5_C2_gamma_choice_source_gap",
+          "ref": "Lemma C.2 prerequisite, (D.12), and Theorem B.5 statement",
+          "source_pdf_lines": [
+            1130,
+            1703
+          ],
+          "uses": [
+            "lemma_C_2",
+            "C2_gamma_choice",
+            "B5_beta_schedule"
+          ],
+          "step": 5
+        },
+        {
+          "description": "Conditionally, subject to the unresolved beta-admissibility and gamma-choice prerequisites recorded in the preceding prerequisite steps, bound I2 using Lemma C.2 and substitute \\beta_{1,t+1}=1-c\\eta_t^2 for the variance term.",
+          "math": "I_2\\le \\frac{\\rho}{16L^2}\\left(\\frac{\\beta_{1,t+1}^2}{\\eta_t}-\\frac1{\\eta_{t-1}}\\right)\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2+\\frac{\\rho}{8\\eta_t}\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2+\\frac{\\rho c^2\\eta_t^3\\sigma^2}{8L^2}-\\frac{\\rho}{16L^2\\eta_t}M_{t+1}.",
+          "ref": "(C.5)",
+          "source_pdf_lines": [
+            1200,
+            1218
+          ],
+          "step": 6,
+          "uses": [
+            "lemma_C_2",
+            "B5_beta_schedule",
+            "B5_C2_beta_admissibility_source_gap",
+            "B5_C2_gamma_choice_source_gap"
+          ]
+        },
+        {
+          "description": "Algebraically rewrite the first coefficient in the I2 bound.",
+          "math": "\\frac{\\rho}{16L^2}\\left(\\frac{\\beta_{1,t+1}^2}{\\eta_t}-\\frac1{\\eta_{t-1}}\\right)\\le\\frac{\\rho}{16L^2}\\left(\\frac{\\beta_{1,t+1}}{\\eta_t}-\\frac1{\\eta_{t-1}}\\right)=\\frac{\\rho}{16L^2}\\left(\\frac{1-c\\eta_t^2}{\\eta_t}-\\frac1{\\eta_{t-1}}\\right)=\\frac{\\rho}{16L^2}\\left(\\frac1{\\eta_t}-\\frac1{\\eta_{t-1}}-c\\eta_t\\right).",
+          "ref": "C.1 display after (C.5)",
+          "source_pdf_lines": [
+            1218,
+            1224
+          ],
+          "step": 7,
+          "uses": [
+            "B5_beta_schedule",
+            "B5_C2_beta_admissibility_source_gap"
+          ]
+        },
+        {
+          "description": "Theorem B.5 source-gap/prerequisite check before invoking Lemma C.5: Lemma C.5 assumes s\\ge1 for its stepsize comparison, while Theorem B.5 prints only s\\ge 8L^3/\\rho^3. This records the missing prerequisite rather than inferring it from the theorem schedule.",
+          "math": "s\\ge1",
+          "produces": "B5_C5_s_ge_1_source_gap",
+          "ref": "Lemma C.5 prerequisite at C.1 invocation",
+          "source_pdf_lines": [
+            1176,
+            1231
+          ],
+          "uses": [
+            "lemma_C_5",
+            "B5_stepsize_schedule"
+          ],
+          "step": 8
+        },
+        {
+          "description": "Apply Lemma C.5 subject to the recorded s\\ge1 prerequisite and the lower bound on c to make the estimator coefficient negative.",
+          "math": "\\frac{\\rho}{16L^2}\\left(\\frac{\\beta_{1,t+1}^2}{\\eta_t}-\\frac1{\\eta_{t-1}}\\right)\\le\\frac{\\rho}{16L^2}\\cdot(\\eta_t-c\\eta_t)\\le -2\\eta_t\\rho^{-1}.",
+          "ref": "(C.6)",
+          "source_pdf_lines": [
+            1225,
+            1231
+          ],
+          "step": 9,
+          "uses": [
+            "lemma_C_5",
+            "B5_beta_schedule",
+            "B5_stepsize_schedule",
+            "lemma_C_5_stepsize_hypothesis",
+            "B5_C2_beta_admissibility_source_gap"
+          ]
+        },
+        {
+          "description": "Insert the negative coefficient into the I2 estimate.",
+          "math": "I_2\\le -\\frac{2\\eta_t}{\\rho}\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2+\\frac{\\rho}{8\\eta_t}\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2+\\frac{\\rho c^2\\eta_t^3\\sigma^2}{8L^2}-\\frac{\\rho}{16L^2\\eta_t}M_{t+1}.",
+          "ref": "(C.7)",
+          "source_pdf_lines": [
+            1232,
+            1236
+          ],
+          "step": 10,
+          "uses": [
+            "lemma_C_2",
+            "lemma_C_5",
+            "B5_beta_schedule"
+          ]
+        },
+        {
+          "description": "Combine the Lyapunov expansion, I1 bound, and I2 bound.",
+          "math": "\\Phi_{t+1}-\\Phi_t\\le -\\frac{\\eta_t}{\\rho}\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2-\\frac{3\\rho}{8\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2+\\frac{\\rho c^2\\eta_t^3\\sigma^2}{8L^2}-\\frac{\\rho}{16L^2\\eta_t}M_{t+1}.",
+          "ref": "C.1 display before telescoping",
+          "source_pdf_lines": [
+            1237,
+            1240
+          ],
+          "step": 11,
+          "uses": [
+            "lemma_C_2",
+            "lemma_C_3",
+            "lemma_C_5",
+            "B5_beta_schedule"
+          ]
+        },
+        {
+          "description": "Telescope from t=1 to T and use \\sum_{t=1}^T(s+t)^{-1}\\le\\log(s+T).",
+          "math": "\\sum_{t=1}^T\\left(\\frac{\\eta_t}{\\rho}\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2+\\frac{3\\rho}{8\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\right)\\le \\Phi_1-\\Phi_{T+1}+\\frac{\\rho c^2\\sigma^2}{8L^2}\\cdot\\log(s+T)-\\sum_{t=1}^T\\frac{\\rho}{16L^2\\eta_t}M_{t+1}.",
+          "ref": "C.1 telescoping display",
+          "source_pdf_lines": [
+            1241,
+            1255
+          ],
+          "step": 12,
+          "uses": [
+            "B5_stepsize_schedule"
+          ]
+        },
+        {
+          "description": "Theorem B.5 trace: Lower-bound the terminal Lyapunov value by the objective infimum.",
+          "math": "\\Phi_{T+1}\\ge F(x_{T+1})\\ge\\min_xF(x).",
+          "ref": "C.1 display after telescoping",
+          "source_pdf_lines": [
+            1256,
+            1258
+          ],
+          "uses": [
+            "H_lower_bounded_B_3",
+            "B5_telescoped_bound"
+          ],
+          "step": 13
+        },
+        {
+          "description": "Theorem B.5 trace/source-gap bridge: expand \\Phi_1 and follow the source substitution m_1=\\nabla f(x_1,\\xi_1); Algorithm 1 prints m_0\\leftarrow0 and a clipped momentum update for m_1, so this substitution is recorded as a source-visible bridge, not as an independently justified algorithm consequence.",
+          "math": "\\Phi_1=\\mathbb{E}\\left[F(x_1)+\\frac{\\rho s^{1/3}}{16L^2}\\cdot\\|\\nabla F(x_1)-m_1\\|_2^2\\right]=F(x_1)+\\frac{\\rho s^{1/3}}{16L^2}\\cdot\\mathbb{E}[\\|\\nabla F(x_1)-\\nabla f(x_1,\\xi_1)\\|_2^2]",
+          "produces": "B5_Phi1_source_substitution_m_1_equals_grad_f_x1_xi1",
+          "ref": "C.1 Phi_1 display",
+          "source_pdf_lines": [
+            1258,
+            1264
+          ],
+          "uses": [
+            "Algorithm1_momentum"
+          ],
+          "step": 14
+        },
+        {
+          "description": "Theorem B.5 trace: apply the bounded-variance assumption to the displayed initial Lyapunov expression.",
+          "math": "\\Phi_1\\le F(x_1)+\\frac{\\rho s^{1/3}\\sigma^2}{16L^2}.",
+          "ref": "C.1 Phi_1 display",
+          "source_pdf_lines": [
+            1263,
+            1265
+          ],
+          "uses": [
+            "bounded_variance_B_1",
+            "B5_Phi1_source_substitution"
+          ],
+          "step": 15
+        },
+        {
+          "description": "Define G and divide the telescoped inequality by T.",
+          "math": "\\frac1T\\sum_{t=1}^T\\left(\\frac{\\eta_t}{\\rho}\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2+\\frac{3\\rho}{8\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\right)\\le\\frac{G}{T}+\\frac{\\rho c^2\\sigma^2}{8L^2T}\\cdot\\log(s+T)-\\frac1T\\sum_{t=1}^T\\frac{\\rho}{16L^2\\eta_t}M_{t+1}.",
+          "produces": "G=F(x_1)-\\min_xF(x)+\\rho s^{1/3}\\sigma^2/(16L^2)",
+          "ref": "(C.8)",
+          "source_pdf_lines": [
+            1265,
+            1270
+          ],
+          "step": 16,
+          "uses": [
+            "B5_stepsize_schedule",
+            "bounded_variance_B_1",
+            "B5_telescoped_bound",
+            "B5_Phi1_variance_bound",
+            "H_lower_bounded_B_3"
+          ]
+        },
+        {
+          "description": "Separate the estimator-error term from (C.8) and lower-bound the left coefficient by eta_T, retaining the printed eta_t^{-2} residual sum. This line depends on the C.8 divided telescoping bound, discarding the nonnegative displacement term, and using eta_t >= eta_T on the left and in the residual denominator.",
+          "math": "\\frac1T\\sum_{t=1}^T\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2\\le\\frac{\\rho G}{T\\eta_T}+\\frac{\\rho^2c^2\\sigma^2}{8L^2T\\eta_T}\\cdot\\log(s+T)-\\frac1T\\sum_{t=1}^T\\frac{\\rho^2}{16L^2\\eta_t^2}M_{t+1}.",
+          "ref": "C.1 first separated estimator display",
+          "source_pdf_lines": [
+            1274,
+            1277
+          ],
+          "step": 17,
+          "uses": [
+            "lemma_C_2",
+            "lemma_C_3",
+            "lemma_C_5",
+            "B5_stepsize_schedule",
+            "B5_beta_schedule",
+            "bounded_variance_B_1",
+            "B5_C8_divided_telescoping"
+          ],
+          "produces": "B5_estimator_first_separation_from_C8"
+        },
+        {
+          "description": "Substitute eta_T=(s+T)^{-1/3} in the positive terms while keeping the residual sum in the printed form. It continues from the first separated estimator display by substituting eta_T=(s+T)^{-1/3}.",
+          "math": "\\le\\left(\\rho G+\\frac{\\rho^2c^2\\sigma^2}{8L^2}\\cdot\\log(s+T)\\right)\\cdot\\frac{(s+T)^{1/3}}{T}-\\frac1T\\sum_{t=1}^T\\frac{\\rho^2}{16L^2\\eta_t^2}M_{t+1}.",
+          "ref": "C.1 second estimator display line",
+          "source_pdf_lines": [
+            1279,
+            1281
+          ],
+          "step": 18,
+          "uses": [
+            "lemma_C_2",
+            "lemma_C_3",
+            "lemma_C_5",
+            "B5_stepsize_schedule",
+            "B5_beta_schedule",
+            "bounded_variance_B_1",
+            "B5_estimator_first_separation_from_C8"
+          ],
+          "produces": "B5_estimator_etaT_substitution"
+        },
+        {
+          "description": "Use T>=s to reach the theorem estimator-error endpoint and replace the residual denominator by T^{1/3}. It continues from the eta_T-substituted display, uses T\\ge s to compare (s+T)^{1/3}/T with 2/T^{2/3}, and uses the residual-denominator comparison printed in the endpoint.",
+          "math": "\\le\\left(2\\rho G+\\frac{\\rho c^2\\sigma^2}{4L^2}\\cdot\\log(s+T)\\right)\\cdot\\frac1{T^{2/3}}-\\frac{\\rho^2\\sum_{t=1}^TM_{t+1}}{8L^2T^{1/3}}.",
+          "ref": "C.1 final estimator display line",
+          "source_pdf_lines": [
+            1283,
+            1285
+          ],
+          "step": 19,
+          "uses": [
+            "lemma_C_2",
+            "lemma_C_3",
+            "lemma_C_5",
+            "B5_stepsize_schedule",
+            "B5_beta_schedule",
+            "bounded_variance_B_1",
+            "B5_estimator_etaT_substitution",
+            "B5_horizon_condition"
+          ]
+        },
+        {
+          "description": "Separate the second term in (C.8), preserving the printed rho/(8 eta_t) left coefficient and residual endpoint. This line depends on the C.8 divided telescoping bound after discarding the nonnegative estimator term and replacing the residual denominator using eta_t=(s+t)^{-1/3}.",
+          "math": "\\frac1T\\sum_{t=1}^T\\frac{3\\rho}{8\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\le\\frac GT+\\frac{\\rho c^2\\sigma^2}{8L^2T}\\cdot\\log(s+T)-\\frac{\\rho\\sum_{t=1}^TM_{t+1}}{16L^2T^{2/3}}.",
+          "ref": "C.1 first separated displacement display",
+          "source_pdf_lines": [
+            1288,
+            1291
+          ],
+          "step": 20,
+          "uses": [
+            "lemma_C_2",
+            "lemma_C_3",
+            "lemma_C_5",
+            "B5_stepsize_schedule",
+            "B5_beta_schedule",
+            "bounded_variance_B_1",
+            "B5_C8_divided_telescoping"
+          ],
+          "produces": "B5_displacement_first_separation_from_C8"
+        },
+        {
+          "description": "Convert the separated displacement inequality to the printed eta_t^{-2} scaled form using eta_T. It continues from the separated displacement display and uses eta_T to pass to the printed eta_t^{-2} scaled form.",
+          "math": "\\frac1T\\sum_{t=1}^T\\frac1{\\eta_t^2}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\le\\frac{8G}{3\\rho T\\eta_T}+\\frac{c^2\\sigma^2}{3L^2T\\eta_T}\\cdot\\log(s+T)-\\frac{\\sum_{t=1}^TM_{t+1}}{6L^2T^{2/3}}.",
+          "ref": "C.1 second displacement display first line",
+          "source_pdf_lines": [
+            1295,
+            1299
+          ],
+          "step": 21,
+          "uses": [
+            "lemma_C_2",
+            "lemma_C_3",
+            "lemma_C_5",
+            "B5_stepsize_schedule",
+            "B5_beta_schedule",
+            "bounded_variance_B_1",
+            "B5_displacement_first_separation_from_C8"
+          ],
+          "produces": "B5_displacement_etaT_conversion"
+        },
+        {
+          "description": "Use T>=s and eta_T=(s+T)^{-1/3} to reach the printed final displacement display. It continues from the eta_T converted display and uses T\\ge s for the positive terms and residual denominator comparison.",
+          "math": "\\le\\frac{16G}{3\\rho T^{2/3}}+\\frac{2c^2\\sigma^2}{3L^2T^{2/3}}\\cdot\\log(s+T)-\\frac{\\sum_{t=1}^TM_{t+1}}{6L^2T^{1/3}}.",
+          "ref": "C.1 final displacement display line",
+          "source_pdf_lines": [
+            1300,
+            1303
+          ],
+          "step": 22,
+          "uses": [
+            "lemma_C_2",
+            "lemma_C_3",
+            "lemma_C_5",
+            "B5_stepsize_schedule",
+            "B5_beta_schedule",
+            "bounded_variance_B_1",
+            "B5_displacement_etaT_conversion",
+            "B5_horizon_condition"
+          ]
+        },
+        {
+          "description": "Proof-boundary/source-gap step: compare the printed C.1 proof endpoint with the Theorem B.5 statement. The theorem statement bounds the displacement metric with 1/eta_t, but the proof endpoint just obtained is the displayed 1/eta_t^2 bound; the PDF does not print a bridge from the C.1 endpoint to the theorem-level 1/eta_t displacement inequality, including preservation of the negative M_{t+1} residual term.",
+          "ref": "Theorem B.5 statement vs C.1 final displacement display line",
+          "source_pdf_lines": [
+            1084,
+            1303
+          ],
+          "step": 23,
+          "uses": [
+            "B5_displacement_final_display_from_C1",
+            "B5_stepsize_schedule",
+            "B5_horizon_condition"
+          ],
+          "produces": "B5_displacement_scale_statement_vs_proof_source_gap: public statement has (1/T) sum_t eta_t^{-1} E||x_{t+1}-x_t||_2^2, while the printed proof chain ends with (1/T) sum_t eta_t^{-2} E||x_{t+1}-x_t||_2^2. No PDF-printed derivation of the statement-level 1/eta_t displacement bound is supplied."
+        }
+      ],
+      "ref": "Theorem B.5",
+      "role": "Registered public target SGD.MARS.theorem_B_5; provides the Algorithm 1 convergence bounds.",
+      "statement_math": "\\text{In Algorithm 1, under Assumptions B.1, B.2 and B.3, when choosing }\\eta_t=(s+t)^{-1/3},\\ s\\ge 8L^3/\\rho^3.\\ \\text{Suppose }c\\ge 32L^2\\rho^{-2}+1,\\ \\beta_{1,t+1}=1-c\\eta_t^2\\text{ and }\\beta_{2,t+1}=1-\\eta_t^6,\\text{ then }\\forall T\\ge s,\\text{ it holds that }\\frac1T\\sum_{t=1}^T\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2\\le\\left(2\\rho G+\\frac{\\rho c^2\\sigma^2}{4L^2}\\cdot\\log(s+T)\\right)\\cdot\\frac1{T^{2/3}}-\\frac{\\rho^2\\sum_{t=1}^T M_{t+1}}{8L^2T^{1/3}},\\quad \\frac1T\\sum_{t=1}^T\\frac1{\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\le\\left(\\frac{16G}{3\\rho}+\\frac{2c^2\\sigma^2}{3L^2}\\cdot\\log(s+T)\\right)\\cdot\\frac1{T^{2/3}}-\\frac{\\sum_{t=1}^T M_{t+1}}{6L^2T^{1/3}},\\ \\text{where }G=F(x_1)-\\min_xF(x)+\\frac{\\rho s^{1/3}\\sigma^2}{16L^2}\\text{ and }M_{t+1}\\text{ is defined in (C.2).}"
+    },
+    {
+      "name": "theorem_B_6",
+      "proof": [
+        {
+          "description": "Define the AdamW Lyapunov function with the weight-decay/preconditioner quadratic term.",
+          "math": "\\Phi_t=\\mathbb{E}\\left[F(x_t)+\\frac{\\lambda}{2}\\cdot x_t^\\top H_tx_t+\\frac{\\rho}{16L^2\\eta_{t-1}}\\cdot\\|\\nabla F(x_t)-m_t\\|_2^2\\right],\\quad\\forall t\\ge1.",
+          "ref": "C.2",
+          "source_pdf_lines": [
+            1307,
+            1312
+          ],
+          "step": 1,
+          "uses": []
+        },
+        {
+          "description": "Expand the consecutive Lyapunov difference into I1 and I2.",
+          "math": "\\Phi_{t+1}-\\Phi_t=\\mathbb{E}\\left[F(x_{t+1})+\\frac\\lambda2x_{t+1}^\\top H_{t+1}x_{t+1}-F(x_t)-\\frac\\lambda2x_t^\\top H_tx_t\\right]+\\mathbb{E}\\left[\\frac\\rho{16L^2\\eta_t}\\|\\nabla F(x_{t+1})-m_{t+1}\\|_2^2-\\frac\\rho{16L^2\\eta_{t-1}}\\|\\nabla F(x_t)-m_t\\|_2^2\\right].",
+          "ref": "(C.9)",
+          "source_pdf_lines": [
+            1314,
+            1327
+          ],
+          "step": 2,
+          "uses": []
+        },
+        {
+          "description": "Bound I1 with Lemma C.4 after the B.6 stepsize schedule supplies eta_t <= min{(4 lambda)^(-1), rho*(2L)^(-1)}. The implication from the B.6 schedule to this eta-side-condition is recorded here only as a derived application-boundary check, not as a source lemma.",
+          "math": "I_1\\le\\mathbb{E}\\left[-\\frac{\\rho}{4\\eta_t}\\cdot\\|x_t-x_{t+1}\\|_2^2+\\frac{\\eta_t}{\\rho}\\cdot\\|\\nabla F(x_t)-m_t\\|_2^2+\\frac{\\lambda D^2\\sqrt{2(1-\\beta_{2,t})}}2\\right].",
+          "ref": "(C.10)",
+          "source_pdf_lines": [
+            1328,
+            1332
+          ],
+          "step": 3,
+          "uses": [
+            "lemma_C_4",
+            "B6_bounded_iterates",
+            "B6_stepsize_schedule",
+            "lemma_C_4_stepsize_hypothesis"
+          ],
+          "produces": "derived: from B6_stepsize_schedule, the Lemma C.4 eta-side-condition \\eta_t\\le\\min\\{(4\\lambda)^{-1},\\rho\\cdot(2L)^{-1}\\} is available for this application."
+        },
+        {
+          "description": "Source-gap/prerequisite check before invoking Lemma C.2: Lemma C.2 requires 1 >= beta_{1,t+1} >= 0 for all t, while Theorem B.6 prints only bounded iterates, the lower-bound schedule c >= 32L^2 rho^{-2}+1, and beta_{1,t+1}=1-c eta_t^2. The nonnegativity beta_{1,t+1} >= 0 is not derivable from the printed assumptions without an additional upper bound on c or other side condition.",
+          "math": "1\\ge\\beta_{1,t+1}\\ge0,\\ \\forall t",
+          "produces": "B6_C2_beta_admissibility_source_gap",
+          "ref": "Theorem B.6 statement and Lemma C.2 prerequisite",
+          "source_pdf_lines": [
+            1095,
+            1137
+          ],
+          "step": 4,
+          "uses": [
+            "lemma_C_2",
+            "B6_beta_schedule",
+            "B6_bounded_iterates"
+          ]
+        },
+        {
+          "description": "Theorem B.6 source-gap/prerequisite check before invoking Lemma C.2 for I2: Lemma C.2 also requires the approximate choice of gamma_{t+1} as in (D.12), while Theorem B.6 prints bounded iterates and the eta and beta schedules but no gamma-choice hypothesis. This records the missing prerequisite rather than silently adding it to the theorem statement.",
+          "math": "\\gamma_{t+1}=1-\\frac{G_{t+1}+\\beta_{1,t+1}(\\mathbb{E}\\|\\Delta_t\\|_2^2-\\|\\mathbb{E}\\Delta_t\\|_2^2)}{\\beta_{1,t+1}\\mathbb{E}\\|\\Delta_t\\|_2^2}=\\frac{\\|\\mathbb{E}\\Delta_t\\|_2^2-G_{t+1}}{\\beta_{1,t+1}\\mathbb{E}\\|\\Delta_t\\|_2^2}",
+          "produces": "B6_C2_gamma_choice_source_gap",
+          "ref": "Lemma C.2 prerequisite, (D.12), and Theorem B.6 statement",
+          "source_pdf_lines": [
+            1130,
+            1703
+          ],
+          "uses": [
+            "lemma_C_2",
+            "C2_gamma_choice",
+            "B6_beta_schedule",
+            "B6_bounded_iterates"
+          ],
+          "step": 5
+        },
+        {
+          "description": "Conditionally, subject to the unresolved beta-admissibility and gamma-choice prerequisites recorded in the preceding prerequisite steps, bound I2 using Lemma C.2 and substitute the beta schedule.",
+          "math": "I_2\\le\\frac{\\rho}{16L^2}\\left(\\frac{\\beta_{1,t+1}^2}{\\eta_t}-\\frac1{\\eta_{t-1}}\\right)\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2+\\frac{\\rho}{8\\eta_t}\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2+\\frac{\\rho c^2\\eta_t^3\\sigma^2}{8L^2}-\\frac{\\rho}{16L^2\\eta_t}M_{t+1}.",
+          "ref": "(C.11)",
+          "source_pdf_lines": [
+            1338,
+            1356
+          ],
+          "step": 6,
+          "uses": [
+            "lemma_C_2",
+            "B6_beta_schedule",
+            "B6_C2_beta_admissibility_source_gap",
+            "B6_C2_gamma_choice_source_gap"
+          ]
+        },
+        {
+          "description": "Theorem B.6 source-gap/prerequisite check before invoking Lemma C.5: Lemma C.5 assumes s\\ge1 for its stepsize comparison, while Theorem B.6 prints only s\\ge\\max(8L^3/\\rho^3,64\\lambda^3). This records the missing prerequisite rather than inferring it from the theorem schedule.",
+          "math": "s\\ge1",
+          "produces": "B6_C5_s_ge_1_source_gap",
+          "ref": "Lemma C.5 prerequisite at C.2 invocation",
+          "source_pdf_lines": [
+            1176,
+            1372
+          ],
+          "uses": [
+            "lemma_C_5",
+            "B6_stepsize_schedule"
+          ],
+          "step": 7
+        },
+        {
+          "description": "Use Lemma C.5 subject to the recorded s\\ge1 prerequisite and c>=32L^2 rho^{-2}+1 to make the I2 estimator coefficient negative.",
+          "math": "\\frac{\\rho}{16L^2}\\left(\\frac{\\beta_{1,t+1}^2}{\\eta_t}-\\frac1{\\eta_{t-1}}\\right)\\le\\frac{\\rho}{16L^2}\\cdot(\\eta_t-c\\eta_t)\\le -2\\eta_t\\rho^{-1}.",
+          "ref": "(C.12)",
+          "source_pdf_lines": [
+            1357,
+            1372
+          ],
+          "step": 8,
+          "uses": [
+            "lemma_C_5",
+            "B6_beta_schedule",
+            "B6_stepsize_schedule",
+            "lemma_C_5_stepsize_hypothesis",
+            "B6_C2_beta_admissibility_source_gap"
+          ]
+        },
+        {
+          "description": "Insert the negative coefficient into the I2 estimate.",
+          "math": "I_2\\le -\\frac{2\\eta_t}{\\rho}\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2+\\frac{\\rho}{8\\eta_t}\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2+\\frac{\\rho c^2\\eta_t^3\\sigma^2}{8L^2}-\\frac{\\rho}{16L^2\\eta_t}M_{t+1}.",
+          "ref": "(C.13)",
+          "source_pdf_lines": [
+            1373,
+            1376
+          ],
+          "step": 9,
+          "uses": [
+            "lemma_C_2",
+            "lemma_C_5",
+            "B6_beta_schedule"
+          ]
+        },
+        {
+          "description": "Combine (C.9), (C.10), and (C.13).",
+          "math": "\\Phi_{t+1}-\\Phi_t\\le -\\frac{\\eta_t}{\\rho}\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2-\\frac{\\rho}{8\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2+\\frac{\\rho c^2\\eta_t^3\\sigma^2}{8L^2}+\\frac{\\lambda D^2\\sqrt{2(1-\\beta_{2,t})}}2-\\frac{\\rho}{16L^2\\eta_t}M_{t+1}.",
+          "ref": "C.2 display before telescoping",
+          "source_pdf_lines": [
+            1377,
+            1381
+          ],
+          "step": 10,
+          "uses": [
+            "lemma_C_2",
+            "lemma_C_4",
+            "lemma_C_5",
+            "B6_beta_schedule",
+            "B6_bounded_iterates"
+          ]
+        },
+        {
+          "description": "Telescope the one-step inequality and substitute \\beta_{2,t}=1-\\eta_t^6 to sum the weight-decay perturbation.",
+          "math": "\\sum_{t=1}^T\\left(\\frac{\\eta_t}{\\rho}\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2+\\frac{\\rho}{8\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\right)\\le \\Phi_1-\\Phi_{T+1}+\\frac{\\rho c^2\\sigma^2}{8L^2}\\cdot\\log(s+T)+\\lambda D^2\\log(s+T)-\\sum_{t=1}^T\\frac{\\rho}{16L^2\\eta_t}M_{t+1}.",
+          "ref": "C.2 telescoping display",
+          "source_pdf_lines": [
+            1382,
+            1403
+          ],
+          "step": 11,
+          "uses": [
+            "B6_beta_schedule",
+            "B6_stepsize_schedule"
+          ]
+        },
+        {
+          "description": "Theorem B.6 trace: Lower-bound the terminal Lyapunov value by the objective infimum.",
+          "math": "\\Phi_{T+1}\\ge F(x_{T+1})\\ge\\min_xF(x).",
+          "ref": "C.2 display after telescoping",
+          "source_pdf_lines": [
+            1403,
+            1405
+          ],
+          "uses": [
+            "H_lower_bounded_B_3",
+            "B6_telescoped_bound"
+          ],
+          "step": 12
+        },
+        {
+          "description": "Theorem B.6 trace: record the source bound on the preconditioner norm used in the initial Lyapunov estimate.",
+          "math": "\\|H_{t+1}\\|_2=\\operatorname{diag}(\\sqrt{v_{t+1}}+\\epsilon)\\le1+\\epsilon.",
+          "produces": "B6_H_bound_following_D7",
+          "ref": "C.2 text after telescoping; fact following (D.7)",
+          "source_pdf_lines": [
+            1405,
+            1408
+          ],
+          "uses": [
+            "lemma_C_1"
+          ],
+          "step": 13
+        },
+        {
+          "description": "Theorem B.6 trace/source-gap bridge: expand \\Phi_1, use the H_1 bound and bounded iterates, and follow the source substitution m_1=\\nabla f(x_1,\\xi_1); Algorithm 2 prints m_0,v_0\\leftarrow0 and a clipped first-moment update for m_1, so this substitution is recorded as source-visible rather than silently derived.",
+          "math": "\\Phi_1=\\mathbb{E}\\left[F(x_1)+\\frac\\lambda2\\cdot x_1^\\top H_1x_1+\\frac{\\rho s^{1/3}}{16L^2}\\cdot\\|\\nabla F(x_1)-m_1\\|_2^2\\right]\\le F(x_1)+\\frac\\lambda2D^2(1+\\epsilon)+\\frac{\\rho s^{1/3}}{16L^2}\\cdot\\mathbb{E}[\\|\\nabla F(x_1)-\\nabla f(x_1,\\xi_1)\\|_2^2]",
+          "produces": "B6_Phi1_H1_bound_and_source_substitution_m_1_equals_grad_f_x1_xi1",
+          "ref": "C.2 Phi_1 display",
+          "source_pdf_lines": [
+            1408,
+            1414
+          ],
+          "uses": [
+            "B6_bounded_iterates",
+            "B6_H_bound_following_D7",
+            "B6_Algorithm2_initialization_and_first_moment_source"
+          ],
+          "step": 14
+        },
+        {
+          "description": "Theorem B.6 trace: apply the bounded-variance assumption to the displayed initial Lyapunov expression.",
+          "math": "\\Phi_1\\le F(x_1)+\\frac\\lambda2D^2(1+\\epsilon)+\\frac{\\rho s^{1/3}\\sigma^2}{16L^2}.",
+          "ref": "C.2 Phi_1 display",
+          "source_pdf_lines": [
+            1414,
+            1418
+          ],
+          "uses": [
+            "bounded_variance_B_1",
+            "B6_Phi1_H1_bound_and_source_substitution"
+          ],
+          "step": 15
+        },
+        {
+          "description": "Define G and divide the telescoped bound by T.",
+          "math": "\\frac1T\\sum_{t=1}^T\\left(\\frac{\\eta_t}{\\rho}\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2+\\frac{\\rho}{8\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\right)\\le\\frac GT+\\frac{\\rho c^2\\sigma^2}{8L^2T}\\cdot\\log(s+T)+\\frac{\\lambda D^2\\log(s+T)}T-\\frac1T\\sum_{t=1}^T\\frac{\\rho}{16L^2\\eta_t}M_{t+1}.",
+          "produces": "G=F(x_1)-\\min_xF(x)+\\lambda D^2(1+\\epsilon)/2+\\rho s^{1/3}\\sigma^2/(16L^2)",
+          "ref": "(C.14)-(C.15)",
+          "source_pdf_lines": [
+            1418,
+            1427
+          ],
+          "step": 16,
+          "uses": [
+            "B6_stepsize_schedule",
+            "bounded_variance_B_1",
+            "lemma_C_1",
+            "B6_bounded_iterates",
+            "B6_telescoped_bound",
+            "B6_Phi1_variance_bound",
+            "H_lower_bounded_B_3"
+          ]
+        },
+        {
+          "description": "Separate the estimator-error term from (C.14)-(C.15), using eta_T for the positive terms and the printed residual denominator. This line depends on the C.14-C.15 divided telescoping bound, discarding the nonnegative displacement term, and using eta_T for the positive left coefficient while preserving the printed residual comparison.",
+          "math": "\\frac1T\\sum_{t=1}^T\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2\\le\\frac{\\rho(G+\\lambda D^2\\log(s+T))}{T\\eta_T}+\\frac{\\rho^2c^2\\sigma^2}{8L^2T\\eta_T}\\cdot\\log(s+T)-\\frac{\\rho^2\\sum_{t=1}^TM_{t+1}}{16L^2T^{1/3}}.",
+          "ref": "C.2 first separated estimator display",
+          "source_pdf_lines": [
+            1435,
+            1438
+          ],
+          "step": 17,
+          "uses": [
+            "lemma_C_2",
+            "lemma_C_4",
+            "lemma_C_5",
+            "lemma_C_1",
+            "B6_stepsize_schedule",
+            "B6_beta_schedule",
+            "B6_bounded_iterates",
+            "bounded_variance_B_1",
+            "B6_C14_C15_divided_telescoping"
+          ],
+          "produces": "B6_estimator_first_separation_from_C14_C15"
+        },
+        {
+          "description": "Rewrite the positive eta_T terms using (s+T)^{1/3}/T, preserving the displayed residual. It continues from the first separated estimator display by substituting eta_T=(s+T)^{-1/3}.",
+          "math": "\\le\\left(\\rho(G+\\lambda D^2\\log(s+T))+\\frac{\\rho^2c^2\\sigma^2}{8L^2}\\cdot\\log(s+T)\\right)\\cdot\\frac{(s+T)^{1/3}}{T}-\\frac{\\rho^2\\sum_{t=1}^TM_{t+1}}{16L^2T^{1/3}}.",
+          "ref": "C.2 second estimator display line",
+          "source_pdf_lines": [
+            1440,
+            1442
+          ],
+          "step": 18,
+          "uses": [
+            "lemma_C_2",
+            "lemma_C_4",
+            "lemma_C_5",
+            "lemma_C_1",
+            "B6_stepsize_schedule",
+            "B6_beta_schedule",
+            "B6_bounded_iterates",
+            "bounded_variance_B_1",
+            "B6_estimator_first_separation_from_C14_C15"
+          ],
+          "produces": "B6_estimator_etaT_substitution"
+        },
+        {
+          "description": "Use T>=s to obtain the final estimator-error inequality printed in the proof. It continues from the eta_T-substituted display and uses T\\ge s to compare (s+T)^{1/3}/T with 2/T^{2/3}.",
+          "math": "\\le\\left(2\\rho(G+\\lambda D^2\\log(s+T))+\\frac{\\rho c^2\\sigma^2}{4L^2}\\cdot\\log(s+T)\\right)\\cdot\\frac1{T^{2/3}}-\\frac{\\rho^2\\sum_{t=1}^TM_{t+1}}{16L^2T^{1/3}}.",
+          "ref": "C.2 final estimator display line",
+          "source_pdf_lines": [
+            1445,
+            1447
+          ],
+          "step": 19,
+          "uses": [
+            "lemma_C_2",
+            "lemma_C_4",
+            "lemma_C_5",
+            "lemma_C_1",
+            "B6_stepsize_schedule",
+            "B6_beta_schedule",
+            "B6_bounded_iterates",
+            "bounded_variance_B_1",
+            "B6_estimator_etaT_substitution",
+            "B6_horizon_condition"
+          ]
+        },
+        {
+          "description": "Separate the displacement term, leaving the printed eta_t residual in the negative term. This line depends on the C.14-C.15 divided telescoping bound after discarding the nonnegative estimator term and carrying forward the residual term printed in the proof.",
+          "math": "\\frac1T\\sum_{t=1}^T\\frac{\\rho}{8\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\le\\frac{G+\\lambda D^2\\log(s+T)}T+\\frac{\\rho c^2\\sigma^2}{8L^2T}\\cdot\\log(s+T)-\\frac{\\rho\\sum_{t=1}^TM_{t+1}}{16L^2T\\eta_t}.",
+          "ref": "C.2 first separated displacement display",
+          "source_pdf_lines": [
+            1451,
+            1454
+          ],
+          "step": 20,
+          "uses": [
+            "lemma_C_2",
+            "lemma_C_4",
+            "lemma_C_5",
+            "lemma_C_1",
+            "B6_stepsize_schedule",
+            "B6_beta_schedule",
+            "B6_bounded_iterates",
+            "bounded_variance_B_1",
+            "B6_C14_C15_divided_telescoping"
+          ],
+          "produces": "B6_displacement_first_separation_from_C14_C15"
+        },
+        {
+          "description": "Convert to the printed eta_t^{-2} scaled displacement form and substitute eta_T for the positive terms. It continues from the separated displacement display and uses eta_T to pass to the printed eta_t^{-2} scaled form.",
+          "math": "\\frac1T\\sum_{t=1}^T\\frac1{\\eta_t^2}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\le\\frac{8(G+\\lambda D^2\\log(s+T))}{\\rho T\\eta_T}+\\frac{c^2\\sigma^2}{L^2T\\eta_T}\\cdot\\log(s+T)-\\frac{\\sum_{t=1}^TM_{t+1}}{2L^2T\\eta_t^2}.",
+          "ref": "C.2 second displacement display first line",
+          "source_pdf_lines": [
+            1458,
+            1461
+          ],
+          "step": 21,
+          "uses": [
+            "lemma_C_2",
+            "lemma_C_4",
+            "lemma_C_5",
+            "lemma_C_1",
+            "B6_stepsize_schedule",
+            "B6_beta_schedule",
+            "B6_bounded_iterates",
+            "bounded_variance_B_1",
+            "B6_displacement_first_separation_from_C14_C15"
+          ],
+          "produces": "B6_displacement_etaT_conversion"
+        },
+        {
+          "description": "Use T>=s to obtain the printed final displacement display. It continues from the eta_T converted display and uses T\\ge s for the positive terms and residual denominator comparison.",
+          "math": "\\le\\frac{16(G+\\lambda D^2\\log(s+T))}{\\rho T^{2/3}}+\\frac{2c^2\\sigma^2}{L^2T^{2/3}}\\cdot\\log(s+T)-\\frac{\\sum_{t=1}^TM_{t+1}}{L^2T^{1/3}}.",
+          "ref": "C.2 final displacement display line",
+          "source_pdf_lines": [
+            1462,
+            1465
+          ],
+          "step": 22,
+          "uses": [
+            "lemma_C_2",
+            "lemma_C_4",
+            "lemma_C_5",
+            "lemma_C_1",
+            "B6_stepsize_schedule",
+            "B6_beta_schedule",
+            "B6_bounded_iterates",
+            "bounded_variance_B_1",
+            "B6_displacement_etaT_conversion",
+            "B6_horizon_condition"
+          ]
+        },
+        {
+          "description": "Proof-boundary/source-gap step: compare the printed C.2 proof endpoint with the Theorem B.6 statement. The theorem statement bounds the displacement metric with 1/eta_t, but the proof endpoint just obtained is the displayed 1/eta_t^2 bound; the PDF does not print a bridge from the C.2 endpoint to the theorem-level 1/eta_t displacement inequality, including preservation of the negative M_{t+1} residual term.",
+          "ref": "Theorem B.6 statement vs C.2 final displacement display line",
+          "source_pdf_lines": [
+            1104,
+            1465
+          ],
+          "step": 23,
+          "uses": [
+            "B6_displacement_final_display_from_C2",
+            "B6_stepsize_schedule",
+            "B6_horizon_condition"
+          ],
+          "produces": "B6_displacement_scale_statement_vs_proof_source_gap: public statement has (1/T) sum_t eta_t^{-1} E||x_{t+1}-x_t||_2^2, while the printed proof chain ends with (1/T) sum_t eta_t^{-2} E||x_{t+1}-x_t||_2^2. No PDF-printed derivation of the statement-level 1/eta_t displacement bound is supplied."
+        }
+      ],
+      "ref": "Theorem B.6",
+      "role": "Registered public target SGD.MARS.theorem_B_6; provides the Algorithm 2 MARS-AdamW convergence bounds with weight decay.",
+      "statement_math": "\\text{In Algorithm 2, under Assumptions B.1, B.2 and B.3, when choosing }\\eta_t=(s+t)^{-1/3},\\ s\\ge\\max(8L^3/\\rho^3,64\\lambda^3).\\ \\text{Suppose }\\|x_t\\|_2\\le D,\\ c\\ge32L^2\\rho^{-2}+1,\\ \\beta_{1,t+1}=1-c\\eta_t^2\\text{ and }\\beta_{2,t+1}=1-\\eta_t^6,\\text{ then }\\forall T\\ge s,\\text{ it holds that }\\frac1T\\sum_{t=1}^T\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2\\le\\left(2\\rho(G+\\lambda D^2\\log(s+T))+\\frac{\\rho c^2\\sigma^2}{4L^2}\\cdot\\log(s+T)\\right)\\cdot\\frac1{T^{2/3}}-\\frac{\\rho^2\\sum_{t=1}^TM_{t+1}}{16L^2T^{1/3}},\\quad \\frac1T\\sum_{t=1}^T\\frac1{\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\le\\left(\\frac{16(G+\\lambda D^2\\log(s+T))}{\\rho}+\\frac{2c^2\\sigma^2}{L^2}\\cdot\\log(s+T)\\right)\\cdot\\frac1{T^{2/3}}-\\frac{\\sum_{t=1}^TM_{t+1}}{L^2T^{1/3}}.\\ \\text{where }G=F(x_1)-\\min_xF(x)+\\frac{\\lambda}{2}D^2(1+\\epsilon)+\\frac{\\rho s^{1/3}\\sigma^2}{16L^2}\\text{ and }M_{t+1}\\text{ is defined in (C.2).}"
+    },
+    {
+      "name": "B5_C2_beta_admissibility_source_gap",
+      "ref": "Theorem B.5 statement and Lemma C.2 prerequisite",
+      "statement_math": "1\\ge\\beta_{1,t+1}\\ge0,\\ \\forall t",
+      "role": "Declared source-gap prerequisite for Theorem B.5 applications of Lemma C.2 and for the subsequent coefficient rewrite \\beta_{1,t+1}^2/\\eta_t\\le\\beta_{1,t+1}/\\eta_t.",
+      "proof": [
+        {
+          "description": "Lemma C.2 prints beta-admissibility as a prerequisite for its estimator recursion.",
+          "math": "1\\ge\\beta_{1,t+1}\\ge0,\\ \\forall t",
+          "ref": "Lemma C.2",
+          "source_pdf_lines": [
+            1130,
+            1137
+          ],
+          "step": 1,
+          "uses": [
+            "lemma_C_2"
+          ]
+        },
+        {
+          "description": "Theorem B.5 prints the stepsize and beta schedule but only lower-bounds c; the missing upper-bound information is why this same-JSON symbol is marked as a source-gap prerequisite rather than a silently proved consequence.",
+          "math": "\\eta_t=(s+t)^{-1/3},\\quad s\\ge 8L^3/\\rho^3,\\quad c\\ge 32L^2\\rho^{-2}+1,\\quad \\beta_{1,t+1}=1-c\\eta_t^2\\text{ and }\\beta_{2,t+1}=1-\\eta_t^6",
+          "ref": "Theorem B.5",
+          "source_pdf_lines": [
+            1078,
+            1094
+          ],
+          "step": 2,
+          "uses": [
+            "B5_stepsize_schedule",
+            "B5_beta_schedule"
+          ],
+          "produces": "source_gap: Theorem B.5 does not print an upper bound on c or another condition ensuring \\beta_{1,t+1}\\ge0, although Lemma C.2 and the displayed coefficient rewrite require it."
+        }
+      ]
+    },
+    {
+      "name": "B6_C2_beta_admissibility_source_gap",
+      "ref": "Theorem B.6 statement and Lemma C.2 prerequisite",
+      "statement_math": "1\\ge\\beta_{1,t+1}\\ge0,\\ \\forall t",
+      "role": "Declared source-gap prerequisite for Theorem B.6 applications of Lemma C.2 and for the subsequent coefficient rewrite \\beta_{1,t+1}^2/\\eta_t\\le\\beta_{1,t+1}/\\eta_t.",
+      "proof": [
+        {
+          "description": "Lemma C.2 prints beta-admissibility as a prerequisite for its estimator recursion.",
+          "math": "1\\ge\\beta_{1,t+1}\\ge0,\\ \\forall t",
+          "ref": "Lemma C.2",
+          "source_pdf_lines": [
+            1130,
+            1137
+          ],
+          "step": 1,
+          "uses": [
+            "lemma_C_2"
+          ]
+        },
+        {
+          "description": "Theorem B.6 prints bounded iterates and the stepsize and beta schedule but only lower-bounds c; the missing upper-bound information is why this same-JSON symbol is marked as a source-gap prerequisite rather than a silently proved consequence.",
+          "math": "\\eta_t=(s+t)^{-1/3},\\quad s\\ge\\max(8L^3/\\rho^3,64\\lambda^3),\\quad \\|x_t\\|_2\\le D,\\quad c\\ge 32L^2\\rho^{-2}+1,\\quad \\beta_{1,t+1}=1-c\\eta_t^2\\text{ and }\\beta_{2,t+1}=1-\\eta_t^6",
+          "ref": "Theorem B.6",
+          "source_pdf_lines": [
+            1095,
+            1110
+          ],
+          "step": 2,
+          "uses": [
+            "B6_stepsize_schedule",
+            "B6_bounded_iterates",
+            "B6_beta_schedule"
+          ],
+          "produces": "source_gap: Theorem B.6 does not print an upper bound on c or another condition ensuring \\beta_{1,t+1}\\ge0, although Lemma C.2 and the displayed coefficient rewrite require it."
+        }
+      ]
+    },
+    {
+      "name": "B5_C2_gamma_choice_source_gap",
+      "ref": "Theorem B.5 statement, Lemma C.2 prerequisite, and (D.12)",
+      "statement_math": "\\gamma_{t+1}=1-\\frac{G_{t+1}+\\beta_{1,t+1}(\\mathbb{E}\\|\\Delta_t\\|_2^2-\\|\\mathbb{E}\\Delta_t\\|_2^2)}{\\beta_{1,t+1}\\mathbb{E}\\|\\Delta_t\\|_2^2}=\\frac{\\|\\mathbb{E}\\Delta_t\\|_2^2-G_{t+1}}{\\beta_{1,t+1}\\mathbb{E}\\|\\Delta_t\\|_2^2}",
+      "role": "Declared source-gap prerequisite for Theorem B.5 applications of Lemma C.2: Lemma C.2 requires the approximate gamma choice as in (D.12), but Theorem B.5 does not print a gamma-choice hypothesis.",
+      "proof": [
+        {
+          "description": "Lemma C.2 prints the gamma-choice prerequisite for its estimator recursion.",
+          "math": "\\text{under approximate choice of }\\gamma_{t+1}\\text{ as in (D.12)}",
+          "ref": "Lemma C.2",
+          "source_pdf_lines": [
+            1130,
+            1137
+          ],
+          "step": 1,
+          "uses": [
+            "lemma_C_2"
+          ]
+        },
+        {
+          "description": "Equation (D.12) prints the approximate gamma choice required by Lemma C.2.",
+          "math": "\\gamma_{t+1}=1-\\frac{G_{t+1}+\\beta_{1,t+1}(\\mathbb{E}\\|\\Delta_t\\|_2^2-\\|\\mathbb{E}\\Delta_t\\|_2^2)}{\\beta_{1,t+1}\\mathbb{E}\\|\\Delta_t\\|_2^2}=\\frac{\\|\\mathbb{E}\\Delta_t\\|_2^2-G_{t+1}}{\\beta_{1,t+1}\\mathbb{E}\\|\\Delta_t\\|_2^2}",
+          "ref": "(D.12)",
+          "source_pdf_lines": [
+            1699,
+            1703
+          ],
+          "step": 2,
+          "uses": [
+            "C2_gamma_choice"
+          ]
+        },
+        {
+          "description": "Theorem B.5 prints the stepsize and beta schedule but does not print the approximate gamma-choice condition; this same-JSON symbol records that missing prerequisite instead of silently adding it to the theorem statement.",
+          "math": "\\eta_t=(s+t)^{-1/3},\\quad s\\ge 8L^3/\\rho^3,\\quad c\\ge 32L^2\\rho^{-2}+1,\\quad \\beta_{1,t+1}=1-c\\eta_t^2\\text{ and }\\beta_{2,t+1}=1-\\eta_t^6",
+          "ref": "Theorem B.5",
+          "source_pdf_lines": [
+            1078,
+            1094
+          ],
+          "step": 3,
+          "uses": [
+            "B5_stepsize_schedule",
+            "B5_beta_schedule"
+          ],
+          "produces": "source_gap: Theorem B.5 does not state that \\gamma_{t+1} is chosen as in (D.12), although Lemma C.2 requires that approximate choice before the I2 estimate is applied."
+        }
+      ]
+    },
+    {
+      "name": "B6_C2_gamma_choice_source_gap",
+      "ref": "Theorem B.6 statement, Lemma C.2 prerequisite, and (D.12)",
+      "statement_math": "\\gamma_{t+1}=1-\\frac{G_{t+1}+\\beta_{1,t+1}(\\mathbb{E}\\|\\Delta_t\\|_2^2-\\|\\mathbb{E}\\Delta_t\\|_2^2)}{\\beta_{1,t+1}\\mathbb{E}\\|\\Delta_t\\|_2^2}=\\frac{\\|\\mathbb{E}\\Delta_t\\|_2^2-G_{t+1}}{\\beta_{1,t+1}\\mathbb{E}\\|\\Delta_t\\|_2^2}",
+      "role": "Declared source-gap prerequisite for Theorem B.6 applications of Lemma C.2: Lemma C.2 requires the approximate gamma choice as in (D.12), but Theorem B.6 does not print a gamma-choice hypothesis.",
+      "proof": [
+        {
+          "description": "Lemma C.2 prints the gamma-choice prerequisite for its estimator recursion.",
+          "math": "\\text{under approximate choice of }\\gamma_{t+1}\\text{ as in (D.12)}",
+          "ref": "Lemma C.2",
+          "source_pdf_lines": [
+            1130,
+            1137
+          ],
+          "step": 1,
+          "uses": [
+            "lemma_C_2"
+          ]
+        },
+        {
+          "description": "Equation (D.12) prints the approximate gamma choice required by Lemma C.2.",
+          "math": "\\gamma_{t+1}=1-\\frac{G_{t+1}+\\beta_{1,t+1}(\\mathbb{E}\\|\\Delta_t\\|_2^2-\\|\\mathbb{E}\\Delta_t\\|_2^2)}{\\beta_{1,t+1}\\mathbb{E}\\|\\Delta_t\\|_2^2}=\\frac{\\|\\mathbb{E}\\Delta_t\\|_2^2-G_{t+1}}{\\beta_{1,t+1}\\mathbb{E}\\|\\Delta_t\\|_2^2}",
+          "ref": "(D.12)",
+          "source_pdf_lines": [
+            1699,
+            1703
+          ],
+          "step": 2,
+          "uses": [
+            "C2_gamma_choice"
+          ]
+        },
+        {
+          "description": "Theorem B.6 prints bounded iterates and the stepsize and beta schedule but does not print the approximate gamma-choice condition; this same-JSON symbol records that missing prerequisite instead of silently adding it to the theorem statement.",
+          "math": "\\eta_t=(s+t)^{-1/3},\\quad s\\ge\\max(8L^3/\\rho^3,64\\lambda^3),\\quad \\|x_t\\|_2\\le D,\\quad c\\ge 32L^2\\rho^{-2}+1,\\quad \\beta_{1,t+1}=1-c\\eta_t^2\\text{ and }\\beta_{2,t+1}=1-\\eta_t^6",
+          "ref": "Theorem B.6",
+          "source_pdf_lines": [
+            1095,
+            1110
+          ],
+          "step": 3,
+          "uses": [
+            "B6_stepsize_schedule",
+            "B6_bounded_iterates",
+            "B6_beta_schedule"
+          ],
+          "produces": "source_gap: Theorem B.6 does not state that \\gamma_{t+1} is chosen as in (D.12), although Lemma C.2 requires that approximate choice before the I2 estimate is applied."
+        }
+      ]
+    },
+    {
+      "name": "B5_telescoped_bound",
+      "ref": "C.1 telescoping display",
+      "statement_math": "\\sum_{t=1}^T\\left(\\frac{\\eta_t}{\\rho}\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2+\\frac{3\\rho}{8\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\right)\\le \\Phi_1-\\Phi_{T+1}+\\frac{\\rho c^2\\sigma^2}{8L^2}\\cdot\\log(s+T)-\\sum_{t=1}^T\\frac{\\rho}{16L^2\\eta_t}M_{t+1}.",
+      "role": "Named copy of the telescoped inequality used to derive (C.8) and the terminal separations in Theorem B.5.",
+      "proof": [
+        {
+          "description": "Telescope from t=1 to T and use \\sum_{t=1}^T(s+t)^{-1}\\le\\log(s+T).",
+          "math": "\\sum_{t=1}^T\\left(\\frac{\\eta_t}{\\rho}\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2+\\frac{3\\rho}{8\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\right)\\le \\Phi_1-\\Phi_{T+1}+\\frac{\\rho c^2\\sigma^2}{8L^2}\\cdot\\log(s+T)-\\sum_{t=1}^T\\frac{\\rho}{16L^2\\eta_t}M_{t+1}.",
+          "ref": "C.1 telescoping display",
+          "source_pdf_lines": [
+            1241,
+            1255
+          ],
+          "step": 1,
+          "uses": [
+            "lemma_C_2",
+            "lemma_C_3",
+            "lemma_C_5",
+            "B5_stepsize_schedule",
+            "B5_beta_schedule"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "B5_Phi1_source_substitution",
+      "ref": "C.1 Phi_1 display",
+      "statement_math": "\\Phi_1=\\mathbb{E}\\left[F(x_1)+\\frac{\\rho s^{1/3}}{16L^2}\\cdot\\|\\nabla F(x_1)-m_1\\|_2^2\\right]=F(x_1)+\\frac{\\rho s^{1/3}}{16L^2}\\cdot\\mathbb{E}[\\|\\nabla F(x_1)-\\nabla f(x_1,\\xi_1)\\|_2^2]",
+      "role": "Names the source's initial Lyapunov expansion and m_1 substitution in Theorem B.5.",
+      "proof": [
+        {
+          "description": "Theorem B.5 trace/source-gap bridge: expand \\Phi_1 and follow the source substitution m_1=\\nabla f(x_1,\\xi_1); Algorithm 1 prints m_0\\leftarrow0 and a clipped momentum update for m_1, so this substitution is recorded as a source-visible bridge, not as an independently justified algorithm consequence.",
+          "math": "\\Phi_1=\\mathbb{E}\\left[F(x_1)+\\frac{\\rho s^{1/3}}{16L^2}\\cdot\\|\\nabla F(x_1)-m_1\\|_2^2\\right]=F(x_1)+\\frac{\\rho s^{1/3}}{16L^2}\\cdot\\mathbb{E}[\\|\\nabla F(x_1)-\\nabla f(x_1,\\xi_1)\\|_2^2]",
+          "ref": "C.1 Phi_1 display",
+          "source_pdf_lines": [
+            1258,
+            1264
+          ],
+          "uses": [
+            "Algorithm1_momentum"
+          ],
+          "step": 1
+        }
+      ]
+    },
+    {
+      "name": "B5_Phi1_variance_bound",
+      "ref": "C.1 Phi_1 display",
+      "statement_math": "\\Phi_1\\le F(x_1)+\\frac{\\rho s^{1/3}\\sigma^2}{16L^2}.",
+      "role": "Names the bounded-variance estimate on the initial Lyapunov term in Theorem B.5.",
+      "proof": [
+        {
+          "description": "Theorem B.5 trace: apply the bounded-variance assumption to the displayed initial Lyapunov expression.",
+          "math": "\\Phi_1\\le F(x_1)+\\frac{\\rho s^{1/3}\\sigma^2}{16L^2}.",
+          "ref": "C.1 Phi_1 display",
+          "source_pdf_lines": [
+            1263,
+            1265
+          ],
+          "uses": [
+            "B5_Phi1_source_substitution",
+            "bounded_variance_B_1"
+          ],
+          "step": 1
+        }
+      ]
+    },
+    {
+      "name": "B5_C8_divided_telescoping",
+      "ref": "(C.8)",
+      "statement_math": "\\frac1T\\sum_{t=1}^T\\left(\\frac{\\eta_t}{\\rho}\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2+\\frac{3\\rho}{8\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\right)\\le\\frac{G}{T}+\\frac{\\rho c^2\\sigma^2}{8L^2T}\\cdot\\log(s+T)-\\frac1T\\sum_{t=1}^T\\frac{\\rho}{16L^2\\eta_t}M_{t+1}.",
+      "role": "Named copy of (C.8), the divided telescoping bound feeding both terminal inequalities of Theorem B.5.",
+      "proof": [
+        {
+          "description": "Define G and divide the telescoped inequality by T.",
+          "math": "\\frac1T\\sum_{t=1}^T\\left(\\frac{\\eta_t}{\\rho}\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2+\\frac{3\\rho}{8\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\right)\\le\\frac{G}{T}+\\frac{\\rho c^2\\sigma^2}{8L^2T}\\cdot\\log(s+T)-\\frac1T\\sum_{t=1}^T\\frac{\\rho}{16L^2\\eta_t}M_{t+1}.",
+          "ref": "(C.8)",
+          "source_pdf_lines": [
+            1265,
+            1270
+          ],
+          "step": 1,
+          "uses": [
+            "B5_telescoped_bound",
+            "B5_Phi1_variance_bound",
+            "H_lower_bounded_B_3",
+            "B5_stepsize_schedule"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "B5_estimator_first_separation_from_C8",
+      "ref": "C.1 first separated estimator display",
+      "statement_math": "\\frac1T\\sum_{t=1}^T\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2\\le\\frac{\\rho G}{T\\eta_T}+\\frac{\\rho^2c^2\\sigma^2}{8L^2T\\eta_T}\\cdot\\log(s+T)-\\frac1T\\sum_{t=1}^T\\frac{\\rho^2}{16L^2\\eta_t^2}M_{t+1}.",
+      "role": "First estimator-error separation from (C.8) in Theorem B.5.",
+      "proof": [
+        {
+          "description": "Separate the estimator-error term from (C.8) and lower-bound the left coefficient by eta_T, retaining the printed eta_t^{-2} residual sum. This line depends on the C.8 divided telescoping bound, discarding the nonnegative displacement term, and using eta_t >= eta_T on the left and in the residual denominator.",
+          "math": "\\frac1T\\sum_{t=1}^T\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2\\le\\frac{\\rho G}{T\\eta_T}+\\frac{\\rho^2c^2\\sigma^2}{8L^2T\\eta_T}\\cdot\\log(s+T)-\\frac1T\\sum_{t=1}^T\\frac{\\rho^2}{16L^2\\eta_t^2}M_{t+1}.",
+          "ref": "C.1 first separated estimator display",
+          "source_pdf_lines": [
+            1274,
+            1277
+          ],
+          "step": 1,
+          "uses": [
+            "B5_C8_divided_telescoping",
+            "B5_stepsize_schedule"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "B5_estimator_etaT_substitution",
+      "ref": "C.1 second estimator display line",
+      "statement_math": "\\le\\left(\\rho G+\\frac{\\rho^2c^2\\sigma^2}{8L^2}\\cdot\\log(s+T)\\right)\\cdot\\frac{(s+T)^{1/3}}{T}-\\frac1T\\sum_{t=1}^T\\frac{\\rho^2}{16L^2\\eta_t^2}M_{t+1}.",
+      "role": "Eta_T substitution line in the Theorem B.5 estimator chain.",
+      "proof": [
+        {
+          "description": "Substitute eta_T=(s+T)^{-1/3} in the positive terms while keeping the residual sum in the printed form. It continues from the first separated estimator display by substituting eta_T=(s+T)^{-1/3}.",
+          "math": "\\le\\left(\\rho G+\\frac{\\rho^2c^2\\sigma^2}{8L^2}\\cdot\\log(s+T)\\right)\\cdot\\frac{(s+T)^{1/3}}{T}-\\frac1T\\sum_{t=1}^T\\frac{\\rho^2}{16L^2\\eta_t^2}M_{t+1}.",
+          "ref": "C.1 second estimator display line",
+          "source_pdf_lines": [
+            1279,
+            1281
+          ],
+          "step": 1,
+          "uses": [
+            "B5_estimator_first_separation_from_C8",
+            "B5_stepsize_schedule"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "B5_displacement_first_separation_from_C8",
+      "ref": "C.1 first separated displacement display",
+      "statement_math": "\\frac1T\\sum_{t=1}^T\\frac{3\\rho}{8\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\le\\frac GT+\\frac{\\rho c^2\\sigma^2}{8L^2T}\\cdot\\log(s+T)-\\frac{\\rho\\sum_{t=1}^TM_{t+1}}{16L^2T^{2/3}}.",
+      "role": "First displacement separation from (C.8) in Theorem B.5.",
+      "proof": [
+        {
+          "description": "Separate the second term in (C.8), preserving the printed rho/(8 eta_t) left coefficient and residual endpoint. This line depends on the C.8 divided telescoping bound after discarding the nonnegative estimator term and replacing the residual denominator using eta_t=(s+t)^{-1/3}.",
+          "math": "\\frac1T\\sum_{t=1}^T\\frac{3\\rho}{8\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\le\\frac GT+\\frac{\\rho c^2\\sigma^2}{8L^2T}\\cdot\\log(s+T)-\\frac{\\rho\\sum_{t=1}^TM_{t+1}}{16L^2T^{2/3}}.",
+          "ref": "C.1 first separated displacement display",
+          "source_pdf_lines": [
+            1288,
+            1291
+          ],
+          "step": 1,
+          "uses": [
+            "B5_C8_divided_telescoping",
+            "B5_stepsize_schedule"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "B5_displacement_etaT_conversion",
+      "ref": "C.1 second displacement display first line",
+      "statement_math": "\\frac1T\\sum_{t=1}^T\\frac1{\\eta_t^2}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\le\\frac{8G}{3\\rho T\\eta_T}+\\frac{c^2\\sigma^2}{3L^2T\\eta_T}\\cdot\\log(s+T)-\\frac{\\sum_{t=1}^TM_{t+1}}{6L^2T^{2/3}}.",
+      "role": "Eta_T conversion line in the Theorem B.5 displacement chain.",
+      "proof": [
+        {
+          "description": "Convert the separated displacement inequality to the printed eta_t^{-2} scaled form using eta_T. It continues from the separated displacement display and uses eta_T to pass to the printed eta_t^{-2} scaled form.",
+          "math": "\\frac1T\\sum_{t=1}^T\\frac1{\\eta_t^2}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\le\\frac{8G}{3\\rho T\\eta_T}+\\frac{c^2\\sigma^2}{3L^2T\\eta_T}\\cdot\\log(s+T)-\\frac{\\sum_{t=1}^TM_{t+1}}{6L^2T^{2/3}}.",
+          "ref": "C.1 second displacement display first line",
+          "source_pdf_lines": [
+            1295,
+            1299
+          ],
+          "step": 1,
+          "uses": [
+            "B5_displacement_first_separation_from_C8",
+            "B5_stepsize_schedule"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "B5_displacement_final_display_from_C1",
+      "ref": "C.1 final displacement display line",
+      "statement_math": "\\frac1T\\sum_{t=1}^T\\frac1{\\eta_t^2}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\le\\frac{16G}{3\\rho T^{2/3}}+\\frac{2c^2\\sigma^2}{3L^2T^{2/3}}\\cdot\\log(s+T)-\\frac{\\sum_{t=1}^TM_{t+1}}{6L^2T^{1/3}}.",
+      "role": "Terminal printed C.1 displacement endpoint used before comparing the proof endpoint with the Theorem B.5 statement.",
+      "proof": [
+        {
+          "description": "Use T\\ge s and eta_T=(s+T)^{-1/3} to reach the printed final displacement display from the eta_T-converted line.",
+          "math": "\\frac1T\\sum_{t=1}^T\\frac1{\\eta_t^2}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\le\\frac{16G}{3\\rho T^{2/3}}+\\frac{2c^2\\sigma^2}{3L^2T^{2/3}}\\cdot\\log(s+T)-\\frac{\\sum_{t=1}^TM_{t+1}}{6L^2T^{1/3}}.",
+          "ref": "C.1 final displacement display line",
+          "source_pdf_lines": [
+            1300,
+            1303
+          ],
+          "step": 1,
+          "uses": [
+            "B5_displacement_etaT_conversion",
+            "B5_stepsize_schedule",
+            "B5_horizon_condition"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "B6_telescoped_bound",
+      "ref": "C.2 telescoping display",
+      "statement_math": "\\sum_{t=1}^T\\left(\\frac{\\eta_t}{\\rho}\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2+\\frac{\\rho}{8\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\right)\\le \\Phi_1-\\Phi_{T+1}+\\frac{\\rho c^2\\sigma^2}{8L^2}\\cdot\\log(s+T)+\\lambda D^2\\log(s+T)-\\sum_{t=1}^T\\frac{\\rho}{16L^2\\eta_t}M_{t+1}.",
+      "role": "Named copy of the telescoped inequality used to derive (C.14)-(C.15) and the terminal separations in Theorem B.6.",
+      "proof": [
+        {
+          "description": "Telescope the one-step inequality and substitute \\beta_{2,t}=1-\\eta_t^6 to sum the weight-decay perturbation.",
+          "math": "\\sum_{t=1}^T\\left(\\frac{\\eta_t}{\\rho}\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2+\\frac{\\rho}{8\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\right)\\le \\Phi_1-\\Phi_{T+1}+\\frac{\\rho c^2\\sigma^2}{8L^2}\\cdot\\log(s+T)+\\lambda D^2\\log(s+T)-\\sum_{t=1}^T\\frac{\\rho}{16L^2\\eta_t}M_{t+1}.",
+          "ref": "C.2 telescoping display",
+          "source_pdf_lines": [
+            1382,
+            1403
+          ],
+          "step": 1,
+          "uses": [
+            "lemma_C_2",
+            "lemma_C_4",
+            "lemma_C_5",
+            "B6_beta_schedule",
+            "B6_stepsize_schedule",
+            "B6_bounded_iterates"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "B6_H_bound_following_D7",
+      "ref": "C.2 text after telescoping; fact following (D.7)",
+      "statement_math": "\\|H_{t+1}\\|_2=\\operatorname{diag}(\\sqrt{v_{t+1}}+\\epsilon)\\le1+\\epsilon.",
+      "role": "Names the preconditioner norm bound used in the initial Lyapunov estimate for Theorem B.6.",
+      "proof": [
+        {
+          "description": "Theorem B.6 trace: record the source bound on the preconditioner norm used in the initial Lyapunov estimate.",
+          "math": "\\|H_{t+1}\\|_2=\\operatorname{diag}(\\sqrt{v_{t+1}}+\\epsilon)\\le1+\\epsilon.",
+          "ref": "C.2 text after telescoping; fact following (D.7)",
+          "source_pdf_lines": [
+            1405,
+            1408
+          ],
+          "uses": [
+            "lemma_C_1"
+          ],
+          "step": 1
+        }
+      ]
+    },
+    {
+      "name": "B6_Algorithm2_initialization_and_first_moment_source",
+      "ref": "Algorithm 2, lines 2 and 6",
+      "statement_math": "m_0\\leftarrow0,\\ v_0\\leftarrow0\\text{ and }x_1\\leftarrow x_0;\\quad m_t=\\beta_1m_{t-1}+(1-\\beta_1)\\widetilde c_t",
+      "role": "Records the Algorithm 2 source lines involved in the C.2 substitution of m_1 by \\nabla f(x_1,\\xi_1).",
+      "proof": [
+        {
+          "description": "Read the initialization and first-moment update from Algorithm 2; C.2 then substitutes m_1 by \\nabla f(x_1,\\xi_1) in the displayed Phi_1 estimate.",
+          "math": "m_0\\leftarrow0,\\ v_0\\leftarrow0\\text{ and }x_1\\leftarrow x_0;\\quad m_t=\\beta_1m_{t-1}+(1-\\beta_1)\\widetilde c_t",
+          "ref": "Algorithm 2, lines 2 and 6; C.2 Phi_1 display",
+          "source_pdf_lines": [
+            374,
+            383
+          ],
+          "step": 1,
+          "uses": []
+        }
+      ]
+    },
+    {
+      "name": "B6_Phi1_H1_bound_and_source_substitution",
+      "ref": "C.2 Phi_1 display",
+      "statement_math": "\\Phi_1=\\mathbb{E}\\left[F(x_1)+\\frac\\lambda2\\cdot x_1^\\top H_1x_1+\\frac{\\rho s^{1/3}}{16L^2}\\cdot\\|\\nabla F(x_1)-m_1\\|_2^2\\right]\\le F(x_1)+\\frac\\lambda2D^2(1+\\epsilon)+\\frac{\\rho s^{1/3}}{16L^2}\\cdot\\mathbb{E}[\\|\\nabla F(x_1)-\\nabla f(x_1,\\xi_1)\\|_2^2]",
+      "role": "Names the initial Lyapunov H_1 bound and m_1 substitution in Theorem B.6.",
+      "proof": [
+        {
+          "description": "Theorem B.6 trace/source-gap bridge: expand \\Phi_1, use the H_1 bound and bounded iterates, and follow the source substitution m_1=\\nabla f(x_1,\\xi_1); Algorithm 2 prints m_0,v_0\\leftarrow0 and a clipped first-moment update for m_1, so this substitution is recorded as source-visible rather than silently derived.",
+          "math": "\\Phi_1=\\mathbb{E}\\left[F(x_1)+\\frac\\lambda2\\cdot x_1^\\top H_1x_1+\\frac{\\rho s^{1/3}}{16L^2}\\cdot\\|\\nabla F(x_1)-m_1\\|_2^2\\right]\\le F(x_1)+\\frac\\lambda2D^2(1+\\epsilon)+\\frac{\\rho s^{1/3}}{16L^2}\\cdot\\mathbb{E}[\\|\\nabla F(x_1)-\\nabla f(x_1,\\xi_1)\\|_2^2]",
+          "ref": "C.2 Phi_1 display",
+          "source_pdf_lines": [
+            1408,
+            1414
+          ],
+          "uses": [
+            "B6_H_bound_following_D7",
+            "B6_bounded_iterates",
+            "B6_Algorithm2_initialization_and_first_moment_source"
+          ],
+          "step": 1
+        }
+      ]
+    },
+    {
+      "name": "B6_Phi1_variance_bound",
+      "ref": "C.2 Phi_1 display",
+      "statement_math": "\\Phi_1\\le F(x_1)+\\frac\\lambda2D^2(1+\\epsilon)+\\frac{\\rho s^{1/3}\\sigma^2}{16L^2}.",
+      "role": "Names the bounded-variance estimate on the initial Lyapunov term in Theorem B.6.",
+      "proof": [
+        {
+          "description": "Theorem B.6 trace: apply the bounded-variance assumption to the displayed initial Lyapunov expression.",
+          "math": "\\Phi_1\\le F(x_1)+\\frac\\lambda2D^2(1+\\epsilon)+\\frac{\\rho s^{1/3}\\sigma^2}{16L^2}.",
+          "ref": "C.2 Phi_1 display",
+          "source_pdf_lines": [
+            1414,
+            1418
+          ],
+          "uses": [
+            "B6_Phi1_H1_bound_and_source_substitution",
+            "bounded_variance_B_1"
+          ],
+          "step": 1
+        }
+      ]
+    },
+    {
+      "name": "B6_C14_C15_divided_telescoping",
+      "ref": "(C.14)-(C.15)",
+      "statement_math": "\\frac1T\\sum_{t=1}^T\\left(\\frac{\\eta_t}{\\rho}\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2+\\frac{\\rho}{8\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\right)\\le\\frac GT+\\frac{\\rho c^2\\sigma^2}{8L^2T}\\cdot\\log(s+T)+\\frac{\\lambda D^2\\log(s+T)}T-\\frac1T\\sum_{t=1}^T\\frac{\\rho}{16L^2\\eta_t}M_{t+1}.",
+      "role": "Named copy of (C.14)-(C.15), the divided telescoping bound feeding both terminal inequalities of Theorem B.6.",
+      "proof": [
+        {
+          "description": "Define G and divide the telescoped bound by T.",
+          "math": "\\frac1T\\sum_{t=1}^T\\left(\\frac{\\eta_t}{\\rho}\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2+\\frac{\\rho}{8\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\right)\\le\\frac GT+\\frac{\\rho c^2\\sigma^2}{8L^2T}\\cdot\\log(s+T)+\\frac{\\lambda D^2\\log(s+T)}T-\\frac1T\\sum_{t=1}^T\\frac{\\rho}{16L^2\\eta_t}M_{t+1}.",
+          "ref": "(C.14)-(C.15)",
+          "source_pdf_lines": [
+            1418,
+            1427
+          ],
+          "step": 1,
+          "uses": [
+            "B6_telescoped_bound",
+            "B6_Phi1_variance_bound",
+            "H_lower_bounded_B_3",
+            "B6_stepsize_schedule"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "B6_estimator_first_separation_from_C14_C15",
+      "ref": "C.2 first separated estimator display",
+      "statement_math": "\\frac1T\\sum_{t=1}^T\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2\\le\\frac{\\rho(G+\\lambda D^2\\log(s+T))}{T\\eta_T}+\\frac{\\rho^2c^2\\sigma^2}{8L^2T\\eta_T}\\cdot\\log(s+T)-\\frac{\\rho^2\\sum_{t=1}^TM_{t+1}}{16L^2T^{1/3}}.",
+      "role": "First estimator-error separation from (C.14)-(C.15) in Theorem B.6.",
+      "proof": [
+        {
+          "description": "Separate the estimator-error term from (C.14)-(C.15), using eta_T for the positive terms and the printed residual denominator. This line depends on the C.14-C.15 divided telescoping bound, discarding the nonnegative displacement term, and using eta_T for the positive left coefficient while preserving the printed residual comparison.",
+          "math": "\\frac1T\\sum_{t=1}^T\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2\\le\\frac{\\rho(G+\\lambda D^2\\log(s+T))}{T\\eta_T}+\\frac{\\rho^2c^2\\sigma^2}{8L^2T\\eta_T}\\cdot\\log(s+T)-\\frac{\\rho^2\\sum_{t=1}^TM_{t+1}}{16L^2T^{1/3}}.",
+          "ref": "C.2 first separated estimator display",
+          "source_pdf_lines": [
+            1435,
+            1438
+          ],
+          "step": 1,
+          "uses": [
+            "B6_C14_C15_divided_telescoping",
+            "B6_stepsize_schedule"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "B6_estimator_etaT_substitution",
+      "ref": "C.2 second estimator display line",
+      "statement_math": "\\le\\left(\\rho(G+\\lambda D^2\\log(s+T))+\\frac{\\rho^2c^2\\sigma^2}{8L^2}\\cdot\\log(s+T)\\right)\\cdot\\frac{(s+T)^{1/3}}{T}-\\frac{\\rho^2\\sum_{t=1}^TM_{t+1}}{16L^2T^{1/3}}.",
+      "role": "Eta_T substitution line in the Theorem B.6 estimator chain.",
+      "proof": [
+        {
+          "description": "Rewrite the positive eta_T terms using (s+T)^{1/3}/T, preserving the displayed residual. It continues from the first separated estimator display by substituting eta_T=(s+T)^{-1/3}.",
+          "math": "\\le\\left(\\rho(G+\\lambda D^2\\log(s+T))+\\frac{\\rho^2c^2\\sigma^2}{8L^2}\\cdot\\log(s+T)\\right)\\cdot\\frac{(s+T)^{1/3}}{T}-\\frac{\\rho^2\\sum_{t=1}^TM_{t+1}}{16L^2T^{1/3}}.",
+          "ref": "C.2 second estimator display line",
+          "source_pdf_lines": [
+            1440,
+            1442
+          ],
+          "step": 1,
+          "uses": [
+            "B6_estimator_first_separation_from_C14_C15",
+            "B6_stepsize_schedule"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "B6_displacement_first_separation_from_C14_C15",
+      "ref": "C.2 first separated displacement display",
+      "statement_math": "\\frac1T\\sum_{t=1}^T\\frac{\\rho}{8\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\le\\frac{G+\\lambda D^2\\log(s+T)}T+\\frac{\\rho c^2\\sigma^2}{8L^2T}\\cdot\\log(s+T)-\\frac{\\rho\\sum_{t=1}^TM_{t+1}}{16L^2T\\eta_t}.",
+      "role": "First displacement separation from (C.14)-(C.15) in Theorem B.6.",
+      "proof": [
+        {
+          "description": "Separate the displacement term, leaving the printed eta_t residual in the negative term. This line depends on the C.14-C.15 divided telescoping bound after discarding the nonnegative estimator term and carrying forward the residual term printed in the proof.",
+          "math": "\\frac1T\\sum_{t=1}^T\\frac{\\rho}{8\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\le\\frac{G+\\lambda D^2\\log(s+T)}T+\\frac{\\rho c^2\\sigma^2}{8L^2T}\\cdot\\log(s+T)-\\frac{\\rho\\sum_{t=1}^TM_{t+1}}{16L^2T\\eta_t}.",
+          "ref": "C.2 first separated displacement display",
+          "source_pdf_lines": [
+            1451,
+            1454
+          ],
+          "step": 1,
+          "uses": [
+            "B6_C14_C15_divided_telescoping",
+            "B6_stepsize_schedule"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "B6_displacement_etaT_conversion",
+      "ref": "C.2 second displacement display first line",
+      "statement_math": "\\frac1T\\sum_{t=1}^T\\frac1{\\eta_t^2}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\le\\frac{8(G+\\lambda D^2\\log(s+T))}{\\rho T\\eta_T}+\\frac{c^2\\sigma^2}{L^2T\\eta_T}\\cdot\\log(s+T)-\\frac{\\sum_{t=1}^TM_{t+1}}{2L^2T\\eta_t^2}.",
+      "role": "Eta_T conversion line in the Theorem B.6 displacement chain.",
+      "proof": [
+        {
+          "description": "Convert to the printed eta_t^{-2} scaled displacement form and substitute eta_T for the positive terms. It continues from the separated displacement display and uses eta_T to pass to the printed eta_t^{-2} scaled form.",
+          "math": "\\frac1T\\sum_{t=1}^T\\frac1{\\eta_t^2}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\le\\frac{8(G+\\lambda D^2\\log(s+T))}{\\rho T\\eta_T}+\\frac{c^2\\sigma^2}{L^2T\\eta_T}\\cdot\\log(s+T)-\\frac{\\sum_{t=1}^TM_{t+1}}{2L^2T\\eta_t^2}.",
+          "ref": "C.2 second displacement display first line",
+          "source_pdf_lines": [
+            1458,
+            1461
+          ],
+          "step": 1,
+          "uses": [
+            "B6_displacement_first_separation_from_C14_C15",
+            "B6_stepsize_schedule"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "B6_displacement_final_display_from_C2",
+      "ref": "C.2 final displacement display line",
+      "statement_math": "\\frac1T\\sum_{t=1}^T\\frac1{\\eta_t^2}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\le\\frac{16(G+\\lambda D^2\\log(s+T))}{\\rho T^{2/3}}+\\frac{2c^2\\sigma^2}{L^2T^{2/3}}\\cdot\\log(s+T)-\\frac{\\sum_{t=1}^TM_{t+1}}{L^2T^{1/3}}.",
+      "role": "Terminal printed C.2 displacement endpoint used before comparing the proof endpoint with the Theorem B.6 statement.",
+      "proof": [
+        {
+          "description": "Use T\\ge s to obtain the printed final displacement display from the eta_T-converted line.",
+          "math": "\\frac1T\\sum_{t=1}^T\\frac1{\\eta_t^2}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\le\\frac{16(G+\\lambda D^2\\log(s+T))}{\\rho T^{2/3}}+\\frac{2c^2\\sigma^2}{L^2T^{2/3}}\\cdot\\log(s+T)-\\frac{\\sum_{t=1}^TM_{t+1}}{L^2T^{1/3}}.",
+          "ref": "C.2 final displacement display line",
+          "source_pdf_lines": [
+            1462,
+            1465
+          ],
+          "step": 1,
+          "uses": [
+            "B6_displacement_etaT_conversion",
+            "B6_stepsize_schedule",
+            "B6_horizon_condition"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lemma_C_5_side_condition_for_second_inequality",
+      "ref": "D.6 text after display",
+      "statement_math": "s+t\\ge2,\\quad 27(s+t-1)^2\\ge(s+t)^2.",
+      "role": "Names the side-condition comparison used in the final line of Lemma C.5's proof.",
+      "proof": [
+        {
+          "description": "Use the printed side condition s\\ge1 to obtain s+t\\ge2 and 27(s+t-1)^2\\ge(s+t)^2, which is the source justification for the second inequality.",
+          "math": "s+t\\ge2,\\quad 27(s+t-1)^2\\ge(s+t)^2.",
+          "ref": "D.6 text after display",
+          "source_pdf_lines": [
+            1823,
+            1825
+          ],
+          "step": 1,
+          "uses": [
+            "lemma_C_5_stepsize_hypothesis"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lemma_D_1_D3_substitution",
+      "ref": "(D.3)",
+      "statement_math": "m_t=b_1(a_1u_{t-1}+a_2g_t)+b_2g_t=a_1b_1u_{t-1}+(b_1a_2+b_2)g_t.",
+      "role": "Declared auxiliary name for the first displayed arithmetic step in Lemma D.1.",
+      "proof": [
+        {
+          "description": "Substitute (D.1) into (D.2).",
+          "math": "m_t=b_1(a_1u_{t-1}+a_2g_t)+b_2g_t=a_1b_1u_{t-1}+(b_1a_2+b_2)g_t.",
+          "ref": "(D.3)",
+          "source_pdf_lines": [
+            1482,
+            1485
+          ],
+          "step": 1,
+          "uses": []
+        }
+      ]
+    },
+    {
+      "name": "lemma_D_1_D4_index_shift",
+      "ref": "(D.4)",
+      "statement_math": "m_{t-1}=b_1u_{t-1}+b_2g_{t-1}.",
+      "role": "Declared auxiliary name for the shifted-index display in Lemma D.1.",
+      "proof": [
+        {
+          "description": "Shift (D.2) by one index.",
+          "math": "m_{t-1}=b_1u_{t-1}+b_2g_{t-1}.",
+          "ref": "(D.4)",
+          "source_pdf_lines": [
+            1486,
+            1489
+          ],
+          "step": 1,
+          "uses": []
+        }
+      ]
+    },
+    {
+      "name": "lemma_3_4_Lion_parameter_substitution",
+      "ref": "Lemma 3.4 application after statement",
+      "statement_math": "g_t=\\nabla f(x_t,\\xi_t),\\quad a_1=\\beta_1,\\quad a_2=1-\\beta_1,\\quad b_1=\\beta_2,\\quad b_2=1-\\beta_2.",
+      "role": "Declared auxiliary name for the parameter substitution used when Lemma D.1/Lemma 3.4 is applied to the Lion momentum updates.",
+      "proof": [
+        {
+          "description": "Record the source's printed substitution into Lemma D.1.",
+          "math": "g_t=\\nabla f(x_t,\\xi_t),\\quad a_1=\\beta_1,\\quad a_2=1-\\beta_1,\\quad b_1=\\beta_2,\\quad b_2=1-\\beta_2.",
+          "ref": "Lemma 3.4 application after statement",
+          "source_pdf_lines": [
+            493,
+            495
+          ],
+          "step": 1,
+          "uses": [
+            "lemma_D_1"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lemma_3_4_Lion_index_shift_to_equations_3_15_3_16",
+      "ref": "Lemma 3.4 application after statement",
+      "statement_math": "u_t=u_{t-1},\\quad u_{t-1}=u_{t-2}.",
+      "role": "Declared auxiliary name for the index shift aligning Lemma D.1 with Lion updates (3.15) and (3.16).",
+      "proof": [
+        {
+          "description": "Record the source's printed index shift for the u variables.",
+          "math": "u_t=u_{t-1},\\quad u_{t-1}=u_{t-2}.",
+          "ref": "Lemma 3.4 application after statement",
+          "source_pdf_lines": [
+            495,
+            498
+          ],
+          "step": 1,
+          "uses": [
+            "lemma_D_1",
+            "lemma_3_4_Lion_parameter_substitution"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lemma_3_4_Lion_single_momentum_update_3_25_3_26",
+      "ref": "(3.25)-(3.26)",
+      "statement_math": "m_t=\\beta_1m_{t-1}+(1-\\beta_1)\\left[\\nabla f(x_t,\\xi_t)+\\frac{\\beta_1(1-\\beta_2)}{1-\\beta_1}\\left(\\nabla f(x_t,\\xi_t)-\\nabla f(x_{t-1},\\xi_{t-1})\\right)\\right].",
+      "role": "Declared auxiliary name for the consequence that Lion updates (3.15) and (3.16) are equivalent to the single momentum update (3.25)-(3.26).",
+      "proof": [
+        {
+          "description": "Combine the Lemma D.1 arithmetic with the Lion substitution and index shift to obtain the printed single momentum update.",
+          "math": "m_t=\\beta_1m_{t-1}+(1-\\beta_1)\\left[\\nabla f(x_t,\\xi_t)+\\frac{\\beta_1(1-\\beta_2)}{1-\\beta_1}\\left(\\nabla f(x_t,\\xi_t)-\\nabla f(x_{t-1},\\xi_{t-1})\\right)\\right].",
+          "ref": "(3.25)-(3.26)",
+          "source_pdf_lines": [
+            497,
+            506
+          ],
+          "step": 1,
+          "uses": [
+            "lemma_D_1",
+            "lemma_3_4_Lion_parameter_substitution",
+            "lemma_3_4_Lion_index_shift_to_equations_3_15_3_16"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lemma_3_4",
+      "proof": [
+        {
+          "description": "Use the first update inside the second update.",
+          "math": "m_t=b_1(a_1u_{t-1}+a_2g_t)+b_2g_t=a_1b_1u_{t-1}+(b_1a_2+b_2)g_t.",
+          "ref": "(D.3)",
+          "source_pdf_lines": [
+            1482,
+            1485
+          ],
+          "step": 1,
+          "uses": []
+        },
+        {
+          "description": "Shift the second defining update by one index.",
+          "math": "m_{t-1}=b_1u_{t-1}+b_2g_{t-1}.",
+          "ref": "(D.4)",
+          "source_pdf_lines": [
+            1486,
+            1489
+          ],
+          "step": 2,
+          "uses": []
+        },
+        {
+          "description": "Combine (D.3) and (D.4) to eliminate u_{t-1}.",
+          "math": "m_t=a_1m_{t-1}-a_1b_2g_{t-1}+(b_1a_2+b_2)g_t=a_1m_{t-1}+(b_1a_2-a_1b_2+b_2)g_t+a_1b_2(g_t-g_{t-1}).",
+          "ref": "D.1 final display",
+          "source_pdf_lines": [
+            1490,
+            1495
+          ],
+          "step": 3,
+          "uses": [
+            "lemma_D_1",
+            "lemma_D_1_D3_substitution",
+            "lemma_D_1_D4_index_shift"
+          ]
+        },
+        {
+          "description": "Apply the lemma to the Lion momentum variables by making the source's parameter substitution.",
+          "math": "g_t=\\nabla f(x_t,\\xi_t),\\quad a_1=\\beta_1,\\quad a_2=1-\\beta_1,\\quad b_1=\\beta_2,\\quad b_2=1-\\beta_2.",
+          "ref": "Lemma 3.4 application after statement",
+          "source_pdf_lines": [
+            493,
+            495
+          ],
+          "step": 4,
+          "uses": [
+            "lemma_D_1",
+            "lemma_3_4_Lion_parameter_substitution"
+          ],
+          "produces": "lemma_3_4_Lion_parameter_substitution"
+        },
+        {
+          "description": "Record the source index shift used to align the generic u-update with the Lion momentum updates (3.15) and (3.16).",
+          "math": "u_t=u_{t-1},\\quad u_{t-1}=u_{t-2}.",
+          "ref": "Lemma 3.4 application after statement",
+          "source_pdf_lines": [
+            495,
+            498
+          ],
+          "step": 5,
+          "uses": [
+            "lemma_3_4_Lion_parameter_substitution",
+            "lemma_3_4_Lion_index_shift_to_equations_3_15_3_16"
+          ],
+          "produces": "lemma_3_4_Lion_index_shift_to_equations_3_15_3_16"
+        },
+        {
+          "description": "With the substitution and index shift, identify the Lion momentum updates (3.15) and (3.16) with the printed single momentum update.",
+          "math": "m_t=\\beta_1m_{t-1}+(1-\\beta_1)\\left[\\nabla f(x_t,\\xi_t)+\\frac{\\beta_1(1-\\beta_2)}{1-\\beta_1}\\left(\\nabla f(x_t,\\xi_t)-\\nabla f(x_{t-1},\\xi_{t-1})\\right)\\right].",
+          "ref": "(3.25)-(3.26)",
+          "source_pdf_lines": [
+            497,
+            506
+          ],
+          "step": 6,
+          "uses": [
+            "lemma_D_1",
+            "lemma_3_4_Lion_parameter_substitution",
+            "lemma_3_4_Lion_index_shift_to_equations_3_15_3_16",
+            "lemma_3_4_Lion_single_momentum_update_3_25_3_26"
+          ],
+          "produces": "Lion momentum updates in (3.15) and (3.16) are equivalent to the single momentum update (3.25)-(3.26)."
+        }
+      ],
+      "ref": "Lemma 3.4",
+      "role": "Registered public target SGD.MARS.lemma_3_4; supports the connection between MARS-Lion and Lion by reducing two momentum recurrences to one recurrence.",
+      "statement_math": "\\text{For any sequence }\\{g_t\\in\\mathbb{R}^d\\}_{t=0,1,\\ldots},\\text{ consider the following updates of }m_t\\text{ for any constant factors }a_1,a_2,b_1,\\text{ and }b_2:\\quad u_t=a_1u_{t-1}+a_2g_t,\\quad m_t=b_1u_t+b_2g_t.\\ \\text{The updates are equivalent to }m_t=a_1m_{t-1}+(b_1a_2-a_1b_2+b_2)g_t+a_1b_2(g_t-g_{t-1})."
+    },
+    {
+      "name": "lemma_C_1",
+      "proof": [
+        {
+          "description": "Use clipping and v0=0 to bound the second moment.",
+          "math": "\\|v_t\\|_2=\\left\\|\\sum_{k=1}^t(1-\\beta_{2,k})\\widetilde c_k^2\\prod_{j=k+1}^t\\beta_{2,j}+\\prod_{j=1}^t\\beta_{2,j}v_0\\right\\|_2\\le \\sum_{k=1}^t(1-\\beta_{2,k})\\prod_{j=k+1}^t\\beta_{2,j}=1-\\prod_{k=1}^t\\beta_{2,k}\\le1.",
+          "produces": "\\|v_t\\|_2\\le1",
+          "ref": "(D.7)",
+          "source_pdf_lines": [
+            1547,
+            1560
+          ],
+          "step": 1,
+          "uses": [
+            "Algorithm2_MARS_AdamW_initialization",
+            "Algorithm2_clipping",
+            "Algorithm2_second_moment",
+            "Algorithm2_beta_bounds"
+          ]
+        },
+        {
+          "description": "Similarly bound the first moment, as printed in the proof.",
+          "math": "\\|m_t\\|_2=\\left\\|\\sum_{k=1}^t(1-\\beta_{1,k})\\widetilde c_k\\prod_{j=k+1}^t\\beta_{1,j}+\\prod_{j=1}^t\\beta_{1,j}m_0\\right\\|_2\\le\\sum_{k=1}^t(1-\\beta_{1,k})\\prod_{j=k+1}^t\\beta_{1,j}=1-\\prod_{k=1}^t\\beta_{1,k}\\le1.",
+          "produces": "\\|m_t\\|_2\\le1",
+          "ref": "(D.8)",
+          "source_pdf_lines": [
+            1561,
+            1573
+          ],
+          "step": 2,
+          "uses": [
+            "Algorithm2_MARS_AdamW_initialization",
+            "Algorithm2_clipping",
+            "Algorithm2_first_moment",
+            "Algorithm2_beta_bounds"
+          ]
+        },
+        {
+          "description": "Bound the infinity norm difference v_{t+1}-v_t from the update rule.",
+          "math": "\\|v_{t+1}-v_t\\|_\\infty=\\|(1-\\beta_{2,t})(\\widetilde c_{t+1}^2-v_t)\\|_\\infty\\le(1-\\beta_{2,t})(\\|\\widetilde c_{t+1}\\|_2+\\|v_t\\|_2)\\le2(1-\\beta_{2,t}).",
+          "produces": "\\|v_{t+1}-v_t\\|_\\infty\\le2(1-\\beta_{2,t})",
+          "ref": "D.3 display after (D.8)",
+          "source_pdf_lines": [
+            1574,
+            1582
+          ],
+          "step": 3,
+          "uses": [
+            "Algorithm2_second_moment",
+            "Algorithm2_clipping",
+            "Algorithm2_beta_bounds",
+            "Algorithm2_MARS_AdamW_initialization"
+          ]
+        },
+        {
+          "description": "Apply the scalar square-root inequality coordinatewise.",
+          "math": "\\|\\sqrt{v_t}-\\sqrt{v_{t+1}}\\|_\\infty\\le\\sqrt{\\|v_{t+1}-v_t\\|_\\infty}\\le\\sqrt{2(1-\\beta_{2,t})}.",
+          "ref": "D.3 final display",
+          "source_pdf_lines": [
+            1586,
+            1593
+          ],
+          "step": 4,
+          "uses": [
+            "scalar_sqrt_difference_inequality",
+            "Algorithm2_second_moment",
+            "Algorithm2_beta_bounds",
+            "Algorithm2_clipping"
+          ]
+        }
+      ],
+      "ref": "Lemma C.1",
+      "role": "Controls changes in the AdamW preconditioner H_t and is used in Lemma D.2, Lemma C.4, and the B.6 initial-potential bound.",
+      "statement_math": "\\text{In Algorithm 2, for any }0\\le\\beta_{2,t}\\le1\\text{ and }\\forall t\\ge1,\\text{ the following inequality holds: }\\|\\sqrt{v_t}-\\sqrt{v_{t+1}}\\|_\\infty\\le\\sqrt{2(1-\\beta_{2,t})}."
+    },
+    {
+      "name": "lemma_C_2",
+      "proof": [
+        {
+          "description": "Expand m_{t+1} from the Algorithm 1 momentum update.",
+          "math": "m_{t+1}=\\beta_{1,t+1}m_t+(1-\\beta_{1,t+1})\\left(\\nabla f(x_{t+1},\\xi_{t+1})+\\gamma_{t+1}\\frac{\\beta_{1,t+1}}{1-\\beta_{1,t+1}}(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla f(x_t,\\xi_{t+1}))\\right).",
+          "produces": "D4_momentum_expansion_first_line",
+          "ref": "D.4 first display",
+          "source_pdf_lines": [
+            1597,
+            1605
+          ],
+          "step": 1,
+          "uses": [
+            "D4_unclipped_momentum_expansion"
+          ]
+        },
+        {
+          "description": "Simplify the first expansion while preserving the source-visible beta-factored correction block.",
+          "math": "m_{t+1}=(1-\\beta_{1,t+1})\\nabla f(x_{t+1},\\xi_{t+1})+\\beta_{1,t+1}\\left(m_t+\\gamma_{t+1}\\left(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla f(x_t,\\xi_{t+1})\\right)\\right).",
+          "produces": "D4_momentum_expansion_second_line",
+          "ref": "D.4 first display, second equality",
+          "source_pdf_lines": [
+            1601,
+            1605
+          ],
+          "step": 2,
+          "uses": []
+        },
+        {
+          "description": "Subtract \\nabla F(x_{t+1}) from both sides.",
+          "math": "m_{t+1}-\\nabla F(x_{t+1})=(1-\\beta_{1,t+1})\\nabla f(x_{t+1},\\xi_{t+1})+\\beta_{1,t+1}\\left(m_t+\\gamma_{t+1}\\left(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla f(x_t,\\xi_{t+1})\\right)\\right)-\\nabla F(x_{t+1}).",
+          "produces": "D4_subtracted_expansion",
+          "ref": "D.4 subtracting display, first equality",
+          "source_pdf_lines": [
+            1606,
+            1611
+          ],
+          "step": 3,
+          "uses": []
+        },
+        {
+          "description": "Regroup by adding and subtracting \\nabla F(x_t), preserving the printed beta-factored estimator-error block before the later centered rearrangement.",
+          "math": "m_{t+1}-\\nabla F(x_{t+1})=\\beta_{1,t+1}\\left(m_t-\\nabla F(x_t)\\right)+\\beta_{1,t+1}\\nabla F(x_t)-\\nabla F(x_{t+1})+(1-\\beta_{1,t+1})\\nabla f(x_{t+1},\\xi_{t+1})+\\gamma_{t+1}\\beta_{1,t+1}\\left(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla f(x_t,\\xi_{t+1})\\right).",
+          "produces": "D4_beta_mt_regrouping",
+          "ref": "D.4 subtracting display, regrouping equality",
+          "source_pdf_lines": [
+            1612,
+            1619
+          ],
+          "step": 4,
+          "uses": []
+        },
+        {
+          "description": "Rearrange into the centered stochastic-gradient term, the estimator error, and the Delta correction.",
+          "math": "m_{t+1}-\\nabla F(x_{t+1})=(1-\\beta_{1,t+1})(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1}))+\\beta_{1,t+1}(m_t-\\nabla F(x_t))+\\beta_{1,t+1}(\\nabla F(x_t)-\\nabla F(x_{t+1})+\\gamma_{t+1}(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla f(x_t,\\xi_{t+1}))).",
+          "produces": "D4_centered_rearrangement",
+          "ref": "D.4 rearranging display",
+          "source_pdf_lines": [
+            1620,
+            1628
+          ],
+          "step": 5,
+          "uses": [
+            "unbiased_gradient_oracle"
+          ]
+        },
+        {
+          "description": "Introduce epsilon and Delta shorthands and print the epsilon recursion.",
+          "math": "\\epsilon_t:=m_t-\\nabla F(x_t),\\quad \\Delta_t:=\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla f(x_t,\\xi_{t+1}),\\quad \\epsilon_{t+1}=(1-\\beta_{1,t+1})(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1}))+\\beta_{1,t+1}\\epsilon_t+\\beta_{1,t+1}(\\gamma_{t+1}\\Delta_t-\\mathbb{E}\\Delta_t).",
+          "produces": "epsilon_Delta_recursion_D9",
+          "ref": "(D.9)",
+          "source_pdf_lines": [
+            1629,
+            1633
+          ],
+          "step": 6,
+          "uses": [
+            "unbiased_gradient_oracle"
+          ]
+        },
+        {
+          "description": "Take squared norms in (D.9), add and subtract the gamma=1 Delta term, and label the resulting I, II, and III pieces exactly as in (D.10).",
+          "math": "\\begin{aligned}\\mathbb{E}\\|\\epsilon_{t+1}\\|_2^2&=\\mathbb{E}\\|(1-\\beta_{1,t+1})(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1}))+\\beta_{1,t+1}\\epsilon_t+\\beta_{1,t+1}(\\gamma_{t+1}\\Delta_t-\\mathbb{E}\\Delta_t)\\|_2^2\\\\&=\\mathbb{E}\\|(1-\\beta_{1,t+1})(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1}))+\\beta_{1,t+1}\\epsilon_t+\\beta_{1,t+1}(\\Delta_t-\\mathbb{E}\\Delta_t+(\\gamma_{t+1}-1)\\Delta_t)\\|_2^2\\\\&=\\underbrace{\\mathbb{E}\\|(1-\\beta_{1,t+1})(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1}))+\\beta_{1,t+1}\\epsilon_t+\\beta_{1,t+1}(\\Delta_t-\\mathbb{E}\\Delta_t)\\|_2^2}_{I}\\\\&\\quad+\\underbrace{\\beta_{1,t+1}^2(\\gamma_{t+1}-1)^2\\mathbb{E}\\|\\Delta_t\\|_2^2}_{II}\\\\&\\quad-2(1-\\gamma_{t+1})\\beta_{1,t+1}\\underbrace{\\mathbb{E}\\left\\langle\\Delta_t,(1-\\beta_{1,t+1})(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1}))+\\beta_{1,t+1}\\epsilon_t+\\beta_{1,t+1}(\\Delta_t-\\mathbb{E}\\Delta_t)\\right\\rangle}_{III}.\\end{aligned}",
+          "produces": "D10_I_II_III_decomposition",
+          "ref": "(D.10)",
+          "source_pdf_lines": [
+            1635,
+            1654
+          ],
+          "step": 7,
+          "uses": [
+            "unbiased_gradient_oracle",
+            "D9_epsilon_Delta_recursion"
+          ]
+        },
+        {
+          "description": "Use independence of epsilon_t from xi_{t+1} and zero-mean centered terms to separate the epsilon_t norm contribution in I.",
+          "math": "I=\\mathbb{E}\\|(1-\\beta_{1,t+1})(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1}))+\\beta_{1,t+1}(\\Delta_t-\\mathbb{E}\\Delta_t)\\|_2^2+\\beta_{1,t+1}^2\\mathbb{E}\\|\\epsilon_t\\|_2^2.",
+          "produces": "D11_I_zero_mean_separation",
+          "ref": "(D.11)",
+          "source_pdf_lines": [
+            1659,
+            1664
+          ],
+          "step": 8,
+          "uses": [
+            "unbiased_gradient_oracle",
+            "D4_fresh_sample_independence_and_centering",
+            "D10_I_II_III_decomposition"
+          ]
+        },
+        {
+          "description": "Apply the printed two-term norm bound to the separated I expression.",
+          "math": "I\\le2(1-\\beta_{1,t+1})^2\\mathbb{E}\\|\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1})\\|_2^2+2\\beta_{1,t+1}^2\\mathbb{E}\\|\\Delta_t-\\mathbb{E}\\Delta_t\\|_2^2+\\beta_{1,t+1}^2\\mathbb{E}\\|\\epsilon_t\\|_2^2.",
+          "produces": "D11_I_bound",
+          "ref": "(D.11)",
+          "source_pdf_lines": [
+            1666,
+            1670
+          ],
+          "step": 9,
+          "uses": [
+            "unbiased_gradient_oracle",
+            "D4_fresh_sample_independence_and_centering",
+            "D11_I_zero_mean_separation"
+          ]
+        },
+        {
+          "description": "Minimize the II-III part over gamma and state the optimality condition.",
+          "math": "1-\\gamma_{t+1}=\\frac{\\mathbb{E}\\langle\\Delta_t,(1-\\beta_{1,t+1})(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1}))+\\beta_{1,t+1}\\epsilon_t+\\beta_{1,t+1}(\\Delta_t-\\mathbb{E}\\Delta_t)\\rangle}{\\beta_{1,t+1}\\mathbb{E}\\|\\Delta_t\\|_2^2}.",
+          "produces": "D4_gamma_optimality_condition",
+          "ref": "D.4 minimization display",
+          "source_pdf_lines": [
+            1672,
+            1685
+          ],
+          "step": 10,
+          "uses": [
+            "D10_I_II_III_decomposition"
+          ]
+        },
+        {
+          "description": "Record the printed optimal value of II-2(1-gamma)beta III at the minimizing gamma.",
+          "math": "II-2(1-\\gamma_{t+1})\\beta_{1,t+1}III=-\\frac{\\left(\\mathbb{E}\\left\\langle\\Delta_t,(1-\\beta_{1,t+1})(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1}))+\\beta_{1,t+1}\\epsilon_t+\\beta_{1,t+1}(\\Delta_t-\\mathbb{E}\\Delta_t)\\right\\rangle\\right)^2}{\\mathbb{E}\\|\\Delta_t\\|_2^2}.",
+          "produces": "D4_gamma_optimal_value",
+          "ref": "D.4 optimality display",
+          "source_pdf_lines": [
+            1679,
+            1684
+          ],
+          "step": 11,
+          "uses": [
+            "D10_I_II_III_decomposition",
+            "D4_gamma_optimality_condition"
+          ]
+        },
+        {
+          "description": "Record that D.4 introduces a Delta/epsilon definition of G_{t+1} and A_{t+1}, distinct from the statement-window G_{t+1}, before recentering the quadratic residual.",
+          "math": "G_{t+1}:=(1-\\beta_{1,t+1})\\mathbb{E}\\langle\\Delta_t,\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1})\\rangle+\\beta_{1,t+1}\\mathbb{E}\\langle\\Delta_t,\\epsilon_t\\rangle,\\quad A_{t+1}:=\\frac{G_{t+1}+\\beta_{1,t+1}(\\mathbb{E}\\|\\Delta_t\\|_2^2-\\|\\mathbb{E}\\Delta_t\\|_2^2)}{\\mathbb{E}\\|\\Delta_t\\|_2^2}.",
+          "produces": "D4_G_and_A_definitions_distinct_from_C2_statement_G",
+          "ref": "D.4 definitions before (D.12)",
+          "source_pdf_lines": [
+            1686,
+            1694
+          ],
+          "step": 12,
+          "uses": [
+            "D4_proof_G_definition"
+          ]
+        },
+        {
+          "description": "Rewrite the II-III contribution in the A_{t+1}-centered square form.",
+          "math": "II-2(1-\\gamma_{t+1})\\beta_{1,t+1}III=\\mathbb{E}\\|\\Delta_t\\|_2^2\\left(\\beta_{1,t+1}(1-\\gamma_{t+1})-A_{t+1}\\right)^2-\\mathbb{E}\\|\\Delta_t\\|_2^2A_{t+1}^2.",
+          "produces": "D4_A_centered_residual_identity",
+          "ref": "D.4 A-centered display",
+          "source_pdf_lines": [
+            1695,
+            1698
+          ],
+          "step": 13,
+          "uses": [
+            "D4_proof_G_definition"
+          ]
+        },
+        {
+          "description": "Source-gap/prerequisite check for the printed gamma choice: (D.12) divides by beta_{1,t+1} E||Delta_t||_2^2, but Lemma C.2 states only 1 >= beta_{1,t+1} >= 0 and the proof window does not state beta_{1,t+1} E||Delta_t||_2^2 != 0. The denominator side condition is therefore recorded as unresolved rather than silently assumed.",
+          "math": "\\gamma_{t+1}=1-\\frac{G_{t+1}+\\beta_{1,t+1}(\\mathbb{E}\\|\\Delta_t\\|_2^2-\\|\\mathbb{E}\\Delta_t\\|_2^2)}{\\beta_{1,t+1}\\mathbb{E}\\|\\Delta_t\\|_2^2}=\\frac{\\|\\mathbb{E}\\Delta_t\\|_2^2-G_{t+1}}{\\beta_{1,t+1}\\mathbb{E}\\|\\Delta_t\\|_2^2}",
+          "produces": "D12_gamma_denominator_nonzero_source_gap",
+          "ref": "Lemma C.2 prerequisite and (D.12)",
+          "source_pdf_lines": [
+            1130,
+            1703
+          ],
+          "step": 14,
+          "uses": [
+            "C2_gamma_choice",
+            "lemma_C_2"
+          ]
+        },
+        {
+          "description": "Conditionally, subject to the unresolved nonzero-denominator prerequisite recorded in the previous step, choose gamma as in (D.12), which makes the A-centered square vanish in the printed consequence.",
+          "math": "\\gamma_{t+1}=1-\\frac{G_{t+1}+\\beta_{1,t+1}(\\mathbb{E}\\|\\Delta_t\\|_2^2-\\|\\mathbb{E}\\Delta_t\\|_2^2)}{\\beta_{1,t+1}\\mathbb{E}\\|\\Delta_t\\|_2^2}=\\frac{\\|\\mathbb{E}\\Delta_t\\|_2^2-G_{t+1}}{\\beta_{1,t+1}\\mathbb{E}\\|\\Delta_t\\|_2^2},\\quad II-2(1-\\gamma_{t+1})\\beta_{1,t+1}III=-\\mathbb{E}\\|\\Delta_t\\|_2^2A_{t+1}^2.",
+          "produces": "D12_gamma_choice_and_optimal_residual",
+          "ref": "(D.12) and following display",
+          "source_pdf_lines": [
+            1699,
+            1706
+          ],
+          "step": 15,
+          "uses": [
+            "C2_gamma_choice",
+            "D4_proof_G_definition"
+          ]
+        },
+        {
+          "description": "Define the residual M_{t+1} by the printed difference of the A-square and the off-schedule square.",
+          "math": "M_{t+1}:=\\mathbb{E}\\|\\Delta_t\\|_2^2A_{t+1}^2-\\mathbb{E}\\|\\Delta_t\\|_2^2\\left(\\beta_{1,t+1}(1-\\gamma_{t+1})-A_{t+1}\\right)^2.",
+          "produces": "M_residual_definition_D4",
+          "ref": "D.4 definition of M_{t+1}",
+          "source_pdf_lines": [
+            1708,
+            1711
+          ],
+          "step": 16,
+          "uses": [
+            "C2_gamma_choice",
+            "D4_proof_G_definition"
+          ]
+        },
+        {
+          "description": "Start the final conclusion by subtracting the residual from the I contribution.",
+          "math": "\\min_{\\{\\gamma_i\\}_{i=1,\\ldots,t}}\\mathbb{E}\\|\\epsilon_{t+1}\\|_2^2\\le\\mathbb{E}\\|I\\|_2^2-M_{t+1}.",
+          "ref": "D.4 final chain first display",
+          "source_pdf_lines": [
+            1712,
+            1717
+          ],
+          "step": 17,
+          "uses": [
+            "C2_gamma_choice",
+            "D4_proof_G_definition"
+          ]
+        },
+        {
+          "description": "Insert the bound on I from (D.11) into the final chain.",
+          "math": "\\le2(1-\\beta_{1,t+1})^2\\mathbb{E}\\|\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1})\\|_2^2+2\\beta_{1,t+1}^2\\mathbb{E}\\|\\Delta_t-\\mathbb{E}\\Delta_t\\|_2^2+\\beta_{1,t+1}^2\\mathbb{E}\\|\\epsilon_t\\|_2^2-M_{t+1}.",
+          "ref": "D.4 final chain using (D.11)",
+          "source_pdf_lines": [
+            1717,
+            1722
+          ],
+          "step": 18,
+          "uses": [
+            "C2_gamma_choice",
+            "D4_proof_G_definition",
+            "unbiased_gradient_oracle",
+            "D4_fresh_sample_independence_and_centering"
+          ]
+        },
+        {
+          "description": "Apply bounded variance, E||Delta-E Delta||^2 <= E||Delta||^2, and L-smoothness to finish the recursion.",
+          "math": "\\le2(1-\\beta_{1,t+1})^2\\sigma^2+2\\beta_{1,t+1}^2L^2\\|x_{t+1}-x_t\\|_2^2+\\beta_{1,t+1}^2\\mathbb{E}\\|\\epsilon_t\\|_2^2-M_{t+1}.",
+          "ref": "D.4 final display",
+          "source_pdf_lines": [
+            1723,
+            1730
+          ],
+          "step": 19,
+          "uses": [
+            "bounded_variance_B_1",
+            "L_smoothness_B_2"
+          ]
+        }
+      ],
+      "ref": "Lemma C.2",
+      "role": "Estimator-error recursion with the residual M_{t+1}; used directly in both B.5 and B.6.",
+      "statement_math": "\\text{In Algorithm 1. Under Assumption B.1 and B.2, if }1\\ge\\beta_{1,t+1}\\ge0,\\forall t,\\text{ under approximate choice of }\\gamma_{t+1}\\text{ as in (D.12), we have }\\mathbb{E}\\|\\nabla F(x_{t+1})-m_{t+1}\\|_2^2\\le\\beta_{1,t+1}^2\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2+2\\beta_{1,t+1}^2L^2\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2+2(1-\\beta_{1,t+1})^2\\sigma^2-M_{t+1},\\text{ where }M_{t+1}:=\\mathbb{E}\\|\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla f(x_t,\\xi_{t+1})\\|_2^2\\left(A_{t+1}^2-\\left(\\beta_{1,t+1}(1-\\gamma_{t+1})-A_{t+1}\\right)^2\\right),\\quad A_{t+1}:=\\frac{G_{t+1}+\\beta_{1,t+1}\\operatorname{tr}\\operatorname{Var}\\left(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla f(x_t,\\xi_{t+1})\\right)}{\\mathbb{E}\\|\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla f(x_t,\\xi_{t+1})\\|_2^2},\\quad G_{t+1}:=(1-\\beta_{1,t+1})\\mathbb{E}\\left\\langle\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla f(x_t,\\xi_{t+1}),\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1})\\right\\rangle+\\beta_{1,t+1}\\mathbb{E}\\left\\langle\\nabla F(x_{t+})-\\nabla F(x_t),F(x_t)-m_t\\right\\rangle."
+    },
+    {
+      "name": "D9_epsilon_Delta_recursion",
+      "ref": "(D.9)",
+      "statement_math": "\\epsilon_t:=m_t-\\nabla F(x_t),\\quad \\Delta_t:=\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla f(x_t,\\xi_{t+1}),\\quad \\epsilon_{t+1}=(1-\\beta_{1,t+1})(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1}))+\\beta_{1,t+1}\\epsilon_t+\\beta_{1,t+1}(\\gamma_{t+1}\\Delta_t-\\mathbb{E}\\Delta_t).",
+      "role": "Source-fact record for the D.9 epsilon/Delta recursion used by the D.10 decomposition in Lemma C.2.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "D.4 obtains this display after introducing epsilon_t and Delta_t shorthands.",
+          "math": "\\epsilon_t:=m_t-\\nabla F(x_t),\\quad \\Delta_t:=\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla f(x_t,\\xi_{t+1}),\\quad \\epsilon_{t+1}=(1-\\beta_{1,t+1})(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1}))+\\beta_{1,t+1}\\epsilon_t+\\beta_{1,t+1}(\\gamma_{t+1}\\Delta_t-\\mathbb{E}\\Delta_t).",
+          "ref": "(D.9)",
+          "source_pdf_lines": [
+            1629,
+            1633
+          ],
+          "uses": [
+            "unbiased_gradient_oracle"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "D10_I_II_III_decomposition",
+      "ref": "(D.10)",
+      "statement_math": "\\begin{aligned}\\mathbb{E}\\|\\epsilon_{t+1}\\|_2^2&=\\mathbb{E}\\|(1-\\beta_{1,t+1})(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1}))+\\beta_{1,t+1}\\epsilon_t+\\beta_{1,t+1}(\\gamma_{t+1}\\Delta_t-\\mathbb{E}\\Delta_t)\\|_2^2\\\\&=\\mathbb{E}\\|(1-\\beta_{1,t+1})(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1}))+\\beta_{1,t+1}\\epsilon_t+\\beta_{1,t+1}(\\Delta_t-\\mathbb{E}\\Delta_t+(\\gamma_{t+1}-1)\\Delta_t)\\|_2^2\\\\&=\\underbrace{\\mathbb{E}\\|(1-\\beta_{1,t+1})(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1}))+\\beta_{1,t+1}\\epsilon_t+\\beta_{1,t+1}(\\Delta_t-\\mathbb{E}\\Delta_t)\\|_2^2}_{I}\\\\&\\quad+\\underbrace{\\beta_{1,t+1}^2(\\gamma_{t+1}-1)^2\\mathbb{E}\\|\\Delta_t\\|_2^2}_{II}\\\\&\\quad-2(1-\\gamma_{t+1})\\beta_{1,t+1}\\underbrace{\\mathbb{E}\\left\\langle\\Delta_t,(1-\\beta_{1,t+1})(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1}))+\\beta_{1,t+1}\\epsilon_t+\\beta_{1,t+1}(\\Delta_t-\\mathbb{E}\\Delta_t)\\right\\rangle}_{III}.\\end{aligned}",
+      "role": "Source-fact record for the D.10 decomposition into I, II, and III used by the Lemma C.2 minimization and I-bound steps.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "D.4 obtains (D.10) by taking squared norms in (D.9), taking expectation over xi_{t+1}, and separating the gamma residual.",
+          "math": "\\begin{aligned}\\mathbb{E}\\|\\epsilon_{t+1}\\|_2^2&=\\mathbb{E}\\|(1-\\beta_{1,t+1})(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1}))+\\beta_{1,t+1}\\epsilon_t+\\beta_{1,t+1}(\\gamma_{t+1}\\Delta_t-\\mathbb{E}\\Delta_t)\\|_2^2\\\\&=\\mathbb{E}\\|(1-\\beta_{1,t+1})(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1}))+\\beta_{1,t+1}\\epsilon_t+\\beta_{1,t+1}(\\Delta_t-\\mathbb{E}\\Delta_t+(\\gamma_{t+1}-1)\\Delta_t)\\|_2^2\\\\&=\\underbrace{\\mathbb{E}\\|(1-\\beta_{1,t+1})(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1}))+\\beta_{1,t+1}\\epsilon_t+\\beta_{1,t+1}(\\Delta_t-\\mathbb{E}\\Delta_t)\\|_2^2}_{I}\\\\&\\quad+\\underbrace{\\beta_{1,t+1}^2(\\gamma_{t+1}-1)^2\\mathbb{E}\\|\\Delta_t\\|_2^2}_{II}\\\\&\\quad-2(1-\\gamma_{t+1})\\beta_{1,t+1}\\underbrace{\\mathbb{E}\\left\\langle\\Delta_t,(1-\\beta_{1,t+1})(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1}))+\\beta_{1,t+1}\\epsilon_t+\\beta_{1,t+1}(\\Delta_t-\\mathbb{E}\\Delta_t)\\right\\rangle}_{III}.\\end{aligned}",
+          "ref": "(D.10)",
+          "source_pdf_lines": [
+            1635,
+            1654
+          ],
+          "uses": [
+            "D9_epsilon_Delta_recursion"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "D11_I_zero_mean_separation",
+      "ref": "(D.11)",
+      "statement_math": "I=\\mathbb{E}\\|(1-\\beta_{1,t+1})(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1}))+\\beta_{1,t+1}(\\Delta_t-\\mathbb{E}\\Delta_t)\\|_2^2+\\beta_{1,t+1}^2\\mathbb{E}\\|\\epsilon_t\\|_2^2.",
+      "role": "Source-fact record for the first D.11 equality separating the epsilon_t contribution in Lemma C.2.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "D.4 uses independence of epsilon_t from xi_{t+1} and zero means of the centered gradient and Delta terms.",
+          "math": "I=\\mathbb{E}\\|(1-\\beta_{1,t+1})(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1}))+\\beta_{1,t+1}(\\Delta_t-\\mathbb{E}\\Delta_t)\\|_2^2+\\beta_{1,t+1}^2\\mathbb{E}\\|\\epsilon_t\\|_2^2.",
+          "ref": "(D.11)",
+          "source_pdf_lines": [
+            1659,
+            1664
+          ],
+          "uses": [
+            "D10_I_II_III_decomposition",
+            "D4_fresh_sample_independence_and_centering"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "D4_gamma_optimality_condition",
+      "ref": "D.4 minimization display",
+      "statement_math": "1-\\gamma_{t+1}=\\frac{\\mathbb{E}\\langle\\Delta_t,(1-\\beta_{1,t+1})(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1}))+\\beta_{1,t+1}\\epsilon_t+\\beta_{1,t+1}(\\Delta_t-\\mathbb{E}\\Delta_t)\\rangle}{\\beta_{1,t+1}\\mathbb{E}\\|\\Delta_t\\|_2^2}.",
+      "role": "Source-fact record for the gamma optimality condition printed before the optimal residual value in Lemma C.2.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "D.4 obtains this condition by minimizing II-2(1-gamma_{t+1}) beta_{1,t+1} III over gamma_{t+1} in (D.10).",
+          "math": "1-\\gamma_{t+1}=\\frac{\\mathbb{E}\\langle\\Delta_t,(1-\\beta_{1,t+1})(\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1}))+\\beta_{1,t+1}\\epsilon_t+\\beta_{1,t+1}(\\Delta_t-\\mathbb{E}\\Delta_t)\\rangle}{\\beta_{1,t+1}\\mathbb{E}\\|\\Delta_t\\|_2^2}.",
+          "ref": "D.4 minimization display",
+          "source_pdf_lines": [
+            1672,
+            1685
+          ],
+          "uses": [
+            "D10_I_II_III_decomposition"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lemma_C_3",
+      "proof": [
+        {
+          "description": "Apply smoothness of F and insert mt.",
+          "math": "F(x_{t+1})\\le F(x_t)+\\langle\\nabla F(x_t),x_{t+1}-x_t\\rangle+\\frac L2\\|x_{t+1}-x_t\\|_2^2=F(x_t)+\\langle m_t,x_{t+1}-x_t\\rangle+\\langle\\nabla F(x_t)-m_t,x_{t+1}-x_t\\rangle+\\frac L2\\|x_{t+1}-x_t\\|_2^2.",
+          "ref": "(D.13)",
+          "source_pdf_lines": [
+            1735,
+            1742
+          ],
+          "step": 1,
+          "uses": [
+            "L_smoothness_B_2"
+          ]
+        },
+        {
+          "description": "Use the Algorithm 1 update and Assumption B.3 to lower-bound the mirror-descent inner product.",
+          "math": "\\langle m_t,x_t-x_{t+1}\\rangle=\\frac1{\\eta_t}\\langle H_t(x_t-x_{t+1}),x_t-x_{t+1}\\rangle\\ge\\frac\\rho{\\eta_t}\\|x_t-x_{t+1}\\|_2^2.",
+          "ref": "(D.14)",
+          "source_pdf_lines": [
+            1743,
+            1750
+          ],
+          "step": 2,
+          "uses": [
+            "H_lower_bounded_B_3",
+            "Algorithm1_mirror_descent_update"
+          ]
+        },
+        {
+          "description": "Apply Cauchy-Schwarz and Young inequalities to the cross term and use the Lemma C.3 eta-side-condition.",
+          "math": "F(x_{t+1})\\le F(x_t)-\\frac\\rho{\\eta_t}\\|x_t-x_{t+1}\\|_2^2+\\frac{\\eta_t}{\\rho}\\|\\nabla F(x_t)-m_t\\|_2^2+\\frac\\rho{4\\eta_t}\\|x_{t+1}-x_t\\|_2^2+\\frac L2\\|x_{t+1}-x_t\\|_2^2\\le F(x_t)-\\frac\\rho{2\\eta_t}\\|x_t-x_{t+1}\\|_2^2+\\frac{\\eta_t}{\\rho}\\|\\nabla F(x_t)-m_t\\|_2^2.",
+          "ref": "D.5 Lemma C.3 final display",
+          "source_pdf_lines": [
+            1751,
+            1763
+          ],
+          "step": 3,
+          "uses": [
+            "L_smoothness_B_2",
+            "H_lower_bounded_B_3",
+            "Algorithm1_mirror_descent_update",
+            "lemma_C_3_stepsize_hypothesis"
+          ]
+        }
+      ],
+      "ref": "Lemma C.3",
+      "role": "Objective descent inequality for Algorithm 1; supplies I1 in Theorem B.5.",
+      "statement_math": "\\text{In Algorithm 1. With Assuptions B.2 and B.3 and }\\eta_t\\le\\rho\\cdot(2L)^{-1},\\forall t\\ge1,\\text{ it holds that }F(x_{t+1})\\le F(x_t)-\\frac{\\rho}{2\\eta_t}\\cdot\\|x_t-x_{t+1}\\|_2^2+\\frac{\\eta_t}{\\rho}\\cdot\\|\\nabla F(x_t)-m_t\\|_2^2."
+    },
+    {
+      "name": "lemma_C_4",
+      "proof": [
+        {
+          "description": "Use D.13 and substitute the Algorithm 2 inner-product bound from Lemma D.2.",
+          "math": "F(x_{t+1})\\le F(x_t)+\\langle\\nabla F(x_t)-m_t,x_{t+1}-x_t\\rangle+\\frac L2\\|x_{t+1}-x_t\\|_2^2-\\frac{\\rho(1-\\eta_t\\lambda)}{\\eta_t}\\|x_t-x_{t+1}\\|_2^2-\\frac\\lambda2\\left[x_t^\\top H_{t+1}x_t-x_{t+1}^\\top H_tx_{t+1}-\\sqrt{2(1-\\beta_{2,t})}D^2\\right].",
+          "ref": "D.5 after Lemma C.3 proof",
+          "source_pdf_lines": [
+            1764,
+            1776
+          ],
+          "step": 1,
+          "uses": [
+            "lemma_D_2",
+            "L_smoothness_B_2"
+          ]
+        },
+        {
+          "description": "Use the Lemma C.4 eta-side-condition to combine the negative displacement and smoothness terms.",
+          "math": "-\\frac{\\rho(1-\\eta_t\\lambda)}{\\eta_t}\\|x_t-x_{t+1}\\|_2^2+\\frac L2\\|x_{t+1}-x_t\\|_2^2\\le-\\left(\\frac{3\\rho}{4\\eta_t}+\\frac L2\\right)\\|x_{t+1}-x_t\\|_2^2\\le-\\frac\\rho{2\\eta_t}\\|x_{t+1}-x_t\\|_2^2.",
+          "ref": "D.5 eta condition display",
+          "source_pdf_lines": [
+            1777,
+            1780
+          ],
+          "step": 2,
+          "uses": [
+            "lemma_D_2",
+            "L_smoothness_B_2",
+            "lemma_C_4_stepsize_hypothesis"
+          ]
+        },
+        {
+          "description": "Apply Cauchy-Schwarz and Young to the gradient-estimation cross term.",
+          "math": "\\langle\\nabla F(x_t)-m_t,x_{t+1}-x_t\\rangle\\le\\|\\nabla F(x_t)-m_t\\|_2\\cdot\\|x_{t+1}-x_t\\|_2\\le\\frac{\\eta_t}{\\rho}\\|\\nabla F(x_t)-m_t\\|_2^2+\\frac\\rho{4\\eta_t}\\|x_{t+1}-x_t\\|_2^2.",
+          "ref": "D.5 Cauchy-Schwarz display",
+          "source_pdf_lines": [
+            1794,
+            1797
+          ],
+          "step": 3,
+          "uses": [
+            "lemma_D_2",
+            "L_smoothness_B_2",
+            "lemma_C_4_stepsize_hypothesis"
+          ]
+        },
+        {
+          "description": "Collect terms and rearrange to the Lemma C.4 statement.",
+          "math": "F(x_{t+1})\\le F(x_t)+\\frac{\\eta_t}{\\rho}\\|\\nabla F(x_t)-m_t\\|_2^2-\\frac\\rho{4\\eta_t}\\|x_{t+1}-x_t\\|_2^2-\\frac\\lambda2\\left[x_t^\\top H_{t+1}x_t-x_{t+1}^\\top H_tx_{t+1}\\right]+\\frac\\lambda2\\sqrt{2(1-\\beta_{2,t})}D^2.",
+          "ref": "D.5 final display",
+          "source_pdf_lines": [
+            1798,
+            1813
+          ],
+          "step": 4,
+          "uses": [
+            "lemma_D_2",
+            "L_smoothness_B_2",
+            "lemma_C_4_stepsize_hypothesis"
+          ]
+        }
+      ],
+      "ref": "Lemma C.4",
+      "role": "Objective descent inequality with the AdamW weight-decay/preconditioner potential; supplies I1 in Theorem B.6.",
+      "statement_math": "\\text{In Algorithm 2. With Assuptions B.2 and B.3 and }\\eta_t\\le\\min\\{(4\\lambda)^{-1},\\rho\\cdot(2L)^{-1}\\},\\forall t\\ge1,\\text{ it holds that }F(x_{t+1})+\\frac\\lambda2\\cdot x_{t+1}^\\top H_{t+1}x_{t+1}\\le F(x_t)+\\frac\\lambda2\\cdot x_t^\\top H_tx_t-\\frac\\rho{4\\eta_t}\\cdot\\|x_t-x_{t+1}\\|_2^2+\\frac{\\eta_t}{\\rho}\\cdot\\|\\nabla F(x_t)-m_t\\|_2^2+\\frac\\lambda2\\sqrt{2(1-\\beta_{2,t})}D^2."
+    },
+    {
+      "name": "lemma_C_5",
+      "proof": [
+        {
+          "description": "Use the printed Lemma C.5 hypothesis \\eta_t=(s+t)^{-1/3}, s\\ge1 and the concavity of h_2(x)=x^{1/3}.",
+          "math": "\\frac1{\\eta_t}-\\frac1{\\eta_{t-1}}=(s+t)^{1/3}-(s+t-1)^{1/3}\\le\\frac1{3(s+t-1)^{2/3}}.",
+          "ref": "D.6",
+          "source_pdf_lines": [
+            1818,
+            1822
+          ],
+          "step": 1,
+          "uses": [
+            "lemma_C_5_stepsize_hypothesis"
+          ]
+        },
+        {
+          "description": "Use the printed side condition s\\ge1 to obtain s+t\\ge2 and 27(s+t-1)^2\\ge(s+t)^2, which is the source justification for the second inequality.",
+          "math": "s+t\\ge2,\\quad 27(s+t-1)^2\\ge(s+t)^2.",
+          "produces": "lemma_C_5_side_condition_for_second_inequality",
+          "ref": "D.6 text after display",
+          "source_pdf_lines": [
+            1823,
+            1825
+          ],
+          "step": 2,
+          "uses": [
+            "lemma_C_5_stepsize_hypothesis"
+          ]
+        },
+        {
+          "description": "Apply the side-condition comparison to finish the displayed chain by bounding the concavity denominator by \\eta_t^2 and then by \\eta_t.",
+          "math": "\\frac1{3(s+t-1)^{2/3}}\\le\\frac1{(s+t)^{2/3}}=\\eta_t^2\\le\\eta_t.",
+          "ref": "D.6",
+          "source_pdf_lines": [
+            1821,
+            1825
+          ],
+          "step": 3,
+          "uses": [
+            "lemma_C_5_stepsize_hypothesis",
+            "lemma_C_5_side_condition_for_second_inequality"
+          ]
+        }
+      ],
+      "ref": "Lemma C.5",
+      "role": "Turns the beta-schedule coefficient in the Lyapunov estimator recursion negative in both theorem proofs.",
+      "statement_math": "\\text{Let }\\eta_t=(s+t)^{-1/3},\\ s\\ge1,\\ \\forall t\\ge0.\\text{ Then }\\eta_t^{-1}-\\eta_{t-1}^{-1}\\le\\eta_t,\\ \\forall t\\ge1."
+    },
+    {
+      "name": "lemma_D_1",
+      "proof": [
+        {
+          "description": "Substitute (D.1) into (D.2).",
+          "math": "m_t=b_1(a_1u_{t-1}+a_2g_t)+b_2g_t=a_1b_1u_{t-1}+(b_1a_2+b_2)g_t.",
+          "ref": "(D.3)",
+          "source_pdf_lines": [
+            1482,
+            1485
+          ],
+          "step": 1,
+          "uses": []
+        },
+        {
+          "description": "Shift (D.2) by one index.",
+          "math": "m_{t-1}=b_1u_{t-1}+b_2g_{t-1}.",
+          "ref": "(D.4)",
+          "source_pdf_lines": [
+            1486,
+            1489
+          ],
+          "step": 2,
+          "uses": []
+        },
+        {
+          "description": "Eliminate u_{t-1} and collect the g_t and g_t-g_{t-1} terms.",
+          "math": "m_t=a_1m_{t-1}-a_1b_2g_{t-1}+(b_1a_2+b_2)g_t=a_1m_{t-1}+(b_1a_2-a_1b_2+b_2)g_t+a_1b_2(g_t-g_{t-1}).",
+          "ref": "D.1 final display",
+          "source_pdf_lines": [
+            1490,
+            1495
+          ],
+          "step": 3,
+          "uses": [
+            "lemma_D_1_D3_substitution",
+            "lemma_D_1_D4_index_shift"
+          ]
+        }
+      ],
+      "ref": "Lemma D.1",
+      "role": "Appendix duplicate/proof source for Lemma 3.4.",
+      "statement_math": "\\text{For any sequence }\\{m_t\\in\\mathbb{R}^d\\}_{t=0,1,\\ldots},\\text{ consider the following updates of }m_t\\text{ for any constant factors }a_1,a_2,b_1,\\text{ and }b_2:\\ u_t=a_1u_{t-1}+a_2g_t,\\quad m_t=b_1u_t+b_2g_t.\\ \\text{The updates are equivalent to }m_t=a_1m_{t-1}+(b_1a_2-a_1b_2+b_2)g_t+a_1b_2(g_t-g_{t-1})."
+    },
+    {
+      "name": "lemma_D_2",
+      "proof": [
+        {
+          "description": "Use the Algorithm 2 update and H lower bound.",
+          "math": "\\langle m_t,x_t-x_{t+1}\\rangle=\\frac1{\\eta_t}\\langle H_t[(1-\\eta_t\\lambda)x_t-x_{t+1}],x_t-x_{t+1}\\rangle\\ge\\frac{\\rho(1-\\eta_t\\lambda)}{\\eta_t}\\|x_t-x_{t+1}\\|_2^2-\\lambda\\langle H_tx_{t+1},x_t-x_{t+1}\\rangle.",
+          "ref": "(D.6)",
+          "source_pdf_lines": [
+            1510,
+            1516
+          ],
+          "step": 1,
+          "uses": [
+            "H_lower_bounded_B_3",
+            "Algorithm2_weight_decay_update"
+          ]
+        },
+        {
+          "description": "Apply convexity of h_1(x)=1/2 x^T H_t x to the remaining inner product.",
+          "math": "\\langle H_tx_{t+1},x_t-x_{t+1}\\rangle\\le\\frac12x_t^\\top H_tx_t-\\frac12x_{t+1}^\\top H_tx_{t+1}.",
+          "ref": "D.2 convexity display",
+          "source_pdf_lines": [
+            1517,
+            1520
+          ],
+          "step": 2,
+          "uses": [
+            "H_lower_bounded_B_3",
+            "Algorithm2_weight_decay_update"
+          ]
+        },
+        {
+          "description": "Rewrite the H_t quadratic using H_{t+1} plus a difference term.",
+          "math": "\\langle m_t,x_t-x_{t+1}\\rangle\\ge\\frac{\\rho(1-\\eta_t\\lambda)}{\\eta_t}\\|x_t-x_{t+1}\\|_2^2-\\frac\\lambda2x_t^\\top H_tx_t+\\frac\\lambda2x_{t+1}^\\top H_{t+1}x_{t+1}+\\frac\\lambda2x_{t+1}^\\top(H_t-H_{t+1})x_{t+1}.",
+          "ref": "D.2 display after convexity",
+          "source_pdf_lines": [
+            1521,
+            1529
+          ],
+          "step": 3,
+          "uses": [
+            "H_lower_bounded_B_3",
+            "Algorithm2_weight_decay_update"
+          ]
+        },
+        {
+          "description": "Use H_t=diag(sqrt(vhat_t)+epsilon), Lemma C.1, and the D bound.",
+          "math": "x_{t+1}^\\top(H_t-H_{t+1})x_{t+1}=x_{t+1}^\\top\\operatorname{diag}(\\sqrt{v_t}-\\sqrt{v_{t+1}})x_{t+1}\\ge-\\sqrt{2(1-\\beta_{2,t})}D^2.",
+          "ref": "D.2 preconditioner-difference display",
+          "source_pdf_lines": [
+            1530,
+            1537
+          ],
+          "step": 4,
+          "uses": [
+            "lemma_C_1",
+            "B6_bounded_iterates"
+          ]
+        },
+        {
+          "description": "Collect terms to obtain the printed (D.5); note that the proof window has just displayed a bound with -x_t^\\top H_tx_t+x_{t+1}^\\top H_{t+1}x_{t+1}, while (D.5) prints x_t^\\top H_{t+1}x_t-x_{t+1}^\\top H_tx_{t+1}.",
+          "math": "\\langle m_t,x_t-x_{t+1}\\rangle\\ge\\frac{\\rho(1-\\eta_t\\lambda)}{\\eta_t}\\|x_t-x_{t+1}\\|_2^2+\\frac\\lambda2\\left[x_t^\\top H_{t+1}x_t-x_{t+1}^\\top H_tx_{t+1}-\\sqrt{2(1-\\beta_{2,t})}D^2\\right].",
+          "ref": "(D.5)",
+          "source_pdf_lines": [
+            1538,
+            1545
+          ],
+          "step": 5,
+          "uses": [
+            "H_lower_bounded_B_3",
+            "Algorithm2_weight_decay_update",
+            "lemma_C_1",
+            "B6_bounded_iterates"
+          ]
+        }
+      ],
+      "ref": "Lemma D.2",
+      "role": "Inner-product bound for Algorithm 2 used inside Lemma C.4.",
+      "statement_math": "\\text{In Algorithm 2, assume there is a constant }D>0\\text{ such that }\\|x_t\\|_2\\le D\\text{ for all }t>0.\\text{ Given that }0\\le\\beta_{2,t}\\le1\\text{ for all }t>0,\\text{ the following inequality holds: }\\langle m_t,x_t-x_{t+1}\\rangle\\ge\\frac{\\rho(1-\\eta_t\\lambda)}{\\eta_t}\\|x_t-x_{t+1}\\|_2^2+\\frac\\lambda2\\left[x_t^\\top H_{t+1}x_t-x_{t+1}^\\top H_tx_{t+1}-\\sqrt{2(1-\\beta_{2,t})}D^2\\right]."
+    },
+    {
+      "name": "C2_statement_G_definition",
+      "ref": "Lemma C.2 statement, display (C.2)",
+      "statement_math": "G_{t+1}:=(1-\\beta_{1,t+1})\\mathbb{E}\\left\\langle\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla f(x_t,\\xi_{t+1}),\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1})\\right\\rangle+\\beta_{1,t+1}\\mathbb{E}\\left\\langle\\nabla F(x_{t+})-\\nabla F(x_t),F(x_t)-m_t\\right\\rangle.",
+      "role": "Source-fact record for the G_{t+1} definition printed in the Lemma C.2 statement window; kept distinct from the Delta/epsilon G_{t+1} definition introduced in D.4.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "This is the displayed statement-window definition following (C.2); the final inner product is preserved as source-visible math, while the likely correction is recorded only in source_gaps_and_notes.",
+          "math": "G_{t+1}:=(1-\\beta_{1,t+1})\\mathbb{E}\\left\\langle\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla f(x_t,\\xi_{t+1}),\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1})\\right\\rangle+\\beta_{1,t+1}\\mathbb{E}\\left\\langle\\nabla F(x_{t+})-\\nabla F(x_t),F(x_t)-m_t\\right\\rangle.",
+          "ref": "Lemma C.2 statement, display (C.2)",
+          "source_pdf_lines": [
+            1151,
+            1154
+          ],
+          "uses": []
+        }
+      ]
+    },
+    {
+      "name": "D4_proof_G_definition",
+      "ref": "D.4 definitions before (D.12)",
+      "statement_math": "G_{t+1}:=(1-\\beta_{1,t+1})\\mathbb{E}\\left\\langle\\Delta_t,\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1})\\right\\rangle+\\beta_{1,t+1}\\mathbb{E}\\left\\langle\\Delta_t,\\epsilon_t\\right\\rangle,\\quad A_{t+1}:=\\frac{G_{t+1}+\\beta_{1,t+1}(\\mathbb{E}\\|\\Delta_t\\|_2^2-\\|\\mathbb{E}\\Delta_t\\|_2^2)}{\\mathbb{E}\\|\\Delta_t\\|_2^2}.",
+      "role": "Source-fact record for the D.4 proof-window definitions of G_{t+1} and A_{t+1}; this is the definition cited by the Lemma C.2 proof trace after introducing epsilon_t and Delta_t.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "D.4 prints this Delta/epsilon definition immediately before the A-centered residual identity and (D.12).",
+          "math": "G_{t+1}:=(1-\\beta_{1,t+1})\\mathbb{E}\\left\\langle\\Delta_t,\\nabla f(x_{t+1},\\xi_{t+1})-\\nabla F(x_{t+1})\\right\\rangle+\\beta_{1,t+1}\\mathbb{E}\\left\\langle\\Delta_t,\\epsilon_t\\right\\rangle,\\quad A_{t+1}:=\\frac{G_{t+1}+\\beta_{1,t+1}(\\mathbb{E}\\|\\Delta_t\\|_2^2-\\|\\mathbb{E}\\Delta_t\\|_2^2)}{\\mathbb{E}\\|\\Delta_t\\|_2^2}.",
+          "ref": "D.4 definitions before (D.12)",
+          "source_pdf_lines": [
+            1686,
+            1694
+          ],
+          "uses": []
+        }
+      ]
+    }
+  ],
+  "main_theorem": {
+    "measure": "Averaged E||nabla F(x_t)-m_t||_2^2 and averaged eta_t^{-1} E||x_{t+1}-x_t||_2^2 for Algorithms 1 and 2; exact momentum identity for Lemma 3.4.",
+    "proof": [
+      {
+        "description": "Theorem B.5 trace: Define the Algorithm 1 Lyapunov function.",
+        "math": "\\Phi_t=\\mathbb{E}\\left[F(x_t)+\\frac{\\rho}{16L^2\\eta_{t-1}}\\cdot\\|\\nabla F(x_t)-m_t\\|_2^2\\right],\\quad\\forall t\\ge 1.",
+        "ref": "C.1",
+        "source_pdf_lines": [
+          1183,
+          1188
+        ],
+        "step": 1,
+        "uses": []
+      },
+      {
+        "description": "Theorem B.5 trace: Expand the one-step Lyapunov difference and name the objective part I1 and estimator part I2.",
+        "math": "\\Phi_{t+1}-\\Phi_t=\\mathbb{E}[F(x_{t+1})-F(x_t)]+\\mathbb{E}\\left[\\frac{\\rho}{16L^2\\eta_t}\\|\\nabla F(x_{t+1})-m_{t+1}\\|_2^2-\\frac{\\rho}{16L^2\\eta_{t-1}}\\|\\nabla F(x_t)-m_t\\|_2^2\\right].",
+        "ref": "(C.3)",
+        "source_pdf_lines": [
+          1189,
+          1195
+        ],
+        "step": 2,
+        "uses": []
+      },
+      {
+        "description": "Theorem B.5 trace: Bound I1 using Lemma C.3 after the B.5 stepsize schedule supplies eta_t <= rho*(2L)^(-1). The implication from the B.5 schedule to this eta-side-condition is recorded here only as a derived application-boundary check, not as a source lemma.",
+        "math": "I_1\\le \\mathbb{E}\\left[-\\frac{\\rho}{2\\eta_t}\\cdot\\|x_t-x_{t+1}\\|_2^2+\\frac{\\eta_t}{\\rho}\\cdot\\|\\nabla F(x_t)-m_t\\|_2^2\\right].",
+        "ref": "(C.4)",
+        "source_pdf_lines": [
+          1196,
+          1199
+        ],
+        "step": 3,
+        "uses": [
+          "lemma_C_3",
+          "B5_stepsize_schedule",
+          "lemma_C_3_stepsize_hypothesis"
+        ],
+        "produces": "derived: from B5_stepsize_schedule, the Lemma C.3 eta-side-condition \\eta_t\\le\\rho\\cdot(2L)^{-1} is available for this application."
+      },
+      {
+        "description": "Theorem B.5 source-gap/prerequisite check before invoking Lemma C.2: Lemma C.2 requires 1 >= beta_{1,t+1} >= 0 for all t, while Theorem B.5 prints only the lower-bound schedule c >= 32L^2 rho^{-2}+1 and beta_{1,t+1}=1-c eta_t^2. The nonnegativity beta_{1,t+1} >= 0 is not derivable from the printed assumptions without an additional upper bound on c or other side condition.",
+        "math": "1\\ge\\beta_{1,t+1}\\ge0,\\ \\forall t",
+        "produces": "B5_C2_beta_admissibility_source_gap",
+        "ref": "Theorem B.5 statement and Lemma C.2 prerequisite",
+        "source_pdf_lines": [
+          1078,
+          1137
+        ],
+        "step": 4,
+        "uses": [
+          "lemma_C_2",
+          "B5_beta_schedule"
+        ]
+      },
+      {
+        "description": "Theorem B.5 source-gap/prerequisite check before invoking Lemma C.2 for I2: Lemma C.2 also requires the approximate choice of gamma_{t+1} as in (D.12), while Theorem B.5 prints only the eta and beta schedules and no gamma-choice hypothesis. This records the missing prerequisite rather than silently adding it to the theorem statement.",
+        "math": "\\gamma_{t+1}=1-\\frac{G_{t+1}+\\beta_{1,t+1}(\\mathbb{E}\\|\\Delta_t\\|_2^2-\\|\\mathbb{E}\\Delta_t\\|_2^2)}{\\beta_{1,t+1}\\mathbb{E}\\|\\Delta_t\\|_2^2}=\\frac{\\|\\mathbb{E}\\Delta_t\\|_2^2-G_{t+1}}{\\beta_{1,t+1}\\mathbb{E}\\|\\Delta_t\\|_2^2}",
+        "produces": "B5_C2_gamma_choice_source_gap",
+        "ref": "Lemma C.2 prerequisite, (D.12), and Theorem B.5 statement",
+        "source_pdf_lines": [
+          1130,
+          1703
+        ],
+        "uses": [
+          "lemma_C_2",
+          "C2_gamma_choice",
+          "B5_beta_schedule"
+        ],
+        "step": 5
+      },
+      {
+        "description": "Theorem B.5 trace: conditionally, subject to the unresolved beta-admissibility and gamma-choice prerequisites recorded in the preceding prerequisite steps, bound I2 using Lemma C.2 and substitute \\beta_{1,t+1}=1-c\\eta_t^2 for the variance term.",
+        "math": "I_2\\le \\frac{\\rho}{16L^2}\\left(\\frac{\\beta_{1,t+1}^2}{\\eta_t}-\\frac1{\\eta_{t-1}}\\right)\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2+\\frac{\\rho}{8\\eta_t}\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2+\\frac{\\rho c^2\\eta_t^3\\sigma^2}{8L^2}-\\frac{\\rho}{16L^2\\eta_t}M_{t+1}.",
+        "ref": "(C.5)",
+        "source_pdf_lines": [
+          1200,
+          1218
+        ],
+        "step": 6,
+        "uses": [
+          "lemma_C_2",
+          "B5_beta_schedule",
+          "B5_C2_beta_admissibility_source_gap",
+          "B5_C2_gamma_choice_source_gap"
+        ]
+      },
+      {
+        "description": "Theorem B.5 trace: Algebraically rewrite the first coefficient in the I2 bound.",
+        "math": "\\frac{\\rho}{16L^2}\\left(\\frac{\\beta_{1,t+1}^2}{\\eta_t}-\\frac1{\\eta_{t-1}}\\right)\\le\\frac{\\rho}{16L^2}\\left(\\frac{\\beta_{1,t+1}}{\\eta_t}-\\frac1{\\eta_{t-1}}\\right)=\\frac{\\rho}{16L^2}\\left(\\frac{1-c\\eta_t^2}{\\eta_t}-\\frac1{\\eta_{t-1}}\\right)=\\frac{\\rho}{16L^2}\\left(\\frac1{\\eta_t}-\\frac1{\\eta_{t-1}}-c\\eta_t\\right).",
+        "ref": "C.1 display after (C.5)",
+        "source_pdf_lines": [
+          1218,
+          1224
+        ],
+        "step": 7,
+        "uses": [
+          "B5_beta_schedule",
+          "B5_C2_beta_admissibility_source_gap"
+        ]
+      },
+      {
+        "description": "Theorem B.5 source-gap/prerequisite check before invoking Lemma C.5: Lemma C.5 assumes s\\ge1 for its stepsize comparison, while Theorem B.5 prints only s\\ge 8L^3/\\rho^3. This records the missing prerequisite rather than inferring it from the theorem schedule.",
+        "math": "s\\ge1",
+        "produces": "B5_C5_s_ge_1_source_gap",
+        "ref": "Lemma C.5 prerequisite at C.1 invocation",
+        "source_pdf_lines": [
+          1176,
+          1231
+        ],
+        "uses": [
+          "lemma_C_5",
+          "B5_stepsize_schedule"
+        ],
+        "step": 8
+      },
+      {
+        "description": "Theorem B.5 trace: Apply Lemma C.5 subject to the recorded s\\ge1 prerequisite and the lower bound on c to make the estimator coefficient negative.",
+        "math": "\\frac{\\rho}{16L^2}\\left(\\frac{\\beta_{1,t+1}^2}{\\eta_t}-\\frac1{\\eta_{t-1}}\\right)\\le\\frac{\\rho}{16L^2}\\cdot(\\eta_t-c\\eta_t)\\le -2\\eta_t\\rho^{-1}.",
+        "ref": "(C.6)",
+        "source_pdf_lines": [
+          1225,
+          1231
+        ],
+        "step": 9,
+        "uses": [
+          "lemma_C_5",
+          "B5_beta_schedule",
+          "B5_stepsize_schedule",
+          "lemma_C_5_stepsize_hypothesis",
+          "B5_C2_beta_admissibility_source_gap"
+        ]
+      },
+      {
+        "description": "Theorem B.5 trace: Insert the negative coefficient into the I2 estimate.",
+        "math": "I_2\\le -\\frac{2\\eta_t}{\\rho}\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2+\\frac{\\rho}{8\\eta_t}\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2+\\frac{\\rho c^2\\eta_t^3\\sigma^2}{8L^2}-\\frac{\\rho}{16L^2\\eta_t}M_{t+1}.",
+        "ref": "(C.7)",
+        "source_pdf_lines": [
+          1232,
+          1236
+        ],
+        "step": 10,
+        "uses": [
+          "lemma_C_2",
+          "lemma_C_5",
+          "B5_beta_schedule"
+        ]
+      },
+      {
+        "description": "Theorem B.5 trace: Combine the Lyapunov expansion, I1 bound, and I2 bound.",
+        "math": "\\Phi_{t+1}-\\Phi_t\\le -\\frac{\\eta_t}{\\rho}\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2-\\frac{3\\rho}{8\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2+\\frac{\\rho c^2\\eta_t^3\\sigma^2}{8L^2}-\\frac{\\rho}{16L^2\\eta_t}M_{t+1}.",
+        "ref": "C.1 display before telescoping",
+        "source_pdf_lines": [
+          1237,
+          1240
+        ],
+        "step": 11,
+        "uses": [
+          "lemma_C_2",
+          "lemma_C_3",
+          "lemma_C_5",
+          "B5_beta_schedule"
+        ]
+      },
+      {
+        "description": "Theorem B.5 trace: Telescope from t=1 to T and use \\sum_{t=1}^T(s+t)^{-1}\\le\\log(s+T).",
+        "math": "\\sum_{t=1}^T\\left(\\frac{\\eta_t}{\\rho}\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2+\\frac{3\\rho}{8\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\right)\\le \\Phi_1-\\Phi_{T+1}+\\frac{\\rho c^2\\sigma^2}{8L^2}\\cdot\\log(s+T)-\\sum_{t=1}^T\\frac{\\rho}{16L^2\\eta_t}M_{t+1}.",
+        "ref": "C.1 telescoping display",
+        "source_pdf_lines": [
+          1241,
+          1255
+        ],
+        "step": 12,
+        "uses": [
+          "B5_stepsize_schedule"
+        ]
+      },
+      {
+        "description": "Theorem B.5 trace: Lower-bound the terminal Lyapunov value by the objective infimum.",
+        "math": "\\Phi_{T+1}\\ge F(x_{T+1})\\ge\\min_xF(x).",
+        "ref": "C.1 display after telescoping",
+        "source_pdf_lines": [
+          1256,
+          1258
+        ],
+        "uses": [
+          "H_lower_bounded_B_3",
+          "B5_telescoped_bound"
+        ],
+        "step": 13
+      },
+      {
+        "description": "Theorem B.5 trace/source-gap bridge: expand \\Phi_1 and follow the source substitution m_1=\\nabla f(x_1,\\xi_1); Algorithm 1 prints m_0\\leftarrow0 and a clipped momentum update for m_1, so this substitution is recorded as a source-visible bridge, not as an independently justified algorithm consequence.",
+        "math": "\\Phi_1=\\mathbb{E}\\left[F(x_1)+\\frac{\\rho s^{1/3}}{16L^2}\\cdot\\|\\nabla F(x_1)-m_1\\|_2^2\\right]=F(x_1)+\\frac{\\rho s^{1/3}}{16L^2}\\cdot\\mathbb{E}[\\|\\nabla F(x_1)-\\nabla f(x_1,\\xi_1)\\|_2^2]",
+        "produces": "B5_Phi1_source_substitution_m_1_equals_grad_f_x1_xi1",
+        "ref": "C.1 Phi_1 display",
+        "source_pdf_lines": [
+          1258,
+          1264
+        ],
+        "uses": [
+          "Algorithm1_momentum"
+        ],
+        "step": 14
+      },
+      {
+        "description": "Theorem B.5 trace: apply the bounded-variance assumption to the displayed initial Lyapunov expression.",
+        "math": "\\Phi_1\\le F(x_1)+\\frac{\\rho s^{1/3}\\sigma^2}{16L^2}.",
+        "ref": "C.1 Phi_1 display",
+        "source_pdf_lines": [
+          1263,
+          1265
+        ],
+        "uses": [
+          "bounded_variance_B_1",
+          "B5_Phi1_source_substitution"
+        ],
+        "step": 15
+      },
+      {
+        "description": "Theorem B.5 trace: Define G and divide the telescoped inequality by T.",
+        "math": "\\frac1T\\sum_{t=1}^T\\left(\\frac{\\eta_t}{\\rho}\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2+\\frac{3\\rho}{8\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\right)\\le\\frac{G}{T}+\\frac{\\rho c^2\\sigma^2}{8L^2T}\\cdot\\log(s+T)-\\frac1T\\sum_{t=1}^T\\frac{\\rho}{16L^2\\eta_t}M_{t+1}.",
+        "produces": "G=F(x_1)-\\min_xF(x)+\\rho s^{1/3}\\sigma^2/(16L^2)",
+        "ref": "(C.8)",
+        "source_pdf_lines": [
+          1265,
+          1270
+        ],
+        "step": 16,
+        "uses": [
+          "B5_stepsize_schedule",
+          "bounded_variance_B_1",
+          "B5_telescoped_bound",
+          "B5_Phi1_variance_bound",
+          "H_lower_bounded_B_3"
+        ]
+      },
+      {
+        "description": "Theorem B.5 trace: Separate the estimator-error term from (C.8) and lower-bound the left coefficient by eta_T, retaining the printed eta_t^{-2} residual sum. This line depends on the C.8 divided telescoping bound, discarding the nonnegative displacement term, and using eta_t >= eta_T on the left and in the residual denominator.",
+        "math": "\\frac1T\\sum_{t=1}^T\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2\\le\\frac{\\rho G}{T\\eta_T}+\\frac{\\rho^2c^2\\sigma^2}{8L^2T\\eta_T}\\cdot\\log(s+T)-\\frac1T\\sum_{t=1}^T\\frac{\\rho^2}{16L^2\\eta_t^2}M_{t+1}.",
+        "ref": "C.1 first separated estimator display",
+        "source_pdf_lines": [
+          1274,
+          1277
+        ],
+        "step": 17,
+        "uses": [
+          "lemma_C_2",
+          "lemma_C_3",
+          "lemma_C_5",
+          "B5_stepsize_schedule",
+          "B5_beta_schedule",
+          "bounded_variance_B_1",
+          "B5_C8_divided_telescoping"
+        ],
+        "produces": "B5_estimator_first_separation_from_C8"
+      },
+      {
+        "description": "Theorem B.5 trace: Substitute eta_T=(s+T)^{-1/3} in the positive terms while keeping the residual sum in the printed form. It continues from the first separated estimator display by substituting eta_T=(s+T)^{-1/3}.",
+        "math": "\\le\\left(\\rho G+\\frac{\\rho^2c^2\\sigma^2}{8L^2}\\cdot\\log(s+T)\\right)\\cdot\\frac{(s+T)^{1/3}}{T}-\\frac1T\\sum_{t=1}^T\\frac{\\rho^2}{16L^2\\eta_t^2}M_{t+1}.",
+        "ref": "C.1 second estimator display line",
+        "source_pdf_lines": [
+          1279,
+          1281
+        ],
+        "step": 18,
+        "uses": [
+          "lemma_C_2",
+          "lemma_C_3",
+          "lemma_C_5",
+          "B5_stepsize_schedule",
+          "B5_beta_schedule",
+          "bounded_variance_B_1",
+          "B5_estimator_first_separation_from_C8"
+        ],
+        "produces": "B5_estimator_etaT_substitution"
+      },
+      {
+        "description": "Theorem B.5 trace: Use T>=s to reach the theorem estimator-error endpoint and replace the residual denominator by T^{1/3}. It continues from the eta_T-substituted display, uses T\\ge s to compare (s+T)^{1/3}/T with 2/T^{2/3}, and uses the residual-denominator comparison printed in the endpoint.",
+        "math": "\\le\\left(2\\rho G+\\frac{\\rho c^2\\sigma^2}{4L^2}\\cdot\\log(s+T)\\right)\\cdot\\frac1{T^{2/3}}-\\frac{\\rho^2\\sum_{t=1}^TM_{t+1}}{8L^2T^{1/3}}.",
+        "ref": "C.1 final estimator display line",
+        "source_pdf_lines": [
+          1283,
+          1285
+        ],
+        "step": 19,
+        "uses": [
+          "lemma_C_2",
+          "lemma_C_3",
+          "lemma_C_5",
+          "B5_stepsize_schedule",
+          "B5_beta_schedule",
+          "bounded_variance_B_1",
+          "B5_estimator_etaT_substitution",
+          "B5_horizon_condition"
+        ]
+      },
+      {
+        "description": "Theorem B.5 trace: Separate the second term in (C.8), preserving the printed rho/(8 eta_t) left coefficient and residual endpoint. This line depends on the C.8 divided telescoping bound after discarding the nonnegative estimator term and replacing the residual denominator using eta_t=(s+t)^{-1/3}.",
+        "math": "\\frac1T\\sum_{t=1}^T\\frac{3\\rho}{8\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\le\\frac GT+\\frac{\\rho c^2\\sigma^2}{8L^2T}\\cdot\\log(s+T)-\\frac{\\rho\\sum_{t=1}^TM_{t+1}}{16L^2T^{2/3}}.",
+        "ref": "C.1 first separated displacement display",
+        "source_pdf_lines": [
+          1288,
+          1291
+        ],
+        "step": 20,
+        "uses": [
+          "lemma_C_2",
+          "lemma_C_3",
+          "lemma_C_5",
+          "B5_stepsize_schedule",
+          "B5_beta_schedule",
+          "bounded_variance_B_1",
+          "B5_C8_divided_telescoping"
+        ],
+        "produces": "B5_displacement_first_separation_from_C8"
+      },
+      {
+        "description": "Theorem B.5 trace: Convert the separated displacement inequality to the printed eta_t^{-2} scaled form using eta_T. It continues from the separated displacement display and uses eta_T to pass to the printed eta_t^{-2} scaled form.",
+        "math": "\\frac1T\\sum_{t=1}^T\\frac1{\\eta_t^2}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\le\\frac{8G}{3\\rho T\\eta_T}+\\frac{c^2\\sigma^2}{3L^2T\\eta_T}\\cdot\\log(s+T)-\\frac{\\sum_{t=1}^TM_{t+1}}{6L^2T^{2/3}}.",
+        "ref": "C.1 second displacement display first line",
+        "source_pdf_lines": [
+          1295,
+          1299
+        ],
+        "step": 21,
+        "uses": [
+          "lemma_C_2",
+          "lemma_C_3",
+          "lemma_C_5",
+          "B5_stepsize_schedule",
+          "B5_beta_schedule",
+          "bounded_variance_B_1",
+          "B5_displacement_first_separation_from_C8"
+        ],
+        "produces": "B5_displacement_etaT_conversion"
+      },
+      {
+        "description": "Theorem B.5 trace: Use T>=s and eta_T=(s+T)^{-1/3} to reach the printed final displacement display. It continues from the eta_T converted display and uses T\\ge s for the positive terms and residual denominator comparison.",
+        "math": "\\le\\frac{16G}{3\\rho T^{2/3}}+\\frac{2c^2\\sigma^2}{3L^2T^{2/3}}\\cdot\\log(s+T)-\\frac{\\sum_{t=1}^TM_{t+1}}{6L^2T^{1/3}}.",
+        "ref": "C.1 final displacement display line",
+        "source_pdf_lines": [
+          1300,
+          1303
+        ],
+        "step": 22,
+        "uses": [
+          "lemma_C_2",
+          "lemma_C_3",
+          "lemma_C_5",
+          "B5_stepsize_schedule",
+          "B5_beta_schedule",
+          "bounded_variance_B_1",
+          "B5_displacement_etaT_conversion",
+          "B5_horizon_condition"
+        ]
+      },
+      {
+        "description": "Theorem B.5 proof-boundary/source-gap step: compare the printed C.1 proof endpoint with the theorem statement. The theorem statement bounds the displacement metric with 1/eta_t, but the C.1 proof endpoint just obtained is the displayed 1/eta_t^2 bound; the PDF does not print a bridge from that endpoint to the theorem-level 1/eta_t displacement inequality, including preservation of the negative M_{t+1} residual term.",
+        "ref": "Theorem B.5 statement vs C.1 final displacement display line",
+        "source_pdf_lines": [
+          1084,
+          1303
+        ],
+        "step": 23,
+        "uses": [
+          "B5_displacement_final_display_from_C1",
+          "B5_stepsize_schedule",
+          "B5_horizon_condition"
+        ],
+        "produces": "B5_displacement_scale_statement_vs_proof_source_gap: public statement has (1/T) sum_t eta_t^{-1} E||x_{t+1}-x_t||_2^2, while the printed proof chain ends with (1/T) sum_t eta_t^{-2} E||x_{t+1}-x_t||_2^2. No PDF-printed derivation of the statement-level 1/eta_t displacement bound is supplied."
+      },
+      {
+        "description": "Theorem B.6 trace: Define the AdamW Lyapunov function with the weight-decay/preconditioner quadratic term.",
+        "math": "\\Phi_t=\\mathbb{E}\\left[F(x_t)+\\frac{\\lambda}{2}\\cdot x_t^\\top H_tx_t+\\frac{\\rho}{16L^2\\eta_{t-1}}\\cdot\\|\\nabla F(x_t)-m_t\\|_2^2\\right],\\quad\\forall t\\ge1.",
+        "ref": "C.2",
+        "source_pdf_lines": [
+          1307,
+          1312
+        ],
+        "step": 24,
+        "uses": []
+      },
+      {
+        "description": "Theorem B.6 trace: Expand the consecutive Lyapunov difference into I1 and I2.",
+        "math": "\\Phi_{t+1}-\\Phi_t=\\mathbb{E}\\left[F(x_{t+1})+\\frac\\lambda2x_{t+1}^\\top H_{t+1}x_{t+1}-F(x_t)-\\frac\\lambda2x_t^\\top H_tx_t\\right]+\\mathbb{E}\\left[\\frac\\rho{16L^2\\eta_t}\\|\\nabla F(x_{t+1})-m_{t+1}\\|_2^2-\\frac\\rho{16L^2\\eta_{t-1}}\\|\\nabla F(x_t)-m_t\\|_2^2\\right].",
+        "ref": "(C.9)",
+        "source_pdf_lines": [
+          1314,
+          1327
+        ],
+        "step": 25,
+        "uses": []
+      },
+      {
+        "description": "Theorem B.6 trace: Bound I1 with Lemma C.4 after the B.6 stepsize schedule supplies eta_t <= min{(4 lambda)^(-1), rho*(2L)^(-1)}. The implication from the B.6 schedule to this eta-side-condition is recorded here only as a derived application-boundary check, not as a source lemma.",
+        "math": "I_1\\le\\mathbb{E}\\left[-\\frac{\\rho}{4\\eta_t}\\cdot\\|x_t-x_{t+1}\\|_2^2+\\frac{\\eta_t}{\\rho}\\cdot\\|\\nabla F(x_t)-m_t\\|_2^2+\\frac{\\lambda D^2\\sqrt{2(1-\\beta_{2,t})}}2\\right].",
+        "ref": "(C.10)",
+        "source_pdf_lines": [
+          1328,
+          1332
+        ],
+        "step": 26,
+        "uses": [
+          "lemma_C_4",
+          "B6_bounded_iterates",
+          "B6_stepsize_schedule",
+          "lemma_C_4_stepsize_hypothesis"
+        ],
+        "produces": "derived: from B6_stepsize_schedule, the Lemma C.4 eta-side-condition \\eta_t\\le\\min\\{(4\\lambda)^{-1},\\rho\\cdot(2L)^{-1}\\} is available for this application."
+      },
+      {
+        "description": "Theorem B.6 source-gap/prerequisite check before invoking Lemma C.2: Lemma C.2 requires 1 >= beta_{1,t+1} >= 0 for all t, while Theorem B.6 prints only bounded iterates, the lower-bound schedule c >= 32L^2 rho^{-2}+1, and beta_{1,t+1}=1-c eta_t^2. The nonnegativity beta_{1,t+1} >= 0 is not derivable from the printed assumptions without an additional upper bound on c or other side condition.",
+        "math": "1\\ge\\beta_{1,t+1}\\ge0,\\ \\forall t",
+        "produces": "B6_C2_beta_admissibility_source_gap",
+        "ref": "Theorem B.6 statement and Lemma C.2 prerequisite",
+        "source_pdf_lines": [
+          1095,
+          1137
+        ],
+        "step": 27,
+        "uses": [
+          "lemma_C_2",
+          "B6_beta_schedule",
+          "B6_bounded_iterates"
+        ]
+      },
+      {
+        "description": "Theorem B.6 source-gap/prerequisite check before invoking Lemma C.2 for I2: Lemma C.2 also requires the approximate choice of gamma_{t+1} as in (D.12), while Theorem B.6 prints bounded iterates and the eta and beta schedules but no gamma-choice hypothesis. This records the missing prerequisite rather than silently adding it to the theorem statement.",
+        "math": "\\gamma_{t+1}=1-\\frac{G_{t+1}+\\beta_{1,t+1}(\\mathbb{E}\\|\\Delta_t\\|_2^2-\\|\\mathbb{E}\\Delta_t\\|_2^2)}{\\beta_{1,t+1}\\mathbb{E}\\|\\Delta_t\\|_2^2}=\\frac{\\|\\mathbb{E}\\Delta_t\\|_2^2-G_{t+1}}{\\beta_{1,t+1}\\mathbb{E}\\|\\Delta_t\\|_2^2}",
+        "produces": "B6_C2_gamma_choice_source_gap",
+        "ref": "Lemma C.2 prerequisite, (D.12), and Theorem B.6 statement",
+        "source_pdf_lines": [
+          1130,
+          1703
+        ],
+        "uses": [
+          "lemma_C_2",
+          "C2_gamma_choice",
+          "B6_beta_schedule",
+          "B6_bounded_iterates"
+        ],
+        "step": 28
+      },
+      {
+        "description": "Theorem B.6 trace: conditionally, subject to the unresolved beta-admissibility and gamma-choice prerequisites recorded in the preceding prerequisite steps, bound I2 using Lemma C.2 and substitute the beta schedule.",
+        "math": "I_2\\le\\frac{\\rho}{16L^2}\\left(\\frac{\\beta_{1,t+1}^2}{\\eta_t}-\\frac1{\\eta_{t-1}}\\right)\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2+\\frac{\\rho}{8\\eta_t}\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2+\\frac{\\rho c^2\\eta_t^3\\sigma^2}{8L^2}-\\frac{\\rho}{16L^2\\eta_t}M_{t+1}.",
+        "ref": "(C.11)",
+        "source_pdf_lines": [
+          1338,
+          1356
+        ],
+        "step": 29,
+        "uses": [
+          "lemma_C_2",
+          "B6_beta_schedule",
+          "B6_C2_beta_admissibility_source_gap",
+          "B6_C2_gamma_choice_source_gap"
+        ]
+      },
+      {
+        "description": "Theorem B.6 source-gap/prerequisite check before invoking Lemma C.5: Lemma C.5 assumes s\\ge1 for its stepsize comparison, while Theorem B.6 prints only s\\ge\\max(8L^3/\\rho^3,64\\lambda^3). This records the missing prerequisite rather than inferring it from the theorem schedule.",
+        "math": "s\\ge1",
+        "produces": "B6_C5_s_ge_1_source_gap",
+        "ref": "Lemma C.5 prerequisite at C.2 invocation",
+        "source_pdf_lines": [
+          1176,
+          1372
+        ],
+        "uses": [
+          "lemma_C_5",
+          "B6_stepsize_schedule"
+        ],
+        "step": 30
+      },
+      {
+        "description": "Theorem B.6 trace: Use Lemma C.5 subject to the recorded s\\ge1 prerequisite and c>=32L^2 rho^{-2}+1 to make the I2 estimator coefficient negative.",
+        "math": "\\frac{\\rho}{16L^2}\\left(\\frac{\\beta_{1,t+1}^2}{\\eta_t}-\\frac1{\\eta_{t-1}}\\right)\\le\\frac{\\rho}{16L^2}\\cdot(\\eta_t-c\\eta_t)\\le -2\\eta_t\\rho^{-1}.",
+        "ref": "(C.12)",
+        "source_pdf_lines": [
+          1357,
+          1372
+        ],
+        "step": 31,
+        "uses": [
+          "lemma_C_5",
+          "B6_beta_schedule",
+          "B6_stepsize_schedule",
+          "B6_C2_beta_admissibility_source_gap"
+        ]
+      },
+      {
+        "description": "Theorem B.6 trace: Insert the negative coefficient into the I2 estimate.",
+        "math": "I_2\\le -\\frac{2\\eta_t}{\\rho}\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2+\\frac{\\rho}{8\\eta_t}\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2+\\frac{\\rho c^2\\eta_t^3\\sigma^2}{8L^2}-\\frac{\\rho}{16L^2\\eta_t}M_{t+1}.",
+        "ref": "(C.13)",
+        "source_pdf_lines": [
+          1373,
+          1376
+        ],
+        "step": 32,
+        "uses": [
+          "lemma_C_2",
+          "lemma_C_5",
+          "B6_beta_schedule"
+        ]
+      },
+      {
+        "description": "Theorem B.6 trace: Combine (C.9), (C.10), and (C.13).",
+        "math": "\\Phi_{t+1}-\\Phi_t\\le -\\frac{\\eta_t}{\\rho}\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2-\\frac{\\rho}{8\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2+\\frac{\\rho c^2\\eta_t^3\\sigma^2}{8L^2}+\\frac{\\lambda D^2\\sqrt{2(1-\\beta_{2,t})}}2-\\frac{\\rho}{16L^2\\eta_t}M_{t+1}.",
+        "ref": "C.2 display before telescoping",
+        "source_pdf_lines": [
+          1377,
+          1381
+        ],
+        "step": 33,
+        "uses": [
+          "lemma_C_2",
+          "lemma_C_4",
+          "lemma_C_5",
+          "B6_beta_schedule",
+          "B6_bounded_iterates"
+        ]
+      },
+      {
+        "description": "Theorem B.6 trace: Telescope the one-step inequality and substitute \\beta_{2,t}=1-\\eta_t^6 to sum the weight-decay perturbation.",
+        "math": "\\sum_{t=1}^T\\left(\\frac{\\eta_t}{\\rho}\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2+\\frac{\\rho}{8\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\right)\\le \\Phi_1-\\Phi_{T+1}+\\frac{\\rho c^2\\sigma^2}{8L^2}\\cdot\\log(s+T)+\\lambda D^2\\log(s+T)-\\sum_{t=1}^T\\frac{\\rho}{16L^2\\eta_t}M_{t+1}.",
+        "ref": "C.2 telescoping display",
+        "source_pdf_lines": [
+          1382,
+          1403
+        ],
+        "step": 34,
+        "uses": [
+          "B6_beta_schedule",
+          "B6_stepsize_schedule"
+        ]
+      },
+      {
+        "description": "Theorem B.6 trace: Lower-bound the terminal Lyapunov value by the objective infimum.",
+        "math": "\\Phi_{T+1}\\ge F(x_{T+1})\\ge\\min_xF(x).",
+        "ref": "C.2 display after telescoping",
+        "source_pdf_lines": [
+          1403,
+          1405
+        ],
+        "uses": [
+          "B6_telescoped_bound",
+          "H_lower_bounded_B_3"
+        ],
+        "step": 35
+      },
+      {
+        "description": "Theorem B.6 trace: record the source bound on the preconditioner norm used in the initial Lyapunov estimate.",
+        "math": "\\|H_{t+1}\\|_2=\\operatorname{diag}(\\sqrt{v_{t+1}}+\\epsilon)\\le1+\\epsilon.",
+        "produces": "B6_H_bound_following_D7",
+        "ref": "C.2 text after telescoping; fact following (D.7)",
+        "source_pdf_lines": [
+          1405,
+          1408
+        ],
+        "uses": [
+          "lemma_C_1"
+        ],
+        "step": 36
+      },
+      {
+        "description": "Theorem B.6 trace/source-gap bridge: expand \\Phi_1, use the H_1 bound and bounded iterates, and follow the source substitution m_1=\\nabla f(x_1,\\xi_1); Algorithm 2 prints m_0,v_0\\leftarrow0 and a clipped first-moment update for m_1, so this substitution is recorded as source-visible rather than silently derived.",
+        "math": "\\Phi_1=\\mathbb{E}\\left[F(x_1)+\\frac\\lambda2\\cdot x_1^\\top H_1x_1+\\frac{\\rho s^{1/3}}{16L^2}\\cdot\\|\\nabla F(x_1)-m_1\\|_2^2\\right]\\le F(x_1)+\\frac\\lambda2D^2(1+\\epsilon)+\\frac{\\rho s^{1/3}}{16L^2}\\cdot\\mathbb{E}[\\|\\nabla F(x_1)-\\nabla f(x_1,\\xi_1)\\|_2^2]",
+        "produces": "B6_Phi1_H1_bound_and_source_substitution_m_1_equals_grad_f_x1_xi1",
+        "ref": "C.2 Phi_1 display",
+        "source_pdf_lines": [
+          1408,
+          1414
+        ],
+        "uses": [
+          "B6_bounded_iterates",
+          "B6_H_bound_following_D7",
+          "B6_Phi1_H1_bound_and_source_substitution",
+          "B6_Algorithm2_initialization_and_first_moment_source"
+        ],
+        "step": 37
+      },
+      {
+        "description": "Theorem B.6 trace: apply the bounded-variance assumption to the displayed initial Lyapunov expression.",
+        "math": "\\Phi_1\\le F(x_1)+\\frac\\lambda2D^2(1+\\epsilon)+\\frac{\\rho s^{1/3}\\sigma^2}{16L^2}.",
+        "ref": "C.2 Phi_1 display",
+        "source_pdf_lines": [
+          1414,
+          1418
+        ],
+        "uses": [
+          "bounded_variance_B_1",
+          "B6_Phi1_H1_bound_and_source_substitution"
+        ],
+        "step": 38
+      },
+      {
+        "description": "Theorem B.6 trace: Define G and divide the telescoped bound by T.",
+        "math": "\\frac1T\\sum_{t=1}^T\\left(\\frac{\\eta_t}{\\rho}\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2+\\frac{\\rho}{8\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\right)\\le\\frac GT+\\frac{\\rho c^2\\sigma^2}{8L^2T}\\cdot\\log(s+T)+\\frac{\\lambda D^2\\log(s+T)}T-\\frac1T\\sum_{t=1}^T\\frac{\\rho}{16L^2\\eta_t}M_{t+1}.",
+        "produces": "G=F(x_1)-\\min_xF(x)+\\lambda D^2(1+\\epsilon)/2+\\rho s^{1/3}\\sigma^2/(16L^2)",
+        "ref": "(C.14)-(C.15)",
+        "source_pdf_lines": [
+          1418,
+          1427
+        ],
+        "step": 39,
+        "uses": [
+          "B6_stepsize_schedule",
+          "bounded_variance_B_1",
+          "lemma_C_1",
+          "B6_bounded_iterates",
+          "B6_telescoped_bound",
+          "B6_Phi1_variance_bound",
+          "H_lower_bounded_B_3"
+        ]
+      },
+      {
+        "description": "Theorem B.6 trace: Separate the estimator-error term from (C.14)-(C.15), using eta_T for the positive terms and the printed residual denominator. This line depends on the C.14-C.15 divided telescoping bound, discarding the nonnegative displacement term, and using eta_T for the positive left coefficient while preserving the printed residual comparison.",
+        "math": "\\frac1T\\sum_{t=1}^T\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2\\le\\frac{\\rho(G+\\lambda D^2\\log(s+T))}{T\\eta_T}+\\frac{\\rho^2c^2\\sigma^2}{8L^2T\\eta_T}\\cdot\\log(s+T)-\\frac{\\rho^2\\sum_{t=1}^TM_{t+1}}{16L^2T^{1/3}}.",
+        "ref": "C.2 first separated estimator display",
+        "source_pdf_lines": [
+          1435,
+          1438
+        ],
+        "step": 40,
+        "uses": [
+          "lemma_C_2",
+          "lemma_C_4",
+          "lemma_C_5",
+          "lemma_C_1",
+          "B6_stepsize_schedule",
+          "B6_beta_schedule",
+          "B6_bounded_iterates",
+          "bounded_variance_B_1",
+          "B6_C14_C15_divided_telescoping"
+        ],
+        "produces": "B6_estimator_first_separation_from_C14_C15"
+      },
+      {
+        "description": "Theorem B.6 trace: Rewrite the positive eta_T terms using (s+T)^{1/3}/T, preserving the displayed residual. It continues from the first separated estimator display by substituting eta_T=(s+T)^{-1/3}.",
+        "math": "\\le\\left(\\rho(G+\\lambda D^2\\log(s+T))+\\frac{\\rho^2c^2\\sigma^2}{8L^2}\\cdot\\log(s+T)\\right)\\cdot\\frac{(s+T)^{1/3}}{T}-\\frac{\\rho^2\\sum_{t=1}^TM_{t+1}}{16L^2T^{1/3}}.",
+        "ref": "C.2 second estimator display line",
+        "source_pdf_lines": [
+          1440,
+          1442
+        ],
+        "step": 41,
+        "uses": [
+          "lemma_C_2",
+          "lemma_C_4",
+          "lemma_C_5",
+          "lemma_C_1",
+          "B6_stepsize_schedule",
+          "B6_beta_schedule",
+          "B6_bounded_iterates",
+          "bounded_variance_B_1",
+          "B6_estimator_first_separation_from_C14_C15"
+        ],
+        "produces": "B6_estimator_etaT_substitution"
+      },
+      {
+        "description": "Theorem B.6 trace: Use T>=s to obtain the final estimator-error inequality printed in the proof. It continues from the eta_T-substituted display and uses T\\ge s to compare (s+T)^{1/3}/T with 2/T^{2/3}.",
+        "math": "\\le\\left(2\\rho(G+\\lambda D^2\\log(s+T))+\\frac{\\rho c^2\\sigma^2}{4L^2}\\cdot\\log(s+T)\\right)\\cdot\\frac1{T^{2/3}}-\\frac{\\rho^2\\sum_{t=1}^TM_{t+1}}{16L^2T^{1/3}}.",
+        "ref": "C.2 final estimator display line",
+        "source_pdf_lines": [
+          1445,
+          1447
+        ],
+        "step": 42,
+        "uses": [
+          "lemma_C_2",
+          "lemma_C_4",
+          "lemma_C_5",
+          "lemma_C_1",
+          "B6_stepsize_schedule",
+          "B6_beta_schedule",
+          "B6_bounded_iterates",
+          "bounded_variance_B_1",
+          "B6_estimator_etaT_substitution",
+          "B6_horizon_condition"
+        ]
+      },
+      {
+        "description": "Theorem B.6 trace: Separate the displacement term, leaving the printed eta_t residual in the negative term. This line depends on the C.14-C.15 divided telescoping bound after discarding the nonnegative estimator term and carrying forward the residual term printed in the proof.",
+        "math": "\\frac1T\\sum_{t=1}^T\\frac{\\rho}{8\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\le\\frac{G+\\lambda D^2\\log(s+T)}T+\\frac{\\rho c^2\\sigma^2}{8L^2T}\\cdot\\log(s+T)-\\frac{\\rho\\sum_{t=1}^TM_{t+1}}{16L^2T\\eta_t}.",
+        "ref": "C.2 first separated displacement display",
+        "source_pdf_lines": [
+          1451,
+          1454
+        ],
+        "step": 43,
+        "uses": [
+          "lemma_C_2",
+          "lemma_C_4",
+          "lemma_C_5",
+          "lemma_C_1",
+          "B6_stepsize_schedule",
+          "B6_beta_schedule",
+          "B6_bounded_iterates",
+          "bounded_variance_B_1",
+          "B6_C14_C15_divided_telescoping"
+        ],
+        "produces": "B6_displacement_first_separation_from_C14_C15"
+      },
+      {
+        "description": "Theorem B.6 trace: Convert to the printed eta_t^{-2} scaled displacement form and substitute eta_T for the positive terms. It continues from the separated displacement display and uses eta_T to pass to the printed eta_t^{-2} scaled form.",
+        "math": "\\frac1T\\sum_{t=1}^T\\frac1{\\eta_t^2}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\le\\frac{8(G+\\lambda D^2\\log(s+T))}{\\rho T\\eta_T}+\\frac{c^2\\sigma^2}{L^2T\\eta_T}\\cdot\\log(s+T)-\\frac{\\sum_{t=1}^TM_{t+1}}{2L^2T\\eta_t^2}.",
+        "ref": "C.2 second displacement display first line",
+        "source_pdf_lines": [
+          1458,
+          1461
+        ],
+        "step": 44,
+        "uses": [
+          "lemma_C_2",
+          "lemma_C_4",
+          "lemma_C_5",
+          "lemma_C_1",
+          "B6_stepsize_schedule",
+          "B6_beta_schedule",
+          "B6_bounded_iterates",
+          "bounded_variance_B_1",
+          "B6_displacement_first_separation_from_C14_C15"
+        ],
+        "produces": "B6_displacement_etaT_conversion"
+      },
+      {
+        "description": "Theorem B.6 trace: Use T>=s to obtain the printed final displacement display. It continues from the eta_T converted display and uses T\\ge s for the positive terms and residual denominator comparison.",
+        "math": "\\le\\frac{16(G+\\lambda D^2\\log(s+T))}{\\rho T^{2/3}}+\\frac{2c^2\\sigma^2}{L^2T^{2/3}}\\cdot\\log(s+T)-\\frac{\\sum_{t=1}^TM_{t+1}}{L^2T^{1/3}}.",
+        "ref": "C.2 final displacement display line",
+        "source_pdf_lines": [
+          1462,
+          1465
+        ],
+        "step": 45,
+        "uses": [
+          "lemma_C_2",
+          "lemma_C_4",
+          "lemma_C_5",
+          "lemma_C_1",
+          "B6_stepsize_schedule",
+          "B6_beta_schedule",
+          "B6_bounded_iterates",
+          "bounded_variance_B_1",
+          "B6_displacement_etaT_conversion",
+          "B6_horizon_condition"
+        ]
+      },
+      {
+        "description": "Theorem B.6 proof-boundary/source-gap step: compare the printed C.2 proof endpoint with the theorem statement. The theorem statement bounds the displacement metric with 1/eta_t, but the C.2 proof endpoint just obtained is the displayed 1/eta_t^2 bound; the PDF does not print a bridge from that endpoint to the theorem-level 1/eta_t displacement inequality, including preservation of the negative M_{t+1} residual term.",
+        "ref": "Theorem B.6 statement vs C.2 final displacement display line",
+        "source_pdf_lines": [
+          1104,
+          1465
+        ],
+        "step": 46,
+        "uses": [
+          "B6_displacement_final_display_from_C2",
+          "B6_stepsize_schedule",
+          "B6_horizon_condition"
+        ],
+        "produces": "B6_displacement_scale_statement_vs_proof_source_gap: public statement has (1/T) sum_t eta_t^{-1} E||x_{t+1}-x_t||_2^2, while the printed proof chain ends with (1/T) sum_t eta_t^{-2} E||x_{t+1}-x_t||_2^2. No PDF-printed derivation of the statement-level 1/eta_t displacement bound is supplied."
+      },
+      {
+        "description": "Lemma 3.4 trace: Use the first update inside the second update.",
+        "math": "m_t=b_1(a_1u_{t-1}+a_2g_t)+b_2g_t=a_1b_1u_{t-1}+(b_1a_2+b_2)g_t.",
+        "ref": "(D.3)",
+        "source_pdf_lines": [
+          1482,
+          1485
+        ],
+        "step": 47,
+        "uses": []
+      },
+      {
+        "description": "Lemma 3.4 trace: Shift the second defining update by one index.",
+        "math": "m_{t-1}=b_1u_{t-1}+b_2g_{t-1}.",
+        "ref": "(D.4)",
+        "source_pdf_lines": [
+          1486,
+          1489
+        ],
+        "step": 48,
+        "uses": []
+      },
+      {
+        "description": "Lemma 3.4 trace: Combine (D.3) and (D.4) to eliminate u_{t-1}.",
+        "math": "m_t=a_1m_{t-1}-a_1b_2g_{t-1}+(b_1a_2+b_2)g_t=a_1m_{t-1}+(b_1a_2-a_1b_2+b_2)g_t+a_1b_2(g_t-g_{t-1}).",
+        "ref": "D.1 final display",
+        "source_pdf_lines": [
+          1490,
+          1495
+        ],
+        "step": 49,
+        "uses": [
+          "lemma_D_1",
+          "lemma_D_1_D3_substitution",
+          "lemma_D_1_D4_index_shift"
+        ]
+      },
+      {
+        "description": "Lemma 3.4 application trace: Apply the lemma to the Lion momentum variables by making the source's parameter substitution.",
+        "math": "g_t=\\nabla f(x_t,\\xi_t),\\quad a_1=\\beta_1,\\quad a_2=1-\\beta_1,\\quad b_1=\\beta_2,\\quad b_2=1-\\beta_2.",
+        "ref": "Lemma 3.4 application after statement",
+        "source_pdf_lines": [
+          493,
+          495
+        ],
+        "step": 50,
+        "uses": [
+          "lemma_D_1",
+          "lemma_3_4_Lion_parameter_substitution"
+        ],
+        "produces": "lemma_3_4_Lion_parameter_substitution"
+      },
+      {
+        "description": "Lemma 3.4 application trace: Record the source index shift used to align the generic u-update with the Lion momentum updates (3.15) and (3.16).",
+        "math": "u_t=u_{t-1},\\quad u_{t-1}=u_{t-2}.",
+        "ref": "Lemma 3.4 application after statement",
+        "source_pdf_lines": [
+          495,
+          498
+        ],
+        "step": 51,
+        "uses": [
+          "lemma_3_4_Lion_parameter_substitution",
+          "lemma_3_4_Lion_index_shift_to_equations_3_15_3_16"
+        ],
+        "produces": "lemma_3_4_Lion_index_shift_to_equations_3_15_3_16"
+      },
+      {
+        "description": "Lemma 3.4 application trace: With the substitution and index shift, identify the Lion momentum updates (3.15) and (3.16) with the printed single momentum update.",
+        "math": "m_t=\\beta_1m_{t-1}+(1-\\beta_1)\\left[\\nabla f(x_t,\\xi_t)+\\frac{\\beta_1(1-\\beta_2)}{1-\\beta_1}\\left(\\nabla f(x_t,\\xi_t)-\\nabla f(x_{t-1},\\xi_{t-1})\\right)\\right].",
+        "ref": "(3.25)-(3.26)",
+        "source_pdf_lines": [
+          497,
+          506
+        ],
+        "step": 52,
+        "uses": [
+          "lemma_D_1",
+          "lemma_3_4_Lion_parameter_substitution",
+          "lemma_3_4_Lion_index_shift_to_equations_3_15_3_16",
+          "lemma_3_4_Lion_single_momentum_update_3_25_3_26"
+        ],
+        "produces": "Lion momentum updates in (3.15) and (3.16) are equivalent to the single momentum update (3.25)-(3.26)."
+      }
+    ],
+    "rate": "Theorem B.5 and Theorem B.6 give O(log(T)/T^{1/3}) averaged convergence bounds in the estimator-error and scaled iterate-displacement metrics; Lemma 3.4 gives the algebraic momentum equivalence used for MARS-Lion/Lion comparison.",
+    "ref": "Theorem B.5; Theorem B.6; Lemma 3.4",
+    "source_pdf_line_ranges": [
+      [
+        1078,
+        1094
+      ],
+      [
+        1095,
+        1110
+      ],
+      [
+        480,
+        493
+      ]
+    ],
+    "statement_math": "\\text{Theorem B.5. In Algorithm 1, under Assumptions B.1, B.2 and B.3, when choosing }\\eta_t=(s+t)^{-1/3},\\ s\\ge 8L^3/\\rho^3.\\ \\text{Suppose }c\\ge 32L^2\\rho^{-2}+1,\\ \\beta_{1,t+1}=1-c\\eta_t^2\\text{ and }\\beta_{2,t+1}=1-\\eta_t^6,\\text{ then }\\forall T\\ge s,\\text{ it holds that }\\frac1T\\sum_{t=1}^T\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2\\le\\left(2\\rho G+\\frac{\\rho c^2\\sigma^2}{4L^2}\\cdot\\log(s+T)\\right)\\cdot\\frac1{T^{2/3}}-\\frac{\\rho^2\\sum_{t=1}^T M_{t+1}}{8L^2T^{1/3}},\\quad \\frac1T\\sum_{t=1}^T\\frac1{\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\le\\left(\\frac{16G}{3\\rho}+\\frac{2c^2\\sigma^2}{3L^2}\\cdot\\log(s+T)\\right)\\cdot\\frac1{T^{2/3}}-\\frac{\\sum_{t=1}^T M_{t+1}}{6L^2T^{1/3}},\\ \\text{where }G=F(x_1)-\\min_xF(x)+\\frac{\\rho s^{1/3}\\sigma^2}{16L^2}\\text{ and }M_{t+1}\\text{ is defined in (C.2).}\\quad \\text{Theorem B.6. In Algorithm 2, under Assumptions B.1, B.2 and B.3, when choosing }\\eta_t=(s+t)^{-1/3},\\ s\\ge\\max(8L^3/\\rho^3,64\\lambda^3).\\ \\text{Suppose }\\|x_t\\|_2\\le D,\\ c\\ge32L^2\\rho^{-2}+1,\\ \\beta_{1,t+1}=1-c\\eta_t^2\\text{ and }\\beta_{2,t+1}=1-\\eta_t^6,\\text{ then }\\forall T\\ge s,\\text{ it holds that }\\frac1T\\sum_{t=1}^T\\mathbb{E}\\|\\nabla F(x_t)-m_t\\|_2^2\\le\\left(2\\rho(G+\\lambda D^2\\log(s+T))+\\frac{\\rho c^2\\sigma^2}{4L^2}\\cdot\\log(s+T)\\right)\\cdot\\frac1{T^{2/3}}-\\frac{\\rho^2\\sum_{t=1}^T M_{t+1}}{16L^2T^{1/3}},\\quad \\frac1T\\sum_{t=1}^T\\frac1{\\eta_t}\\cdot\\mathbb{E}\\|x_{t+1}-x_t\\|_2^2\\le\\left(\\frac{16(G+\\lambda D^2\\log(s+T))}{\\rho}+\\frac{2c^2\\sigma^2}{L^2}\\cdot\\log(s+T)\\right)\\cdot\\frac1{T^{2/3}}-\\frac{\\sum_{t=1}^T M_{t+1}}{L^2T^{1/3}}.\\ \\text{where }G=F(x_1)-\\min_xF(x)+\\frac{\\lambda}{2}D^2(1+\\epsilon)+\\frac{\\rho s^{1/3}\\sigma^2}{16L^2}\\text{ and }M_{t+1}\\text{ is defined in (C.2).}\\quad \\text{Lemma 3.4. For any sequence }\\{g_t\\in\\mathbb{R}^d\\}_{t=0,1,\\ldots},\\text{ consider the following updates of }m_t\\text{ for any constant factors }a_1,a_2,b_1,\\text{ and }b_2:\\quad u_t=a_1u_{t-1}+a_2g_t,\\quad m_t=b_1u_t+b_2g_t.\\ \\text{The updates are equivalent to }m_t=a_1m_{t-1}+(b_1a_2-a_1b_2+b_2)g_t+a_1b_2(g_t-g_{t-1})."
+  },
+  "setup": {
+    "problem": {
+      "description": "The paper studies possibly nonconvex stochastic optimization with first-order oracle access and fresh samples \\xi_t.",
+      "math": "\\min_x F(x)=\\mathbb{E}_{\\xi\\sim\\mathcal{D}}[f(x,\\xi)]",
+      "ref": "(2.1)"
+    },
+    "variable_space": {
+      "math": "x\\in\\mathbb{R}^d",
+      "ref": "Section 2, p.2"
+    }
+  },
+  "source_gaps_and_notes": [
+    {
+      "description": "D.4 says 'By the definition of m_t in Algorithm 1' but expands the unclipped estimator expression rather than the displayed clipped update m_t=beta m_{t-1}+(1-beta)\\widetilde c_t. This may require either a no-clipping specialization or an additional bridge lemma.",
+      "name": "Algorithm1_clipping_vs_D4",
+      "ref": "Algorithm 1 lines 5-6; D.4"
+    },
+    {
+      "description": "D.2 uses H_t and the update rule abstractly; the proof text recalls H_t=diag(sqrt(vhat_t)+epsilon), while Lemma C.1 is stated for v_t. Phase 0/2 should preserve the source statement and explicitly bridge any hatted/unhatted moment convention.",
+      "name": "Algorithm2_bias_correction_vs_D2",
+      "ref": "Algorithm 2 lines 8-9; D.2"
+    },
+    {
+      "description": "The D.2 proof first derives a display containing -\\lambda/2\\,x_t^\\top H_tx_t+\\lambda/2\\,x_{t+1}^\\top H_{t+1}x_{t+1}+\\lambda/2\\,x_{t+1}^\\top(H_t-H_{t+1})x_{t+1}. After bounding the difference term, the printed Lemma D.2 statement (D.5) instead concludes with \\lambda/2[x_t^\\top H_{t+1}x_t-x_{t+1}^\\top H_tx_{t+1}-\\sqrt{2(1-\\beta_{2,t})}D^2]. The PDF does not print the algebraic justification for this H_t/H_{t+1} swap, so Phase 0/2 should preserve the original target and account for this source gap explicitly.",
+      "name": "D2_quadratic_index_swap",
+      "ref": "Lemma D.2 proof and (D.5)"
+    },
+    {
+      "description": "The layout text extraction around the first inequality dropped the superscript in one locator line, but direct visual inspection of the PDF theorem statement and the proof C.2 show lambda D^2 log(s+T). The JSON records the PDF-visible D^2 form.",
+      "name": "B6_lambda_D_power_layout",
+      "ref": "Theorem B.6 and C.2"
+    },
+    {
+      "description": "The displayed definition of G_{t+1} in the Lemma C.2 statement area prints the final inner product as \\langle\\nabla F(x_{t+})-\\nabla F(x_t),F(x_t)-m_t\\rangle. This JSON records that source-visible statement-window formula in C2_statement_G_definition and lemma_C_2.statement_math, while D4_proof_G_definition separately records the Delta/epsilon formula introduced in D.4; any proposed correction to \\langle\\nabla F(x_{t+1})-\\nabla F(x_t),\\nabla F(x_t)-m_t\\rangle must be handled as a source defect, not substituted into source math fields.",
+      "name": "C2_G_definition_layout",
+      "ref": "(C.2)"
+    },
+    {
+      "description": "The pdftotext layout extraction can make the final expectation term look unscaled, but rendered PDF pages 23-24 show beta multiplying the parenthesized \\gamma_{t+1}\\Delta_t-\\mathbb{E}\\Delta_t and \\Delta_t-\\mathbb{E}\\Delta_t blocks in (D.9)-(D.11) and the gamma-minimization display. The JSON records the rendered PDF formulae as authoritative and keeps this note to flag the layout-vs-rendering ambiguity.",
+      "name": "D9_D10_beta_placement_source_gap",
+      "ref": "(D.9), (D.10)"
+    },
+    {
+      "description": "The proof text says 'Proof of Lemma C.4' immediately after proving Lemma C.3; the surrounding displays show the first part is Lemma C.3 and the second part is Lemma C.4.",
+      "name": "D5_section_label_typo",
+      "ref": "D.5"
+    },
+    {
+      "description": "The theorem statements print the displacement metric with 1/eta_t, while the terminal proof displays in C.1 and C.2 print 1/eta_t^2 in the corresponding separated displacement chains. The JSON keeps the public theorem statements as printed and records the proof displays as printed.",
+      "name": "B5_B6_displacement_scale_statement_vs_proof",
+      "ref": "Theorem B.5/B.6 statements; C.1 lines 1295-1303; C.2 lines 1458-1465"
+    },
+    {
+      "name": "D12_gamma_numerator_vs_C2_A_variance_form",
+      "ref": "Lemma C.2 statement (C.2); proof display (D.12)",
+      "description": "The Lemma C.2 statement defines A_{t+1} with beta_{1,t+1} tr Var(Delta_t), while the proof's A_{t+1} definition and gamma choice (D.12) visually print G_{t+1}+beta_{1,t+1}(E||Delta_t||_2^2-||E Delta_t||_2^2). The same (D.12) display then prints the second fraction as (||E Delta_t||_2^2-G_{t+1})/(beta_{1,t+1}E||Delta_t||_2^2), which is not algebraically equal to the first fraction unless beta_{1,t+1}=1 or an additional correction is made. The JSON preserves the source-visible D.12 formula and records this as a source inconsistency rather than silently substituting a corrected variant."
+    },
+    {
+      "name": "B5_B6_C2_beta_admissibility_prerequisite",
+      "ref": "Theorem B.5, Theorem B.6, and Lemma C.2",
+      "description": "Lemma C.2 requires 1 >= beta_{1,t+1} >= 0 for all t. Theorem B.5 and Theorem B.6 state eta_t=(s+t)^(-1/3), lower bounds on s, c >= 32L^2 rho^(-2)+1, beta_{1,t+1}=1-c eta_t^2, and beta_{2,t+1}=1-eta_t^6, but they do not state an upper bound on c or another condition ensuring beta_{1,t+1} >= 0. The JSON records this at each Lemma C.2 invocation and does not add the missing side condition to the theorem statements."
+    },
+    {
+      "name": "D12_gamma_denominator_nonzero_prerequisite",
+      "ref": "Lemma C.2 and (D.12)",
+      "description": "The printed gamma choice in (D.12) divides by beta_{1,t+1} E||Delta_t||_2^2. Lemma C.2 assumes only 1 >= beta_{1,t+1} >= 0, and the proof window does not state beta_{1,t+1} E||Delta_t||_2^2 != 0. The JSON preserves the D.12 formula and marks the denominator nonzero/positivity requirement as an unresolved proof prerequisite rather than assuming it silently."
+    },
+    {
+      "name": "B5_B6_C5_s_ge_1_prerequisite",
+      "ref": "Lemma C.5; Theorem B.5 lines 1078-1094; Theorem B.6 lines 1095-1110; C.1/C.2 invocations",
+      "description": "Lemma C.5 is stated with s >= 1 and its proof uses s >= 1 to infer s+t >= 2 and 27(s+t-1)^2 >= (s+t)^2. Theorem B.5 and Theorem B.6 do not explicitly print s >= 1; the proof steps at the C.1 and C.2 invocations record this missing prerequisite rather than silently deriving it from the printed schedules."
+    },
+    {
+      "name": "B5_B6_Phi1_m1_substitution_from_algorithm",
+      "ref": "C.1 lines 1256-1265; C.2 lines 1403-1418; Algorithm 1 lines 2, 5-6; Algorithm 2 lines 2, 5-6",
+      "description": "The Phi_1 displays in C.1 and C.2 replace m_1 by nabla f(x_1, xi_1). Algorithms 1 and 2 initialize m_0 (and v_0 for Algorithm 2) and then define m_1 through the clipped momentum update, so the JSON records the printed substitution as a source-visible bridge/source gap instead of treating it as an automatically justified algorithm consequence."
+    }
+  ],
+  "source_reference": "Yuan, Liu, Wu, Zhou, and Gu, ICML 2025, PMLR 267:73553-73587 (Theorems B.5, B.6, Lemma 3.4)"
+}

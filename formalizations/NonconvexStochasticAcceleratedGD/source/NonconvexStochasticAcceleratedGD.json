@@ -1,0 +1,889 @@
+{
+  "algorithm": "NonconvexStochasticAcceleratedGD",
+  "full_name": "Randomized stochastic AGD (RSAGD) algorithm for stochastic smooth optimization",
+  "source_reference": "Lan, First-order and Stochastic Optimization Methods for Machine Learning, Springer 2020 (Algorithm 6.4 and Theorem 6.12)",
+  "setup": {
+    "problem": {
+      "math": "\\Psi^* = \\min_{x \\in \\mathbb{R}^n} \\Psi(x)",
+      "ref": "Eq. (6.4.1)",
+      "description": "The stochastic smooth problem considered in Section 6.4.2.1, with \\(\\Psi\\) differentiable, bounded from below, and having Lipschitz continuous gradients."
+    },
+    "variable_space": {
+      "math": "x \\in \\mathbb{R}^n",
+      "ref": "Eq. (6.4.1)"
+    }
+  },
+  "assumptions": [
+    {
+      "name": "Problem_bounded_below",
+      "math": "\\Psi(\\cdot) \\text{ is bounded from below}",
+      "ref": "Section 6.4.1.1, line 21202; Section 6.4.2.1, lines 22005-22006",
+      "parameters": []
+    },
+    {
+      "name": "Lipschitz_gradients",
+      "math": "\\|\\nabla \\Psi(y) - \\nabla \\Psi(x)\\| \\le L_\\Psi \\|y - x\\| \\quad \\forall x,y \\in \\mathbb{R}^n",
+      "ref": "Eq. (6.4.2)",
+      "parameters": [
+        "L_\\Psi > 0"
+      ]
+    },
+    {
+      "name": "Smoothness_upper_model",
+      "math": "|\\Psi(y) - \\Psi(x) - \\langle \\nabla \\Psi(x), y - x\\rangle| \\le \\frac{L_\\Psi}{2}\\|y - x\\|^2 \\quad \\forall x,y \\in \\mathbb{R}^n",
+      "ref": "Eq. (6.4.7)",
+      "parameters": [
+        "L_\\Psi"
+      ]
+    },
+    {
+      "name": "Assumption_16a_unbiased_oracle",
+      "math": "\\mathbb{E}[G(x,\\xi_k)] = \\nabla \\Psi(x)",
+      "ref": "Eq. (6.4.4)",
+      "parameters": [
+        "x \\in \\mathbb{R}^n",
+        "k \\ge 1"
+      ]
+    },
+    {
+      "name": "Assumption_16b_bounded_variance",
+      "math": "\\mathbb{E}\\|G(x,\\xi_k)-\\nabla \\Psi(x)\\|^2 \\le \\sigma^2",
+      "ref": "Eq. (6.4.5)",
+      "parameters": [
+        "x \\in \\mathbb{R}^n",
+        "k \\ge 1",
+        "\\sigma^2"
+      ]
+    },
+    {
+      "name": "Part_a_Ck_condition",
+      "math": "C_k := 1 - L_\\Psi \\lambda_k - \\frac{L_\\Psi(\\lambda_k-\\beta_k)^2}{2\\alpha_k\\Gamma_k\\lambda_k}\\sum_{\\tau=k}^{N}\\Gamma_\\tau > 0 \\quad 1 \\le k \\le N",
+      "ref": "Eq. (6.4.12)",
+      "parameters": [
+        "\\alpha_k",
+        "\\beta_k",
+        "\\lambda_k",
+        "\\Gamma_k",
+        "C_k"
+      ]
+    },
+    {
+      "name": "Part_a_randomization_law",
+      "math": "p_k = \\frac{\\lambda_k C_k}{\\sum_{\\tau=1}^{N}\\lambda_\\tau C_\\tau}, \\quad k=1,\\ldots,N",
+      "ref": "Eq. (6.4.66)",
+      "parameters": [
+        "p_k",
+        "C_k"
+      ]
+    },
+    {
+      "name": "Convexity_and_solution",
+      "math": "\\Psi(\\cdot) \\text{ is convex and an optimal solution } x^* \\text{ exists for problem (6.4.1)}",
+      "ref": "Theorem 6.12(b), lines 22078-22079",
+      "parameters": [
+        "x^*"
+      ]
+    },
+    {
+      "name": "Part_b_stepsize_conditions",
+      "math": "\\frac{\\alpha_1}{\\lambda_1\\Gamma_1} \\ge \\frac{\\alpha_2}{\\lambda_2\\Gamma_2} \\ge \\ldots, \\quad \\alpha_k\\lambda_k \\le L_\\Psi\\beta_k^2, \\quad \\beta_k < 1/L_\\Psi",
+      "ref": "Eqs. (6.4.15), (6.4.68)",
+      "parameters": [
+        "\\alpha_k",
+        "\\beta_k",
+        "\\lambda_k",
+        "\\Gamma_k"
+      ]
+    },
+    {
+      "name": "Part_b_randomization_law",
+      "math": "p_k = \\frac{\\Gamma_k^{-1}\\beta_k(1-L_\\Psi\\beta_k)}{\\sum_{\\tau=1}^{N}\\Gamma_\\tau^{-1}\\beta_\\tau(1-L_\\Psi\\beta_\\tau)}",
+      "ref": "Eq. (6.4.69)",
+      "parameters": [
+        "p_k",
+        "\\Gamma_k",
+        "\\beta_k"
+      ]
+    }
+  ],
+  "algorithm_spec": {
+    "ref": "Algorithm 6.4",
+    "initialization": {
+      "math": "x_0 \\in \\mathbb{R}^n, \\; \\alpha_1 = 1, \\; \\alpha_k \\in (0,1) \\; (k\\ge2), \\; \\{\\beta_k>0\\}, \\; \\{\\lambda_k>0\\}, \\; N\\ge1, \\; \\operatorname{Prob}\\{R=k\\}=p_k, \\; \\bar{x}_0=x_0, \\; k=1",
+      "ref": "Algorithm 6.4 input and step 0"
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "Search point",
+        "math": "\\underline{x}_k = (1-\\alpha_k)\\bar{x}_{k-1}+\\alpha_k x_{k-1}",
+        "ref": "Eq. (6.4.8)"
+      },
+      {
+        "step": 2,
+        "name": "Stochastic gradient update",
+        "math": "x_k = x_{k-1}-\\lambda_k G(\\underline{x}_k,\\xi_k)",
+        "ref": "Eq. (6.4.64)"
+      },
+      {
+        "step": 3,
+        "name": "Averaged stochastic gradient update",
+        "math": "\\bar{x}_k = \\underline{x}_k-\\beta_k G(\\underline{x}_k,\\xi_k)",
+        "ref": "Eq. (6.4.65)"
+      },
+      {
+        "step": 4,
+        "name": "Randomized termination",
+        "math": "\\text{If } k=R, \\text{ terminate the algorithm. Otherwise, set } k=k+1 \\text{ and go to step 1.}",
+        "ref": "Algorithm 6.4 step 3"
+      }
+    ],
+    "output": {
+      "math": "(\\underline{x}_R,\\bar{x}_R)",
+      "ref": "Algorithm 6.4 and lines 22050-22054",
+      "type": "random_iterate_pair"
+    },
+    "parameters": [
+      {
+        "name": "\\Gamma_k",
+        "math": "\\Gamma_k := \\begin{cases}1, & k=1,\\\\ (1-\\alpha_k)\\Gamma_{k-1}, & k\\ge2,\\end{cases}",
+        "ref": "Eq. (6.4.11)"
+      }
+    ]
+  },
+  "main_theorem": {
+    "ref": "Theorem 6.12",
+    "statement_math": "\\text{Let } \\{x_k,\\bar{x}_k\\}_{k\\ge1} \\text{ be computed by Algorithm 6.4 and } \\Gamma_k \\text{ be defined in (6.4.11). Also suppose that Assumption 16 holds. (a) If } \\{\\alpha_k\\}, \\{\\beta_k\\}, \\{\\lambda_k\\}, \\text{ and } \\{p_k\\} \\text{ are chosen such that (6.4.12) holds and } p_k=\\frac{\\lambda_kC_k}{\\sum_{\\tau=1}^{N}\\lambda_\\tau C_\\tau}, \\; k=1,\\ldots,N, \\text{ where } C_k \\text{ is defined in (6.4.12), then for any } N\\ge1, \\text{ we have } \\mathbb{E}[\\|\\nabla\\Psi(\\underline{x}_R)\\|^2]\\le \\frac{1}{\\sum_{k=1}^{N}\\lambda_kC_k}\\left\\{\\Psi(x_0)-\\Psi^*+\\frac{L_\\Psi\\sigma^2}{2}\\sum_{k=1}^{N}\\lambda_k^2\\left(1+\\frac{(\\lambda_k-\\beta_k)^2}{\\alpha_k\\Gamma_k\\lambda_k^2}\\sum_{\\tau=k}^{N}\\Gamma_\\tau\\right)\\right\\}, \\text{ where the expectation is taken with respect to } R \\text{ and } \\xi_{[N]}:=(\\xi_1,\\ldots,\\xi_N). \\text{ (b) Suppose that } \\Psi(\\cdot) \\text{ is convex and that an optimal solution } x^* \\text{ exists for problem (6.4.1). If } \\{\\alpha_k\\}, \\{\\beta_k\\}, \\{\\lambda_k\\}, \\text{ and } \\{p_k\\} \\text{ are chosen such that (6.4.15) holds, } \\alpha_k\\lambda_k\\le L_\\Psi\\beta_k^2, \\; \\beta_k<1/L_\\Psi, \\text{ and } p_k=\\frac{\\Gamma_k^{-1}\\beta_k(1-L_\\Psi\\beta_k)}{\\sum_{\\tau=1}^{N}\\Gamma_\\tau^{-1}\\beta_\\tau(1-L_\\Psi\\beta_\\tau)} \\text{ for all } k=1,\\ldots,N, \\text{ then for any } N\\ge1, \\text{ we have } \\mathbb{E}[\\|\\nabla\\Psi(\\underline{x}_R)\\|^2]\\le \\frac{(2\\lambda_1)^{-1}\\|x_0-x^*\\|^2+L_\\Psi\\sigma^2\\sum_{k=1}^{N}\\Gamma_k^{-1}\\beta_k^2}{\\sum_{k=1}^{N}\\Gamma_k^{-1}\\beta_k(1-L_\\Psi\\beta_k)}, \\quad \\mathbb{E}[\\Psi(\\bar{x}_R)-\\Psi(x^*)]\\le \\frac{\\sum_{k=1}^{N}\\beta_k(1-L_\\Psi\\beta_k)\\left[(2\\lambda_1)^{-1}\\|x_0-x^*\\|^2+L_\\Psi\\sigma^2\\sum_{j=1}^{k}\\Gamma_j^{-1}\\beta_j^2\\right]}{\\sum_{k=1}^{N}\\Gamma_k^{-1}\\beta_k(1-L_\\Psi\\beta_k)}.",
+    "rate": "The theorem gives parameter-dependent expected squared-gradient and convex function-gap bounds; the surrounding text specializes these to the SFO complexity rates stated around (6.4.6) and Corollary 6.16.",
+    "measure": "expected squared gradient norm at the randomized search point, and in the convex case expected function gap at the randomized averaged point",
+    "proof": [
+      {
+        "step": 1,
+        "description": "Define the stochastic gradient error and the search-point gradient difference used throughout part (a).",
+        "ref": "Proof of Theorem 6.12, lines 22110-22111",
+        "source_pdf_lines": [
+          22110,
+          22111
+        ],
+        "math": "\\delta_k := G(\\underline{x}_k,\\xi_k)-\\nabla\\Psi(\\underline{x}_k), \\quad \\Delta_k := \\nabla\\Psi(x_{k-1})-\\nabla\\Psi(\\underline{x}_k)",
+        "uses": [
+          "RSAGD_update_identities"
+        ],
+        "produces": "Definitions of \\(\\delta_k\\) and \\(\\Delta_k\\)."
+      },
+      {
+        "step": 2,
+        "description": "Apply the smoothness upper model to the stochastic update, expand \\(G(\\underline{x}_k,\\xi_k)=\\nabla\\Psi(\\underline{x}_k)+\\delta_k\\), and use Cauchy-Schwarz on the \\(\\Delta_k\\) term.",
+        "ref": "Proof of Theorem 6.12, lines 22111-22122",
+        "source_pdf_lines": [
+          22111,
+          22122
+        ],
+        "math": "\\begin{aligned}\\Psi(x_k) &\\le \\Psi(x_{k-1}) + \\langle\\nabla\\Psi(x_{k-1}),x_k-x_{k-1}\\rangle + \\frac{L_\\Psi}{2}\\|x_k-x_{k-1}\\|^2 \\\\ &= \\Psi(x_{k-1})+\\langle\\Delta_k+\\nabla\\Psi(\\underline{x}_k),-\\lambda_k[\\nabla\\Psi(\\underline{x}_k)+\\delta_k]\\rangle+\\frac{L_\\Psi\\lambda_k^2}{2}\\|\\nabla\\Psi(\\underline{x}_k)+\\delta_k\\|^2 \\\\ &= \\Psi(x_{k-1})+\\langle\\Delta_k+\\nabla\\Psi(\\underline{x}_k),-\\lambda_k\\nabla\\Psi(\\underline{x}_k)\\rangle-\\lambda_k\\langle\\nabla\\Psi(x_{k-1}),\\delta_k\\rangle+\\frac{L_\\Psi\\lambda_k^2}{2}\\|\\nabla\\Psi(\\underline{x}_k)+\\delta_k\\|^2 \\\\ &\\le \\Psi(x_{k-1})-\\lambda_k\\left(1-\\frac{L_\\Psi\\lambda_k}{2}\\right)\\|\\nabla\\Psi(\\underline{x}_k)\\|^2+\\lambda_k\\|\\Delta_k\\|\\|\\nabla\\Psi(\\underline{x}_k)\\|+\\frac{L_\\Psi\\lambda_k^2}{2}\\|\\delta_k\\|^2 \\\\ &\\quad -\\lambda_k\\langle\\nabla\\Psi(x_{k-1})-L_\\Psi\\lambda_k\\nabla\\Psi(\\underline{x}_k),\\delta_k\\rangle.\\end{aligned}",
+        "uses": [
+          "Smoothness_upper_model",
+          "RSAGD_update_identities",
+          "previous_step:1"
+        ],
+        "produces": "First stochastic one-step descent inequality before bounding \\(\\Delta_k\\)."
+      },
+      {
+        "step": 3,
+        "description": "Use the deterministic gradient-difference bound (6.4.18) and then \\(ab\\le(a^2+b^2)/2\\) to separate the gradient norm from the acceleration gap.",
+        "ref": "Proof of Theorem 6.12, lines 22123-22136",
+        "source_pdf_lines": [
+          22123,
+          22136
+        ],
+        "math": "\\begin{aligned}\\Psi(x_k)&\\le \\Psi(x_{k-1})-\\lambda_k\\left(1-\\frac{L_\\Psi\\lambda_k}{2}\\right)\\|\\nabla\\Psi(\\underline{x}_k)\\|^2+\\lambda_kL_\\Psi(1-\\alpha_k)\\|\\bar{x}_{k-1}-x_{k-1}\\|\\|\\nabla\\Psi(\\underline{x}_k)\\| \\\\ &\\quad +\\frac{L_\\Psi\\lambda_k^2}{2}\\|\\delta_k\\|^2-\\lambda_k\\langle\\nabla\\Psi(x_{k-1})-L_\\Psi\\lambda_k\\nabla\\Psi(\\underline{x}_k),\\delta_k\\rangle \\\\ &\\le \\Psi(x_{k-1})-\\lambda_k(1-L_\\Psi\\lambda_k)\\|\\nabla\\Psi(\\underline{x}_k)\\|^2+\\frac{L_\\Psi(1-\\alpha_k)^2}{2}\\|\\bar{x}_{k-1}-x_{k-1}\\|^2 \\\\ &\\quad +\\frac{L_\\Psi\\lambda_k^2}{2}\\|\\delta_k\\|^2-\\lambda_k\\langle\\nabla\\Psi(x_{k-1})-L_\\Psi\\lambda_k\\nabla\\Psi(\\underline{x}_k),\\delta_k\\rangle.\\end{aligned}",
+        "uses": [
+          "Gradient_difference_bound",
+          "previous_step:2"
+        ],
+        "produces": "One-step descent with the acceleration gap \\(\\|\\bar{x}_{k-1}-x_{k-1}\\|^2\\)."
+      },
+      {
+        "step": 4,
+        "description": "Invoke the stochastic analogue of the deterministic acceleration-gap estimate (6.4.22). The PDF prints \\(\\delta_k\\) in the first norm and then expands with \\(\\delta_\\tau\\) in the equality; this step preserves that display and uses the expanded line downstream.",
+        "ref": "Proof of Theorem 6.12, lines 22138-22145",
+        "source_pdf_lines": [
+          22138,
+          22145
+        ],
+        "math": "\\begin{aligned}\\|\\bar{x}_{k-1}-x_{k-1}\\|^2 &\\le \\Gamma_{k-1}\\sum_{\\tau=1}^{k-1}\\frac{(\\lambda_\\tau-\\beta_\\tau)^2}{\\Gamma_\\tau\\alpha_\\tau}\\|\\nabla\\Psi(\\underline{x}_\\tau)+\\delta_k\\|^2 \\\\ &= \\Gamma_{k-1}\\sum_{\\tau=1}^{k-1}\\frac{(\\lambda_\\tau-\\beta_\\tau)^2}{\\Gamma_\\tau\\alpha_\\tau}\\left[\\|\\nabla\\Psi(\\underline{x}_\\tau)\\|^2+\\|\\delta_\\tau\\|^2+2\\langle\\nabla\\Psi(\\underline{x}_\\tau),\\delta_\\tau\\rangle\\right].\\end{aligned}",
+        "uses": [
+          "Stochastic_acceleration_gap_bound"
+        ],
+        "produces": "Printed acceleration-gap display; the expanded equality gives the weighted sum of gradient, noise, and cross terms used in step 5."
+      },
+      {
+        "step": 5,
+        "description": "Substitute the acceleration-gap bound into the one-step descent and use \\(\\Gamma_{k-1}(1-\\alpha_k)^2\\le\\Gamma_k\\).",
+        "ref": "Proof of Theorem 6.12, lines 22146-22154",
+        "source_pdf_lines": [
+          22146,
+          22154
+        ],
+        "math": "\\begin{aligned}\\Psi(x_k)&\\le \\Psi(x_{k-1})-\\lambda_k(1-L_\\Psi\\lambda_k)\\|\\nabla\\Psi(\\underline{x}_k)\\|^2+\\frac{L_\\Psi\\lambda_k^2}{2}\\|\\delta_k\\|^2 \\\\ &\\quad -\\lambda_k\\langle\\nabla\\Psi(x_{k-1})-L_\\Psi\\lambda_k\\nabla\\Psi(\\underline{x}_k),\\delta_k\\rangle \\\\ &\\quad +\\frac{L_\\Psi\\Gamma_k}{2}\\sum_{\\tau=1}^{k}\\frac{(\\lambda_\\tau-\\beta_\\tau)^2}{\\Gamma_\\tau\\alpha_\\tau}\\left[\\|\\nabla\\Psi(\\underline{x}_\\tau)\\|^2+\\|\\delta_\\tau\\|^2+2\\langle\\nabla\\Psi(\\underline{x}_\\tau),\\delta_\\tau\\rangle\\right].\\end{aligned}",
+        "uses": [
+          "previous_step:3",
+          "previous_step:4",
+          "Gamma_weight_identity",
+          "Algorithm_6_4_alpha_domain"
+        ],
+        "produces": "A one-step inequality ready to sum over \\(k=1,\\ldots,N\\)."
+      },
+      {
+        "step": 6,
+        "description": "Sum the one-step inequalities over \\(k=1,\\ldots,N\\), keeping the double sum and stochastic cross terms explicit.",
+        "ref": "Proof of Theorem 6.12, lines 22157-22165",
+        "source_pdf_lines": [
+          22157,
+          22165
+        ],
+        "math": "\\begin{aligned}\\Psi(x_N)&\\le \\Psi(x_0)-\\sum_{k=1}^{N}\\lambda_k(1-L_\\Psi\\lambda_k)\\|\\nabla\\Psi(\\underline{x}_k)\\|^2-\\sum_{k=1}^{N}\\lambda_k\\langle\\nabla\\Psi(x_{k-1})-L_\\Psi\\lambda_k\\nabla\\Psi(\\underline{x}_k),\\delta_k\\rangle \\\\ &\\quad +\\sum_{k=1}^{N}\\frac{L_\\Psi\\lambda_k^2}{2}\\|\\delta_k\\|^2+\\frac{L_\\Psi}{2}\\sum_{k=1}^{N}\\Gamma_k\\sum_{\\tau=1}^{k}\\frac{(\\lambda_\\tau-\\beta_\\tau)^2}{\\Gamma_\\tau\\alpha_\\tau}\\left[\\|\\nabla\\Psi(\\underline{x}_\\tau)\\|^2+\\|\\delta_\\tau\\|^2+2\\langle\\nabla\\Psi(\\underline{x}_\\tau),\\delta_\\tau\\rangle\\right].\\end{aligned}",
+        "uses": [
+          "previous_step:5"
+        ],
+        "produces": "Summed inequality before reindexing the double sum."
+      },
+      {
+        "step": 7,
+        "description": "Reindex the double sum, use the definition of \\(C_k\\), and collect all inner-product noise terms into \\(b_k\\).",
+        "ref": "Proof of Theorem 6.12, lines 22166-22178",
+        "source_pdf_lines": [
+          22166,
+          22178
+        ],
+        "math": "\\Psi(x_N) \\le \\Psi(x_0)-\\sum_{k=1}^{N}\\lambda_kC_k\\|\\nabla\\Psi(\\underline{x}_k)\\|^2+\\frac{L_\\Psi}{2}\\sum_{k=1}^{N}\\lambda_k^2\\left(1+\\frac{(\\lambda_k-\\beta_k)^2}{\\alpha_k\\Gamma_k\\lambda_k^2}\\sum_{\\tau=k}^{N}\\Gamma_\\tau\\right)\\|\\delta_k\\|^2-\\sum_{k=1}^{N}b_k",
+        "uses": [
+          "previous_step:6",
+          "Part_a_Ck_condition"
+        ],
+        "produces": "Summed descent inequality with coefficients \\(C_k\\) and martingale terms \\(b_k\\)."
+      },
+      {
+        "step": 8,
+        "description": "Record the residual term used for martingale cancellation.",
+        "ref": "Proof of Theorem 6.12, lines 22173-22178",
+        "source_pdf_lines": [
+          22173,
+          22178
+        ],
+        "math": "b_k=\\langle v_k,\\delta_k\\rangle, \\quad v_k=\\lambda_k\\nabla\\Psi(x_{k-1})-\\left[L_\\Psi\\lambda_k^2+\\frac{L_\\Psi(\\lambda_k-\\beta_k)^2}{\\alpha_k\\Gamma_k}\\left(\\sum_{\\tau=k}^{N}\\Gamma_\\tau\\right)\\right]\\nabla\\Psi(\\underline{x}_k)",
+        "uses": [
+          "previous_step:7"
+        ],
+        "produces": "Definition of \\(b_k\\) and \\(v_k\\), with \\(v_k\\) depending only on \\(\\xi_{[k-1]}\\)."
+      },
+      {
+        "step": 9,
+        "description": "Take expectation with respect to \\(\\xi_{[N]}\\); bounded variance controls \\(\\mathbb{E}\\|\\delta_k\\|^2\\), and the residuals vanish as martingale differences.",
+        "ref": "Proof of Theorem 6.12, lines 22178-22181",
+        "source_pdf_lines": [
+          22178,
+          22181
+        ],
+        "math": "\\mathbb{E}[b_k\\mid \\xi_{[k-1]}]=\\mathbb{E}[\\langle v_k,\\delta_k\\rangle\\mid \\xi_{[k-1]}]=\\langle v_k,\\mathbb{E}[\\delta_k\\mid \\xi_{[k-1]}]\\rangle=0",
+        "uses": [
+          "Assumption_16a_unbiased_oracle",
+          "Assumption_16b_bounded_variance",
+          "Martingale_difference_cancellation",
+          "previous_step:8"
+        ],
+        "produces": "Expectation removes \\(\\sum_k b_k\\) and bounds \\(\\mathbb{E}\\|\\delta_k\\|^2\\le\\sigma^2\\)."
+      },
+      {
+        "step": 10,
+        "description": "Obtain the expected weighted gradient bound after the martingale cancellation.",
+        "ref": "Proof of Theorem 6.12, lines 22183-22188",
+        "source_pdf_lines": [
+          22183,
+          22188
+        ],
+        "math": "\\sum_{k=1}^{N}\\lambda_kC_k\\mathbb{E}_{\\xi_{[N]}}[\\|\\nabla\\Psi(\\underline{x}_k)\\|^2]\\le \\Psi(x_0)-\\mathbb{E}_{\\xi_{[N]}}[\\Psi(x_N)]+\\frac{L_\\Psi\\sigma^2}{2}\\sum_{k=1}^{N}\\lambda_k^2\\left(1+\\frac{(\\lambda_k-\\beta_k)^2}{\\alpha_k\\Gamma_k\\lambda_k^2}\\sum_{\\tau=k}^{N}\\Gamma_\\tau\\right)",
+        "uses": [
+          "previous_step:7",
+          "previous_step:9"
+        ],
+        "produces": "Expected weighted sum inequality for part (a)."
+      },
+      {
+        "step": 11,
+        "description": "Divide by \\(\\sum_k\\lambda_kC_k\\), use \\(\\Psi(x_N)\\ge\\Psi^*\\), and use the part (a) randomization law to identify the randomized gradient expectation.",
+        "ref": "Proof of Theorem 6.12, lines 22191-22205",
+        "source_pdf_lines": [
+          22191,
+          22205
+        ],
+        "math": "\\mathbb{E}[\\|\\nabla\\Psi(\\underline{x}_R)\\|^2]=\\mathbb{E}_{R,\\xi_{[N]}}[\\|\\nabla\\Psi(\\underline{x}_R)\\|^2]=\\frac{\\sum_{k=1}^{N}\\lambda_kC_k\\mathbb{E}_{\\xi_{[N]}}[\\|\\nabla\\Psi(\\underline{x}_k)\\|^2]}{\\sum_{k=1}^{N}\\lambda_kC_k}",
+        "uses": [
+          "Problem_bounded_below",
+          "Part_a_randomization_law",
+          "previous_step:10"
+        ],
+        "produces": "Theorem 6.12(a), equation (6.4.67)."
+      },
+      {
+        "step": 12,
+        "description": "For part (b), apply the smoothness model to \\(\\bar{x}_k\\), substitute the stochastic averaged update, and use convexity linearization at the search point.",
+        "ref": "Eq. (6.4.72), lines 22206-22213",
+        "source_pdf_lines": [
+          22206,
+          22213
+        ],
+        "math": "\\begin{aligned}\\Psi(\\bar{x}_k)&\\le \\Psi(\\underline{x}_k)+\\langle\\nabla\\Psi(\\underline{x}_k),\\bar{x}_k-\\underline{x}_k\\rangle+\\frac{L_\\Psi}{2}\\|\\bar{x}_k-\\underline{x}_k\\|^2 \\\\ &= \\Psi(\\underline{x}_k)-\\beta_k\\|\\nabla\\Psi(\\underline{x}_k)\\|^2+\\beta_k\\langle\\nabla\\Psi(\\underline{x}_k),\\delta_k\\rangle+\\frac{L_\\Psi\\beta_k^2}{2}\\|\\nabla\\Psi(\\underline{x}_k)+\\delta_k\\|^2 \\\\ &\\le (1-\\alpha_k)\\Psi(\\bar{x}_{k-1})+\\alpha_k\\Psi(x)+\\alpha_k\\langle\\nabla\\Psi(\\underline{x}_k),x_{k-1}-x\\rangle \\\\ &\\quad -\\beta_k\\|\\nabla\\Psi(\\underline{x}_k)\\|^2+\\beta_k\\langle\\nabla\\Psi(\\underline{x}_k),\\delta_k\\rangle+\\frac{L_\\Psi\\beta_k^2}{2}\\|\\nabla\\Psi(\\underline{x}_k)+\\delta_k\\|^2.\\end{aligned}",
+        "uses": [
+          "Smoothness_upper_model",
+          "RSAGD_update_identities",
+          "Proof_local_error_definitions",
+          "Convexity_and_solution",
+          "Convex_search_point_linearization"
+        ],
+        "produces": "Equation (6.4.72)."
+      },
+      {
+        "step": 13,
+        "description": "Use the stochastic analogue of the Euclidean three-point identity, with the stochastic gradient in the update.",
+        "ref": "Proof of Theorem 6.12, lines 22215-22218",
+        "source_pdf_lines": [
+          22215,
+          22218
+        ],
+        "math": "\\alpha_k\\langle\\nabla\\Psi(\\underline{x}_k)+\\delta_k,x_{k-1}-x\\rangle=\\frac{\\alpha_k}{2\\lambda_k}\\left[\\|x_{k-1}-x\\|^2-\\|x_k-x\\|^2\\right]+\\frac{\\alpha_k\\lambda_k}{2}\\|\\nabla\\Psi(\\underline{x}_k)+\\delta_k\\|^2",
+        "uses": [
+          "Stochastic_three_point_identity"
+        ],
+        "produces": "Three-point identity for the stochastic update."
+      },
+      {
+        "step": 14,
+        "description": "Expand the squared stochastic gradient norm into gradient, noise, and cross terms.",
+        "ref": "Proof of Theorem 6.12, lines 22219-22222",
+        "source_pdf_lines": [
+          22219,
+          22222
+        ],
+        "math": "\\|\\nabla\\Psi(\\underline{x}_k)+\\delta_k\\|^2=\\|\\nabla\\Psi(\\underline{x}_k)\\|^2+\\|\\delta_k\\|^2+2\\langle\\nabla\\Psi(\\underline{x}_k),\\delta_k\\rangle",
+        "uses": [
+          "Squared_norm_expansion"
+        ],
+        "produces": "Expansion used to collect gradient, noise, and martingale terms."
+      },
+      {
+        "step": 15,
+        "description": "Combine (6.4.72), the stochastic three-point identity, and the norm expansion to isolate the deterministic gradient coefficient, the noise coefficient, and a residual inner product.",
+        "ref": "Proof of Theorem 6.12, lines 22224-22233",
+        "source_pdf_lines": [
+          22224,
+          22233
+        ],
+        "math": "\\begin{aligned}\\Psi(\\bar{x}_k)&\\le (1-\\alpha_k)\\Psi(\\bar{x}_{k-1})+\\alpha_k\\Psi(x)+\\frac{\\alpha_k}{2\\lambda_k}\\left[\\|x_{k-1}-x\\|^2-\\|x_k-x\\|^2\\right] \\\\ &\\quad -\\beta_k\\left(1-\\frac{L_\\Psi\\beta_k}{2}-\\frac{\\alpha_k\\lambda_k}{2\\beta_k}\\right)\\|\\nabla\\Psi(\\underline{x}_k)\\|^2+\\frac{L_\\Psi\\beta_k^2+\\alpha_k\\lambda_k}{2}\\|\\delta_k\\|^2 \\\\ &\\quad +\\left\\langle\\delta_k,(\\beta_k+L_\\Psi\\beta_k^2+\\alpha_k\\lambda_k)\\nabla\\Psi(\\underline{x}_k)+\\alpha_k(x-x_{k-1})\\right\\rangle.\\end{aligned}",
+        "uses": [
+          "previous_step:12",
+          "previous_step:13",
+          "previous_step:14"
+        ],
+        "produces": "One-step convex-case stochastic inequality before applying Lemma 3.17."
+      },
+      {
+        "step": 16,
+        "description": "Subtract \\(\\Psi(x)\\) from both sides of the one-step inequality and form the affine recursion to which Lemma 3.17 will be applied.",
+        "ref": "Proof of Theorem 6.12, lines 22235-22236",
+        "source_pdf_lines": [
+          22235,
+          22236
+        ],
+        "uses": [
+          "previous_step:15"
+        ],
+        "produces": "Derived recursion for \\(D_k:=\\Psi(\\bar{x}_k)-\\Psi(x)\\): \\(D_k\\le(1-\\alpha_k)D_{k-1}+B_k\\), where \\(B_k:=\\frac{\\alpha_k}{2\\lambda_k}[\\|x_{k-1}-x\\|^2-\\|x_k-x\\|^2]-\\beta_k\\left(1-\\frac{L_\\Psi\\beta_k}{2}-\\frac{\\alpha_k\\lambda_k}{2\\beta_k}\\right)\\|\\nabla\\Psi(\\underline{x}_k)\\|^2+\\frac{L_\\Psi\\beta_k^2+\\alpha_k\\lambda_k}{2}\\|\\delta_k\\|^2+\\left\\langle\\delta_k,(\\beta_k+L_\\Psi\\beta_k^2+\\alpha_k\\lambda_k)\\nabla\\Psi(\\underline{x}_k)+\\alpha_k(x-x_{k-1})\\right\\rangle\\)."
+      },
+      {
+        "step": 17,
+        "description": "Instantiate Lemma 3.17 with \\(w_k=\\alpha_k\\), \\(W_k=\\Gamma_k\\), the lemma's recursion sequence \\(\\delta_k\\) instantiated as \\(D_k\\), and \\(B_k\\) equal to the explicit distance-difference, gradient, noise, and inner-product residual expression from previous_step:16.",
+        "ref": "Proof of Theorem 6.12, lines 22235-22236; Lemma 3.17",
+        "source_pdf_lines": [
+          22235,
+          22236
+        ],
+        "uses": [
+          "Lemma_3_17",
+          "Algorithm_6_4_alpha_domain",
+          "Gamma_weight_identity",
+          "previous_step:16"
+        ],
+        "produces": "The hypotheses of Lemma 3.17 hold with \\(w_k=\\alpha_k\\) and \\(W_k=\\Gamma_k\\): \\(w_k\\in(0,1]\\) follows from Algorithm 6.4, while \\(W_1=\\Gamma_1=1\\), \\(W_k=(1-w_k)W_{k-1}\\), and \\(W_k>0\\) are supplied by Gamma_weight_identity. Lemma 3.17 first yields \\(D_N\\le \\Gamma_N(1-\\alpha_1)D_0+\\Gamma_N\\sum_{k=1}^N B_k/\\Gamma_k\\). After dividing by \\(\\Gamma_N\\), the derived weighted inequality before applying (6.4.30) is \\(\\frac{\\Psi(\\bar{x}_N)-\\Psi(x)}{\\Gamma_N}\\le (1-\\alpha_1)(\\Psi(\\bar{x}_0)-\\Psi(x))+\\sum_{k=1}^N\\frac{\\alpha_k}{2\\lambda_k\\Gamma_k}[\\|x_{k-1}-x\\|^2-\\|x_k-x\\|^2]-\\sum_{k=1}^N\\frac{\\beta_k}{\\Gamma_k}\\left(1-\\frac{L_\\Psi\\beta_k}{2}-\\frac{\\alpha_k\\lambda_k}{2\\beta_k}\\right)\\|\\nabla\\Psi(\\underline{x}_k)\\|^2+\\sum_{k=1}^N\\frac{L_\\Psi\\beta_k^2+\\alpha_k\\lambda_k}{2\\Gamma_k}\\|\\delta_k\\|^2+\\sum_{k=1}^N\\Gamma_k^{-1}\\left\\langle\\delta_k,(\\beta_k+L_\\Psi\\beta_k^2+\\alpha_k\\lambda_k)\\nabla\\Psi(\\underline{x}_k)+\\alpha_k(x-x_{k-1})\\right\\rangle\\). The boundary term \\(\\Gamma_N(1-\\alpha_1)D_0\\) vanishes because \\(\\alpha_1=1\\)."
+      },
+      {
+        "step": 18,
+        "description": "Apply the deterministic distance telescope bound (6.4.30), using \\(\\alpha_1=\\Gamma_1=1\\), to replace the weighted distance-difference sum by \\(\\|x_0-x\\|^2/(2\\lambda_1)\\).",
+        "ref": "Proof of Theorem 6.12, lines 22235-22245; Eq. (6.4.30)",
+        "source_pdf_lines": [
+          22235,
+          22245
+        ],
+        "math": "\\frac{\\Psi(\\bar{x}_N)-\\Psi(x)}{\\Gamma_N}\\le \\frac{\\|x_0-x\\|^2}{2\\lambda_1}-\\sum_{k=1}^{N}\\frac{\\beta_k}{2\\Gamma_k}\\left(2-L_\\Psi\\beta_k-\\frac{\\alpha_k\\lambda_k}{\\beta_k}\\right)\\|\\nabla\\Psi(\\underline{x}_k)\\|^2+\\sum_{k=1}^{N}\\frac{L_\\Psi\\beta_k^2+\\alpha_k\\lambda_k}{2\\Gamma_k}\\|\\delta_k\\|^2+\\sum_{k=1}^{N}b'_k \\quad \\forall x\\in\\mathbb{R}^n",
+        "uses": [
+          "Distance_telescope_bound",
+          "previous_step:17"
+        ],
+        "produces": "Printed weighted recursion bound with residuals \\(b'_k\\)."
+      },
+      {
+        "step": 19,
+        "description": "Record the convex-case residual term introduced by the preceding displayed inequality.",
+        "ref": "Proof of Theorem 6.12, lines 22246-22247",
+        "source_pdf_lines": [
+          22246,
+          22247
+        ],
+        "math": "b'_k=\\Gamma_k^{-1}\\left\\langle\\delta_k,(\\beta_k+L_\\Psi\\beta_k^2+\\alpha_k\\lambda_k)\\nabla\\Psi(\\underline{x}_k)+\\alpha_k(x-x_{k-1})\\right\\rangle",
+        "uses": [
+          "previous_step:18"
+        ],
+        "produces": "Definition of \\(b'_k\\) as a martingale-difference residual."
+      },
+      {
+        "step": 20,
+        "description": "Use the first relation in (6.4.68) to simplify the gradient coefficient and the noise coefficient.",
+        "ref": "Proof of Theorem 6.12, lines 22247-22252",
+        "source_pdf_lines": [
+          22247,
+          22252
+        ],
+        "math": "\\frac{\\Psi(\\bar{x}_N)-\\Psi(x)}{\\Gamma_N}\\le \\frac{\\|x_0-x\\|^2}{2\\lambda_1}-\\sum_{k=1}^{N}\\frac{\\beta_k}{\\Gamma_k}(1-L_\\Psi\\beta_k)\\|\\nabla\\Psi(\\underline{x}_k)\\|^2+\\sum_{k=1}^{N}\\frac{L_\\Psi\\beta_k^2}{\\Gamma_k}\\|\\delta_k\\|^2+\\sum_{k=1}^{N}b'_k \\quad \\forall x\\in\\mathbb{R}^n",
+        "uses": [
+          "Part_b_stepsize_conditions",
+          "previous_step:18",
+          "previous_step:19"
+        ],
+        "produces": "Simplified convex-case deterministic/noise recursion."
+      },
+      {
+        "step": 21,
+        "description": "Take expectation with respect to \\(\\xi_{[N]}\\), use bounded variance, and cancel \\(b'_k\\) by the same martingale argument as in part (a).",
+        "ref": "Eq. (6.4.73), lines 22255-22264",
+        "source_pdf_lines": [
+          22255,
+          22264
+        ],
+        "math": "\\frac{1}{\\Gamma_N}\\mathbb{E}_{\\xi_{[N]}}[\\Psi(\\bar{x}_N)-\\Psi(x)]\\le \\frac{\\|x_0-x\\|^2}{2\\lambda_1}-\\sum_{k=1}^{N}\\frac{\\beta_k}{\\Gamma_k}(1-L_\\Psi\\beta_k)\\mathbb{E}_{\\xi_{[N]}}[\\|\\nabla\\Psi(\\underline{x}_k)\\|^2]+\\sigma^2\\sum_{k=1}^{N}\\frac{L_\\Psi\\beta_k^2}{\\Gamma_k}",
+        "uses": [
+          "Assumption_16a_unbiased_oracle",
+          "Assumption_16b_bounded_variance",
+          "Martingale_difference_cancellation",
+          "previous_step:19",
+          "previous_step:20"
+        ],
+        "produces": "Equation (6.4.73)."
+      },
+      {
+        "step": 22,
+        "description": "Fix \\(x=x^*\\) and use \\(\\Psi(\\bar{x}_N)\\ge\\Psi(x^*)\\) to bound the weighted sum of expected squared gradients.",
+        "ref": "Proof of Theorem 6.12, lines 22268-22272",
+        "source_pdf_lines": [
+          22268,
+          22272
+        ],
+        "math": "\\sum_{k=1}^{N}\\frac{\\beta_k}{\\Gamma_k}(1-L_\\Psi\\beta_k)\\mathbb{E}_{\\xi_{[N]}}[\\|\\nabla\\Psi(\\underline{x}_k)\\|^2]\\le \\frac{\\|x_0-x^*\\|^2}{2\\lambda_1}+\\sigma^2\\sum_{k=1}^{N}\\frac{L_\\Psi\\beta_k^2}{\\Gamma_k}",
+        "uses": [
+          "Convexity_and_solution",
+          "previous_step:21"
+        ],
+        "produces": "Weighted gradient sum bound for part (b)."
+      },
+      {
+        "step": 23,
+        "description": "Use the part (b) randomization law to convert the weighted sum bound into the randomized gradient bound.",
+        "ref": "Theorem 6.12(b), Eq. (6.4.70), lines 22275-22276",
+        "source_pdf_lines": [
+          22275,
+          22276
+        ],
+        "math": "\\mathbb{E}[\\|\\nabla\\Psi(\\underline{x}_R)\\|^2]\\le \\frac{(2\\lambda_1)^{-1}\\|x_0-x^*\\|^2+L_\\Psi\\sigma^2\\sum_{k=1}^{N}\\Gamma_k^{-1}\\beta_k^2}{\\sum_{k=1}^{N}\\Gamma_k^{-1}\\beta_k(1-L_\\Psi\\beta_k)}",
+        "uses": [
+          "Part_b_randomization_law",
+          "previous_step:22"
+        ],
+        "produces": "Theorem 6.12(b) gradient bound, equation (6.4.70)."
+      },
+      {
+        "step": 24,
+        "description": "Use (6.4.73) and \\(\\beta_k<1/L_\\Psi\\) to get the expected function-gap bound for any terminal index \\(N\\).",
+        "ref": "Proof of Theorem 6.12, lines 22276-22282",
+        "source_pdf_lines": [
+          22276,
+          22282
+        ],
+        "math": "\\mathbb{E}_{\\xi_{[N]}}[\\Psi(\\bar{x}_N)-\\Psi(x^*)]\\le \\Gamma_N\\left(\\frac{\\|x_0-x^*\\|^2}{2\\lambda_1}+\\sigma^2\\sum_{k=1}^{N}\\frac{L_\\Psi\\beta_k^2}{\\Gamma_k}\\right)",
+        "uses": [
+          "Convexity_and_solution",
+          "Part_b_stepsize_conditions",
+          "previous_step:21",
+          "previous_step:22"
+        ],
+        "produces": "Terminal expected function-gap bound indexed by \\(N\\)."
+      },
+      {
+        "step": 25,
+        "description": "Average the terminal function-gap bound over the randomized output distribution (6.4.69) to obtain (6.4.71).",
+        "ref": "Proof of Theorem 6.12, lines 22285-22298",
+        "source_pdf_lines": [
+          22285,
+          22298
+        ],
+        "math": "\\mathbb{E}[\\Psi(\\bar{x}_R)-\\Psi(x^*)]=\\sum_{k=1}^{N}\\frac{\\Gamma_k^{-1}\\beta_k(1-L_\\Psi\\beta_k)}{\\sum_{\\tau=1}^{N}\\Gamma_\\tau^{-1}\\beta_\\tau(1-L_\\Psi\\beta_\\tau)}\\mathbb{E}_{\\xi_{[N]}}[\\Psi(\\bar{x}_k)-\\Psi(x^*)]\\le \\frac{\\sum_{k=1}^{N}\\beta_k(1-L_\\Psi\\beta_k)\\left[(2\\lambda_1)^{-1}\\|x_0-x^*\\|^2+L_\\Psi\\sigma^2\\sum_{j=1}^{k}\\Gamma_j^{-1}\\beta_j^2\\right]}{\\sum_{k=1}^{N}\\Gamma_k^{-1}\\beta_k(1-L_\\Psi\\beta_k)}",
+        "uses": [
+          "Part_b_randomization_law",
+          "previous_step:24"
+        ],
+        "produces": "Theorem 6.12(b) function-gap bound, equation (6.4.71)."
+      }
+    ]
+  },
+  "key_lemmas": [
+    {
+      "name": "RSAGD_update_identities",
+      "ref": "Algorithm 6.4; Eqs. (6.4.8), (6.4.64), (6.4.65)",
+      "statement_math": "\\underline{x}_k=(1-\\alpha_k)\\bar{x}_{k-1}+\\alpha_kx_{k-1}, \\quad x_k=x_{k-1}-\\lambda_kG(\\underline{x}_k,\\xi_k), \\quad \\bar{x}_k=\\underline{x}_k-\\beta_kG(\\underline{x}_k,\\xi_k)",
+      "role": "Provides the three update identities repeatedly substituted in the proof of Theorem 6.12.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "These identities are the printed update rules of Algorithm 6.4.",
+          "ref": "Algorithm 6.4, lines 22028-22041",
+          "source_pdf_lines": [
+            22028,
+            22041
+          ],
+          "uses": [],
+          "produces": "RSAGD update identities."
+        }
+      ]
+    },
+    {
+      "name": "Algorithm_6_4_alpha_domain",
+      "ref": "Algorithm 6.4 input, line 22029",
+      "statement_math": "\\alpha_1 = 1, \\quad \\alpha_k \\in (0,1) \\; (k\\ge2)",
+      "role": "Provides the Algorithm 6.4 input-domain facts used to justify \\(\\Gamma_{k-1}(1-\\alpha_k)^2\\le\\Gamma_k\\) and to remove the Lemma 3.17 boundary term.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "These are the printed input conditions on the acceleration weights in Algorithm 6.4.",
+          "ref": "Algorithm 6.4 input, line 22029",
+          "source_pdf_lines": [
+            22029,
+            22029
+          ],
+          "math": "\\alpha_1 = 1, \\quad \\alpha_k \\in (0,1) \\; (k\\ge2)",
+          "uses": [],
+          "produces": "\\(\\alpha_1=1\\) and \\(0<\\alpha_k<1\\) for \\(k\\ge2\\)."
+        }
+      ]
+    },
+    {
+      "name": "Gamma_weight_identity",
+      "ref": "Eqs. (6.4.11), (6.4.21)",
+      "statement_math": "\\Gamma_k := \\begin{cases}1, & k=1,\\\\ (1-\\alpha_k)\\Gamma_{k-1}, & k\\ge2,\\end{cases} \\quad \\sum_{\\tau=1}^{k}\\frac{\\alpha_\\tau}{\\Gamma_\\tau}=\\frac{1}{\\Gamma_k}",
+      "role": "Normalizes the Jensen weights in the acceleration-gap estimate and supports the weighted telescoping arguments.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Record the definition of \\(\\Gamma_k\\) from (6.4.11) together with the Algorithm 6.4 input-domain facts for \\(\\alpha_k\\). These give \\(\\Gamma_1=1\\), \\(\\Gamma_k=(1-\\alpha_k)\\Gamma_{k-1}\\) for \\(k\\ge2\\), and \\(\\Gamma_k>0\\) for the weight sequence used in Lemma 3.17 and Jensen's inequality.",
+          "ref": "Eq. (6.4.11), lines 21331-21335; Algorithm 6.4 input, line 22029",
+          "source_pdf_lines": [
+            21331,
+            21335
+          ],
+          "math": "\\Gamma_k := \\begin{cases}1, & k=1,\\\\ (1-\\alpha_k)\\Gamma_{k-1}, & k\\ge2,\\end{cases}",
+          "uses": [
+            "Algorithm_6_4_alpha_domain"
+          ],
+          "produces": "\\(\\Gamma_1=1\\), \\(\\Gamma_k=(1-\\alpha_k)\\Gamma_{k-1}\\) for \\(k\\ge2\\), \\(\\Gamma_k>0\\), and the recurrence prerequisites for instantiating Lemma 3.17 with \\(W_k=\\Gamma_k\\)."
+        },
+        {
+          "step": 2,
+          "description": "Use the recurrence for \\(\\Gamma_k\\) to rewrite \\(\\alpha_\\tau/\\Gamma_\\tau\\) as the difference of reciprocal weights, substitute \\(\\alpha_1=1\\) and \\(\\Gamma_1=1\\), and telescope.",
+          "ref": "Eq. (6.4.21), lines 21410-21417",
+          "source_pdf_lines": [
+            21410,
+            21417
+          ],
+          "math": "\\sum_{\\tau=1}^{k}\\frac{\\alpha_\\tau}{\\Gamma_\\tau}=\\frac{\\alpha_1}{\\Gamma_1}+\\sum_{\\tau=2}^{k}\\frac{1}{\\Gamma_\\tau}\\left(1-\\frac{\\Gamma_\\tau}{\\Gamma_{\\tau-1}}\\right)=\\frac{1}{\\Gamma_1}+\\sum_{\\tau=2}^{k}\\left(\\frac{1}{\\Gamma_\\tau}-\\frac{1}{\\Gamma_{\\tau-1}}\\right)=\\frac{1}{\\Gamma_k}",
+          "uses": [
+            "Algorithm_6_4_alpha_domain",
+            "previous_step:1"
+          ],
+          "produces": "The reciprocal weight identity (6.4.21), plus the derived normalized Jensen weights \\(\\Gamma_k\\alpha_\\tau/\\Gamma_\\tau\\ge0\\) whose sum over \\(\\tau=1,\\ldots,k\\) is one."
+        }
+      ]
+    },
+    {
+      "name": "Gradient_difference_bound",
+      "ref": "Eq. (6.4.18)",
+      "statement_math": "\\|\\Delta_k\\|=\\|\\nabla\\Psi(x_{k-1})-\\nabla\\Psi(\\underline{x}_k)\\|\\le L_\\Psi\\|x_{k-1}-\\underline{x}_k\\|=L_\\Psi(1-\\alpha_k)\\|\\bar{x}_{k-1}-x_{k-1}\\|",
+      "role": "Bounds the gradient-difference term in the part (a) one-step descent inequality.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Apply Lipschitz continuity of the gradient to \\((x_{k-1},\\underline{x}_k)\\), then use the search-point identity (6.4.8).",
+          "ref": "Eq. (6.4.18), lines 21368-21372",
+          "source_pdf_lines": [
+            21368,
+            21372
+          ],
+          "math": "\\|\\Delta_k\\|=\\|\\nabla\\Psi(x_{k-1})-\\nabla\\Psi(\\underline{x}_k)\\|\\le L_\\Psi\\|x_{k-1}-\\underline{x}_k\\|=L_\\Psi(1-\\alpha_k)\\|\\bar{x}_{k-1}-x_{k-1}\\|",
+          "uses": [
+            "Lipschitz_gradients",
+            "RSAGD_update_identities"
+          ],
+          "produces": "Equation (6.4.18)."
+        }
+      ]
+    },
+    {
+      "name": "Proof_local_error_definitions",
+      "ref": "Proof of Theorem 6.12, lines 22110-22111",
+      "statement_math": "\\delta_k := G(\\underline{x}_k,\\xi_k)-\\nabla\\Psi(\\underline{x}_k), \\quad \\Delta_k := \\nabla\\Psi(x_{k-1})-\\nabla\\Psi(\\underline{x}_k)",
+      "role": "Records the proof-local stochastic error and search-gradient difference definitions used in Theorem 6.12.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "The proof explicitly introduces these two notations before applying (6.4.7) and (6.4.64).",
+          "ref": "Proof of Theorem 6.12, lines 22110-22111",
+          "source_pdf_lines": [
+            22110,
+            22111
+          ],
+          "math": "\\delta_k := G(\\underline{x}_k,\\xi_k)-\\nabla\\Psi(\\underline{x}_k), \\quad \\Delta_k := \\nabla\\Psi(x_{k-1})-\\nabla\\Psi(\\underline{x}_k)",
+          "uses": [],
+          "produces": "Definitions of \\(\\delta_k\\) and \\(\\Delta_k\\)."
+        }
+      ]
+    },
+    {
+      "name": "Stochastic_acceleration_gap_bound",
+      "ref": "Proof of Theorem 6.12, lines 22138-22145; deterministic template Eq. (6.4.22)",
+      "statement_math": "\\begin{aligned}\\|\\bar{x}_{k-1}-x_{k-1}\\|^2 &\\le \\Gamma_{k-1}\\sum_{\\tau=1}^{k-1}\\frac{(\\lambda_\\tau-\\beta_\\tau)^2}{\\Gamma_\\tau\\alpha_\\tau}\\|\\nabla\\Psi(\\underline{x}_\\tau)+\\delta_k\\|^2 \\\\ &= \\Gamma_{k-1}\\sum_{\\tau=1}^{k-1}\\frac{(\\lambda_\\tau-\\beta_\\tau)^2}{\\Gamma_\\tau\\alpha_\\tau}\\left[\\|\\nabla\\Psi(\\underline{x}_\\tau)\\|^2+\\|\\delta_\\tau\\|^2+2\\langle\\nabla\\Psi(\\underline{x}_\\tau),\\delta_\\tau\\rangle\\right].\\end{aligned}",
+      "role": "Controls the acceleration gap in part (a) after stochastic gradients replace exact gradients.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Subtract the two stochastic update equations to get the stochastic analogue of the deterministic recursion printed at lines 21402-21403. The stochastic recursion is derived here from Algorithm 6.4 and the proof-local definition of \\(\\delta_k\\), not printed in this deterministic template window.",
+          "ref": "Algorithm 6.4 and Eq. (6.4.22) deterministic template, lines 21400-21408",
+          "source_pdf_lines": [
+            21400,
+            21408
+          ],
+          "uses": [
+            "RSAGD_update_identities",
+            "Proof_local_error_definitions"
+          ],
+          "produces": "Derived stochastic acceleration-gap recursion: \\(\\bar{x}_k-x_k=(1-\\alpha_k)(\\bar{x}_{k-1}-x_{k-1})+(\\lambda_k-\\beta_k)(\\nabla\\Psi(\\underline{x}_k)+\\delta_k)\\)."
+        },
+        {
+          "step": 2,
+          "description": "Divide the derived stochastic recursion by \\(\\Gamma_k\\) and sum the resulting identity, following the deterministic transition printed immediately before (6.4.21).",
+          "ref": "Eq. (6.4.22) deterministic template, lines 21402-21408",
+          "source_pdf_lines": [
+            21402,
+            21408
+          ],
+          "uses": [
+            "Gamma_weight_identity",
+            "previous_step:1"
+          ],
+          "produces": "Derived divided/summed stochastic identity: \\(\\bar{x}_k-x_k=\\Gamma_k\\sum_{\\tau=1}^{k}\\frac{\\lambda_\\tau-\\beta_\\tau}{\\Gamma_\\tau}(\\nabla\\Psi(\\underline{x}_\\tau)+\\delta_\\tau)\\)."
+        },
+        {
+          "step": 3,
+          "description": "Apply Jensen's inequality to the divided/summed stochastic identity using the normalized weights from (6.4.21), following the deterministic proof of (6.4.22).",
+          "ref": "Eqs. (6.4.21)-(6.4.22) and Theorem 6.12 lines 22138-22145",
+          "source_pdf_lines": [
+            21410,
+            21426
+          ],
+          "uses": [
+            "Gamma_weight_identity",
+            "Algorithm_6_4_alpha_domain",
+            "previous_step:2"
+          ],
+          "produces": "Derived Jensen stochastic analogue of (6.4.22): \\(\\|\\bar{x}_k-x_k\\|^2\\le\\Gamma_k\\sum_{\\tau=1}^{k}\\frac{(\\lambda_\\tau-\\beta_\\tau)^2}{\\Gamma_\\tau\\alpha_\\tau}\\|\\nabla\\Psi(\\underline{x}_\\tau)+\\delta_\\tau\\|^2\\). The Jensen application uses \\(\\Gamma_k\\alpha_\\tau/\\Gamma_\\tau\\ge0\\) and \\(\\sum_{\\tau=1}^k\\Gamma_k\\alpha_\\tau/\\Gamma_\\tau=1\\), supplied by Gamma_weight_identity from (6.4.21) and Algorithm 6.4's \\(\\alpha\\)-domain."
+        },
+        {
+          "step": 4,
+          "description": "Record the two-line acceleration-gap display as printed in Theorem 6.12. The first line contains \\(\\delta_k\\), while the equality line expands with \\(\\delta_\\tau\\); the expanded equality is the source expression used later.",
+          "ref": "Proof of Theorem 6.12, lines 22138-22145",
+          "source_pdf_lines": [
+            22138,
+            22145
+          ],
+          "math": "\\begin{aligned}\\|\\bar{x}_{k-1}-x_{k-1}\\|^2 &\\le \\Gamma_{k-1}\\sum_{\\tau=1}^{k-1}\\frac{(\\lambda_\\tau-\\beta_\\tau)^2}{\\Gamma_\\tau\\alpha_\\tau}\\|\\nabla\\Psi(\\underline{x}_\\tau)+\\delta_k\\|^2 \\\\ &= \\Gamma_{k-1}\\sum_{\\tau=1}^{k-1}\\frac{(\\lambda_\\tau-\\beta_\\tau)^2}{\\Gamma_\\tau\\alpha_\\tau}\\left[\\|\\nabla\\Psi(\\underline{x}_\\tau)\\|^2+\\|\\delta_\\tau\\|^2+2\\langle\\nabla\\Psi(\\underline{x}_\\tau),\\delta_\\tau\\rangle\\right].\\end{aligned}",
+          "uses": [
+            "Squared_norm_expansion",
+            "previous_step:3"
+          ],
+          "produces": "Printed acceleration-gap display; downstream steps use the bracketed expanded equality."
+        }
+      ]
+    },
+    {
+      "name": "Convex_search_point_linearization",
+      "ref": "Eq. (6.4.26)",
+      "statement_math": "\\Psi(\\underline{x}_k)-[(1-\\alpha_k)\\Psi(\\bar{x}_{k-1})+\\alpha_k\\Psi(x)]\\le \\alpha_k\\langle\\nabla\\Psi(\\underline{x}_k),x_{k-1}-x\\rangle",
+      "role": "Converts convexity at the search point into the affine recursion used for Theorem 6.12(b).",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Split the difference into a convex combination and apply convexity at \\(\\underline{x}_k\\).",
+          "ref": "Eq. (6.4.26), lines 21468-21474",
+          "source_pdf_lines": [
+            21468,
+            21474
+          ],
+          "math": "\\begin{aligned}\\Psi(\\underline{x}_k)-[(1-\\alpha_k)\\Psi(\\bar{x}_{k-1})+\\alpha_k\\Psi(x)]&=\\alpha_k[\\Psi(\\underline{x}_k)-\\Psi(x)]+(1-\\alpha_k)[\\Psi(\\underline{x}_k)-\\Psi(\\bar{x}_{k-1})]\\\\ &\\le \\alpha_k\\langle\\nabla\\Psi(\\underline{x}_k),\\underline{x}_k-x\\rangle+(1-\\alpha_k)\\langle\\nabla\\Psi(\\underline{x}_k),\\underline{x}_k-\\bar{x}_{k-1}\\rangle \\\\ &=\\alpha_k\\langle\\nabla\\Psi(\\underline{x}_k),x_{k-1}-x\\rangle.\\end{aligned}",
+          "uses": [
+            "Convexity_and_solution",
+            "RSAGD_update_identities"
+          ],
+          "produces": "Equation (6.4.26)."
+        }
+      ]
+    },
+    {
+      "name": "Stochastic_three_point_identity",
+      "ref": "Proof of Theorem 6.12, lines 22215-22218; deterministic template Eq. (6.4.27)",
+      "statement_math": "\\alpha_k\\langle\\nabla\\Psi(\\underline{x}_k)+\\delta_k,x_{k-1}-x\\rangle=\\frac{\\alpha_k}{2\\lambda_k}\\left[\\|x_{k-1}-x\\|^2-\\|x_k-x\\|^2\\right]+\\frac{\\alpha_k\\lambda_k}{2}\\|\\nabla\\Psi(\\underline{x}_k)+\\delta_k\\|^2",
+      "role": "Turns the stochastic inner product in part (b) into a telescoping squared-distance difference plus a squared stochastic-gradient term.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Expand \\(\\|x_k-x\\|^2\\) using \\(x_k=x_{k-1}-\\lambda_k(\\nabla\\Psi(\\underline{x}_k)+\\delta_k)\\) and rearrange.",
+          "ref": "Proof of Theorem 6.12, lines 22215-22218",
+          "source_pdf_lines": [
+            22215,
+            22218
+          ],
+          "math": "\\alpha_k\\langle\\nabla\\Psi(\\underline{x}_k)+\\delta_k,x_{k-1}-x\\rangle=\\frac{\\alpha_k}{2\\lambda_k}\\left[\\|x_{k-1}-x\\|^2-\\|x_k-x\\|^2\\right]+\\frac{\\alpha_k\\lambda_k}{2}\\|\\nabla\\Psi(\\underline{x}_k)+\\delta_k\\|^2",
+          "uses": [
+            "RSAGD_update_identities",
+            "Proof_local_error_definitions"
+          ],
+          "produces": "Stochastic analogue of (6.4.27)."
+        }
+      ]
+    },
+    {
+      "name": "Squared_norm_expansion",
+      "ref": "Proof of Theorem 6.12, lines 22219-22222",
+      "statement_math": "\\|\\nabla\\Psi(\\underline{x}_k)+\\delta_k\\|^2=\\|\\nabla\\Psi(\\underline{x}_k)\\|^2+\\|\\delta_k\\|^2+2\\langle\\nabla\\Psi(\\underline{x}_k),\\delta_k\\rangle",
+      "role": "Separates deterministic gradient, stochastic noise, and martingale cross terms.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Expand the square of a sum in the Euclidean norm.",
+          "ref": "Proof of Theorem 6.12, lines 22219-22222",
+          "source_pdf_lines": [
+            22219,
+            22222
+          ],
+          "math": "\\|\\nabla\\Psi(\\underline{x}_k)+\\delta_k\\|^2=\\|\\nabla\\Psi(\\underline{x}_k)\\|^2+\\|\\delta_k\\|^2+2\\langle\\nabla\\Psi(\\underline{x}_k),\\delta_k\\rangle",
+          "uses": [],
+          "produces": "Squared norm expansion."
+        }
+      ]
+    },
+    {
+      "name": "Distance_telescope_bound",
+      "ref": "Eq. (6.4.30)",
+      "statement_math": "\\sum_{k=1}^{N}\\frac{\\alpha_k}{\\lambda_k\\Gamma_k}\\left[\\|x_{k-1}-x\\|^2-\\|x_k-x\\|^2\\right]\\le \\frac{\\alpha_1}{\\lambda_1\\Gamma_1}\\|x_0-x\\|^2=\\frac{\\|x_0-x\\|^2}{\\lambda_1}",
+      "role": "Controls the squared-distance terms after applying Lemma 3.17 in the convex part.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Use the monotonicity condition (6.4.15) to telescope the weighted squared-distance differences and drop the final nonpositive term.",
+          "ref": "Eq. (6.4.30), lines 21516-21522",
+          "source_pdf_lines": [
+            21516,
+            21522
+          ],
+          "math": "\\sum_{k=1}^{N}\\frac{\\alpha_k}{\\lambda_k\\Gamma_k}\\left[\\|x_{k-1}-x\\|^2-\\|x_k-x\\|^2\\right]\\le \\frac{\\alpha_1}{\\lambda_1\\Gamma_1}\\|x_0-x\\|^2=\\frac{\\|x_0-x\\|^2}{\\lambda_1}",
+          "uses": [
+            "Part_b_stepsize_conditions",
+            "Gamma_weight_identity",
+            "Algorithm_6_4_alpha_domain"
+          ],
+          "produces": "Equation (6.4.30). The final equality uses \\(\\alpha_1=1\\) from Algorithm 6.4 and \\(\\Gamma_1=1\\) from Gamma_weight_identity to rewrite \\(\\alpha_1\\|x_0-x\\|^2/(\\lambda_1\\Gamma_1)\\) as \\(\\|x_0-x\\|^2/\\lambda_1\\)."
+        }
+      ]
+    },
+    {
+      "name": "Lemma_3_17",
+      "ref": "Lemma 3.17",
+      "statement_math": "\\text{Let } w_k\\in(0,1], \\; k=1,2,\\ldots, \\text{ be given. Also let } W_k:=\\begin{cases}1, & k=1,\\\\ (1-w_k)W_{k-1}, & k\\ge2.\\end{cases} \\text{ Suppose that } W_k>0 \\text{ for all } k\\ge2 \\text{ and } \\delta_k\\le(1-w_k)\\delta_{k-1}+B_k, \\; k=1,2,\\ldots. \\text{ Then, we have } \\delta_k\\le W_k(1-w_1)\\delta_0+W_k\\sum_{i=1}^{k}(B_i/W_i).",
+      "role": "Provides the weighted recursion/telescoping tool used to pass from the one-step convex recursion to the \\(\\Gamma_N\\)-weighted inequality.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Divide the base inequality and the later inequalities by \\(W_k\\).",
+          "ref": "Lemma 3.17 proof, lines 5301-5309",
+          "source_pdf_lines": [
+            5301,
+            5309
+          ],
+          "math": "\\frac{\\delta_1}{W_1}\\le \\frac{(1-w_1)\\delta_0}{W_1}+\\frac{B_1}{W_1}, \\quad \\frac{\\delta_k}{W_k}\\le \\frac{\\delta_{k-1}}{W_{k-1}}+\\frac{B_k}{W_k}, \\quad \\forall k\\ge2",
+          "uses": [],
+          "produces": "Scaled recursive inequalities."
+        },
+        {
+          "step": 2,
+          "description": "Sum the scaled inequalities and rearrange the telescoping terms.",
+          "ref": "Lemma 3.17 proof, lines 5308-5311",
+          "source_pdf_lines": [
+            5308,
+            5311
+          ],
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "\\(\\delta_k\\le W_k(1-w_1)\\delta_0+W_k\\sum_{i=1}^{k}B_i/W_i\\)."
+        }
+      ]
+    },
+    {
+      "name": "Martingale_difference_cancellation",
+      "ref": "Proof of Theorem 6.12, lines 22178-22181 and 22255-22257",
+      "statement_math": "\\mathbb{E}[\\langle v_k,\\delta_k\\rangle\\mid \\xi_{[k-1]}]=\\langle v_k,\\mathbb{E}[\\delta_k\\mid\\xi_{[k-1]}]\\rangle=0",
+      "role": "Cancels the residual inner-product sums in both parts of Theorem 6.12 after taking expectation.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "The proof notes that \\(v_k\\) only depends on \\(\\xi_{[k-1]}\\), so it is measurable before the oracle noise \\(\\delta_k\\) is sampled.",
+          "ref": "Proof of Theorem 6.12, lines 22173-22180",
+          "source_pdf_lines": [
+            22173,
+            22180
+          ],
+          "uses": [],
+          "produces": "\\(v_k\\) is \\(\\xi_{[k-1]}\\)-measurable."
+        },
+        {
+          "step": 2,
+          "description": "Use Assumption 16(a) to make the conditional mean of \\(\\delta_k\\) vanish, hence the conditional mean of the residual inner product is zero.",
+          "ref": "Proof of Theorem 6.12, lines 22178-22181",
+          "source_pdf_lines": [
+            22178,
+            22181
+          ],
+          "math": "\\mathbb{E}[b_k\\mid\\xi_{[k-1]}]=\\mathbb{E}[\\langle v_k,\\delta_k\\rangle\\mid\\xi_{[k-1]}]=\\langle v_k,\\mathbb{E}[\\delta_k\\mid\\xi_{[k-1]}]\\rangle=0",
+          "uses": [
+            "Assumption_16a_unbiased_oracle",
+            "previous_step:1"
+          ],
+          "produces": "\\(\\{b_k\\}\\) is a martingale-difference sequence; the same reasoning applies to \\(\\{b'_k\\}\\)."
+        }
+      ]
+    }
+  ]
+}

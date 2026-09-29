@@ -1,0 +1,2926 @@
+{
+  "algorithm": "HeavyBallSecondRiddle",
+  "full_name": "The Second Heavy-Ball Riddle: convergence beyond the prescribed Lyapunov family",
+  "source_reference": "Research notes and evidence bundle (HB-A (Theorem A); Theorems B--C; D1--D11)",
+  "setup": {
+    "problem": {
+      "math": "\\mathcal F_{q,1}(\\mathbb R^d)\\text{ is the class of globally differentiable }f\\text{ satisfying, for all }x,y\\in\\mathbb R^d,\\quad f(y)\\ge f(x)+\\langle\\nabla f(x),y-x\\rangle+\\frac q2\\|y-x\\|^2,\\qquad \\|\\nabla f(y)-\\nabla f(x)\\|\\le\\|y-x\\|.",
+      "ref": "research/notes.md §1.1, PDF lines 2559–2573",
+      "description": "Globally differentiable q-strongly convex objectives with 1-Lipschitz gradient; x_* is the unique minimizer and f_*=f(x_*)."
+    },
+    "variable_space": {
+      "math": "d\\in\\mathbb N,\\ d\\ge1,\\ x_{-1},x_0\\in\\mathbb R^d,\\ (q,a,b)\\in\\mathcal D",
+      "ref": "research/notes.md §1.1"
+    }
+  },
+  "assumptions": [
+    {
+      "name": "HB-admissible_objective",
+      "math": "f:\\mathbb R^d\\to\\mathbb R\\text{ globally differentiable},\\quad\\forall x,y\\in\\mathbb R^d:\\ f(y)\\ge f(x)+\\langle\\nabla f(x),y-x\\rangle+\\frac q2\\|y-x\\|^2,\\qquad \\|\\nabla f(y)-\\nabla f(x)\\|\\le\\|y-x\\|.",
+      "ref": "research/notes.md §1.1, PDF lines 2559–2571",
+      "parameters": [
+        "q",
+        "d",
+        "f"
+      ]
+    },
+    {
+      "name": "HB-parameter_domain",
+      "math": "\\mathcal D=\\{(q,a,b):0<q<1,\\ 0\\le b<1,\\ 0<a<2(1+b)\\}.",
+      "ref": "research/notes.md §1.1",
+      "parameters": [
+        "q",
+        "a",
+        "b"
+      ]
+    },
+    {
+      "name": "HB-fixed_objective_trajectory",
+      "math": "x_{t+1}=x_t-a\\nabla f(x_t)+b(x_t-x_{t-1}).",
+      "ref": "(HB), research/notes.md §1.1",
+      "parameters": [
+        "a",
+        "b",
+        "x_{-1}",
+        "x_0"
+      ]
+    },
+    {
+      "name": "HB-successor_form",
+      "math": "w=(1+b)v-bu-a\\nabla f(v).",
+      "ref": "(L), research/notes.md §1.2, PDF lines 2624–2628",
+      "parameters": [
+        "u",
+        "v",
+        "w",
+        "a",
+        "b"
+      ]
+    },
+    {
+      "name": "HB-prescribed_certificate",
+      "math": "\\begin{aligned}V_f(u,v)={}&c_0(f(v)-f_*)+c_1(f(u)-f_*)\\\\&+\\sum_{i,j=1}^4Q_{ij}\\langle s_i,s_j\\rangle,\\qquad Q\\in\\mathbb S^4,\\qquad s_f(u,v)=\\big(u-x_*,\\nabla f(u),v-x_*,\\nabla f(v)\\big).\\end{aligned}",
+      "ref": "(L-form), research/notes.md §1.2, PDF lines 2604–2619",
+      "parameters": [
+        "c_0",
+        "c_1",
+        "Q"
+      ]
+    },
+    {
+      "name": "HB-certificate_inequalities",
+      "math": "f(w)-f_*\\le V_f(v,w)\\le V_f(u,v),\\qquad w=(1+b)v-bu-a\\nabla f(v).",
+      "ref": "(L), research/notes.md §1.2, PDF lines 2621–2629",
+      "parameters": [
+        "u",
+        "v",
+        "w"
+      ]
+    },
+    {
+      "name": "HB-L-definition",
+      "math": "\\mathsf L(q,a,b)\\text{ means that there exist }c_0,c_1,Q\\text{ (possibly parameter-dependent), }Q\\in\\mathbb S^4,\\ Q\\text{ need not itself be positive semidefinite, with the same coefficients working for every admissible objective, dimension, and initial pair, and satisfying }w=(1+b)v-bu-a\\nabla f(v),\\ f(w)-f_*\\le V_f(v,w)\\le V_f(u,v).",
+      "ref": "research/notes.md §1.2, PDF lines 2610–2634",
+      "parameters": [
+        "q",
+        "a",
+        "b",
+        "c_0",
+        "c_1",
+        "Q"
+      ]
+    },
+    {
+      "name": "HB-C-definition",
+      "math": "\\mathsf C(q,a,b)\\text{ means that some finite dimension }d\\ge1,\\text{ some fixed }f\\in\\mathcal F_{q,1}(\\mathbb R^d),\\text{ and some integer }K\\ge2\\text{ admit a nonconstant }K\\text{-periodic HB trajectory.}",
+      "ref": "research/notes.md §1.2, PDF lines 2636–2637",
+      "parameters": [
+        "q",
+        "a",
+        "b",
+        "d",
+        "f",
+        "K"
+      ]
+    },
+    {
+      "name": "HB-G-definition",
+      "math": "\\mathsf G(q,a,b):\\quad \\forall d\\geq1\\ \\forall f\\in\\mathcal F_{q,1}(\\mathbb R^d)\\ \\forall(x_{-1},x_0)\\in(\\mathbb R^d)^2:\\ \\lim_{t\\to\\infty}\\|x_t-x_*\\|=0.",
+      "ref": "The broader dynamical question, PDF lines 2466-2472",
+      "parameters": [
+        "q",
+        "a",
+        "b",
+        "d",
+        "f",
+        "x_{-1}",
+        "x_0"
+      ]
+    },
+    {
+      "name": "HB-box",
+      "math": "B=\\{(q,a,b):|q-1/100|\\le10^{-5},\\ |a-113/50|\\le10^{-5},\\ |b-3/5|\\le10^{-5}\\}.",
+      "ref": "Theorem B, (G)",
+      "parameters": [
+        "q",
+        "a",
+        "b"
+      ]
+    },
+    {
+      "name": "HB-record_obstruction_antecedents",
+      "math": "J=\\{*,0,1,2\\},\\ d\\ge1,\\ (q,a,b)\\in\\mathcal D,\\ (x_*,g_*,F_*)=(0,0,0),\\ I_{ij}\\ge0\\ \\forall(i,j)\\in J\\times J,\\ x_2=(1+b)x_1-bx_0-a g_1,\\ S\\in\\mathbb R^{d\\times d},\\ S^TS=RI,\\ R>1,\\ x_{j+1}=Sx_j,\\ g_{j+1}=Sg_j,\\ F_{j+1}=RF_j\\ (j=0,1),\\ F_0>0.",
+      "ref": "HB-RECORD-GENERAL, scope.md/PDF lines 66–75; supplemental similarity display in common_record_review.md and PDF lines 3630–3636",
+      "parameters": [
+        "q",
+        "a",
+        "b",
+        "d",
+        "S",
+        "R"
+      ]
+    },
+    {
+      "name": "HB-central_parameters",
+      "math": "(q_*,a_*,b_*)=(1/100,113/50,3/5).",
+      "ref": "Theorem A, (1)",
+      "parameters": [
+        "q_*",
+        "a_*",
+        "b_*"
+      ]
+    },
+    {
+      "name": "HB-finite_data_residual_condition",
+      "math": "I_{ij}\\ge0\\quad\\text{for every ordered pair }(i,j).",
+      "ref": "(I), research/notes.md §3",
+      "parameters": [
+        "I_{ij}",
+        "x_i",
+        "g_i",
+        "F_i"
+      ]
+    },
+    {
+      "name": "HB-record-map-scope",
+      "math": "\\mathcal O_f(u,v)=\\big(u-x_*,\\nabla f(u),v-x_*,\\nabla f(v),f(u)-f_*,f(v)-f_*\\big);\\ \\Phi\\text{ may be nonlinear or discontinuous, may depend on fixed parameters and dimension, is finite on every record, and is the same map for every objective with no access beyond the displayed record.}",
+      "ref": "research/notes.md §7, PDF lines 3597–3608",
+      "parameters": [
+        "f",
+        "u",
+        "v",
+        "Phi"
+      ]
+    }
+  ],
+  "definitions": [
+    {
+      "name": "HB-centered-two-state-update",
+      "math": "x_{t+1}=x_t-a\\nabla f(x_t)+b(x_t-x_{t-1}),\\qquad t=0,1,2,\\ldots.",
+      "ref": "(HB), PDF lines 2369-2376 and 2576-2578",
+      "description": "The source recurrence whose centered two-state map is named later in §7.2."
+    },
+    {
+      "name": "HB-centered-two-state-map-derived",
+      "math": "\\text{For each fixed objective, let }T_f\\text{ be the centered two-state update.}",
+      "ref": "§7.2, PDF lines 3679-3682; recurrence (HB), PDF lines 2371-2373 and 2576-2578",
+      "description": "Source-printed naming sentence for the centered two-state update. The coordinate expansion T_f(ξ,χ)=(χ,χ-a∇f(x_*+χ)+b(χ-ξ)) is a derived declaration-level consequence of (HB), not a source-displayed formula."
+    },
+    {
+      "name": "HB-infinite-centered-energy-definition",
+      "math": "E_f(Y)=\\sum_{j=0}^{\\infty}\\|T_f^jY\\|^2.",
+      "ref": "PDF lines 3679-3682",
+      "description": "The source's infinite objective-dependent centered trajectory energy, kept separate from the recurrence defining T_f."
+    },
+    {
+      "name": "HB-centered-state-sequence",
+      "math": "Y_t=(x_{t-1},x_t).",
+      "ref": "(D10), PDF line 4310",
+      "description": "This is the source's state notation after translating the minimizer and minimum to zero; undoing translation gives the centered pair used in the energy sections."
+    },
+    {
+      "name": "HB-successor-centered-state",
+      "math": "w=(1+b)v-bu-a\\nabla f(v).",
+      "ref": "(L), PDF lines 2624-2628",
+      "description": "Source-printed successor formula. The centered bridge Y=(u-x_*,v-x_*) and T_fY=(v-x_*,w-x_*) is derived in the finite-energy proof from this formula, (HB), and the source's centered-update notation."
+    },
+    {
+      "name": "HB-finite-centered-energy-definition",
+      "math": "N=48C=4\\,800\\,000\\,000\\,000\\,000,\\qquad \\mathcal E_{f,N}(Y)=\\sum_{k=0}^{N-1}\\|T_f^kY\\|^2.",
+      "ref": "submission_dynamics.md final section, PDF lines 4342-4345",
+      "description": "Finite-horizon version of the same centered two-state update used for the objective-dependent trajectory energy."
+    }
+  ],
+  "algorithm_spec": {
+    "initialization": {
+      "math": "(x_{-1},x_0)\\in(\\mathbb R^d)^2\\ \\text{arbitrary}.",
+      "ref": "research/notes.md §1.1"
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "Heavy-Ball update",
+        "math": "x_{t+1}=x_t-a\\nabla f(x_t)+b(x_t-x_{t-1}).",
+        "ref": "(HB)"
+      },
+      {
+        "step": 2,
+        "name": "Successor form",
+        "math": "w=(1+b)v-bu-a\\nabla f(v).",
+        "ref": "(L)"
+      }
+    ],
+    "output": {
+      "math": "\\text{The output at time }t\\text{ is }x_t.",
+      "ref": "PDF lines 2369-2376",
+      "type": "trajectory iterate",
+      "description": "The recurrence is recorded only under algorithm_spec.steps; the source output clause is the iterate returned at time t."
+    },
+    "parameters": [
+      {
+        "name": "q",
+        "math": "q=\\mu/L",
+        "ref": "§1.1"
+      },
+      {
+        "name": "a",
+        "math": "a=L\\gamma",
+        "ref": "§1.1"
+      },
+      {
+        "name": "b",
+        "math": "b=\\beta",
+        "ref": "§1.1"
+      },
+      {
+        "name": "epsilon",
+        "math": "\\varepsilon=10^{-5}",
+        "ref": "(Multiplier)/(D3)"
+      },
+      {
+        "name": "C",
+        "math": "C=10^{14}",
+        "ref": "(D10)"
+      },
+      {
+        "name": "N",
+        "math": "N=48C=4800000000000000",
+        "ref": "finite trajectory-energy section"
+      }
+    ]
+  },
+  "main_theorem": {
+    "ref": "Theorem A (HB-A), research/notes.md §2, PDF lines 2658–2666",
+    "statement_math": "**Theorem A — An exact separation witness.** At\n\n$$\n(q_*,a_*,b_*)=\\left(\\frac1{100},\\frac{113}{50},\\frac35\\right),\n$$\n\nboth $\\neg\\mathsf L(q_*,a_*,b_*)$ and $\\neg\\mathsf C(q_*,a_*,b_*)$ hold. The first statement excludes every coefficient choice in (L-form). The second excludes every nonconstant finite cycle, in every finite dimension, over the entire admissible function class.",
+    "rate": "No asymptotic rate is part of Theorem A; HB-B below gives the separate uniform rate on the closed box.",
+    "measure": "absence of a common prescribed two-point certificate and absence of nonconstant finite periodic trajectories",
+    "proof": [
+      {
+        "step": 1,
+        "description": "Instantiate the central complex witness z,R,F,eta and four samples, then verify the exact residual certificate and diagonal zeros.",
+        "ref": "(4),(5)",
+        "source_pdf_lines": [
+          715,
+          920
+        ],
+        "uses": [
+          "HB-central_parameters",
+          "HB-RATIONAL-WITNESS"
+        ],
+        "produces": "the four-point data satisfy every interpolation inequality"
+      },
+      {
+        "step": 2,
+        "description": "Apply HB-INTERPOLATION to realize the data by one globally admissible objective with minimizer zero.",
+        "ref": "§3, (Interp)",
+        "source_pdf_lines": [
+          487,
+          710
+        ],
+        "uses": [
+          "HB-INTERPOLATION",
+          "HB-RATIONAL-WITNESS"
+        ],
+        "produces": "a legal fixed objective realizing the witness"
+      },
+      {
+        "step": 3,
+        "description": "Set u=z^{-1}, v=1, and w=z; the definition of eta gives the exact Heavy-Ball successor from the state (u,v) to w.",
+        "ref": "(6)",
+        "source_pdf_lines": [
+          2925,
+          2933
+        ],
+        "uses": [
+          "HB-fixed_objective_trajectory",
+          "HB-RATIONAL-WITNESS",
+          "previous_step:2"
+        ],
+        "math": "(1+b)v-bu-a\\nabla f(v)=1+b-b/z-a\\eta=z=w.",
+        "produces": "legal HB transition from (u,v) to (v,w)"
+      },
+      {
+        "step": 4,
+        "description": "Use the expanding similarity of the four state features.",
+        "ref": "Scale prelude",
+        "source_pdf_lines": [
+          2935,
+          2941
+        ],
+        "uses": [
+          "HB-prescribed_certificate",
+          "HB-RATIONAL-WITNESS",
+          "previous_step:3"
+        ],
+        "math": "s_f(v,w)=z\\,s_f(u,v).",
+        "produces": "feature vectors scale componentwise by z"
+      },
+      {
+        "step": 5,
+        "description": "Multiplication by the same complex number multiplies every real inner product and both sampled value gaps by R, so every prescribed coefficient choice satisfies the printed scale identity.",
+        "ref": "(Scale)",
+        "source_pdf_lines": [
+          2943,
+          2954
+        ],
+        "uses": [
+          "HB-prescribed_certificate",
+          "HB-RATIONAL-WITNESS",
+          "previous_step:4"
+        ],
+        "math": "V_f(v,w)=R\\,V_f(u,v).",
+        "produces": "scaled certificate equality for arbitrary c_0,c_1,Q"
+      },
+      {
+        "step": 6,
+        "description": "Assuming (L), the monotonicity half of the certificate inequalities and the scale identity give (R-1)V_f(u,v)<=0; because R>1 this yields V_f(u,v)<=0.",
+        "ref": "post-Scale monotonicity",
+        "source_pdf_lines": [
+          2956,
+          2957
+        ],
+        "uses": [
+          "HB-certificate_inequalities",
+          "HB-L-definition",
+          "HB-RATIONAL-WITNESS",
+          "previous_step:5"
+        ],
+        "produces": "V_f(u,v)<=0 under the assumed prescribed certificate"
+      },
+      {
+        "step": 7,
+        "description": "Objective-gap domination at the successor gives the printed contradiction. The witness data identify the successor sample gap as F_2=FR, but the source display writes the positive term as FR.",
+        "ref": "contradiction display",
+        "source_pdf_lines": [
+          2956,
+          2964
+        ],
+        "uses": [
+          "HB-certificate_inequalities",
+          "HB-RATIONAL-WITNESS",
+          "previous_step:5",
+          "previous_step:6"
+        ],
+        "math": "0<FR=f(w)-f_*\\le V_f(v,w)=R V_f(u,v)\\le0,",
+        "produces": "F_2=FR by the witness sample values, hence neg L(q_*,a_*,b_*)"
+      },
+      {
+        "step": 8,
+        "description": "For the cycle half, assume a finite periodic trajectory at the central parameters; this is exactly the situation ruled out by the all-frequency cycle exclusion lemma.",
+        "ref": "§5, (Lag)--(13)",
+        "source_pdf_lines": [
+          2975,
+          2991
+        ],
+        "uses": [
+          "HB-C-definition",
+          "HB-central_parameters"
+        ],
+        "produces": "a hypothetical nonconstant finite cycle at (q_*,a_*,b_*)"
+      },
+      {
+        "step": 9,
+        "description": "Apply the all-frequency Fourier positivity lemma as the terminal cycle argument: adding the k=-1 and k=4 lag inequalities forces every nonzero Fourier mode to vanish, so the trajectory is constant.",
+        "ref": "(13)",
+        "source_pdf_lines": [
+          3162,
+          3165
+        ],
+        "uses": [
+          "HB-ALL-FREQUENCY-CYCLE-EXCLUSION",
+          "previous_step:8"
+        ],
+        "produces": "every finite cycle is constant"
+      },
+      {
+        "step": 10,
+        "description": "A constant cycle contradicts the nonconstant condition in the definition of C, proving not C in every finite dimension and period.",
+        "ref": "Theorem A",
+        "source_pdf_lines": [
+          3164,
+          3165
+        ],
+        "uses": [
+          "HB-C-definition",
+          "previous_step:9"
+        ],
+        "produces": "neg C(q_*,a_*,b_*)"
+      }
+    ],
+    "name": "HB-A"
+  },
+  "key_lemmas": [
+    {
+      "name": "HB-INTERPOLATION",
+      "ref": "(I), (CI), (Co), (Interp)",
+      "statement_math": "I_{ij}=F_i-F_j-\\langle g_j,x_i-x_j\\rangle-\\frac{\\|g_i-g_j\\|^2+q\\|x_i-x_j\\|^2-2q\\langle g_i-g_j,x_i-x_j\\rangle}{2(1-q)}\\ge0\\ \\text{for every ordered pair }(i,j)\\ \\Longleftrightarrow\\ \\text{finite data are realizable by }f\\in\\mathcal F_{q,1}.",
+      "role": "Provides both interpolation necessity for cycles and an explicit globally admissible conjugate interpolant for finite witnesses.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Set the shifted curvature variables and quote the smooth upper bound after subtracting q||x||^2/2.",
+          "ref": "§3.1",
+          "source_pdf_lines": [
+            499,
+            519
+          ],
+          "uses": [
+            "HB-admissible_objective"
+          ],
+          "produces": "ell=1-q, psi is convex and ell-smooth",
+          "math": "\\ell=1-q,\\quad \\psi(x)=f(x)-\\frac q2\\|x\\|^2,\\quad p(x)=\\nabla\\psi(x),\\quad \\psi(y)\\le\\psi(x)+\\langle p(x),y-x\\rangle+\\frac\\ell2\\|y-x\\|^2."
+        },
+        {
+          "step": 2,
+          "description": "For fixed x_j subtract the linear form, define phi, and use convexity to make x_j a global minimizer.",
+          "ref": "§3.1",
+          "source_pdf_lines": [
+            525,
+            539
+          ],
+          "uses": [
+            "HB-admissible_objective",
+            "previous_step:1"
+          ],
+          "produces": "varphi(x_j) is no larger than varphi at the gradient-step point",
+          "math": "\\varphi(x)=\\psi(x)-\\langle p(x_j),x\\rangle,\\qquad \\varphi(x_j)\\le\\varphi\\!\\left(x_i-\\frac{\\nabla\\varphi(x_i)}\\ell\\right)."
+        },
+        {
+          "step": 3,
+          "description": "Apply the ell-smooth descent inequality to the 1/ell gradient step from x_i.",
+          "ref": "§3.1",
+          "source_pdf_lines": [
+            540,
+            555
+          ],
+          "uses": [
+            "HB-admissible_objective",
+            "previous_step:1",
+            "previous_step:2"
+          ],
+          "produces": "the gradient-step value is bounded by varphi(x_i) minus the squared gradient difference",
+          "math": "\\varphi\\!\\left(x_i-\\frac{\\nabla\\varphi(x_i)}\\ell\\right)\\le\\varphi(x_i)-\\frac1{2\\ell}\\|p(x_i)-p(x_j)\\|^2."
+        },
+        {
+          "step": 4,
+          "description": "Combine the two displayed gradient-step inequalities and rearrange to the cocoercive interpolation inequality.",
+          "ref": "(CI)",
+          "source_pdf_lines": [
+            556,
+            567
+          ],
+          "uses": [
+            "previous_step:2",
+            "previous_step:3"
+          ],
+          "produces": "the cocoercive interpolation inequality (CI)",
+          "math": "\\psi(x_i)-\\psi(x_j)\\ge\\langle p(x_j),x_i-x_j\\rangle+\\frac1{2\\ell}\\|p(x_i)-p(x_j)\\|^2."
+        },
+        {
+          "step": 5,
+          "description": "Substitute p_i=g_i-qx_i and expand (CI) into the ordered residual condition.",
+          "ref": "(I)",
+          "source_pdf_lines": [
+            464,
+            487
+          ],
+          "uses": [
+            "previous_step:4"
+          ],
+          "produces": "I_ij>=0 for every ordered pair",
+          "math": "I_{ij}=F_i-F_j-\\langle g_j,x_i-x_j\\rangle-\\frac{\\|g_i-g_j\\|^2+q\\|x_i-x_j\\|^2-2q\\langle g_i-g_j,x_i-x_j\\rangle}{2(1-q)}\\ge0."
+        },
+        {
+          "step": 6,
+          "description": "Add (CI) to its reverse to obtain cocoercivity and then the ell-Lipschitz bound by Cauchy–Schwarz.",
+          "ref": "(Co)",
+          "source_pdf_lines": [
+            578,
+            587
+          ],
+          "uses": [
+            "previous_step:4"
+          ],
+          "produces": "||p_i-p_j||^2<=ell<p_i-p_j,x_i-x_j> and p is ell-Lipschitz",
+          "math": "\\|p_i-p_j\\|^2\\le\\ell\\langle p_i-p_j,x_i-x_j\\rangle."
+        },
+        {
+          "step": 7,
+          "description": "Assuming all residuals nonnegative, define p_i,h_i, the max of equal-curvature quadratics H, its conjugate, and f.",
+          "ref": "(Interp)",
+          "source_pdf_lines": [
+            592,
+            641
+          ],
+          "uses": [
+            "previous_step:5"
+          ],
+          "produces": "candidate global interpolant f=H*+q||x||^2/2",
+          "math": "p_i=g_i-qx_i,\\quad h_i=F_i-\\frac q2\\|x_i\\|^2,\\quad H(p)=\\max_i\\{\\langle p,x_i\\rangle-h_i+\\frac{\\|p-p_i\\|^2}{2\\ell}\\},\\quad f(x)=H^*(x)+\\frac q2\\|x\\|^2."
+        },
+        {
+          "step": 8,
+          "description": "Direct expansion gives H_i(p_i)-H_j(p_i)=I_ji>=0, so each piece is active and x_i belongs to the subdifferential at p_i.",
+          "ref": "(Interp)",
+          "source_pdf_lines": [
+            643,
+            656
+          ],
+          "uses": [
+            "previous_step:7"
+          ],
+          "produces": "H_i is active at p_i and x_i∈∂H(p_i)",
+          "math": "H_i(p_i)-H_j(p_i)=I_{ji}\\ge0."
+        },
+        {
+          "step": 9,
+          "description": "Conjugacy at active points gives H*(x_i)=h_i and ∇H*(x_i)=p_i, hence f(x_i)=F_i and ∇f(x_i)=g_i.",
+          "ref": "(Interp)",
+          "source_pdf_lines": [
+            661,
+            678
+          ],
+          "uses": [
+            "previous_step:8"
+          ],
+          "produces": "exact interpolation of values and gradients",
+          "math": "H^*(x_i)=h_i,\\quad \\nabla H^*(x_i)=p_i."
+        },
+        {
+          "step": 10,
+          "description": "Each H_i minus ||p||^2/(2ell) is affine, so H is 1/ell-strongly convex; coercivity gives a unique minimizer P(x) of H(p)-<x,p> for every x.",
+          "ref": "(Interp)",
+          "source_pdf_lines": [
+            683,
+            690
+          ],
+          "uses": [
+            "previous_step:7"
+          ],
+          "produces": "global attainment and unique P(x)"
+        },
+        {
+          "step": 11,
+          "description": "Add the strong subgradient inequalities at P(x),P(y) to obtain monotonicity and the ell-Lipschitz estimate.",
+          "ref": "(Interp)",
+          "source_pdf_lines": [
+            689,
+            700
+          ],
+          "uses": [
+            "previous_step:10"
+          ],
+          "produces": "||P(x)-P(y)||<=ell||x-y||",
+          "math": "\\langle x-y,P(x)-P(y)\\rangle\\ge\\frac1\\ell\\|P(x)-P(y)\\|^2."
+        },
+        {
+          "step": 12,
+          "description": "Use the two maximizing inequalities for H* to bound the differentiability remainder.",
+          "ref": "(Interp)",
+          "source_pdf_lines": [
+            700,
+            705
+          ],
+          "uses": [
+            "previous_step:11"
+          ],
+          "produces": "0<=remainder<=ell||v||^2 and H* is differentiable with gradient P",
+          "math": "0\\le H^*(x+v)-H^*(x)-\\langle P(x),v\\rangle\\le\\langle P(x+v)-P(x),v\\rangle\\le\\ell\\|v\\|^2."
+        },
+        {
+          "step": 13,
+          "description": "Add q||x||^2/2 to H*: the interpolant is q-strongly convex and has gradient Lipschitz constant at most ell+q=1.",
+          "ref": "(Interp)",
+          "source_pdf_lines": [
+            709,
+            710
+          ],
+          "uses": [
+            "previous_step:12"
+          ],
+          "produces": "f belongs to F_{q,1} globally; the Lipschitz-gradient inequality is derived from the printed bound that the gradient Lipschitz constant is at most ell+q=1"
+        }
+      ]
+    },
+    {
+      "name": "HB-RATIONAL-WITNESS",
+      "ref": "(4)--(6)",
+      "statement_math": "z=(23+199i)/200,\\quad R=|z|^2=4013/4000>1,\\quad F=41/100,\\quad \\eta=(1+b-z-b/z)/a,\\quad x=(0,z^{-1},1,z),\\ g_i=\\eta x_i,\\ F_i=F|x_i|^2.",
+      "role": "Supplies the exact finite data and one legal expanding Heavy-Ball transition used to refute the prescribed family and instantiate the record obstruction.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "At the central parameters identify R² with C and define z,R,F,eta and the four samples x_i,g_i,F_i, including the exact eta fraction.",
+          "ref": "(4),(5)",
+          "source_pdf_lines": [
+            715,
+            759
+          ],
+          "uses": [
+            "HB-central_parameters"
+          ],
+          "produces": "four sample records and R>1",
+          "math": "z=\\frac{23+199i}{200},\\ R=|z|^2=\\frac{4013}{4000}>1,\\ F=\\frac{41}{100},\\ \\eta=\\frac{1136661-320987i}{1813876},\\ x_* =0,\\ x_0=z^{-1},\\ x_1=1,\\ x_2=z,\\ g_*=0,F_*=0,\\ g_j=\\eta x_j,F_j=F|x_j|^2."
+        },
+        {
+          "step": 2,
+          "description": "Substitution into (I) checks every ordered residual from the witness data: all twelve off-diagonal values are positive with the printed minimum, while diagonal residuals vanish. The complete off-diagonal table is I_{*,0}=76785548080/20357779262139, I_{*,1}=959819351/253647885150, I_{*,2}=959819351/252826200000, I_{0,*}=4000260206920/20357779262139, I_{0,1}=1775394252563/1017888963106950, I_{0,2}=1447646143705644319/4071555852427800000, I_{1,*}=100006505173/507295770300, I_{1,0}=719411350000249/2035777926213900, I_{1,2}=1775394252563/1014591540600000, I_{2,*}=100006505173/505652400000, I_{2,0}=3562928495857226237/8143111704855600000, I_{2,1}=719411350000249/2029183081200000.",
+          "ref": "(I), witness table",
+          "source_pdf_lines": [
+            760,
+            920
+          ],
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "all residuals I_ij>=0 for the finite witness data",
+          "math": "I_{ii}=0,\\quad \\min_{i\\ne j}I_{ij}=\\frac{1775394252563}{1017888963106950}>0\\quad\\text{(all twelve ordered off-diagonal pairs as tabulated in the source).}"
+        },
+        {
+          "step": 3,
+          "description": "Use the interpolation lemma to obtain one global admissible objective with these samples and minimizer zero.",
+          "ref": "§3, (4)",
+          "source_pdf_lines": [
+            487,
+            710
+          ],
+          "uses": [
+            "HB-INTERPOLATION",
+            "previous_step:2"
+          ],
+          "produces": "an admissible f realizing the witness"
+        },
+        {
+          "step": 4,
+          "description": "Set u=z^{-1},v=1,w=z; eta makes the HB successor identity exact.",
+          "ref": "(6)",
+          "source_pdf_lines": [
+            2925,
+            2933
+          ],
+          "uses": [
+            "HB-fixed_objective_trajectory",
+            "previous_step:1",
+            "previous_step:3"
+          ],
+          "produces": "w=(1+b)v-bu-a∇f(v)=z",
+          "math": "(1+b)v-bu-a\\nabla f(v)=1+b-b/z-a\\eta=z=w."
+        },
+        {
+          "step": 5,
+          "description": "The four state features satisfy the printed componentwise similarity identity.",
+          "ref": "Scale prelude",
+          "source_pdf_lines": [
+            2935,
+            2941
+          ],
+          "uses": [
+            "HB-prescribed_certificate",
+            "previous_step:1",
+            "previous_step:3",
+            "previous_step:4"
+          ],
+          "produces": "feature vectors scale componentwise by z",
+          "math": "s_f(v,w)=z\\,s_f(u,v)."
+        },
+        {
+          "step": 6,
+          "description": "Because multiplication by the same complex number multiplies every real inner product and both sampled value gaps by R, every prescribed certificate has the printed scale identity.",
+          "ref": "(Scale)",
+          "source_pdf_lines": [
+            2943,
+            2954
+          ],
+          "uses": [
+            "HB-prescribed_certificate",
+            "previous_step:1",
+            "previous_step:3",
+            "previous_step:5"
+          ],
+          "produces": "scaled certificate equality",
+          "math": "V_f(v,w)=R\\,V_f(u,v)."
+        },
+        {
+          "step": 7,
+          "description": "If (L) held, monotonicity and the scale identity would imply (R-1)V_f(u,v)<=0, hence V_f(u,v)<=0.",
+          "ref": "post-Scale monotonicity",
+          "source_pdf_lines": [
+            2956,
+            2957
+          ],
+          "uses": [
+            "HB-certificate_inequalities",
+            "HB-L-definition",
+            "previous_step:1",
+            "previous_step:6"
+          ],
+          "produces": "V_f(u,v)<=0 under the assumed prescribed certificate"
+        },
+        {
+          "step": 8,
+          "description": "Objective-gap domination gives the printed contradiction. The witness values identify F_2=FR, but the source display writes the positive gap as FR.",
+          "ref": "contradiction display",
+          "source_pdf_lines": [
+            2959,
+            2964
+          ],
+          "uses": [
+            "HB-certificate_inequalities",
+            "previous_step:1",
+            "previous_step:6",
+            "previous_step:7"
+          ],
+          "produces": "neg L at the central triple",
+          "math": "0<FR=f(w)-f_*\\le V_f(v,w)=R V_f(u,v)\\le0,"
+        }
+      ]
+    },
+    {
+      "name": "HB-ALL-FREQUENCY-CYCLE-EXCLUSION",
+      "ref": "(7)--(13)",
+      "statement_math": "\\neg\\mathsf C(q_*,a_*,b_*):\\text{ every finite periodic trajectory in every finite dimension is constant}.",
+      "role": "Excludes all periods, vector shapes, and Fourier modes at the central parameters.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "For a K-periodic trajectory apply each ordered interpolation inequality at every signed lag and sum over the period; function-value terms telescope, including negative or beyond-period lags.",
+          "ref": "(7)",
+          "source_pdf_lines": [
+            940,
+            982
+          ],
+          "uses": [
+            "HB-INTERPOLATION"
+          ],
+          "produces": "the nonpositive lag sum for every signed k",
+          "math": "\\sum_i\\left[\\langle g_i,y_{i+k}-y_i\\rangle+\\frac{\\|g_{i+k}-g_i\\|^2+q\\|y_{i+k}-y_i\\|^2-2q\\langle g_{i+k}-g_i,y_{i+k}-y_i\\rangle}{2(1-q)}\\right]\\le0."
+        },
+        {
+          "step": 2,
+          "description": "Take the unitary DFT; the recurrence gives the mode transfer representation with U,V.",
+          "ref": "(8)",
+          "source_pdf_lines": [
+            987,
+            1020
+          ],
+          "uses": [
+            "HB-fixed_objective_trajectory",
+            "previous_step:1"
+          ],
+          "produces": "modewise transfer representation",
+          "math": "\\widehat g_j=\\mathcal H(\\theta_j)\\widehat y_j,\\quad \\mathcal H(\\theta)=U-iV,\\quad U=\\frac{(1+b)(1-\\cos\\theta)}a,\\quad V=\\frac{(1-b)\\sin\\theta}a."
+        },
+        {
+          "step": 3,
+          "description": "Parseval converts the lag sum to a sum of squared mode norms times tau_k; combined with the earlier nonpositive lag inequality, this yields the derived modewise inequality.",
+          "ref": "(Symbol)",
+          "source_pdf_lines": [
+            1021,
+            1038
+          ],
+          "uses": [
+            "previous_step:1",
+            "previous_step:2"
+          ],
+          "produces": "source Parseval representation and the derived modewise inequality \\sum_{j=0}^{K-1}\\|\\widehat y_j\\|^2\\tau_k(\\theta_j)\\le0",
+          "math": "\\sum_{j=0}^{K-1}\\|\\widehat y_j\\|^2\\tau_k(\\theta_j),\\quad \\tau_k(\\theta)=\\frac{U^2+V^2-(1+q)U+q}{1-q}(1-\\cos k\\theta)-V\\sin k\\theta."
+        },
+        {
+          "step": 4,
+          "description": "Evaluate the first inner-product Fourier contribution separately.",
+          "ref": "Symbol derivation",
+          "source_pdf_lines": [
+            1049,
+            1058
+          ],
+          "uses": [
+            "previous_step:3"
+          ],
+          "produces": "inner-product term in tau_k",
+          "math": "\\operatorname{Re}((U+iV)(e^{ik\\theta}-1))=-U(1-\\cos k\\theta)-V\\sin k\\theta."
+        },
+        {
+          "step": 5,
+          "description": "Evaluate the squared-difference Fourier contribution separately and add it to the inner-product term to recover Symbol.",
+          "ref": "Symbol derivation",
+          "source_pdf_lines": [
+            1059,
+            1068
+          ],
+          "uses": [
+            "previous_step:3",
+            "previous_step:4"
+          ],
+          "produces": "the complete tau_k expression",
+          "math": "\\frac{U^2+V^2+q-2qU}{1-q}(1-\\cos k\\theta)."
+        },
+        {
+          "step": 6,
+          "description": "Define c,J,A,S,K,W and use the Chebyshev identities for cos4theta and sin4theta.",
+          "ref": "(W)",
+          "source_pdf_lines": [
+            1071,
+            1096
+          ],
+          "uses": [
+            "previous_step:3"
+          ],
+          "produces": "the lag polynomial factors",
+          "math": "J(c)=2(1-c)(1+b^2-2bc)-a(1+q)(1+b)(1-c)+a^2q,\\quad A=a(1-q)(1-b),\\quad S(c)=1+\\frac{32}{25}c^2(1+c),\\quad K(c)=(1+c)(1+\\frac{16}{25}c-\\frac{32}{25}c^3),\\quad W(c)=S(c)J(c)+K(c)A."
+        },
+        {
+          "step": 7,
+          "description": "Substitute the two selected lags and record the first printed factor identity.",
+          "ref": "(Two-lags)",
+          "source_pdf_lines": [
+            1098,
+            1110
+          ],
+          "uses": [
+            "previous_step:6"
+          ],
+          "produces": "the S factor for 1-cos lags",
+          "math": "(1-c)+\\frac4{25}(1-\\cos4\\theta)=(1-c)S(c)."
+        },
+        {
+          "step": 8,
+          "description": "Record the second printed factor identity for the sine contribution.",
+          "ref": "(Two-lags)",
+          "source_pdf_lines": [
+            1111,
+            1120
+          ],
+          "uses": [
+            "previous_step:6"
+          ],
+          "produces": "the K factor for sine lags",
+          "math": "(1+c)\\left(1-\\frac4{25}(8c^3-4c)\\right)=K(c)."
+        },
+        {
+          "step": 9,
+          "description": "Combine the two factor identities with the symbol to obtain the weighted two-lag identity.",
+          "ref": "(Two-lags)",
+          "source_pdf_lines": [
+            1121,
+            1125
+          ],
+          "uses": [
+            "previous_step:3",
+            "previous_step:7",
+            "previous_step:8"
+          ],
+          "produces": "weighted lag symbol",
+          "math": "\\tau_{-1}(\\theta)+\\frac4{25}\\tau_4(\\theta)=\\frac{1-c}{a^2(1-q)}W(c)."
+        },
+        {
+          "step": 10,
+          "description": "At the central parameters expand W*=P/6250000 and record the printed degree-five polynomial.",
+          "ref": "(P)",
+          "source_pdf_lines": [
+            1131,
+            1138
+          ],
+          "uses": [
+            "HB-central_parameters",
+            "previous_step:6"
+          ],
+          "produces": "central polynomial P",
+          "math": "P(c)=19200000c^5+297600c^4-25951072c^3+11531168c^2-660c+86725."
+        },
+        {
+          "step": 11,
+          "description": "Express P on the first interval in the Bernstein basis with its full coefficient row and denominator.",
+          "ref": "Bernstein rows",
+          "source_pdf_lines": [
+            3134,
+            3146
+          ],
+          "uses": [
+            "previous_step:10"
+          ],
+          "produces": "first Bernstein row",
+          "math": "(B_0,B_1,B_2,B_3,B_4,B_5)=\\frac1{5}(93336125,87229513,30707893,6200529,434285,433625)\\quad\\text{on }[-1,0]."
+        },
+        {
+          "step": 12,
+          "description": "Record the complete Bernstein coefficient row on [0,1/2].",
+          "ref": "Bernstein rows",
+          "source_pdf_lines": [
+            3134,
+            3146
+          ],
+          "uses": [
+            "previous_step:10"
+          ],
+          "produces": "second Bernstein row",
+          "math": "(B_0,B_1,B_2,B_3,B_4,B_5)=\\frac1{5}(433625,433295,1874361,3134881,2611513,1719515)\\quad\\text{on }[0,1/2]."
+        },
+        {
+          "step": 13,
+          "description": "Record the complete Bernstein coefficient row on [1/2,3/4].",
+          "ref": "Bernstein rows",
+          "source_pdf_lines": [
+            3134,
+            3146
+          ],
+          "uses": [
+            "previous_step:10"
+          ],
+          "produces": "third Bernstein row",
+          "math": "(B_0,B_1,B_2,B_3,B_4,B_5)=\\frac1{20}(6878060,5094064,2941438,1127811,1115462,5496320)\\quad\\text{on }[1/2,3/4]."
+        },
+        {
+          "step": 14,
+          "description": "Record the complete Bernstein coefficient row on [3/4,1].",
+          "ref": "Bernstein rows",
+          "source_pdf_lines": [
+            3134,
+            3146
+          ],
+          "uses": [
+            "previous_step:10"
+          ],
+          "produces": "fourth Bernstein row",
+          "math": "(B_0,B_1,B_2,B_3,B_4,B_5)=\\frac1{20}(5496320,9877178,18651243,34410444,60876360,103275220)\\quad\\text{on }[3/4,1]."
+        },
+        {
+          "step": 15,
+          "description": "Use nonnegativity and partition of unity of the Bernstein basis on each interval, together with the printed rows, to obtain the uniform strict polynomial and W bounds.",
+          "ref": "(Positive)",
+          "source_pdf_lines": [
+            3107,
+            3125
+          ],
+          "uses": [
+            "previous_step:11",
+            "previous_step:12",
+            "previous_step:13",
+            "previous_step:14"
+          ],
+          "produces": "P(c)>=557731/10 and W*(c)>=557731/62500000",
+          "math": "P(l+(r-l)t)=\\sum_{j=0}^5B_j\\binom5j t^j(1-t)^{5-j},\\quad0\\le t\\le1;\\qquad P(c)\\ge\\frac{557731}{10}>0,\\quad W_*(c)\\ge\\frac{557731}{62500000}\\quad(-1\\le c\\le1)."
+        },
+        {
+          "step": 16,
+          "description": "Add the lag inequalities with weights 1 and 4/25; every nonzero mode has positive coefficient because 1-c>0 and W*>0, while zero mode contributes zero, so all nonzero modes vanish and every cycle is constant.",
+          "ref": "(13)",
+          "source_pdf_lines": [
+            1248,
+            1260
+          ],
+          "uses": [
+            "previous_step:1",
+            "previous_step:9",
+            "previous_step:15"
+          ],
+          "produces": "neg C at the central triple"
+        }
+      ]
+    },
+    {
+      "name": "HB-CENTRAL-W-POSITIVITY",
+      "ref": "(P), (Positive), Bernstein rows",
+      "statement_math": "P(c)=19200000c^5+297600c^4-25951072c^3+11531168c^2-660c+86725,\\quad P(c)\\ge\\frac{557731}{10}>0,\\quad W_*(c)\\ge\\frac{557731}{62500000}\\quad(-1\\le c\\le1).",
+      "role": "Exports the central Bernstein positivity bound for W_* without forcing later proofs to cite the final cycle-exclusion conclusion.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "At the central parameters expand W_* as P/6250000 and record the degree-five polynomial.",
+          "ref": "(P)",
+          "source_pdf_lines": [
+            1131,
+            1138
+          ],
+          "uses": [
+            "HB-central_parameters"
+          ],
+          "produces": "central polynomial P",
+          "math": "P(c)=19200000c^5+297600c^4-25951072c^3+11531168c^2-660c+86725."
+        },
+        {
+          "step": 2,
+          "description": "Use the four printed Bernstein coefficient rows and partition of unity on [-1,0], [0,1/2], [1/2,3/4], and [3/4,1].",
+          "ref": "Bernstein rows",
+          "source_pdf_lines": [
+            1154,
+            1231
+          ],
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "nonnegative Bernstein lower bound for P on [-1,1]",
+          "math": "P(l+(r-l)t)=\\sum_{j=0}^5B_j\\binom5j t^j(1-t)^{5-j},\\quad0\\le t\\le1;\\quad (B_0,\\ldots,B_5)=\\frac1{5}(93336125,87229513,30707893,6200529,434285,433625)\\text{ on }[-1,0];\\quad (B_0,\\ldots,B_5)=\\frac1{5}(433625,433295,1874361,3134881,2611513,1719515)\\text{ on }[0,1/2];\\quad (B_0,\\ldots,B_5)=\\frac1{20}(6878060,5094064,2941438,1127811,1115462,5496320)\\text{ on }[1/2,3/4];\\quad (B_0,\\ldots,B_5)=\\frac1{20}(5496320,9877178,18651243,34410444,60876360,103275220)\\text{ on }[3/4,1]."
+        },
+        {
+          "step": 3,
+          "description": "The smallest Bernstein coefficient over the printed rows gives the central strict positivity bound and hence the W_* lower bound.",
+          "ref": "(Positive)",
+          "source_pdf_lines": [
+            1174,
+            1179
+          ],
+          "uses": [
+            "previous_step:1",
+            "previous_step:2"
+          ],
+          "produces": "central W_* positivity",
+          "math": "P(c)\\ge\\frac{557731}{10}>0,\\quad W_*(c)\\ge\\frac{557731}{62500000}\\quad(-1\\le c\\le1)."
+        }
+      ]
+    },
+    {
+      "name": "HB-BOX-W-MARGIN",
+      "ref": "(Box-margin), robust_box.md (4)--(5)",
+      "statement_math": "\\forall(q,a,b)\\in B\\ \\forall c\\ (|c|\\le1):\\quad W(c)>\\frac3{500}.",
+      "role": "Exports the strict lag-polynomial margin used both by the cycle exclusion on the box and by the D6--D8 frequency estimate.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "All center-to-box line segments lie in the printed Ranges; direct differentiation of W=SJ+KA gives the displayed derivative bounds for J,A,S,K.",
+          "ref": "Ranges and derivative bounds",
+          "source_pdf_lines": [
+            3271,
+            3289
+          ],
+          "uses": [
+            "HB-box"
+          ],
+          "produces": "uniform derivative bounds on center-to-box segments",
+          "math": "\\frac{99}{10000}<q<\\frac{11}{1000},\\quad\\frac94<a<\\frac{23}{10},\\quad\\frac{59}{100}<b<\\frac{61}{100},\\quad |J_q|<13,\\ |J_a|<4,\\ |J_b|<18,\\ |A_q|<1,\\ |A_a|<\\tfrac12,\\ |A_b|<\\tfrac52,\\ |S|<4,\\ |K|<6."
+        },
+        {
+          "step": 2,
+          "description": "Integrate the derivative bounds along a center-to-box segment to compare W with the central polynomial W_*.",
+          "ref": "Box-margin comparison",
+          "source_pdf_lines": [
+            3301,
+            3308
+          ],
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "uniform W-W_* comparison",
+          "math": "|W(c)-W_*(c)|<10^{-5}\\left[4(13+4+18)+6(1+\\tfrac12+\\tfrac52)\\right]=\\frac{41}{25000}<\\frac1{500}."
+        },
+        {
+          "step": 3,
+          "description": "Combine the comparison with the central positivity certificate to obtain the boxed margin.",
+          "ref": "(Box-margin)",
+          "source_pdf_lines": [
+            3311,
+            3315
+          ],
+          "uses": [
+            "previous_step:2",
+            "HB-CENTRAL-W-POSITIVITY"
+          ],
+          "produces": "W(c)>3/500 uniformly on B",
+          "math": "W(c)>\\frac{557731}{62500000}-\\frac1{500}>\\frac3{500}."
+        },
+        {
+          "step": 4,
+          "description": "The robust-box transcription gives the same exported margin by exact rational interval expansion of the six coefficients.",
+          "ref": "robust_box.md (5)",
+          "source_pdf_lines": [
+            4482,
+            4506
+          ],
+          "uses": [
+            "previous_step:3"
+          ],
+          "produces": "robust_box.md W-margin statement",
+          "math": "|W(c)-W_*(c)|<\\frac{1385}{10^6}<\\frac1{500},\\qquad W(c)>\\frac3{500}>0."
+        }
+      ]
+    },
+    {
+      "name": "HB-FREQUENCY-NUMERATOR-ALGEBRA",
+      "ref": "(W), (Multiplier), (Frequency), PDF lines 3057-3068 and 3240-3353",
+      "statement_math": "J(c)=2(1-c)(1+b^2-2bc)-a(1+q)(1+b)(1-c)+a^2q,\\quad A=a(1-q)(1-b),\\quad S(c)=1+\\frac{32}{25}c^2(1+c),\\quad K(c)=(1+c)\\left(1+\\frac{16}{25}c-\\frac{32}{25}c^3\\right),\\quad W(c)=S(c)J(c)+K(c)A,\\quad M(z)=\\varepsilon+(1-z^{-1})+\\frac4{25}(1-z^4),\\quad z=e^{\\mathrm i\\theta},\\ c=\\cos\\theta,\\ r=1-c,\\ h=\\frac{1+b-z-bz^{-1}}a,\\quad d(c)=-a^2q+\\{a(1+q)(1+b)-2(1-b)^2\\}r-4br^2,\\quad T(c)=a^2q^2+\\{2(1-b)^2-2aq(1+b)\\}r+4br^2,\\quad \\varepsilon d-rSJ-rKA=\\varepsilon d-rW.",
+      "role": "Exports the direct polynomial algebra needed in the D6 frequency numerator without citing a final cycle-exclusion theorem.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Introduce the real polynomials J, A, S, K, and W from the two-lag construction; these are the W, S, K, J, and A later used in the frequency numerator.",
+          "ref": "(W)",
+          "source_pdf_lines": [
+            3057,
+            3068
+          ],
+          "uses": [
+            "HB-parameter_domain"
+          ],
+          "produces": "definitions of J(c), A, S(c), K(c), and W(c)",
+          "math": "\\begin{aligned}J(c)={}&2(1-c)(1+b^2-2bc)\\\\&-a(1+q)(1+b)(1-c)+a^2q,\\\\A={}&a(1-q)(1-b),\\\\S(c)={}&1+\\frac{32}{25}c^2(1+c),\\\\K(c)={}&(1+c)\\left(1+\\frac{16}{25}c-\\frac{32}{25}c^3\\right),\\\\W(c)={}&S(c)J(c)+K(c)A.\\end{aligned}"
+        },
+        {
+          "step": 2,
+          "description": "Introduce the finite-lag multiplier and epsilon used in the supply inequality.",
+          "ref": "(Multiplier)",
+          "source_pdf_lines": [
+            3240,
+            3247
+          ],
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "definition of M and epsilon",
+          "math": "M(z)=\\varepsilon+(1-z^{-1})+\\frac4{25}(1-z^4),\\qquad\\varepsilon=10^{-5}."
+        },
+        {
+          "step": 3,
+          "description": "On the unit circle define z, c, r, and h.",
+          "ref": "Frequency setup",
+          "source_pdf_lines": [
+            3318,
+            3322
+          ],
+          "uses": [
+            "previous_step:2"
+          ],
+          "produces": "unit-circle variables for the frequency numerator",
+          "math": "z=e^{\\mathrm i\\theta},\\quad c=\\cos\\theta,\\quad r=1-c,\\qquad h=\\frac{1+b-z-bz^{-1}}a."
+        },
+        {
+          "step": 4,
+          "description": "Use the plant relation and define the real denominator polynomials d and T.",
+          "ref": "d,T definitions",
+          "source_pdf_lines": [
+            3328,
+            3335
+          ],
+          "uses": [
+            "previous_step:3"
+          ],
+          "produces": "definitions of G, ell G-1, d(c), and T(c)",
+          "math": "G=1/(h-q),\\quad \\ell G-1=(1-h)/(h-q),\\qquad\\begin{aligned}d(c)&=-a^2q+\\{a(1+q)(1+b)-2(1-b)^2\\}r-4br^2,\\\\T(c)&=a^2q^2+\\{2(1-b)^2-2aq(1+b)\\}r+4br^2.\\end{aligned}"
+        },
+        {
+          "step": 5,
+          "description": "Record that the denominator is positive because the stable plant has no unit-circle pole.",
+          "ref": "T positivity",
+          "source_pdf_lines": [
+            3337,
+            3337
+          ],
+          "uses": [
+            "HB-parameter_domain",
+            "previous_step:4"
+          ],
+          "produces": "positive real denominator T",
+          "math": "T=a^2|h-q|^2>0."
+        },
+        {
+          "step": 6,
+          "description": "The direct calculation gives the frequency quotient whose numerator must be signed.",
+          "ref": "(Frequency)",
+          "source_pdf_lines": [
+            3339,
+            3343
+          ],
+          "uses": [
+            "previous_step:1",
+            "previous_step:2",
+            "previous_step:3",
+            "previous_step:4",
+            "previous_step:5"
+          ],
+          "produces": "frequency quotient identity",
+          "math": "\\operatorname{Re}\\{M(z)(\\ell G(z)-1)\\}=\\frac{-rW(c)+\\varepsilon d(c)}{T(c)}."
+        },
+        {
+          "step": 7,
+          "description": "Record the two real-part identities used to check the numerator without relying on a software simplification.",
+          "ref": "Frequency algebra",
+          "source_pdf_lines": [
+            3345,
+            3347
+          ],
+          "uses": [
+            "previous_step:1",
+            "previous_step:2",
+            "previous_step:4"
+          ],
+          "produces": "real multiplier component",
+          "math": "d=-J,\\qquad \\operatorname{Re}M=\\varepsilon+rS(c)."
+        },
+        {
+          "step": 8,
+          "description": "Record the imaginary multiplier component and the scaled imaginary part of ell G-1.",
+          "ref": "Frequency algebra",
+          "source_pdf_lines": [
+            3348,
+            3353
+          ],
+          "uses": [
+            "previous_step:1",
+            "previous_step:2",
+            "previous_step:4"
+          ],
+          "produces": "imaginary multiplier and plant components",
+          "math": "\\operatorname{Im}M=\\sin\\theta\\left(1-\\frac4{25}(8c^3-4c)\\right),\\qquad \\operatorname{Im}(\\ell G-1)=A\\sin\\theta\\ \\text{after multiplication by }T."
+        },
+        {
+          "step": 9,
+          "description": "Taking the real part of the product gives the printed numerator identity.",
+          "ref": "Frequency algebra",
+          "source_pdf_lines": [
+            3352,
+            3353
+          ],
+          "uses": [
+            "previous_step:1",
+            "previous_step:7",
+            "previous_step:8"
+          ],
+          "produces": "verified polynomial identity",
+          "math": "\\varepsilon d-rSJ-rKA=\\varepsilon d-rW."
+        }
+      ]
+    },
+    {
+      "name": "HB-BOX-ENDPOINT-RANGES",
+      "ref": "(Ranges), endpoint consequences, PDF lines 3271-3279 and 3355-3361",
+      "statement_math": "\\frac{99}{10000}<q<\\frac{11}{1000},\\quad\\frac94<a<\\frac{23}{10},\\quad\\frac{59}{100}<b<\\frac{61}{100}.\\qquad a(1+q)(1+b)<4,\\qquad a^2q>\\frac1{20},\\qquad a^2q^2<\\frac1{1000},\\qquad 2(1-b)^2+8b<6.",
+      "role": "Provides the exact parameter range consequences used in the D8 sign estimate without depending on Theorem B or HB-BOX.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "All line segments from the central point to the closed box lie inside the printed open rational ranges.",
+          "ref": "(Ranges)",
+          "source_pdf_lines": [
+            3271,
+            3279
+          ],
+          "uses": [
+            "HB-box",
+            "HB-central_parameters"
+          ],
+          "produces": "open rational bounds for q,a,b throughout the box",
+          "math": "\\frac{99}{10000}<q<\\frac{11}{1000},\\quad\\frac94<a<\\frac{23}{10},\\quad\\frac{59}{100}<b<\\frac{61}{100}."
+        },
+        {
+          "step": 2,
+          "description": "The ranges above imply the four endpoint inequalities used later to bound d and T.",
+          "ref": "endpoint consequences",
+          "source_pdf_lines": [
+            3355,
+            3361
+          ],
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "parameter bounds for the frequency sign estimate",
+          "math": "a(1+q)(1+b)<4,\\qquad a^2q>\\frac1{20},\\qquad a^2q^2<\\frac1{1000},\\qquad 2(1-b)^2+8b<6."
+        }
+      ]
+    },
+    {
+      "name": "HB-BOX-CYCLE-FOURIER-EXCLUSION",
+      "ref": "(Lag), (Symbol), (Two-lags), robust_box.md (4)--(5)",
+      "statement_math": "\\sum_i\\Bigg[\\langle g_i,y_{i+k}-y_i\\rangle+\\frac{\\|g_{i+k}-g_i\\|^2+q\\|y_{i+k}-y_i\\|^2-2q\\langle g_{i+k}-g_i,y_{i+k}-y_i\\rangle}{2(1-q)}\\Bigg]\\le0.\\qquad \\sum_{j=0}^{K-1}\\|\\widehat y_j\\|^2\\tau_k(\\theta_j)\\le0.\\qquad \\tau_{-1}(\\theta)+\\frac4{25}\\tau_4(\\theta)=\\frac{1-c}{a^2(1-q)}W(c).",
+      "role": "Parameterized Fourier/Parseval cycle exclusion used by the box proof; it preserves the lag-sum argument instead of citing the central final no-cycle theorem.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "For a hypothetical K-periodic trajectory, apply every ordered interpolation inequality at signed lag k and sum over the period; function values cancel.",
+          "ref": "(Lag)",
+          "source_pdf_lines": [
+            2977,
+            2987
+          ],
+          "uses": [
+            "HB-INTERPOLATION",
+            "HB-C-definition"
+          ],
+          "produces": "nonpositive lag inequality for every signed k",
+          "math": "\\sum_i\\Bigg[\\langle g_i,y_{i+k}-y_i\\rangle+\\frac{\\|g_{i+k}-g_i\\|^2+q\\|y_{i+k}-y_i\\|^2-2q\\langle g_{i+k}-g_i,y_{i+k}-y_i\\rangle}{2(1-q)}\\Bigg]\\le0."
+        },
+        {
+          "step": 2,
+          "description": "Use the unitary discrete Fourier transform and the Heavy-Ball recurrence to express each gradient mode through the transfer variables U,V.",
+          "ref": "Fourier transfer",
+          "source_pdf_lines": [
+            2995,
+            3014
+          ],
+          "uses": [
+            "HB-fixed_objective_trajectory",
+            "previous_step:1"
+          ],
+          "produces": "modewise gradient representation",
+          "math": "\\widehat y_j=\\frac1{\\sqrt K}\\sum_{i=0}^{K-1}y_i e^{-2\\pi\\mathrm i ji/K},\\qquad \\theta_j=\\frac{2\\pi j}K.\\qquad \\widehat g_j=\\mathcal H(\\theta_j)\\widehat y_j,\\qquad \\mathcal H(\\theta)=U-\\mathrm i V,\\qquad U=\\frac{(1+b)(1-\\cos\\theta)}a,\\qquad V=\\frac{(1-b)\\sin\\theta}a."
+        },
+        {
+          "step": 3,
+          "description": "Parseval's identity converts the lag inequality into the printed sum of squared mode norms weighted by tau_k.",
+          "ref": "(Symbol)",
+          "source_pdf_lines": [
+            3016,
+            3033
+          ],
+          "uses": [
+            "previous_step:1",
+            "previous_step:2"
+          ],
+          "produces": "modewise nonpositive lag inequality",
+          "math": "\\sum_{j=0}^{K-1}\\|\\widehat y_j\\|^2\\tau_k(\\theta_j),\\qquad \\tau_k(\\theta)=\\frac{U^2+V^2-(1+q)U+q}{1-q}(1-\\cos k\\theta)-V\\sin k\\theta."
+        },
+        {
+          "step": 4,
+          "description": "Define J,A,S,K,W and substitute the two selected lags into the symbol.",
+          "ref": "(W), (Two-lags)",
+          "source_pdf_lines": [
+            3057,
+            3076
+          ],
+          "uses": [
+            "previous_step:3",
+            "HB-FREQUENCY-NUMERATOR-ALGEBRA"
+          ],
+          "produces": "weighted lag Fourier symbol",
+          "math": "\\begin{aligned}J(c)={}&2(1-c)(1+b^2-2bc)\\\\&-a(1+q)(1+b)(1-c)+a^2q,\\\\A={}&a(1-q)(1-b),\\\\S(c)={}&1+\\frac{32}{25}c^2(1+c),\\\\K(c)={}&(1+c)\\left(1+\\frac{16}{25}c-\\frac{32}{25}c^3\\right),\\\\W(c)={}&S(c)J(c)+K(c)A.\\end{aligned}\\qquad \\tau_{-1}(\\theta)+\\frac4{25}\\tau_4(\\theta)=\\frac{1-c}{a^2(1-q)}W(c)."
+        },
+        {
+          "step": 5,
+          "description": "On the closed box, robust interval arithmetic gives W(c)>0 for every |c|<=1.",
+          "ref": "(5)",
+          "source_pdf_lines": [
+            4501,
+            4507
+          ],
+          "uses": [
+            "HB-BOX-W-MARGIN",
+            "previous_step:4"
+          ],
+          "produces": "strict positivity of every nonzero weighted-lag Fourier coefficient",
+          "math": "|W(c)-W_*(c)|<\\frac{1385}{10^6}<\\frac1{500},\\qquad W(c)>\\frac3{500}>0."
+        },
+        {
+          "step": 6,
+          "description": "Add the lag inequalities at weights 1 and 4/25. The zero mode contributes zero; every nonzero frequency contributes a strictly positive multiple of ||yhat_j||^2, so all nonzero modes vanish and the cycle is constant.",
+          "ref": "Parseval cycle exclusion",
+          "source_pdf_lines": [
+            4509,
+            4516
+          ],
+          "uses": [
+            "previous_step:1",
+            "previous_step:4",
+            "previous_step:5"
+          ],
+          "produces": "no nonconstant finite cycle for any parameter triple in the closed box"
+        }
+      ]
+    },
+    {
+      "name": "HB-BOX",
+      "ref": "(1)--(6) of robust_box.md",
+      "statement_math": "\\mathcal B=\n\\left[\\frac{999}{100000},\\frac{1001}{100000}\\right]\n\\times\\left[\\frac{225999}{100000},\\frac{226001}{100000}\\right]\n\\times\\left[\\frac{59999}{100000},\\frac{60001}{100000}\\right],\n\\tag{1}\n\\qquad\\text{where the coordinates are }(q,a,b).\\qquad \\text{Every point of this box satisfies}\\quad\n\\neg\\mathsf L(q,a,b),\\qquad\n\\neg\\mathsf C(q,a,b),\\qquad\n\\mathsf G(q,a,b).\n\\tag{2}",
+      "role": "Extends the witness and all-period positivity to the full closed box with exact endpoints.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Fix the complex locations and sampled values used throughout the robust-box interpolation certificate.",
+          "ref": "Uniform interpolation witness",
+          "source_pdf_lines": [
+            4416,
+            4420
+          ],
+          "uses": [
+            "HB-box"
+          ],
+          "produces": "fixed z, R, x_i, and F_i for the box certificate",
+          "math": "z=(23+199i)/200,\\quad R=|z|^2=4013/4000,\\quad x=(0,z^{-1},1,z),\\quad F_i=(41/100)|x_i|^2."
+        },
+        {
+          "step": 2,
+          "description": "At each parameter point in the box define the parameter-dependent slope h(q,a,b) and gradients g_i.",
+          "ref": "Uniform interpolation witness",
+          "source_pdf_lines": [
+            4423,
+            4427
+          ],
+          "uses": [
+            "HB-box",
+            "previous_step:1"
+          ],
+          "produces": "parameter-dependent gradients for the fixed locations",
+          "math": "h(q,a,b)=\\frac{1+b-z-b/z}{a},\\qquad g_i=h(q,a,b)x_i."
+        },
+        {
+          "step": 3,
+          "description": "Record the printed rational-interval formulas for the real and imaginary parts of h used to reproduce the interval evaluation.",
+          "ref": "rational interval inputs for (3)",
+          "source_pdf_lines": [
+            4439,
+            4445
+          ],
+          "uses": [
+            "HB-box",
+            "previous_step:1",
+            "previous_step:2"
+          ],
+          "produces": "rational interval expressions for Re h and Im h",
+          "math": "\\operatorname{Re}h=\\frac{1+b-\\operatorname{Re}z-b\\operatorname{Re}(z^{-1})}{a},\\quad\n\\operatorname{Im}h=\\frac{-\\operatorname{Im}z-b\\operatorname{Im}(z^{-1})}{a}."
+        },
+        {
+          "step": 4,
+          "description": "Use endpoint sums, endpoint-product minima and maxima, reciprocal intervals for division, and the no-zero-denominator check; repeated parameter occurrences only enlarge the enclosure.",
+          "ref": "rational interval arithmetic for (3)",
+          "source_pdf_lines": [
+            4447,
+            4453
+          ],
+          "uses": [
+            "HB-box",
+            "previous_step:3"
+          ],
+          "produces": "sound rational interval enclosures for the residual calculation"
+        },
+        {
+          "step": 5,
+          "description": "The minimum lower endpoint over all computed residual enclosures is the displayed rational number, which is greater than 1/1000.",
+          "ref": "(3), lower endpoint",
+          "source_pdf_lines": [
+            4453,
+            4458
+          ],
+          "uses": [
+            "previous_step:4"
+          ],
+          "produces": "uniform lower endpoint greater than 1/1000 for the twelve residual enclosures",
+          "math": "\\frac{1258956992409209822810340188261336072239}\n{744215470645011212060971735989487648427100}>\\frac1{1000}."
+        },
+        {
+          "step": 6,
+          "description": "Conclude the printed strict off-diagonal residual inequality for all twelve ordered pairs i != j from the fixed witness definitions and the interval lower endpoint.",
+          "ref": "(3)",
+          "source_pdf_lines": [
+            4429,
+            4437
+          ],
+          "uses": [
+            "previous_step:2",
+            "previous_step:5"
+          ],
+          "produces": "all twelve off-diagonal residuals are strictly positive uniformly on the box",
+          "math": "F_i-F_j-\\langle g_j,x_i-x_j\\rangle\n-\\frac{\\|g_i-g_j\\|^2+q\\|x_i-x_j\\|^2\n-2q\\langle g_i-g_j,x_i-x_j\\rangle}{2(1-q)}\n>\\frac1{1000}."
+        },
+        {
+          "step": 7,
+          "description": "Apply the finite conjugate construction from the root proof to the residual-certified data, obtaining a single global function for each chosen parameter point with minimizer zero.",
+          "ref": "robust_box.md finite conjugate realization",
+          "source_pdf_lines": [
+            4461,
+            4462
+          ],
+          "uses": [
+            "HB-INTERPOLATION",
+            "previous_step:6"
+          ],
+          "produces": "uniform finite-data realization by an admissible objective on every closed-box parameter"
+        },
+        {
+          "step": 8,
+          "description": "Use the defining choice of h(q,a,b) to make the update from (z^{-1},1) to (1,z) exact, and use the same R>1 similarity to scale all specified certificate features.",
+          "ref": "robust_box.md update and scaling",
+          "source_pdf_lines": [
+            4462,
+            4463
+          ],
+          "uses": [
+            "previous_step:1",
+            "previous_step:2",
+            "previous_step:7",
+            "HB-prescribed_certificate"
+          ],
+          "produces": "exact Heavy-Ball transition and certificate-feature scaling by R>1"
+        },
+        {
+          "step": 9,
+          "description": "The unchanged certificate contradiction gives not L uniformly on the box.",
+          "ref": "robust_box.md certificate contradiction",
+          "source_pdf_lines": [
+            4463,
+            4464
+          ],
+          "uses": [
+            "previous_step:8",
+            "HB-certificate_inequalities",
+            "HB-L-definition"
+          ],
+          "produces": "uniform prescribed-family impossibility",
+          "math": "0<F_3\\le R V_f(z^{-1},1)\\le0."
+        },
+        {
+          "step": 10,
+          "description": "Define J,A,S,K,W exactly as in (4), use W_*(c)=P(c)/6250000 and the Bernstein lower bound 557731/62500000, then use the six coefficient interval bounds 187,198,256,417,275,52 (scaled by 10^6) to obtain |W-W_*|<1385/10^6<1/500. The complete Bernstein rows are: [-1,0] numerators (93336125,87229513,30707893,6200529,434285,433625)/5; [0,1/2] (433625,433295,1874361,3134881,2611513,1719515)/5; [1/2,3/4] (6878060,5094064,2941438,1127811,1115462,5496320)/20; [3/4,1] (5496320,9877178,18651243,34410444,60876360,103275220)/20.",
+          "ref": "(4),(5)",
+          "source_pdf_lines": [
+            4466,
+            4507
+          ],
+          "uses": [
+            "HB-BOX-W-MARGIN"
+          ],
+          "produces": "strict uniform polynomial positivity",
+          "math": "W(c)=\\left[1+\\frac{32}{25}c^2(1+c)\\right]J(c)+A(1+c)\\left[1+\\frac{16}{25}c-\\frac{32}{25}c^3\\right],\\quad |W(c)-W_*(c)|<\\frac{1385}{10^6}<\\frac1{500},\\qquad W(c)>\\frac3{500}>0."
+        },
+        {
+          "step": 11,
+          "description": "Use the parameterized weighted-lag Fourier/Parseval argument with the box margin; positivity at every nonzero frequency excludes all nonconstant finite cycles.",
+          "ref": "(5), Parseval cycle exclusion",
+          "source_pdf_lines": [
+            4511,
+            4525
+          ],
+          "uses": [
+            "previous_step:10",
+            "HB-BOX-CYCLE-FOURIER-EXCLUSION"
+          ],
+          "produces": "uniform \neg C on B"
+        },
+        {
+          "step": 12,
+          "description": "Use the direct D9--D11 route on the same box: the supply/frequency margin feeds the finite-prefix continuation, then the free-response and total-energy estimates give the explicit uniform rate, hence square summability.",
+          "ref": "(D9)--(D11)",
+          "source_pdf_lines": [
+            4240,
+            4337
+          ],
+          "uses": [
+            "HB-DYNAMICS-SUPPLY-FREQUENCY",
+            "HB-CAUSAL-CONTINUATION",
+            "HB-FREE-RESPONSE-TOTAL-ENERGY"
+          ],
+          "produces": "direct box convergence and the D11 rate",
+          "math": "\\|x_t-x_*\\|\\le10^7(1-10^{-14})^{t/2}\\sqrt{\\|x_{-1}-x_*\\|^2+\\|x_0-x_*\\|^2}."
+        },
+        {
+          "step": 13,
+          "description": "Match the direct convergence conclusion to the robust-box transcription's separate assertion G(q,a,b); the transcription states only summability here and says the proof does not identify a rate or add state.",
+          "ref": "Separate convergence on the box",
+          "source_pdf_lines": [
+            4560,
+            4568
+          ],
+          "uses": [
+            "previous_step:12",
+            "HB-G-definition"
+          ],
+          "produces": "uniform G assertion on the box",
+          "math": "\\sum_{t\\ge0}\\|x_t-x_*\\|^2<\\infty."
+        }
+      ]
+    },
+    {
+      "name": "HB-DYNAMICS-LOOP-REPRESENTATION",
+      "ref": "(D5), PDF lines 4178-4192",
+      "statement_math": "\\text{The transformed Heavy-Ball equation has the stable strictly causal transfer function}\\quad G(z)=\\frac{-az}{z^2-(1+b-aq)z+b}.\\tag{D5}\\qquad \\text{Its poles are strictly inside the unit circle, since }b<1\\text{ and }0<aq<2(1+b).\\qquad \\text{If }e\\text{ is the free homogeneous response with initial pair }(x_{-1},x_0),\\text{ variation of constants gives exactly }x=e+GD(x).",
+      "role": "Exports the stable strictly causal plant and variation-of-constants loop identity consumed by the D9 continuation argument.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Transform the centered Heavy-Ball recurrence into its scalar transfer from D(x) to x and print the plant.",
+          "ref": "(D5)",
+          "source_pdf_lines": [
+            4178,
+            4187
+          ],
+          "uses": [
+            "HB-fixed_objective_trajectory",
+            "HB-parameter_domain"
+          ],
+          "produces": "stable strictly causal transfer function G",
+          "math": "G(z)=\\frac{-az}{z^2-(1+b-aq)z+b}."
+        },
+        {
+          "step": 2,
+          "description": "Use the source parameter inequalities b<1 and 0<aq<2(1+b) to locate the poles strictly inside the unit circle.",
+          "ref": "D5 pole sentence",
+          "source_pdf_lines": [
+            4188,
+            4189
+          ],
+          "uses": [
+            "previous_step:1",
+            "HB-parameter_domain"
+          ],
+          "produces": "G is stable and strictly causal"
+        },
+        {
+          "step": 3,
+          "description": "Apply variation of constants to include arbitrary initialization through the free homogeneous response e.",
+          "ref": "D5 variation of constants",
+          "source_pdf_lines": [
+            4189,
+            4192
+          ],
+          "uses": [
+            "previous_step:2",
+            "HB-fixed_objective_trajectory"
+          ],
+          "produces": "loop representation x=e+GD(x)",
+          "math": "x=e+GD(x)."
+        }
+      ]
+    },
+    {
+      "name": "HB-DYNAMICS-SUPPLY-FREQUENCY",
+      "ref": "(D1)--(D8)",
+      "statement_math": "L_0=1-q,\\quad\\psi(x)=f(x)-q\\|x\\|^2/2,\\quad D(x)=\\nabla\\psi(x).\\qquad D(0)=0,\\qquad \\|D(x)\\|\\le L_0\\|x\\|.\\qquad \\text{For every }\\tau\\in[0,1],\\quad M(z)=\\varepsilon+(1-z^{-1})+\\frac4{25}(1-z^4),\\qquad\\varepsilon=10^{-5}.\\qquad \\langle p,M(L_0x-p)\\rangle\\ge0,\\qquad p=\\tau D(x),\\quad x\\in\\ell_2.\\qquad G(z)=\\frac{-az}{z^2-(1+b-aq)z+b}.\\tag{D5}\\qquad \\text{Its poles are strictly inside the unit circle, since }b<1\\text{ and }0<aq<2(1+b).\\qquad x=e+GD(x).\\qquad \\text{For }(q,a,b)\\in\\mathcal B\\text{ and }|z|=1,\\quad \\operatorname{Re}\\{M(L_0G-1)\\}\\le-\\eta,\\qquad\\eta=1/2000.",
+      "role": "Provides the pointwise Lipschitz consequence, the longer-range supply inequality, and a strict frequency margin uniform on the closed box.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Translate x*=0,f*=0 and define L0, psi, D; subtract the quadratic to obtain the L0-smooth upper bound.",
+          "ref": "D1 setup",
+          "source_pdf_lines": [
+            4119,
+            4126
+          ],
+          "uses": [
+            "HB-admissible_objective"
+          ],
+          "produces": "shifted convex nonlinearity and upper bound",
+          "math": "L_0=1-q,\\quad\\psi(x)=f(x)-q\\|x\\|^2/2,\\quad D(x)=\\nabla\\psi(x),\\quad \\psi(y)\\le\\psi(x)+\\langle D(x),y-x\\rangle+\\frac{L_0}{2}\\|y-x\\|^2."
+        },
+        {
+          "step": 2,
+          "description": "For tau in [0,1] set F=tau psi and p_i=gradient F(x_i); the descent argument gives D1.",
+          "ref": "(D1)",
+          "source_pdf_lines": [
+            4127,
+            4134
+          ],
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "scaled interpolation inequality",
+          "math": "F(x_i)-F(x_j)\\ge\\langle p_j,x_i-x_j\\rangle+\\frac{\\|p_i-p_j\\|^2}{2L_0},\\quad p_i=\\nabla F(x_i)."
+        },
+        {
+          "step": 3,
+          "description": "Add the reversed D1 inequality, derive cocoercivity and export the source-printed bounds D(0)=0 and ||D(x)||<=L0||x||.",
+          "ref": "D1 derivation",
+          "source_pdf_lines": [
+            4135,
+            4144
+          ],
+          "uses": [
+            "previous_step:2"
+          ],
+          "produces": "cocoercivity, D(0)=0, and pointwise bound ||D(x)||<=L0||x||",
+          "math": "\\|p_i-p_j\\|^2\\le L_0\\langle p_i-p_j,x_i-x_j\\rangle."
+        },
+        {
+          "step": 4,
+          "description": "For a square-summable zero-extended sequence define p_t,s_t and Phi_t.",
+          "ref": "D2 setup",
+          "source_pdf_lines": [
+            4146,
+            4151
+          ],
+          "uses": [
+            "previous_step:2"
+          ],
+          "produces": "residual sequences are defined",
+          "math": "p_t=\\tau D(x_t),\\quad s_t=L_0x_t-p_t,\\quad \\Phi_t=L_0F(x_t)-\\tfrac12\\|p_t\\|^2."
+        },
+        {
+          "step": 5,
+          "description": "Rearrange D1 using the definitions of p_t,s_t and Phi_t to obtain Phi_i-Phi_j>=<p_j,s_i-s_j>.",
+          "ref": "D2 derivation",
+          "source_pdf_lines": [
+            4152,
+            4153
+          ],
+          "uses": [
+            "previous_step:2",
+            "previous_step:4"
+          ],
+          "produces": "D1 rearranged in Phi,s variables",
+          "math": "\\Phi_i-\\Phi_j\\ge\\langle p_j,s_i-s_j\\rangle."
+        },
+        {
+          "step": 6,
+          "description": "Use the printed bounds 0<=F(x)<=L0||x||^2/2 and ||p||<=L0||x|| to make Phi absolutely summable and p,s square summable for the zero-extended ell2 sequence.",
+          "ref": "D2 summability justification",
+          "source_pdf_lines": [
+            4154,
+            4156
+          ],
+          "uses": [
+            "previous_step:1",
+            "previous_step:3",
+            "previous_step:4",
+            "previous_step:5"
+          ],
+          "produces": "Phi is absolutely summable and p,s are square summable",
+          "math": "0\\le F(x)\\le L_0\\|x\\|^2/2,\\qquad \\|p\\|\\le L_0\\|x\\|."
+        },
+        {
+          "step": 7,
+          "description": "For every signed integer ell, sum the rearranged inequality over (i,j)=(t+ell,t); the summability facts justify changing index and yield D2.",
+          "ref": "(D2)",
+          "source_pdf_lines": [
+            4156,
+            4161
+          ],
+          "uses": [
+            "previous_step:5",
+            "previous_step:6"
+          ],
+          "produces": "bilateral lag supply inequalities",
+          "math": "\\sum_{t\\in\\mathbb Z}\\langle p_t,s_t-s_{t+\\ell}\\rangle\\ge0."
+        },
+        {
+          "step": 8,
+          "description": "Use the earlier cocoercivity inequality with zero and the definitions of p_t,s_t to obtain the zero-lag nonnegativity; combine it with the signed-lag D2 inequalities, define the bilateral multiplier M, derive D4, and record ||M||<3.",
+          "ref": "(D3)--(D4)",
+          "source_pdf_lines": [
+            4162,
+            4176
+          ],
+          "uses": [
+            "previous_step:3",
+            "previous_step:4",
+            "previous_step:7"
+          ],
+          "produces": "supply inequality for every tau and x in ell2",
+          "math": "M(z)=\\varepsilon+(1-z^{-1})+\\frac4{25}(1-z^4),\\quad\\langle p,M(L_0x-p)\\rangle\\ge0,\\quad\\|M\\|<3."
+        },
+        {
+          "step": 9,
+          "description": "Transform the Heavy-Ball recurrence to the stable strictly causal plant G; its poles are inside the unit disk and variation of constants gives x=e+GD(x).",
+          "ref": "(D5)",
+          "source_pdf_lines": [
+            4178,
+            4192
+          ],
+          "uses": [
+            "HB-DYNAMICS-LOOP-REPRESENTATION"
+          ],
+          "produces": "loop representation",
+          "math": "G(z)=\\frac{-az}{z^2-(1+b-aq)z+b},\\qquad x=e+GD(x)."
+        },
+        {
+          "step": 10,
+          "description": "On |z|=1 define c,r,h and use G=1/(h-q) to prepare the frequency identity.",
+          "ref": "frequency setup",
+          "source_pdf_lines": [
+            4194,
+            4197
+          ],
+          "uses": [
+            "previous_step:9"
+          ],
+          "produces": "frequency variables",
+          "math": "c=\\cos\\theta,\\quad r=1-c,\\quad h=(1+b-z-bz^{-1})/a,\\quad G=1/(h-q)."
+        },
+        {
+          "step": 11,
+          "description": "Use the main Frequency display to expand the real part as a quotient with numerator -rW(c)+epsilon d(c).",
+          "ref": "Frequency",
+          "source_pdf_lines": [
+            3337,
+            3343
+          ],
+          "uses": [
+            "previous_step:10",
+            "HB-FREQUENCY-NUMERATOR-ALGEBRA"
+          ],
+          "produces": "numerator-denominator identity",
+          "math": "\\operatorname{Re}\\{M(z)(\\ell G(z)-1)\\}=\\frac{-rW(c)+\\varepsilon d(c)}{T(c)}."
+        },
+        {
+          "step": 12,
+          "description": "Define d and T and record positivity T=a²|h-q|².",
+          "ref": "(D7)",
+          "source_pdf_lines": [
+            4204,
+            4210
+          ],
+          "uses": [
+            "previous_step:11"
+          ],
+          "produces": "explicit d,T and T>0",
+          "math": "d=-a^2q+\\{a(1+q)(1+b)-2(1-b)^2\\}r-4br^2,\\quad T=a^2q^2+\\{2(1-b)^2-2aq(1+b)\\}r+4br^2=a^2|h-q|^2>0."
+        },
+        {
+          "step": 13,
+          "description": "Use d=-J and compute the real part of the multiplier as epsilon+rS(c).",
+          "ref": "Frequency algebra",
+          "source_pdf_lines": [
+            3345,
+            3347
+          ],
+          "uses": [
+            "previous_step:12",
+            "previous_step:10"
+          ],
+          "produces": "real multiplier component",
+          "math": "d=-J,\\qquad \\operatorname{Re}M=\\varepsilon+rS(c)."
+        },
+        {
+          "step": 14,
+          "description": "Compute the imaginary part of M explicitly and, after multiplication by T, identify the imaginary part of ell G-1.",
+          "ref": "Frequency algebra",
+          "source_pdf_lines": [
+            3348,
+            3353
+          ],
+          "uses": [
+            "previous_step:13",
+            "previous_step:12"
+          ],
+          "produces": "imaginary multiplier and plant components",
+          "math": "\\operatorname{Im}M=\\sin\\theta\\left(1-\\frac4{25}(8c^3-4c)\\right),\\qquad \\operatorname{Im}(\\ell G-1)=A\\sin\\theta\\ \\text{after multiplication by }T."
+        },
+        {
+          "step": 15,
+          "description": "Take the real part of the product; the terms expand to the corrected numerator identity epsilon d-rW.",
+          "ref": "Frequency algebra",
+          "source_pdf_lines": [
+            3352,
+            3353
+          ],
+          "uses": [
+            "previous_step:11",
+            "previous_step:13",
+            "previous_step:14",
+            "HB-FREQUENCY-NUMERATOR-ALGEBRA"
+          ],
+          "produces": "verified polynomial identity",
+          "math": "\\varepsilon d-rSJ-rKA=\\varepsilon d-rW."
+        },
+        {
+          "step": 16,
+          "description": "Use exact box endpoint arithmetic to record the four strict inequalities.",
+          "ref": "box endpoint bounds",
+          "source_pdf_lines": [
+            3355,
+            3361
+          ],
+          "uses": [
+            "HB-BOX-ENDPOINT-RANGES"
+          ],
+          "produces": "parameter bounds for sign estimate",
+          "math": "a(1+q)(1+b)<4,\\quad a^2q>1/20,\\quad a^2q^2<1/1000,\\quad2(1-b)^2+8b<6."
+        },
+        {
+          "step": 17,
+          "description": "Name the frequency numerator. The PDF calls it N, but this JSON records it as N_freq to avoid collision with the finite-horizon integer N.",
+          "ref": "(D6), margin-chain setup",
+          "source_pdf_lines": [
+            4198,
+            4200
+          ],
+          "uses": [
+            "previous_step:11"
+          ],
+          "produces": "N_freq=-rW(c)+\\varepsilon d(c) is the numerator of the frequency quotient",
+          "math": "\\operatorname{Re}\\{M(L_0G-1)\\}=\\frac{N}{T},\\qquad N=-rW(1-r)+\\varepsilon d."
+        },
+        {
+          "step": 18,
+          "description": "Using 0<=r<=2, r²<=2r, the endpoint bounds, and W>3/500, bound -N_freq through each printed inequality.",
+          "ref": "margin chain",
+          "source_pdf_lines": [
+            3364,
+            3371
+          ],
+          "uses": [
+            "previous_step:17",
+            "previous_step:12",
+            "previous_step:16",
+            "HB-BOX-W-MARGIN"
+          ],
+          "produces": "-N_freq>T/2000",
+          "math": "-N>\\frac{149}{25000}r+\\frac1{2000000}\\ge\\frac1{2000}(6r+1/1000)>\\frac T{2000}."
+        },
+        {
+          "step": 19,
+          "description": "Divide by positive T and conclude the strict uniform D8 margin, including zero frequency.",
+          "ref": "(D8)",
+          "source_pdf_lines": [
+            4232,
+            4238
+          ],
+          "uses": [
+            "previous_step:12",
+            "previous_step:17",
+            "previous_step:18"
+          ],
+          "produces": "frequency margin eta=1/2000",
+          "math": "\\operatorname{Re}\\{M(L_0G-1)\\}\\le-\\eta,\\qquad\\eta=1/2000."
+        }
+      ]
+    },
+    {
+      "name": "HB-CAUSAL-CONTINUATION",
+      "ref": "(D9), finite-prefix continuation",
+      "statement_math": "g=\\|G\\|,\\quad m=\\|M\\|,\\quad C_0=1+gL_0m/\\eta.\\qquad \\text{If a solution of }x=e+G(\\tau D(x))\\text{ is already known to belong to }\\ell_2,\\text{ then}\\quad 0\\le-\\eta\\|p\\|_2^2+L_0m\\|p\\|_2\\|e\\|_2,\\quad p=\\tau D(x).\\qquad \\|p\\|_2\\le L_0m\\|e\\|_2/\\eta,\\qquad \\|x\\|_2\\le C_0\\|e\\|_2.\\tag{D9}\\qquad \\text{These are conditional estimates so far.}\\qquad \\text{Bounded increasing partial energy sums establish }x\\in\\ell_2.\\ \\text{Only now apply (D9) to sharpen its gain back to }C_0.\\ \\text{A fixed number of steps, with an integer }J\\ge\\max(1,2C_0gL_0)\\text{ and }\\delta=1/J,\\text{ reaches }\\tau=1;\\text{ the case }g=0\\text{ is immediate. This proves stability and (D9) without any external stability theorem or uncontrolled terminal terms.}",
+      "role": "Establishes square summability of the actual trajectory before applying infinite-trajectory estimates.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "For a square-summable loop x=e+G(\\tau D(x)), set p=\\tau D(x), substitute x=e+Gp into D4, and use Parseval together with D8 to obtain the printed quadratic estimate.",
+          "ref": "(D9)",
+          "source_pdf_lines": [
+            4240,
+            4248
+          ],
+          "uses": [
+            "HB-DYNAMICS-LOOP-REPRESENTATION",
+            "HB-DYNAMICS-SUPPLY-FREQUENCY"
+          ],
+          "produces": "conditional quadratic inequality",
+          "math": "0\\le-\\eta\\|p\\|_2^2+L_0m\\|p\\|_2\\|e\\|_2."
+        },
+        {
+          "step": 2,
+          "description": "Divide when p is nonzero (zero case immediate) to derive both conditional gain inequalities.",
+          "ref": "(D9)",
+          "source_pdf_lines": [
+            4249,
+            4255
+          ],
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "conditional loop gain",
+          "math": "\\|p\\|_2\\le L_0m\\|e\\|_2/\\eta,\\qquad\\|x\\|_2\\le C_0\\|e\\|_2,\\quad C_0=1+gL_0m/\\eta."
+        },
+        {
+          "step": 3,
+          "description": "At tau=0 the solution is x=e. Assume the local homotopy induction hypothesis at the old gain tau: every ell2 input has a square-summable old-loop output satisfying D9. Choose delta with C0 delta g L0<=1/2 and proceed by homotopy.",
+          "ref": "finite-prefix continuation",
+          "source_pdf_lines": [
+            4261,
+            4264
+          ],
+          "uses": [
+            "previous_step:2"
+          ],
+          "produces": "old-gain continuation induction hypothesis and admissible continuation increment",
+          "math": "C_0\\delta gL_0\\le1/2."
+        },
+        {
+          "step": 4,
+          "description": "Strict causality of the loop representation defines each finite prefix of the new tau+delta solution without assuming x lies in ell2; define P_n and the truncated old-loop input r^(n), which lies in ell2.",
+          "ref": "finite-prefix continuation",
+          "source_pdf_lines": [
+            4264,
+            4271
+          ],
+          "uses": [
+            "HB-DYNAMICS-LOOP-REPRESENTATION",
+            "previous_step:3"
+          ],
+          "produces": "valid truncated old-loop input",
+          "math": "r^{(n)}=e+\\delta G(P_nD(x))."
+        },
+        {
+          "step": 5,
+          "description": "Apply the old-gain continuation induction hypothesis to the valid input r^(n), obtaining an ell2 old-loop output y^(n); strict causality and induction over time identify prefixes P_n y^(n)=P_n x.",
+          "ref": "finite-prefix continuation",
+          "source_pdf_lines": [
+            4271,
+            4274
+          ],
+          "uses": [
+            "HB-DYNAMICS-LOOP-REPRESENTATION",
+            "previous_step:3",
+            "previous_step:4"
+          ],
+          "produces": "ell2 old-loop output y^(n) and prefix identity",
+          "math": "P_n y^{(n)}=P_n x."
+        },
+        {
+          "step": 6,
+          "description": "Record the old-loop D9 estimate for the ell2 output y^(n) with input r^(n).",
+          "ref": "finite-prefix continuation",
+          "source_pdf_lines": [
+            4271,
+            4273
+          ],
+          "uses": [
+            "previous_step:2",
+            "previous_step:3",
+            "previous_step:4",
+            "previous_step:5"
+          ],
+          "produces": "old-loop estimate ||y^(n)||_2 <= C_0||r^(n)||_2"
+        },
+        {
+          "step": 7,
+          "description": "Bound the truncated old-loop input by the external input plus the increment term, using r^(n)=e+delta G(P_nD(x)), the gain g=||G||, the exported pointwise bound ||D(u)||<=L0||u||, and the prefix identity P_n y^(n)=P_n x.",
+          "ref": "finite-prefix continuation",
+          "source_pdf_lines": [
+            4268,
+            4275
+          ],
+          "uses": [
+            "HB-DYNAMICS-SUPPLY-FREQUENCY",
+            "previous_step:3",
+            "previous_step:4",
+            "previous_step:5"
+          ],
+          "produces": "input estimate ||r^(n)||_2 <= ||e||_2 + delta g L_0||P_n x||_2"
+        },
+        {
+          "step": 8,
+          "description": "Combine the old-loop estimate, the input estimate, and the prefix identity to obtain the first displayed inequality for ||P_n x||_2.",
+          "ref": "finite-prefix continuation",
+          "source_pdf_lines": [
+            4274,
+            4276
+          ],
+          "uses": [
+            "previous_step:5",
+            "previous_step:6",
+            "previous_step:7"
+          ],
+          "produces": "pre-absorption partial norm inequality",
+          "math": "\\|P_nx\\|_2\\le C_0\\|e\\|_2+C_0\\delta gL_0\\|P_nx\\|_2."
+        },
+        {
+          "step": 9,
+          "description": "Absorb the increment term using the chosen side condition C0 delta g L0<=1/2 to obtain the displayed uniform partial norm bound.",
+          "ref": "finite-prefix continuation",
+          "source_pdf_lines": [
+            4275,
+            4277
+          ],
+          "uses": [
+            "previous_step:3",
+            "previous_step:8"
+          ],
+          "produces": "uniform partial norm bound",
+          "math": "\\|P_nx\\|_2\\le2C_0\\|e\\|_2."
+        },
+        {
+          "step": 10,
+          "description": "Bounded increasing partial energy sums prove x is in ell2; then sharpen the gain via D9 and choose J>=max(1,2C0gL0), delta=1/J to reach tau=1.",
+          "ref": "finite-prefix continuation",
+          "source_pdf_lines": [
+            4278,
+            4282
+          ],
+          "uses": [
+            "previous_step:2",
+            "previous_step:9"
+          ],
+          "produces": "actual trajectory is square summable and satisfies D9",
+          "math": "J\\ge\\max(1,2C_0gL_0),\\quad\\delta=1/J."
+        }
+      ]
+    },
+    {
+      "name": "HB-FREE-RESPONSE-TOTAL-ENERGY",
+      "ref": "(D10), PDF lines 4310–4325",
+      "statement_math": "\\forall(q,a,b)\\in B\\ \\forall d\\ge1\\ \\forall f\\in\\mathcal F_{q,1}(\\mathbb R^d)\\ \\forall Y_0:\\quad \\sum_{t\\ge0}\\|Y_t\\|^2\\le(1+200\\cdot610000^2)\\|Y_0\\|^2\\le C\\|Y_0\\|^2,\\qquad C=10^{14}.\\tag{D10}\\qquad S_t=\\sum_{j=t}^\\infty\\|Y_j\\|^2,\\qquad S_t\\le C\\|Y_t\\|^2,\\qquad S_{t+1}=S_t-\\|Y_t\\|^2\\le(1-C^{-1})S_t,\\qquad\\|Y_t\\|^2\\le C(1-C^{-1})^t\\|Y_0\\|^2.",
+      "role": "Converts the loop gain into the exact uniform Theorem B rate and supplies total and tail energy bounds.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Set alpha and use endpoint comparison on the box to obtain the discriminant and root-location facts.",
+          "ref": "Gain",
+          "source_pdf_lines": [
+            4284,
+            4285
+          ],
+          "uses": [
+            "HB-box"
+          ],
+          "produces": "alpha>0, alpha^2>4b, and both characteristic roots lie in (0,1)",
+          "math": "\\alpha=1+b-aq,\\quad \\alpha>0,\\quad \\alpha^2>4b,\\quad\\text{and two roots in }(0,1)."
+        },
+        {
+          "step": 2,
+          "description": "Define the scalar impulse-response recurrence and use the root formula to get nonnegativity.",
+          "ref": "Gain",
+          "source_pdf_lines": [
+            4286,
+            4288
+          ],
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "nonnegative impulse-response coefficients",
+          "math": "k_{-1}=0,\\quad k_0=1,\\quad k_{t+1}=\\alpha k_t-bk_{t-1},\\quad k_t\\ge0."
+        },
+        {
+          "step": 3,
+          "description": "Sum the one-sign impulse response of G to obtain the exact gain bound and then combine with m<3 and D9.",
+          "ref": "Gain",
+          "source_pdf_lines": [
+            4287,
+            4293
+          ],
+          "uses": [
+            "previous_step:2",
+            "HB-CAUSAL-CONTINUATION"
+          ],
+          "produces": "g<101 and ||x||2<=610000||e||2",
+          "math": "a\\sum_{t\\ge0}k_t=\\frac a{1-\\alpha+b}=\\frac1q<101."
+        },
+        {
+          "step": 4,
+          "description": "Write the free response in terms of k_t.",
+          "ref": "free response",
+          "source_pdf_lines": [
+            4295,
+            4296
+          ],
+          "uses": [
+            "previous_step:3"
+          ],
+          "produces": "explicit homogeneous response",
+          "math": "e_t=k_tx_0-bk_{t-1}x_{-1}."
+        },
+        {
+          "step": 5,
+          "description": "Define R_k,R_1 and sum the recurrence and its square to obtain the two identities.",
+          "ref": "free response",
+          "source_pdf_lines": [
+            4296,
+            4303
+          ],
+          "uses": [
+            "previous_step:4"
+          ],
+          "produces": "closed form R_k",
+          "math": "(1+b)R_1=\\alpha R_k,\\quad R_k=1+(\\alpha^2+b^2)R_k-2\\alpha bR_1,\\quad R_k=\\frac{1+b}{(1-b)aq[2(1+b)-aq]}."
+        },
+        {
+          "step": 6,
+          "description": "Apply Cauchy–Schwarz and endpoint comparison to bound the free-response energy by 100 times the initial energy.",
+          "ref": "free response",
+          "source_pdf_lines": [
+            4304,
+            4309
+          ],
+          "uses": [
+            "previous_step:5"
+          ],
+          "produces": "free-response energy bound",
+          "math": "\\sum_{t\\ge0}\\|e_t\\|^2\\le100(\\|x_{-1}\\|^2+\\|x_0\\|^2)."
+        },
+        {
+          "step": 7,
+          "description": "Combine loop and free-response bounds for Y_t to obtain D10.",
+          "ref": "(D10)",
+          "source_pdf_lines": [
+            4310,
+            4317
+          ],
+          "uses": [
+            "previous_step:3",
+            "previous_step:6"
+          ],
+          "produces": "total state energy bound",
+          "math": "\\sum_{t\\ge0}\\|Y_t\\|^2\\le(1+200\\cdot610000^2)\\|Y_0\\|^2\\le C\\|Y_0\\|^2,\\quad C=10^{14}."
+        },
+        {
+          "step": 8,
+          "description": "Apply D10 to every tail, define S_t, and derive tail contraction and the pointwise state estimate.",
+          "ref": "(D10)--(D11)",
+          "source_pdf_lines": [
+            4318,
+            4325
+          ],
+          "uses": [
+            "previous_step:7"
+          ],
+          "produces": "geometric tail contraction",
+          "math": "S_t=\\sum_{j=t}^{\\infty}\\|Y_j\\|^2,\\quad S_t\\le C\\|Y_t\\|^2,\\quad S_{t+1}\\le(1-C^{-1})S_t,\\quad\\|Y_t\\|^2\\le C(1-C^{-1})^t\\|Y_0\\|^2."
+        },
+        {
+          "step": 9,
+          "description": "Undo translation and take square roots to print D11/Theorem B rate.",
+          "ref": "(D11)",
+          "source_pdf_lines": [
+            4326,
+            4337
+          ],
+          "uses": [
+            "previous_step:8"
+          ],
+          "produces": "uniform pointwise rate",
+          "math": "\\|x_t-x_*\\|\\le10^7(1-10^{-14})^{t/2}\\sqrt{\\|x_{-1}-x_*\\|^2+\\|x_0-x_*\\|^2}."
+        }
+      ]
+    },
+    {
+      "name": "HB-RECORD-GENERAL",
+      "ref": "common_record_review.md lines 3–13, PDF §7.1 lines 4582–4591",
+      "statement_math": "\\forall(q,a,b)\\in\\mathcal D\\ \\forall d\\ge1,\\ \\text{if four samples indexed by }*,0,1,2\\text{ have }(x_*,g_*,F_*)=(0,0,0),\\ \\text{all ordered interpolation residuals nonnegative }(I_{ij}\\ge0\\ \\forall(i,j)),\\ x_2=(1+b)x_1-bx_0-a g_1,\\ S^TS=RI,\\ R>1,\\ x_{j+1}=Sx_j,\\ g_{j+1}=Sg_j,\\ F_{j+1}=RF_j\\ (j=0,1),\\ F_0>0,\\ \\text{then no common finite-valued }\\Phi\\text{ of the displayed full two-point oracle record }\\mathcal O_f(u,v)=\\big(u-x_*,\\nabla f(u),v-x_*,\\nabla f(v),f(u)-f_*,f(v)-f_*\\big)\\text{ can satisfy }f(w)-f_*\\le\\Phi(\\mathcal O_f(v,w))\\le\\Phi(\\mathcal O_f(u,v))\\text{ for every admissible objective and every initial pair at these parameters and dimension.}",
+      "role": "General conditional record obstruction; the rational witness instantiates its antecedents for HB-C.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Fix arbitrary parameters, dimension and witness; set J={*,0,1,2}, L=1-q, p_i=g_i-qx_i and h_i=F_i-q||x_i||²/2, then expand the residual to equation (1).",
+          "ref": "(1)",
+          "source_pdf_lines": [
+            4596,
+            4611
+          ],
+          "uses": [
+            "HB-record_obstruction_antecedents",
+            "HB-finite_data_residual_condition"
+          ],
+          "produces": "shifted residual inequalities",
+          "math": "h_i-h_j-\\langle p_j,x_i-x_j\\rangle-\\frac{\\|p_i-p_j\\|^2}{2L}=I_{ij}\\ge0."
+        },
+        {
+          "step": 2,
+          "description": "Record the explicit numerator identity showing the original q coefficient is retained.",
+          "ref": "(1) expansion",
+          "source_pdf_lines": [
+            4605,
+            4611
+          ],
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "equivalence with original interpolation residual",
+          "math": "\\|g_i-g_j-q(x_i-x_j)\\|^2+qL\\|x_i-x_j\\|^2=\\|g_i-g_j\\|^2+q\\|x_i-x_j\\|^2-2q\\langle g_i-g_j,x_i-x_j\\rangle."
+        },
+        {
+          "step": 3,
+          "description": "Define Q_i and H on all of R^d; use Q_i(p_i)-Q_j(p_i)=I_ji>=0 to establish active pieces and the strong support inequality.",
+          "ref": "(2)--(3)",
+          "source_pdf_lines": [
+            4613,
+            4633
+          ],
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "H and active-piece support",
+          "math": "Q_i(p)=\\langle p,x_i\\rangle-h_i+\\frac{\\|p-p_i\\|^2}{2L},\\quad H(p)=\\max_{i\\in J}Q_i(p),\\quad Q_i(p_i)-Q_j(p_i)=I_{ji}\\ge0."
+        },
+        {
+          "step": 4,
+          "description": "Subtracting ||p||²/(2L) leaves an affine maximum, so H is finite continuous and 1/L-strongly convex; the starred piece gives H(0)=0 and H(p)>=||p||²/(2L). Coercivity yields a unique minimizer P(x) for H(p)-<x,p>.",
+          "ref": "(3) and attainment",
+          "source_pdf_lines": [
+            4635,
+            4643
+          ],
+          "uses": [
+            "previous_step:3"
+          ],
+          "produces": "global conjugate attainment and unique P(x)"
+        },
+        {
+          "step": 5,
+          "description": "Apply strong subgradient inequality (4) at P(x),P(y) to obtain monotonicity and the Lipschitz estimate (5).",
+          "ref": "(4)--(5)",
+          "source_pdf_lines": [
+            4645,
+            4665
+          ],
+          "uses": [
+            "previous_step:4"
+          ],
+          "produces": "P is L-Lipschitz",
+          "math": "H(r)\\ge H(p)+\\langle s,r-p\\rangle+\\frac1{2L}\\|r-p\\|^2,\\quad\\langle x-y,P(x)-P(y)\\rangle\\ge\\frac1L\\|P(x)-P(y)\\|^2,\\quad\\|P(x)-P(y)\\|\\le L\\|x-y\\|."
+        },
+        {
+          "step": 6,
+          "description": "Use maximizing inequalities for the conjugate to bound the remainder and conclude H* is globally differentiable with gradient P and L-Lipschitz gradient.",
+          "ref": "(6)",
+          "source_pdf_lines": [
+            4667,
+            4677
+          ],
+          "uses": [
+            "previous_step:5"
+          ],
+          "produces": "smooth conjugate",
+          "math": "0\\le H^*(x+v)-H^*(x)-\\langle P(x),v\\rangle\\le\\langle P(x+v)-P(x),v\\rangle\\le L\\|v\\|^2."
+        },
+        {
+          "step": 7,
+          "description": "Use active pieces to identify P(x_i)=p_i and H*(x_i)=h_i, then define the base interpolant f_0.",
+          "ref": "realization",
+          "source_pdf_lines": [
+            4679,
+            4683
+          ],
+          "uses": [
+            "previous_step:3",
+            "previous_step:6"
+          ],
+          "produces": "base function f_0 and exact sample realization",
+          "math": "f_0(x)=H^*(x)+\\frac q2\\|x\\|^2."
+        },
+        {
+          "step": 8,
+          "description": "Convexity of H* gives the printed q-strong convexity inequality for f_0.",
+          "ref": "realization strong convexity",
+          "source_pdf_lines": [
+            4685,
+            4690
+          ],
+          "uses": [
+            "previous_step:7"
+          ],
+          "produces": "f_0 is q-strongly convex",
+          "math": "f_0(y)\\ge f_0(x)+\\langle\\nabla f_0(x),y-x\\rangle+\n\\frac q2\\|y-x\\|^2."
+        },
+        {
+          "step": 9,
+          "description": "Use the Lipschitz estimate for P and q+L=1 to get the printed gradient Lipschitz bound for f_0.",
+          "ref": "realization smoothness",
+          "source_pdf_lines": [
+            4692,
+            4697
+          ],
+          "uses": [
+            "previous_step:5",
+            "previous_step:7"
+          ],
+          "produces": "f_0 has 1-Lipschitz gradient",
+          "math": "\\|\\nabla f_0(y)-\\nabla f_0(x)\\|\n\\le (L+q)\\|y-x\\|=\\|y-x\\|."
+        },
+        {
+          "step": 10,
+          "description": "The starred sample fixes f_0(0)=0 and gradient zero; strong convexity makes zero the unique minimizer and completes admissibility in the original dimension.",
+          "ref": "realization conclusion",
+          "source_pdf_lines": [
+            4699,
+            4703
+          ],
+          "uses": [
+            "previous_step:7",
+            "previous_step:8",
+            "previous_step:9"
+          ],
+          "produces": "global admissible interpolant f_0 with minimizer and minimum zero"
+        },
+        {
+          "step": 11,
+          "description": "From S^TS=RI record the exact norm scaling and transpose identity.",
+          "ref": "(7)",
+          "source_pdf_lines": [
+            4705,
+            4712
+          ],
+          "uses": [
+            "HB-record_obstruction_antecedents"
+          ],
+          "produces": "scaling identities for S^n",
+          "math": "\\|S^n v\\|=R^{n/2}\\|v\\|,\\qquad\n\\|S^{-n}v\\|=R^{-n/2}\\|v\\|,\\qquad\nR^n(S^{-n})^T=S^n."
+        },
+        {
+          "step": 12,
+          "description": "Define f_n and apply the exact chain rule, using the transpose identity to remove the apparent missing factor.",
+          "ref": "(8)",
+          "source_pdf_lines": [
+            4714,
+            4721
+          ],
+          "uses": [
+            "previous_step:10",
+            "previous_step:11"
+          ],
+          "produces": "transformed objective and gradient formula",
+          "math": "\\nabla f_n(y)=R^n(S^{-n})^T\\nabla f_0(S^{-n}y)\n=S^n\\nabla f_0(S^{-n}y)."
+        },
+        {
+          "step": 13,
+          "description": "Transform the strong convexity inequality for f_0 and record the printed gradient Lipschitz estimate for f_n.",
+          "ref": "scaled admissibility",
+          "source_pdf_lines": [
+            4723,
+            4737
+          ],
+          "uses": [
+            "previous_step:8",
+            "previous_step:9",
+            "previous_step:11",
+            "previous_step:12"
+          ],
+          "produces": "every f_n belongs to the identical admissible class with minimizer zero",
+          "math": "\\|\\nabla f_n(z)-\\nabla f_n(y)\\|\n\\le R^{n/2}\\|S^{-n}(z-y)\\|=\\|z-y\\|."
+        },
+        {
+          "step": 14,
+          "description": "Evaluate f_n and its gradient on scaled samples to get the exact transformed sample identities.",
+          "ref": "(9)",
+          "source_pdf_lines": [
+            4737,
+            4744
+          ],
+          "uses": [
+            "previous_step:12",
+            "previous_step:13"
+          ],
+          "produces": "transformed sample identities",
+          "math": "f_n(S^n x_j)=R^n F_j,\\qquad\n\\nabla f_n(S^n x_j)=S^n g_j."
+        },
+        {
+          "step": 15,
+          "description": "Assume for contradiction that a map Phi as in the conclusion exists for the fixed q,a,b,d; it may depend on those fixed parameters, is finite on every record, and remains the same map as n and the objective vary.",
+          "ref": "contradiction hypothesis",
+          "source_pdf_lines": [
+            4746,
+            4747
+          ],
+          "uses": [
+            "HB-record-map-scope"
+          ],
+          "produces": "common-Phi contradiction hypothesis with the two certificate inequalities for every admissible objective and every initial pair"
+        },
+        {
+          "step": 16,
+          "description": "Define the scaled initial state u_n,v_n and the predecessor record A_n using the transformed sample identities.",
+          "ref": "(10)",
+          "source_pdf_lines": [
+            4749,
+            4753
+          ],
+          "uses": [
+            "previous_step:14"
+          ],
+          "produces": "predecessor records A_n",
+          "math": "u_n=S^n x_0,\\quad v_n=S^n x_1,\\quad A_n=O_{f_n}(u_n,v_n)=(S^n x_0,S^n g_0,S^n x_1,S^n g_1,R^nF_0,R^nF_1)."
+        },
+        {
+          "step": 17,
+          "description": "Define w_n and verify the legal Heavy-Ball successor identity w_n=S^nx_2.",
+          "ref": "(11)",
+          "source_pdf_lines": [
+            4756,
+            4762
+          ],
+          "uses": [
+            "HB-fixed_objective_trajectory",
+            "previous_step:12",
+            "previous_step:14",
+            "previous_step:16"
+          ],
+          "produces": "successor state",
+          "math": "w_n=(1+b)v_n-bu_n-a\\nabla f_n(v_n)=S^nx_2."
+        },
+        {
+          "step": 18,
+          "description": "Expand every component of the successor record and identify it exactly with A_{n+1}.",
+          "ref": "(12)",
+          "source_pdf_lines": [
+            4764,
+            4779
+          ],
+          "uses": [
+            "previous_step:14",
+            "previous_step:16",
+            "previous_step:17"
+          ],
+          "produces": "full six-component record equality",
+          "math": "\\begin{aligned}\n\\mathcal O_{f_n}(v_n,w_n)\n&=(S^nx_1,S^ng_1,S^nx_2,S^ng_2,R^nF_1,R^nF_2)\\\\\n&=(S^{n+1}x_0,S^{n+1}g_0,S^{n+1}x_1,S^{n+1}g_1,\nR^{n+1}F_0,R^{n+1}F_1)\\\\\n&=A_{n+1}.\n\\end{aligned}"
+        },
+        {
+          "step": 19,
+          "description": "Apply the common Phi contradiction hypothesis to each fixed admissible f_n and initial pair, use the successor record equality, and retain the objective-gap lower bound.",
+          "ref": "(13)",
+          "source_pdf_lines": [
+            4781,
+            4786
+          ],
+          "uses": [
+            "previous_step:13",
+            "previous_step:15",
+            "previous_step:17",
+            "previous_step:18"
+          ],
+          "produces": "record chain",
+          "math": "R^nF_2=f_n(w_n)-f_{n,*}\\le\\Phi(A_{n+1})\\le\\Phi(A_n)."
+        },
+        {
+          "step": 20,
+          "description": "Induct through finitely many inequalities from (13) to bound every scaled successor gap by the initial record value.",
+          "ref": "record contradiction",
+          "source_pdf_lines": [
+            4789,
+            4790
+          ],
+          "uses": [
+            "previous_step:19"
+          ],
+          "produces": "finite-chain bound for every n",
+          "math": "R^nF_2\\le\\Phi(A_0)\\quad\\text{for every }n,\\qquad F_2=R^2F_0>0,\\quad R>1."
+        },
+        {
+          "step": 21,
+          "description": "Since F_2>0 and R>1 make the lower bounds unbounded while Phi(A_0) is one finite real number, obtain the contradiction.",
+          "ref": "record contradiction",
+          "source_pdf_lines": [
+            4789,
+            4792
+          ],
+          "uses": [
+            "previous_step:20"
+          ],
+          "produces": "no common finite-valued record map"
+        },
+        {
+          "step": 22,
+          "description": "Record the source's quantifier audit: every certificate use concerns one admissible objective and one allowed initial pair; the cross-objective join is justified only by the common-map quantifier and exact equality of records.",
+          "ref": "record quantifier audit",
+          "source_pdf_lines": [
+            4794,
+            4798
+          ],
+          "uses": [
+            "previous_step:15",
+            "previous_step:18",
+            "previous_step:19",
+            "previous_step:21"
+          ],
+          "produces": "full universal conditional record obstruction"
+        }
+      ]
+    },
+    {
+      "name": "HB-ENERGY-INFINITE",
+      "ref": "§7.2, (D10)",
+      "statement_math": "\\text{On the closed box, for each fixed }f,\\text{ let }T_f\\text{ be the centered two-state HB update and }C=10^{14}.\\quad \\text{For every finite }d\\ge1,\\text{ every admissible fixed objective }f,\\text{ and every centered state }Y,\\quad E_f(Y)=\\sum_{j=0}^{\\infty}\\|T_f^jY\\|^2.\\qquad \\|Y\\|^2\\le E_f(Y)\\le C\\|Y\\|^2,\\qquad C=10^{14}.\\qquad E_f(T_fY)=E_f(Y)-\\|Y\\|^2\\le(1-C^{-1})E_f(Y).\\qquad \\sum_{j=N}^{\\infty}\\|T_f^jY\\|^2\\le C(1-C^{-1})^N\\|Y\\|^2.\\qquad \\text{The continuous partial sums converge uniformly on bounded sets, so }E_f\\text{ is continuous.}",
+      "role": "Defines the continuous objective-dependent infinite-horizon energy and its contraction.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Define E_f as the infinite state-energy series and apply D10 to every initial state to obtain absolute summability and norm equivalence.",
+          "ref": "§7.2",
+          "source_pdf_lines": [
+            3679,
+            3689
+          ],
+          "uses": [
+            "HB-fixed_objective_trajectory",
+            "HB-FREE-RESPONSE-TOTAL-ENERGY"
+          ],
+          "produces": "finite energy value and two-sided bounds",
+          "math": "E_f(Y)=\\sum_{j=0}^{\\infty}\\|T_f^jY\\|^2,\\quad\\|Y\\|^2\\le E_f(Y)\\le C\\|Y\\|^2."
+        },
+        {
+          "step": 2,
+          "description": "Shift the convergent series and use the lower norm bound to derive strict contraction.",
+          "ref": "§7.2",
+          "source_pdf_lines": [
+            3691,
+            3696
+          ],
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "energy contraction",
+          "math": "E_f(T_fY)=E_f(Y)-\\|Y\\|^2\\le(1-C^{-1})E_f(Y)."
+        },
+        {
+          "step": 3,
+          "description": "Use the tail-energy estimate to bound tails uniformly on bounded sets, then finite partial sums converge locally uniformly; continuity of each partial sum gives continuity of E_f.",
+          "ref": "§7.2",
+          "source_pdf_lines": [
+            3698,
+            3705
+          ],
+          "uses": [
+            "previous_step:2",
+            "HB-FREE-RESPONSE-TOTAL-ENERGY"
+          ],
+          "produces": "explicit tail bound, locally uniform convergence on bounded sets, and continuous infinite-horizon energy",
+          "math": "\\sum_{j=N}^{\\infty}\\|T_f^jY\\|^2\\le C(1-C^{-1})^N\\|Y\\|^2."
+        }
+      ]
+    },
+    {
+      "name": "HB-ENERGY-FINITE",
+      "ref": "final section of submission_dynamics.md, PDF lines 4342-4374",
+      "statement_math": "\\text{On the same box, for each fixed objective and every centered state }Y,\\quad N=48C=4\\,800\\,000\\,000\\,000\\,000.\\qquad \\mathcal E_{f,N}(Y)=\\sum_{k=0}^{N-1}\\|T_f^kY\\|^2.\\qquad \\|Y\\|^2\\le\\mathcal E_{f,N}(Y)\\le C\\|Y\\|^2.\\qquad \\mathcal E_{f,N}(T_fY)-\\mathcal E_{f,N}(Y)=\\|T_f^NY\\|^2-\\|Y\\|^2\\le-\\tfrac12\\|Y\\|^2.\\qquad \\mathcal E_{f,N}(T_fY)\\le(1-1/(2C))\\mathcal E_{f,N}(Y).\\qquad \\text{This is continuous as a finite sum of continuous compositions.}\\qquad \\text{Smoothness gives }f(w)-f_*\\le\\|w-x_*\\|^2/2,\\text{ so the translated }\\mathcal E_{f,N}\\text{ satisfies the same lower-bound and monotonicity inequalities requested of }V.",
+      "role": "Provides the exact finite-horizon continuous energy and the objective-gap certificate consequence.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Define the fixed finite horizon N=48C and E_{f,N}; the total-energy estimate (D10) gives the two-sided norm bounds.",
+          "ref": "finite-energy definition",
+          "source_pdf_lines": [
+            4342,
+            4348
+          ],
+          "uses": [
+            "HB-fixed_objective_trajectory",
+            "HB-FREE-RESPONSE-TOTAL-ENERGY"
+          ],
+          "produces": "finite energy definition and two-sided bounds",
+          "math": "N=48C=4\\,800\\,000\\,000\\,000\\,000,\\quad\\mathcal E_{f,N}(Y)=\\sum_{k=0}^{N-1}\\|T_f^kY\\|^2,\\quad\\|Y\\|^2\\le\\mathcal E_{f,N}(Y)\\le C\\|Y\\|^2."
+        },
+        {
+          "step": 2,
+          "description": "Use the first two terms of the binomial expansion to get the printed lower bound.",
+          "ref": "finite-energy binomial comparison",
+          "source_pdf_lines": [
+            4349,
+            4350
+          ],
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "binomial lower bound",
+          "math": "(1+1/(C-1))^C>2."
+        },
+        {
+          "step": 3,
+          "description": "Rewrite the preceding binomial lower bound as the printed decay comparison.",
+          "ref": "finite-energy one-block decay",
+          "source_pdf_lines": [
+            4349,
+            4350
+          ],
+          "uses": [
+            "previous_step:2"
+          ],
+          "produces": "one-block contraction comparison",
+          "math": "(1-1/C)^C<1/2."
+        },
+        {
+          "step": 4,
+          "description": "Record the printed arithmetic comparison between the chosen horizon multiplier and C.",
+          "ref": "finite-energy horizon comparison",
+          "source_pdf_lines": [
+            4351,
+            4351
+          ],
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "horizon exponent dominates 2C",
+          "math": "2^{48}>2C."
+        },
+        {
+          "step": 5,
+          "description": "Combine the state estimate preceding (D11), the decay comparison, and N=48C to obtain the printed terminal half bound.",
+          "ref": "finite-energy terminal state bound",
+          "source_pdf_lines": [
+            4351,
+            4352
+          ],
+          "uses": [
+            "previous_step:1",
+            "previous_step:3",
+            "previous_step:4",
+            "HB-FREE-RESPONSE-TOTAL-ENERGY"
+          ],
+          "produces": "terminal state bound",
+          "math": "\\|T_f^NY\\|^2\\le\\|Y\\|^2/2."
+        },
+        {
+          "step": 6,
+          "description": "Telescope the finite sum exactly and apply the terminal bound.",
+          "ref": "finite-energy telescope",
+          "source_pdf_lines": [
+            4352,
+            4356
+          ],
+          "uses": [
+            "previous_step:5",
+            "previous_step:1"
+          ],
+          "produces": "finite-horizon decrease",
+          "math": "\\mathcal E_{f,N}(T_fY)-\\mathcal E_{f,N}(Y)=\\|T_f^NY\\|^2-\\|Y\\|^2\\le-\\tfrac12\\|Y\\|^2."
+        },
+        {
+          "step": 7,
+          "description": "Use the upper bound E_{f,N}(Y)<=C||Y||², equivalently ||Y||²>=E_{f,N}(Y)/C, to derive contraction.",
+          "ref": "finite-energy contraction",
+          "source_pdf_lines": [
+            4357,
+            4360
+          ],
+          "uses": [
+            "previous_step:6",
+            "previous_step:1"
+          ],
+          "produces": "finite-energy contraction",
+          "math": "\\mathcal E_{f,N}(T_fY)\\le(1-1/(2C))\\mathcal E_{f,N}(Y)."
+        },
+        {
+          "step": 8,
+          "description": "The finite-horizon energy is continuous because it is a finite sum of continuous compositions; the future evaluations are only in the proof function and do not alter the algorithm or state.",
+          "ref": "finite-energy continuity and scope",
+          "source_pdf_lines": [
+            4361,
+            4364
+          ],
+          "uses": [
+            "HB-fixed_objective_trajectory",
+            "previous_step:1"
+          ],
+          "produces": "continuous finite-horizon energy with unchanged algorithmic state"
+        },
+        {
+          "step": 9,
+          "description": "For a certificate state, derive the centered bridge Y=(u-x_*,v-x_*) and T_fY=(v-x_*,w-x_*) from the source successor formula and the centered Heavy-Ball update; this is a derived bridge, not a separately printed source formula.",
+          "ref": "(HB), (L), finite-energy scope",
+          "source_pdf_lines": [
+            2624,
+            2628
+          ],
+          "uses": [
+            "HB-fixed_objective_trajectory",
+            "HB-successor_form"
+          ],
+          "produces": "derived centered successor bridge for applying E_{f,N} to certificate states"
+        },
+        {
+          "step": 10,
+          "description": "Apply the source smoothness consequence to the successor w.",
+          "ref": "objective-gap consequence",
+          "source_pdf_lines": [
+            4366,
+            4368
+          ],
+          "uses": [
+            "HB-admissible_objective",
+            "previous_step:9"
+          ],
+          "produces": "objective gap is bounded by the successor centered norm",
+          "math": "f(w)-f_*\\le\\|w-x_*\\|^2/2."
+        },
+        {
+          "step": 11,
+          "description": "Use the lower norm bound for the translated finite energy at T_fY and the contraction of E_{f,N} to obtain the same lower-bound and monotonicity inequalities requested of V; the common prescribed certificate inequalities are not used.",
+          "ref": "objective-gap consequence",
+          "source_pdf_lines": [
+            4366,
+            4370
+          ],
+          "uses": [
+            "previous_step:1",
+            "previous_step:7",
+            "previous_step:9",
+            "previous_step:10"
+          ],
+          "produces": "derived finite-energy objective-gap certificate: f(w)-f_* <= E_{f,N}(T_fY) <= E_{f,N}(Y)"
+        }
+      ]
+    },
+    {
+      "name": "HB-B",
+      "ref": "Theorem B, (G), PDF lines 2672–2695",
+      "statement_math": "\\forall(q,a,b)\\in B\\ \\forall d\\ge1\\ \\forall f\\in\\mathcal F_{q,1}(\\mathbb R^d)\\ \\forall(x_{-1},x_0)\\in(\\mathbb R^d)^2\\ \\forall t\\in\\mathbb Z_{\\ge0}:\\quad \\|x_t-x_*\\|\\le10^7(1-10^{-14})^{t/2}\\sqrt{\\|x_{-1}-x_*\\|^2+\\|x_0-x_*\\|^2}.",
+      "role": "Uniform global linear convergence on the closed box.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "The supply inequality and strict frequency margin hold uniformly on the closed box.",
+          "ref": "(D1)--(D8)",
+          "source_pdf_lines": [
+            4119,
+            4238
+          ],
+          "uses": [
+            "HB-DYNAMICS-SUPPLY-FREQUENCY",
+            "HB-box"
+          ],
+          "produces": "uniform dissipativity"
+        },
+        {
+          "step": 2,
+          "description": "Strict causality and finite-prefix continuation establish square summability before infinite estimates are applied.",
+          "ref": "(D9)",
+          "source_pdf_lines": [
+            4240,
+            4282
+          ],
+          "uses": [
+            "HB-CAUSAL-CONTINUATION"
+          ],
+          "produces": "actual trajectory in ell_2"
+        },
+        {
+          "step": 3,
+          "description": "Free-response and total-energy estimates yield C=10^14 and tail contraction, which gives the exact rate.",
+          "ref": "(D10)--(D11)",
+          "source_pdf_lines": [
+            4284,
+            4370
+          ],
+          "uses": [
+            "HB-FREE-RESPONSE-TOTAL-ENERGY"
+          ],
+          "produces": "the bound (G)"
+        }
+      ]
+    },
+    {
+      "name": "HB-C",
+      "ref": "Theorem C, PDF lines 3612–3620",
+      "statement_math": "\\text{At }(q_*,a_*,b_*),\\ d=2,\\ \\nexists\\text{ a common finite-valued }\\Phi\\text{ of }\\mathcal O_f(u,v)=\\big(u-x_*,\\nabla f(u),v-x_*,\\nabla f(v),f(u)-f_*,f(v)-f_*\\big)\\text{ satisfying }f(w)-f_*\\le\\Phi(\\mathcal O_f(v,w))\\le\\Phi(\\mathcal O_f(u,v))\\text{ for every admissible objective and every initial pair, with }w\\text{ the HB successor}.",
+      "role": "No common finite-valued full-record energy exists at the central triple.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Instantiate the central rational witness in dimension two: the central parameter triple lies in D, z gives R>1, and the Heavy-Ball recurrence gives the printed complex coefficient eta.",
+          "ref": "supplemental rational application",
+          "source_pdf_lines": [
+            4813,
+            4819
+          ],
+          "uses": [
+            "HB-central_parameters",
+            "HB-RATIONAL-WITNESS"
+          ],
+          "produces": "central two-dimensional rational witness parameters, R>1, and eta",
+          "math": "\\eta=\\frac{1+b-z-b/z}{a}=\\frac{1136661-320987i}{1813876}."
+        },
+        {
+          "step": 2,
+          "description": "The samples g_i=eta x_i and F_i=(41/100)|x_i|^2, together with the zero starred sample, have F0>0; all twelve off-diagonal residuals have the printed positive minimum, all diagonal residuals vanish, and the global interpolant gives a valid nonvacuous dimension-two application.",
+          "ref": "supplemental residual verification",
+          "source_pdf_lines": [
+            4821,
+            4830
+          ],
+          "uses": [
+            "HB-INTERPOLATION",
+            "HB-RATIONAL-WITNESS",
+            "previous_step:1"
+          ],
+          "produces": "the rational data satisfy the interpolation antecedents of HB-RECORD-GENERAL in dimension two",
+          "math": "\\frac{1775394252563}{1017888963106950}>0."
+        },
+        {
+          "step": 3,
+          "description": "The real matrix S for multiplication by z satisfies the printed similarity identity S^T S=RI. The same source display gives the position, gradient, and value recurrences with F0>0.",
+          "ref": "§7.1 similarity identities; supplemental exact-check support",
+          "source_pdf_lines": [
+            3630,
+            3636
+          ],
+          "uses": [
+            "previous_step:1",
+            "previous_step:2"
+          ],
+          "produces": "matrix identity S^T S=RI and all similarity antecedents for HB-RECORD-GENERAL",
+          "math": "S^{\\mathsf T}S=RI,\\qquad x_{j+1}=Sx_j,\\quad g_{j+1}=Sg_j,\\quad F_{j+1}=RF_j\\quad(j=0,1),\\qquad F_0>0."
+        },
+        {
+          "step": 4,
+          "description": "Collect the interpolation, update, similarity, scaling, and positivity facts as exactly the antecedent witness required by the conditional universal record obstruction.",
+          "ref": "HB-RECORD-GENERAL antecedents",
+          "source_pdf_lines": [
+            3630,
+            3636
+          ],
+          "uses": [
+            "previous_step:1",
+            "previous_step:2",
+            "previous_step:3"
+          ],
+          "produces": "all antecedents of HB-RECORD-GENERAL at the central triple in dimension two"
+        },
+        {
+          "step": 5,
+          "description": "Invoke HB-RECORD-GENERAL on the instantiated witness as the final proof step; its expanded proof supplies the scaled-objective record equality, Phi-inequality chain, unboundedness, and quantifier audit.",
+          "ref": "Theorem C",
+          "source_pdf_lines": [
+            3612,
+            3620
+          ],
+          "uses": [
+            "HB-RECORD-GENERAL",
+            "HB-record-map-scope",
+            "previous_step:4"
+          ],
+          "produces": "HB-C",
+          "math": "f(w)-f_*\\le\\Phi(\\mathcal O_f(v,w))\\le\\Phi(\\mathcal O_f(u,v))"
+        }
+      ]
+    }
+  ]
+}

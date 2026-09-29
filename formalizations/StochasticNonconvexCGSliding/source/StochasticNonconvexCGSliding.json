@@ -1,0 +1,1279 @@
+{
+  "algorithm": "StochasticNonconvexCGSliding",
+  "full_name": "Nonconvex Stochastic Conditional Gradient Sliding for Finite-Sum Problems",
+  "source_reference": "Lan, First-order and Stochastic Optimization Methods for Machine Learning, Springer 2020 (Section 7.5.2, Theorem 7.18, Corollary 7.13)",
+  "setup": {
+    "problem": {
+      "math": "f^* := \\min_{x\\in X}\\{f(x)\\}",
+      "ref": "Eq. (7.4.1)",
+      "description": "Projection-free nonconvex finite-sum optimization with accuracy measured by the squared generalized projected gradient."
+    },
+    "variable_space": {
+      "math": "X \\text{ is a closed compact set in Euclidean space } \\mathbb{R}^n, \\text{ and } f \\text{ can be given as the average of } m \\text{ smooth but possibly nonconvex component functions } f_i, \\text{ i.e., } f(x)=\\sum_{i=1}^m f_i(x)/m",
+      "ref": "Section 7.4, text following Eq. (7.4.1)"
+    }
+  },
+  "assumptions": [
+    {
+      "name": "FiniteSumProblem_7_4_1",
+      "math": "f^* := \\min_{x\\in X}\\{f(x)\\}",
+      "ref": "Eq. (7.4.1)",
+      "parameters": [
+        "f",
+        "X",
+        "f^*"
+      ]
+    },
+    {
+      "name": "ComponentSmoothness_6_5_2",
+      "math": "\\forall i=1,2,\\ldots,m,\\ \\exists L_i>0,\\ \\text{s.t.}\\ \\|\\nabla f_i(x)-\\nabla f_i(y)\\|_*\\le L_i\\|x-y\\|,\\ \\forall x,y\\in X.",
+      "ref": "Section 6.5, text immediately before Eq. (6.5.2)",
+      "parameters": [
+        "L_i"
+      ]
+    },
+    {
+      "name": "AverageLipschitzBound_6_5_2",
+      "math": "L_f\\le L\\equiv \\frac{1}{m}\\sum_{i=1}^m L_i.",
+      "ref": "Eq. (6.5.2)",
+      "parameters": [
+        "L_f",
+        "L",
+        "L_i"
+      ]
+    },
+    {
+      "name": "ProbabilityChoice_7_4_3",
+      "math": "q_i=\\frac{L_i}{mL}",
+      "ref": "Eq. (7.4.3)",
+      "parameters": [
+        "q_i",
+        "L_i",
+        "L",
+        "m"
+      ]
+    },
+    {
+      "name": "ParameterChoice_7_5_8",
+      "math": "b=10T\\ \\text{ and }\\ \\gamma=\\frac{1}{L}",
+      "ref": "Eq. (7.5.8)",
+      "parameters": [
+        "b",
+        "T",
+        "\\gamma",
+        "L"
+      ]
+    },
+    {
+      "name": "CorollaryTChoice_7_13",
+      "math": "T=\\sqrt{m}",
+      "ref": "Corollary 7.13",
+      "parameters": [
+        "T",
+        "m"
+      ]
+    },
+    {
+      "name": "CndGAccuracy_7_5_7",
+      "math": "\\langle\\phi_k'(x_{k+1}),x_{k+1}-x\\rangle=\\langle G_k+(x_{k+1}-x_k)/\\gamma,x_{k+1}-x\\rangle\\le \\eta,\\ \\forall x\\in X",
+      "ref": "Eq. (7.5.7)",
+      "parameters": [
+        "\\phi_k",
+        "x_{k+1}",
+        "G_k",
+        "\\gamma",
+        "\\eta"
+      ]
+    },
+    {
+      "name": "CndGConstantAccuracyCall_7_5_5",
+      "math": "x_{k+1}=\\operatorname{CndG}(G_k,x_k,1/\\gamma,\\eta)",
+      "ref": "Eq. (7.5.5)",
+      "parameters": [
+        "x_{k+1}",
+        "G_k",
+        "x_k",
+        "\\gamma",
+        "\\eta"
+      ]
+    },
+    {
+      "name": "RandomOutputDistribution_Algorithm7_12",
+      "math": "x_R,\\ \\text{where }R\\text{ is a random variable s.t. to }\\operatorname{Prob}\\{R=k\\}=\\frac{\\alpha_k}{\\sum_{k=1}^N\\alpha_k},\\ k=1,\\ldots,N",
+      "ref": "Algorithm 7.12 output, lines 27983-27986",
+      "parameters": [
+        "x_R",
+        "R",
+        "\\alpha_k",
+        "N"
+      ]
+    }
+  ],
+  "algorithm_spec": {
+    "ref": "Section 7.5.2, lines 28499-28505: printed replacement of the definition of x_{k+1} in Algorithm 7.13 by Eq. (7.5.5)",
+    "printed_replacement": {
+      "math": "\\text{Replace the definition of }x_{k+1}\\text{ in Algorithm 7.13 by }x_{k+1}=\\operatorname{CndG}(G_k,x_k,1/\\gamma,\\eta),\\text{ where the procedure CndG is defined in the conditional gradient sliding method (see Algorithm 7.6).}",
+      "ref": "Section 7.5.2, lines 28499-28505 and Eq. (7.5.5)"
+    },
+    "source_note": "The PDF prints Algorithm 7.13 as the base algorithm in Section 7.5.2. Since the subsection title says finite-sum problems and Theorem 7.18 assumes the finite-sum probabilities q_i from (7.4.3), the Algorithm 7.12 finite-sum gradient-estimator steps below are retained as a derived interpretation, not as the paper's printed base-algorithm reference.",
+    "initialization": {
+      "math": "x_1,\\ T,\\ \\{\\alpha_k\\}\\ \\text{ and probability distribution } Q=\\{q_1,\\ldots,q_m\\}\\ \\text{ on }\\{1,\\ldots,m\\}",
+      "ref": "Algorithm 7.12 input, lines 27970-27972 (derived finite-sum interpretation); Section 7.5.2 lines 28499-28505 prints Algorithm 7.13 as base"
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "FullGradientRefresh",
+        "math": "\\text{if } k\\%T==1 \\text{ then set } G_k=\\nabla f(x_k).",
+        "ref": "Algorithm 7.12, lines 27973-27975 (derived finite-sum interpretation; Section 7.5.2 prints Algorithm 7.13)"
+      },
+      {
+        "step": 2,
+        "name": "RecursiveMiniBatchGradient",
+        "math": "\\text{Generate i.i.d. samples } I_b \\text{ of size } b \\text{ according to } Q.\\quad G_k=\\frac{1}{b}\\sum_{i\\in I_b}\\frac{\\nabla f_i(x_k)-\\nabla f_i(x_{k-1})}{q_i m}+G_{k-1}.",
+        "ref": "Algorithm 7.12, lines 27976-27978 (derived finite-sum interpretation; Section 7.5.2 prints Algorithm 7.13)"
+      },
+      {
+        "step": 3,
+        "name": "CndGReplacement",
+        "math": "x_{k+1}=\\operatorname{CndG}(G_k,x_k,1/\\gamma,\\eta)",
+        "ref": "Section 7.5.2, lines 28499-28505 and Eq. (7.5.5): paper prints replacement of x_{k+1} in Algorithm 7.13"
+      },
+      {
+        "step": 4,
+        "name": "CndGSubproblem",
+        "math": "\\min_{x\\in X}\\phi_k(x):=\\langle G_k,x\\rangle+\\frac{1}{2\\gamma}\\|x-x_k\\|^2",
+        "ref": "Eq. (7.5.6)"
+      },
+      {
+        "step": 5,
+        "name": "CndGStoppingCondition",
+        "math": "\\langle\\phi_k'(x_{k+1}),x_{k+1}-x\\rangle=\\langle G_k+(x_{k+1}-x_k)/\\gamma,x_{k+1}-x\\rangle\\le \\eta,\\ \\forall x\\in X",
+        "ref": "Eq. (7.5.7)"
+      }
+    ],
+    "output": {
+      "math": "x_R,\\quad \\operatorname{Prob}\\{R=k\\}=\\frac{\\alpha_k}{\\sum_{k=1}^N\\alpha_k},\\quad k=1,\\ldots,N",
+      "ref": "Algorithm 7.12 output, lines 27983-27986 (derived finite-sum interpretation; Section 7.5.2 prints Algorithm 7.13 as base)",
+      "type": "random_iterate"
+    },
+    "parameters": [
+      {
+        "name": "projected_gradient",
+        "math": "g_X(\\bar{x})\\equiv P_X(x,\\nabla f(\\bar{x}),\\gamma):=\\frac{1}{\\gamma}(\\bar{x}-\\bar{x}^+)",
+        "ref": "Eq. (7.5.1)"
+      },
+      {
+        "name": "projected_point",
+        "math": "\\bar{x}^+=\\operatorname*{argmin}_{u\\in X}\\{\\langle\\nabla f(\\bar{x}),u\\rangle+\\frac{1}{\\gamma}V(\\bar{x},u)\\}",
+        "ref": "Eq. (7.5.2)"
+      },
+      {
+        "name": "phi_k",
+        "math": "\\phi_k(x):=\\langle G_k,x\\rangle+\\frac{1}{2\\gamma}\\|x-x_k\\|^2",
+        "ref": "Eq. (7.5.6)"
+      },
+      {
+        "name": "delta_k",
+        "math": "\\delta_k\\equiv G_k-\\nabla f(x_k)",
+        "ref": "Section 7.4.1, text before Eq. (7.4.2)"
+      },
+      {
+        "name": "Dbar_X",
+        "math": "\\bar D_X\\equiv \\bar D_{X,\\|\\cdot\\|}:=\\max_{x,y\\in X}\\|x-y\\|",
+        "ref": "Eq. (7.1.18)"
+      }
+    ]
+  },
+  "main_theorem": {
+    "ref": "Corollary 7.13",
+    "statement_math": "\\text{Suppose that the probabilities }q_i\\text{ are set to (7.4.3) and that }b\\text{ and }\\gamma\\text{ are set to (7.5.8) with }T=\\sqrt{m}.\\text{ Then the total number of stochastic gradients and calls to the linear optimization oracle performed by the nonconvex stochastic conditional gradient sliding method to find a solution }\\bar{x}\\in X\\text{ s.t. }\\mathbb{E}[g_X(\\bar{x})]\\le\\varepsilon\\text{ will be bounded by }O\\left[m+\\frac{\\sqrt{m}L}{\\varepsilon}[f(x_1)-f^*]\\right]\\text{ and }O\\left[\\frac{L^3\\bar D_X^2[f(x_1)-f^*]}{\\varepsilon^2}\\right],\\text{ respectively.}",
+    "rate": "SFO: O(m + sqrt(m) L [f(x_1)-f^*] / epsilon); LO: O(L^3 Dbar_X^2 [f(x_1)-f^*] / epsilon^2).",
+    "measure": "expected generalized projected gradient norm; the proof route invokes Theorem 7.18's expected squared projected-gradient control",
+    "proof": [
+      {
+        "step": 1,
+        "description": "Set the CndG accuracy for the corollary proof.",
+        "ref": "Corollary 7.13 proof",
+        "source_pdf_lines": [
+          28630,
+          28630
+        ],
+        "math": "\\eta=\\varepsilon/(48L)",
+        "uses": [],
+        "produces": "corollary_eta_choice"
+      },
+      {
+        "step": 2,
+        "description": "Apply Theorem 7.18 with the accuracy choice from step 1; the proof states that the total number of iterations N will be bounded by the displayed quantity.",
+        "ref": "Corollary 7.13 proof, Theorem 7.18",
+        "source_pdf_lines": [
+          28630,
+          28634
+        ],
+        "math": "\\frac{32L}{\\varepsilon}[f(x_1)-f^*]",
+        "uses": [
+          "Theorem7_18_ExpectedProjectedGradientBound",
+          "previous_step:1"
+        ],
+        "produces": "iteration_bound_for_epsilon"
+      },
+      {
+        "step": 3,
+        "description": "Count gradient evaluations by grouping iterations into epochs: each epoch costs one full gradient of size m and T recursive batches of size b, and the number of epochs is bounded by a ceiling of N/T.",
+        "ref": "Corollary 7.13 proof",
+        "source_pdf_lines": [
+          28637,
+          28639
+        ],
+        "math": "(m+bT)\\left\\lceil\\frac{N}{T}\\right\\rceil\\le 11m\\left(\\frac{N}{\\sqrt m}+1\\right)",
+        "uses": [
+          "ParameterChoice_7_5_8",
+          "CorollaryTChoice_7_13",
+          "previous_step:2"
+        ],
+        "produces": "raw_stochastic_gradient_count_bound"
+      },
+      {
+        "step": 4,
+        "description": "Substitute the iteration bound from step 2 into the raw gradient count to obtain the stated stochastic-gradient complexity (7.5.14).",
+        "ref": "Eq. (7.5.14)",
+        "source_pdf_lines": [
+          28620,
+          28621
+        ],
+        "math": "O\\left[m+\\frac{\\sqrt{m}L}{\\varepsilon}[f(x_1)-f^*]\\right]",
+        "uses": [
+          "previous_step:2",
+          "previous_step:3"
+        ],
+        "produces": "stochastic_gradient_complexity_7_5_14"
+      },
+      {
+        "step": 5,
+        "description": "Use the CndG call in (7.5.5) to identify the CndG parameter beta as 1/gamma, then specialize Theorem 7.9(c) with tolerance eta to bound the number of linear-optimization calls made by each CndG subproblem.",
+        "ref": "Corollary 7.13 proof, Theorem 7.9(c)",
+        "source_pdf_lines": [
+          28641,
+          28645
+        ],
+        "math": "\\left\\lceil\\frac{6\\bar D_X^2}{\\gamma\\eta}\\right\\rceil",
+        "uses": [
+          "Theorem7_9c_CndGInnerIterations",
+          "ParameterChoice_7_5_8",
+          "CndGConstantAccuracyCall_7_5_5",
+          "previous_step:1"
+        ],
+        "produces": "Theorem 7.9(c) specialized with beta=1/gamma from (7.5.5) and tolerance eta, giving linear_oracle_calls_per_iteration"
+      },
+      {
+        "step": 6,
+        "description": "Multiply the per-iteration CndG call bound by the number of outer iterations.",
+        "ref": "Corollary 7.13 proof",
+        "source_pdf_lines": [
+          28647,
+          28650
+        ],
+        "math": "N\\left\\lceil\\frac{6\\bar D_X^2}{\\gamma\\eta}\\right\\rceil",
+        "uses": [
+          "previous_step:2",
+          "previous_step:5"
+        ],
+        "produces": "raw_linear_oracle_count_bound"
+      },
+      {
+        "step": 7,
+        "description": "Substitute gamma=1/L, eta=epsilon/(48L), and the iteration bound to obtain the stated LO complexity (7.5.15).",
+        "ref": "Eq. (7.5.15)",
+        "source_pdf_lines": [
+          28623,
+          28626
+        ],
+        "math": "O\\left[\\frac{L^3\\bar D_X^2[f(x_1)-f^*]}{\\varepsilon^2}\\right]",
+        "uses": [
+          "ParameterChoice_7_5_8",
+          "previous_step:1",
+          "previous_step:2",
+          "previous_step:6"
+        ],
+        "produces": "linear_oracle_complexity_7_5_15"
+      }
+    ]
+  },
+  "key_lemmas": [
+    {
+      "name": "Theorem7_18_ExpectedProjectedGradientBound",
+      "ref": "Theorem 7.18 / Eq. (7.5.9)",
+      "statement_math": "\\text{Suppose that the probabilities }q_i\\text{ are set to (7.4.3). If }b=10T\\text{ and }\\gamma=\\frac{1}{L},\\text{ then we have }\\mathbb{E}[\\|g_{X,k}\\|^2]\\le \\frac{16L}{N}[f(x_1)-f^*]+24L\\eta.",
+      "role": "Provides the expected squared projected-gradient bound that Corollary 7.13 converts into SFO and LO complexity.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Introduce the exact minimizer of the stochastic quadratic model, the exact projected point using the true gradient, and the CndG displacement.",
+          "ref": "Theorem 7.18 proof",
+          "source_pdf_lines": [
+            28525,
+            28527
+          ],
+          "math": "\\bar{x}_{k+1}:=\\operatorname*{argmin}_{x\\in X}\\phi_k(x),\\quad \\hat{x}_{k+1}:=\\operatorname*{argmin}_{x\\in X}\\left\\{\\langle\\nabla f(x_k),x\\rangle+\\frac{1}{2\\gamma}\\|x-x_k\\|^2\\right\\},\\quad \\tilde{g}_k\\equiv \\frac{1}{\\gamma}(x_k-x_{k+1})",
+          "uses": [
+            "CndGAccuracy_7_5_7"
+          ],
+          "produces": "model_minimizer_true_gradient_minimizer_and_tilde_g"
+        },
+        {
+          "step": 2,
+          "description": "Apply the CndG approximate optimality condition (7.5.7) at x=x_k.",
+          "ref": "Theorem 7.18 proof",
+          "source_pdf_lines": [
+            28527,
+            28530
+          ],
+          "math": "\\frac{1}{\\gamma}\\|x_k-x_{k+1}\\|^2\\le \\langle G_k,x_k-x_{k+1}\\rangle+\\eta",
+          "uses": [
+            "CndGAccuracy_7_5_7"
+          ],
+          "produces": "cndg_descent_inner_product_bound"
+        },
+        {
+          "step": 3,
+          "description": "Start the descent chain from L-smoothness of f.",
+          "ref": "Theorem 7.18 proof",
+          "source_pdf_lines": [
+            28532,
+            28535
+          ],
+          "math": "f(x_{k+1})\\le f(x_k)+\\langle\\nabla f(x_k),x_{k+1}-x_k\\rangle+\\frac{L}{2}\\|x_{k+1}-x_k\\|^2",
+          "uses": [
+            "AverageLipschitzBound_6_5_2"
+          ],
+          "produces": "smoothness_descent_start"
+        },
+        {
+          "step": 4,
+          "description": "Substitute delta_k = G_k - nabla f(x_k) into the smoothness inequality.",
+          "ref": "Theorem 7.18 proof",
+          "source_pdf_lines": [
+            28535,
+            28536
+          ],
+          "math": "f(x_k)+\\langle G_k,x_{k+1}-x_k\\rangle+\\frac{L}{2}\\|x_{k+1}-x_k\\|^2-\\langle\\delta_k,x_{k+1}-x_k\\rangle",
+          "uses": [
+            "previous_step:3"
+          ],
+          "produces": "gradient_estimator_error_substitution"
+        },
+        {
+          "step": 5,
+          "description": "Use the CndG inner-product bound from step 2 to replace the term involving G_k.",
+          "ref": "Theorem 7.18 proof",
+          "source_pdf_lines": [
+            28537,
+            28537
+          ],
+          "math": "f(x_{k+1})\\le f(x_k)-\\frac{1}{\\gamma}\\|x_k-x_{k+1}\\|^2+\\eta_k+\\frac{L}{2}\\|x_{k+1}-x_k\\|^2-\\langle\\delta_k,x_{k+1}-x_k\\rangle",
+          "uses": [
+            "previous_step:2",
+            "previous_step:4"
+          ],
+          "produces": "descent_with_noise_inner_product"
+        },
+        {
+          "step": 6,
+          "description": "Apply Young's inequality with arbitrary q>0 to the noise inner product.",
+          "ref": "Theorem 7.18 proof",
+          "source_pdf_lines": [
+            28538,
+            28544
+          ],
+          "math": "f(x_{k+1})\\le f(x_k)-\\left(\\frac{1}{\\gamma}-\\frac{L}{2}-\\frac{q}{2}\\right)\\|x_k-x_{k+1}\\|^2+\\frac{1}{2q}\\|\\delta_k\\|^2+\\eta_k",
+          "uses": [
+            "previous_step:5"
+          ],
+          "produces": "young_bounded_descent"
+        },
+        {
+          "step": 7,
+          "description": "Rewrite the displacement through the definition of the approximate projected gradient tilde g.",
+          "ref": "Eq. (7.5.10)",
+          "source_pdf_lines": [
+            28545,
+            28549
+          ],
+          "math": "f(x_{k+1})\\le f(x_k)-\\gamma\\left(1-\\frac{L\\gamma}{2}-\\frac{q\\gamma}{2}\\right)\\|\\tilde g_{X,k}\\|^2+\\frac{1}{2q}\\|\\delta_k\\|^2+\\eta_k.",
+          "uses": [
+            "previous_step:1",
+            "previous_step:6"
+          ],
+          "produces": "one_step_descent_7_5_10"
+        },
+        {
+          "step": 8,
+          "description": "Apply (7.5.7) at x=bar x_{k+1} and strong convexity of phi_k to control the distance between the CndG output and the exact model minimizer.",
+          "ref": "Eq. (7.5.11)",
+          "source_pdf_lines": [
+            28551,
+            28553
+          ],
+          "math": "\\frac{1}{2\\gamma}\\|x_{k+1}-\\bar{x}_{k+1}\\|^2\\le \\langle\\phi_k'(x_{k+1}),x_{k+1}-\\bar{x}_{k+1}\\rangle\\le \\eta_k.",
+          "uses": [
+            "CndGAccuracy_7_5_7",
+            "PhiKStrongConvexity_7_5_6",
+            "previous_step:1"
+          ],
+          "produces": "model_solution_distance_bound_7_5_11"
+        },
+        {
+          "step": 9,
+          "description": "Decompose the exact projected-gradient vector into the approximate displacement, model-solution residual, and true-gradient residual.",
+          "ref": "Theorem 7.18 proof",
+          "source_pdf_lines": [
+            28555,
+            28557
+          ],
+          "math": "g_{X,k}=(x_k-\\hat{x}_{k+1})/\\gamma=[(x_k-x_{k+1})+(x_{k+1}-\\bar{x}_{k+1})+(\\bar{x}_{k+1}-\\hat{x}_{k+1})]/\\gamma",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "projected_gradient_three_term_decomposition"
+        },
+        {
+          "step": 10,
+          "description": "Apply the squared triangle inequality to the three-term decomposition.",
+          "ref": "Theorem 7.18 proof",
+          "source_pdf_lines": [
+            28559,
+            28561
+          ],
+          "math": "\\|g_{X,k}\\|^2\\le 2\\|\\tilde g_{X,k}\\|^2+4\\|(x_{k+1}-\\bar{x}_{k+1})/\\gamma\\|^2+4\\|(\\bar{x}_{k+1}-\\hat{x}_{k+1})/\\gamma\\|^2",
+          "uses": [
+            "previous_step:9"
+          ],
+          "produces": "three_term_squared_bound"
+        },
+        {
+          "step": 11,
+          "description": "Use the prox-map Lipschitz bound (6.2.11) for the difference between the G_k and nabla f(x_k) model minimizers, and use (7.5.11) for the approximate model residual.",
+          "ref": "Theorem 7.18 proof",
+          "source_pdf_lines": [
+            28559,
+            28562
+          ],
+          "math": "\\|g_{X,k}\\|^2\\le 2\\|\\tilde g_{X,k}\\|^2+\\frac{8\\eta_k}{\\gamma}+4\\|\\delta_k\\|^2.",
+          "uses": [
+            "Lemma6_5_ProxMappingLipschitz",
+            "previous_step:8",
+            "previous_step:10"
+          ],
+          "produces": "projected_gradient_bound_by_tilde_noise_eta"
+        },
+        {
+          "step": 12,
+          "description": "Multiply the projected-gradient bound by p>0 and add it to the descent inequality (7.5.10).",
+          "ref": "Theorem 7.18 proof",
+          "source_pdf_lines": [
+            28564,
+            28571
+          ],
+          "math": "f(x_{k+1})+p\\|g_{X,k}\\|^2\\le f(x_k)-\\gamma\\left(1-\\frac{L\\gamma}{2}-\\frac{q\\gamma}{2}-2p\\right)\\|\\tilde g_{X,k}\\|^2+\\left(4p+\\frac{1}{2q}\\right)\\|\\delta_k\\|^2+\\left(1+\\frac{8p}{\\gamma}\\right)\\eta_k.",
+          "uses": [
+            "previous_step:7",
+            "previous_step:11"
+          ],
+          "produces": "descent_plus_projected_gradient_bound"
+        },
+        {
+          "step": 13,
+          "description": "Use the epoch-summation argument similar to (6.5.12), together with Lemma 7.4, to convert the one-step bound into an epoch bound.",
+          "ref": "Eq. (7.5.12)",
+          "source_pdf_lines": [
+            28573,
+            28584
+          ],
+          "math": "\\mathbb{E}[f(x_{s,t+1})]+p\\sum_{j=1}^t\\mathbb{E}[\\|g_{X,(s,j)}\\|^2]\\le \\mathbb{E}[f(x_{s,1})]-\\left[\\gamma\\left(1-\\frac{L\\gamma}{2}-\\frac{q\\gamma}{2}-2p\\right)-\\left(4p+\\frac{1}{2q}\\right)\\frac{\\gamma^2L^2(t-1)}{b}\\right]\\sum_{j=1}^t\\mathbb{E}[\\|\\tilde g_{X,(s,j)}\\|^2]+\\left(1+\\frac{8p}{\\gamma}\\right)\\sum_{j=1}^t\\eta_{s,j}.",
+          "uses": [
+            "Lemma7_4_FiniteSumEstimatorVariance",
+            "EpochTelescopePattern_6_5_12",
+            "previous_step:12"
+          ],
+          "produces": "epoch_bound_7_5_12"
+        },
+        {
+          "step": 14,
+          "description": "Substitute gamma=1/L, p=1/(16L), q=L/2, and b=10T into the coefficient of the tilde-gradient sum.",
+          "ref": "Theorem 7.18 proof",
+          "source_pdf_lines": [
+            28586,
+            28595
+          ],
+          "math": "\\gamma\\left(1-\\frac{L\\gamma}{2}-\\frac{q\\gamma}{2}-2p\\right)-\\left(4p+\\frac{1}{2q}\\right)\\frac{\\gamma^2L^2(t-1)}{b}=\\frac{1}{8L}-\\frac{5(t-1)}{4Lb}>0,\\quad \\forall t=1,\\ldots,T.",
+          "uses": [
+            "ParameterChoice_7_5_8",
+            "previous_step:13"
+          ],
+          "produces": "positive_tilde_gradient_coefficient"
+        },
+        {
+          "step": 15,
+          "description": "Drop the nonpositive tilde-gradient term from the epoch bound after the parameter substitution.",
+          "ref": "Eq. (7.5.13)",
+          "source_pdf_lines": [
+            28597,
+            28601
+          ],
+          "math": "\\mathbb{E}[f(x_{(s,t+1)})]+\\frac{1}{16L}\\sum_{j=1}^t\\mathbb{E}[\\|g_{X,(s,j)}\\|^2]\\le \\mathbb{E}[f(x_{(s,1)})]+\\frac{3}{2}\\sum_{j=1}^t\\eta_{s,j}.",
+          "uses": [
+            "previous_step:13",
+            "previous_step:14"
+          ],
+          "produces": "specialized_epoch_bound_7_5_13"
+        },
+        {
+          "step": 16,
+          "description": "Sum the first N inequalities in the form of (7.5.13).",
+          "ref": "Theorem 7.18 proof",
+          "source_pdf_lines": [
+            28604,
+            28608
+          ],
+          "math": "\\mathbb{E}[f(x_{N+1})]+\\frac{1}{16L}\\sum_{k=1}^N\\mathbb{E}[\\|g_{X,k}\\|^2]\\le f(x_1)+\\frac{3}{2}\\sum_{k=1}^N\\eta_k.",
+          "uses": [
+            "previous_step:15"
+          ],
+          "produces": "global_summed_projected_gradient_bound"
+        },
+        {
+          "step": 17,
+          "description": "Use the lower bound f(x_{N+1}) >= f^*, the definition of the random variable R cited in the proof sentence, and the constant CndG accuracy eta from (7.5.5)--(7.5.7) to turn the printed summed inequality into the printed theorem bound (7.5.9). The proof window does not restate a distribution for R compatible with the unweighted 1/N average; no R-indexed law is asserted in produces.",
+          "ref": "Theorem 7.18 proof / Eq. (7.5.9)",
+          "source_pdf_lines": [
+            28604,
+            28611
+          ],
+          "math": "",
+          "uses": [
+            "FiniteSumProblem_7_4_1",
+            "CndGConstantAccuracyCall_7_5_5",
+            "Theorem7_18RandomVariableRReference",
+            "previous_step:16"
+          ],
+          "produces": "printed_k_indexed_expected_projected_gradient_bound_7_5_9; paper ambiguity: the proof invokes R but does not restate a distribution compatible with the unweighted 1/N average"
+        }
+      ]
+    },
+    {
+      "name": "Lemma6_10_FiniteSumEstimatorVariance",
+      "ref": "Lemma 6.10 / Eq. (6.5.5)",
+      "statement_math": "\\text{Let }L\\text{ be defined in (6.5.2) and suppose that the probabilities }q_i\\text{ are set to }q_i=\\frac{L_i}{mL}\\text{ for }i=1,\\ldots,m.\\text{ If the iteration index }k\\text{ (or equivalently }(s,t)\\text{) represents the }t\\text{-th iteration at the }s\\text{-epoch, then }\\mathbb{E}[\\|\\delta_k\\|^2]\\equiv \\mathbb{E}[\\|\\delta_{(s,t)}\\|^2]\\le \\frac{L^2}{b}\\sum_{i=2}^t\\mathbb{E}[\\|x_{(s,i)}-x_{(s,i-1)}\\|^2].",
+      "role": "Provides the Section 6 variance-to-epoch input used in the source proof of the telescope pattern (6.5.12).",
+      "proof": [
+        {
+          "step": 1,
+          "description": "In the s-th epoch, denote delta_t and x_t by the epoch-indexed quantities and note that the first estimator error in the epoch is zero.",
+          "ref": "Lemma 6.10 proof",
+          "source_pdf_lines": [
+            23034,
+            23036
+          ],
+          "uses": [],
+          "produces": "epoch_error_notation_and_delta1_zero"
+        },
+        {
+          "step": 2,
+          "description": "Expand the recursive estimator error using the definition of delta_t.",
+          "ref": "Lemma 6.10 proof",
+          "source_pdf_lines": [
+            23036,
+            23039
+          ],
+          "math": "\\mathbb{E}[\\|\\delta_t\\|^2]=\\mathbb{E}\\left[\\left\\|\\frac{1}{b}\\sum_{i\\in I_b}\\frac{\\nabla f_i(x_t)-\\nabla f_i(x_{t-1})}{q_i m}+G_{t-1}-\\nabla f(x_t)\\right\\|^2\\right]=\\mathbb{E}\\left[\\left\\|\\frac{1}{b}\\sum_{i\\in I_b}\\frac{\\nabla f_i(x_t)-\\nabla f_i(x_{t-1})}{q_i m}-(\\nabla f(x_t)-\\nabla f(x_{t-1}))+\\delta_{t-1}\\right\\|^2\\right].",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "expanded_recursive_delta_t"
+        },
+        {
+          "step": 3,
+          "description": "Define zeta_i and take conditional expectation with respect to the sampled index to identify its mean.",
+          "ref": "Lemma 6.10 proof",
+          "source_pdf_lines": [
+            23041,
+            23043
+          ],
+          "math": "\\zeta_i=[\\nabla f_i(x_t)-\\nabla f_i(x_{t-1})]/(q_i m),\\quad \\mathbb{E}[\\zeta_i]=\\nabla f(x_t)-\\nabla f(x_{t-1})",
+          "uses": [
+            "ProbabilityChoice_7_4_3"
+          ],
+          "produces": "zeta_i_mean_identity"
+        },
+        {
+          "step": 4,
+          "description": "Use the zero-mean sample fluctuation from the conditional expectation identity to split off the previous estimator error.",
+          "ref": "Eq. (6.5.6)",
+          "source_pdf_lines": [
+            23045,
+            23045
+          ],
+          "math": "\\mathbb{E}[\\|\\delta_t\\|^2]=\\mathbb{E}\\left[\\left\\|\\frac{1}{b}\\sum_{i\\in I_b}\\left[\\zeta_i-(\\nabla f(x_t)-\\nabla f(x_{t-1}))\\right]\\right\\|^2\\right]+\\mathbb{E}[\\|\\delta_{t-1}\\|^2]",
+          "uses": [
+            "previous_step:2",
+            "previous_step:3"
+          ],
+          "produces": "conditional_variance_decomposition"
+        },
+        {
+          "step": 5,
+          "description": "Bound the variance of the sample average by the average of the second moments of the sampled zeta terms.",
+          "ref": "Eq. (6.5.6)",
+          "source_pdf_lines": [
+            23046,
+            23046
+          ],
+          "math": "\\mathbb{E}[\\|\\delta_t\\|^2]\\le \\frac{1}{b^2}\\sum_{i\\in I_b}\\mathbb{E}[\\|\\zeta_i\\|^2]+\\mathbb{E}[\\|\\delta_{t-1}\\|^2]",
+          "uses": [
+            "previous_step:4"
+          ],
+          "produces": "sample_average_second_moment_bound"
+        },
+        {
+          "step": 6,
+          "description": "Substitute the definition of \\zeta_i to express each sampled second moment through the component-gradient difference and the sampling probability; combined with the previous inequality this carries the same upper bound.",
+          "ref": "Eq. (6.5.6)",
+          "source_pdf_lines": [
+            23047,
+            23048
+          ],
+          "math": "\\frac{1}{b^2}\\sum_{i\\in I_b}\\mathbb{E}[\\|\\zeta_i\\|^2]+\\mathbb{E}[\\|\\delta_{t-1}\\|^2]=\\frac{1}{b^2}\\sum_{i\\in I_b}\\mathbb{E}\\left[\\frac{1}{m^2q_i^2}\\|\\nabla f_i(x_t)-\\nabla f_i(x_{t-1})\\|^2\\right]+\\mathbb{E}[\\|\\delta_{t-1}\\|^2]",
+          "uses": [
+            "previous_step:3",
+            "previous_step:5"
+          ],
+          "produces": "zeta_second_moment_substitution"
+        },
+        {
+          "step": 7,
+          "description": "Average over the sampling distribution and apply component smoothness, producing the printed sum with coefficients L_j^2/(m^2 q_j).",
+          "ref": "Eq. (6.5.6)",
+          "source_pdf_lines": [
+            23049,
+            23051
+          ],
+          "math": "\\mathbb{E}[\\|\\delta_t\\|^2]\\le \\frac{1}{b}\\sum_{j=1}^m\\frac{L_j^2}{m^2q_j}\\|x_t-x_{t-1}\\|^2+\\mathbb{E}[\\|\\delta_{t-1}\\|^2]",
+          "uses": [
+            "ComponentSmoothness_6_5_2",
+            "ProbabilityChoice_7_4_3",
+            "previous_step:6"
+          ],
+          "produces": "component_smoothness_weighted_variance_bound"
+        },
+        {
+          "step": 8,
+          "description": "Use the probability choice q_j=L_j/(mL) and the definition L=(1/m)\\sum_j L_j to simplify the weighted coefficient to L^2/b; with the previous upper bound this gives the one-step recursion.",
+          "ref": "Eq. (6.5.6)",
+          "source_pdf_lines": [
+            23052,
+            23053
+          ],
+          "math": "\\frac{1}{b}\\sum_{j=1}^m\\frac{L_j^2}{m^2q_j}\\|x_t-x_{t-1}\\|^2+\\mathbb{E}[\\|\\delta_{t-1}\\|^2]=\\frac{L^2}{b}\\|x_t-x_{t-1}\\|^2+\\mathbb{E}[\\|\\delta_{t-1}\\|^2].",
+          "uses": [
+            "ComponentSmoothness_6_5_2",
+            "AverageLipschitzBound_6_5_2",
+            "ProbabilityChoice_7_4_3",
+            "previous_step:7"
+          ],
+          "produces": "one_step_variance_recursion_6_5_6"
+        },
+        {
+          "step": 9,
+          "description": "Apply the one-step recursion inductively over the epoch to get the displayed Lemma 6.10 bound.",
+          "ref": "Eq. (6.5.5)",
+          "source_pdf_lines": [
+            23055,
+            23055
+          ],
+          "uses": [
+            "previous_step:1",
+            "previous_step:8"
+          ],
+          "produces": "finite_sum_estimator_variance_6_5_5"
+        }
+      ]
+    },
+    {
+      "name": "Lemma7_4_FiniteSumEstimatorVariance",
+      "ref": "Lemma 7.4 / Eq. (7.4.4)",
+      "statement_math": "\\text{Let }L\\text{ be defined in (6.5.2) and suppose that the probabilities }q_i\\text{ are set to }q_i=\\frac{L_i}{mL}\\text{ for }i=1,\\ldots,m.\\text{ If the iteration index }k\\text{ (or equivalently }(s,t)\\text{) represents the }t\\text{-th iteration at the }s\\text{-th epoch, then }\\mathbb{E}[\\|\\delta_k\\|^2]\\equiv \\mathbb{E}[\\|\\delta_{s,t}\\|^2]\\le \\frac{L^2}{b}\\sum_{i=2}^t\\mathbb{E}[\\|x_{s,i}-x_{s,i-1}\\|^2].",
+      "role": "Bounds the finite-sum recursive gradient-estimator variance inside each epoch; Theorem 7.18 uses it in the step producing (7.5.12). The paper states that its proof is skipped since it is similar to Lemma 6.10.",
+      "proof": "cited"
+    },
+    {
+      "name": "Lemma6_5_ProxMappingLipschitz",
+      "ref": "Lemma 6.5 / Eq. (6.2.11)",
+      "statement_math": "\\text{Let }x_1^+\\text{ and }x_2^+\\text{ be given in (6.2.6) with }g\\text{ replaced by }g_1\\text{ and }g_2\\text{ respectively. Then, }\\|x_2^+-x_1^+\\|\\le \\gamma\\|g_2-g_1\\|.",
+      "role": "Controls the distance between the exact model minimizer using G_k and the exact projected point using nabla f(x_k).",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Write the two optimality conditions for x_1^+ and x_2^+.",
+          "ref": "Eqs. (6.2.12)-(6.2.13)",
+          "source_pdf_lines": [
+            19474,
+            19481
+          ],
+          "math": "\\langle g_1+\\frac{1}{\\gamma}(\\nabla\\nu(x_1^+)-\\nabla\\nu(x))+p_1,u-x_1^+\\rangle\\ge 0,\\quad \\langle g_2+\\frac{1}{\\gamma}(\\nabla\\nu(x_2^+)-\\nabla\\nu(x))+p_2,u-x_2^+\\rangle\\ge 0.",
+          "uses": [],
+          "produces": "prox_optimality_conditions"
+        },
+        {
+          "step": 2,
+          "description": "Set u=x_2^+ in the first condition and use convexity of h.",
+          "ref": "Eq. (6.2.14)",
+          "source_pdf_lines": [
+            19483,
+            19490
+          ],
+          "math": "\\langle g_1,x_2^+-x_1^+\\rangle\\ge \\frac{1}{\\gamma}\\langle\\nabla\\nu(x_2^+)-\\nabla\\nu(x_1^+),x_2^+-x_1^+\\rangle+\\frac{1}{\\gamma}\\langle\\nabla\\nu(x)-\\nabla\\nu(x_2^+),x_2^+-x_1^+\\rangle+h(x_1^+)-h(x_2^+).",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "first_tested_optimality_6_2_14"
+        },
+        {
+          "step": 3,
+          "description": "Set u=x_1^+ in the second condition and use convexity of h.",
+          "ref": "Eq. (6.2.15)",
+          "source_pdf_lines": [
+            19492,
+            19495
+          ],
+          "math": "\\langle g_2,x_1^+-x_2^+\\rangle\\ge \\frac{1}{\\gamma}\\langle\\nabla\\nu(x)-\\nabla\\nu(x_2^+),x_1^+-x_2^+\\rangle+h(x_2^+)-h(x_1^+).",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "second_tested_optimality_6_2_15"
+        },
+        {
+          "step": 4,
+          "description": "Sum the two tested optimality inequalities and use strong convexity of nu to get the norm inequality.",
+          "ref": "Lemma 6.5 proof",
+          "source_pdf_lines": [
+            19497,
+            19501
+          ],
+          "math": "\\|g_1-g_2\\|\\|x_2^+-x_1^+\\|\\ge \\langle g_1-g_2,x_2^+-x_1^+\\rangle\\ge \\frac{1}{\\gamma}\\|x_2^+-x_1^+\\|^2.",
+          "uses": [
+            "previous_step:2",
+            "previous_step:3"
+          ],
+          "produces": "prox_mapping_lipschitz_6_2_11"
+        }
+      ]
+    },
+    {
+      "name": "EpochTelescopePattern_6_5_12",
+      "ref": "Eq. (6.5.12)",
+      "statement_math": "\\mathbb{E}[\\Psi(x_{s,t+1})]+p\\sum_{j=1}^t\\mathbb{E}[\\|g_{X,(s,j)}\\|^2]\\le \\mathbb{E}[\\Psi(x_{(s,1)})]-\\left[\\gamma(1-L\\gamma/2)-2p-\\left(\\frac{\\gamma}{2q}+2p\\right)\\frac{\\gamma^2L^2(t-1)}{b}\\right]\\sum_{j=1}^t\\mathbb{E}[\\|\\tilde g_{X,j}\\|^2]",
+      "role": "Theorem 7.18 explicitly says that the epoch inequality (7.5.12) follows by an argument similar to (6.5.12).",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Use the finite-sum estimator variance bound and the identity x_{s,t}-x_{s,t-1}=-gamma tilde g_{X,t} inside an epoch.",
+          "ref": "Proof of Eq. (6.5.12)",
+          "source_pdf_lines": [
+            23108,
+            23112
+          ],
+          "math": "\\mathbb{E}[\\|\\delta_{(s,t)}\\|^2]\\le \\frac{L^2}{b}\\sum_{i=2}^t\\|x_{s,i}-x_{s,i-1}\\|^2=\\frac{\\gamma^2L^2}{b}\\sum_{i=2}^t\\|\\tilde g_{X,(s,i)}\\|^2.",
+          "uses": [
+            "Lemma6_10_FiniteSumEstimatorVariance"
+          ],
+          "produces": "epoch_variance_in_tilde_gradients"
+        },
+        {
+          "step": 2,
+          "description": "Combine the one-step descent-plus-gradient inequality with the epoch variance bound.",
+          "ref": "Eq. (6.5.11)",
+          "source_pdf_lines": [
+            23120,
+            23127
+          ],
+          "math": "\\mathbb{E}[\\Psi(x_{s,t+1})]+p\\mathbb{E}[\\|g_{X,(s,t)}\\|^2]\\le \\mathbb{E}[\\Psi(x_{s,t})]-\\left[\\gamma(1-L\\gamma/2)-2p\\right]\\mathbb{E}[\\|\\tilde g_{X,(s,t)}\\|^2]+\\left(\\frac{\\gamma}{2q}+2p\\right)\\frac{\\gamma^2L^2}{b}\\sum_{i=2}^t\\mathbb{E}[\\|\\tilde g_{X,(s,i)}\\|^2].",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "one_step_epoch_error_bound"
+        },
+        {
+          "step": 3,
+          "description": "Telescope the inequalities over j=1,...,t.",
+          "ref": "Proof of Eq. (6.5.12)",
+          "source_pdf_lines": [
+            23129,
+            23138
+          ],
+          "math": "\\mathbb{E}[\\Psi(x_{s,t+1})]+p\\sum_{j=1}^t\\mathbb{E}[\\|g_{X,(s,j)}\\|^2]\\le \\mathbb{E}[\\Psi(x_{s,1})]-\\left[\\gamma(1-L\\gamma/2)-2p\\right]\\sum_{j=1}^t\\mathbb{E}[\\|\\tilde g_{X,(s,j)}\\|^2]+\\left(\\frac{\\gamma}{2q}+2p\\right)\\frac{\\gamma^2L^2}{b}\\sum_{j=1}^t\\sum_{i=2}^j\\mathbb{E}[\\|\\tilde g_{X,(s,i)}\\|^2].",
+          "uses": [
+            "previous_step:2"
+          ],
+          "produces": "telescoped_epoch_bound_before_double_sum"
+        },
+        {
+          "step": 4,
+          "description": "Bound the double sum by (t-1) times the full accumulated tilde-gradient sum, giving the displayed (6.5.12) pattern.",
+          "ref": "Eq. (6.5.12)",
+          "source_pdf_lines": [
+            23138,
+            23142
+          ],
+          "math": "\\mathbb{E}[\\Psi(x_{s,t+1})]+p\\sum_{j=1}^t\\mathbb{E}[\\|g_{X,(s,j)}\\|^2]\\le \\mathbb{E}[\\Psi(x_{(s,1)})]-\\left[\\gamma(1-L\\gamma/2)-2p-\\left(\\frac{\\gamma}{2q}+2p\\right)\\frac{\\gamma^2L^2(t-1)}{b}\\right]\\sum_{j=1}^t\\mathbb{E}[\\|\\tilde g_{X,j}\\|^2].",
+          "uses": [
+            "previous_step:3"
+          ],
+          "produces": "epoch_telescope_pattern_6_5_12"
+        }
+      ]
+    },
+    {
+      "name": "PhiKStrongConvexity_7_5_6",
+      "ref": "Eq. (7.5.6) and Theorem 7.18 proof, lines 28551-28553",
+      "statement_math": "\\min_{x\\in X}\\phi_k(x):=\\langle G_k,x\\rangle+\\frac{1}{2\\gamma}\\|x-x_k\\|^2",
+      "role": "Supplies the strong-convexity prerequisite explicitly invoked with (7.5.7) to derive (7.5.11).",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Equation (7.5.6) defines phi_k as a linear term plus the quadratic term (1/(2 gamma))||x-x_k||^2. The 1/gamma strong-convexity conclusion is derived from this display and is the strong convexity of phi_k later invoked in Theorem 7.18.",
+          "ref": "Eq. (7.5.6)",
+          "source_pdf_lines": [
+            28507,
+            28510
+          ],
+          "math": "\\min_{x\\in X}\\phi_k(x):=\\langle G_k,x\\rangle+\\frac{1}{2\\gamma}\\|x-x_k\\|^2",
+          "uses": [],
+          "produces": "phi_k_strong_convexity_modulus_1_over_gamma"
+        },
+        {
+          "step": 2,
+          "description": "Theorem 7.18 explicitly combines this strong convexity with (7.5.7) at x=bar x_{k+1} to obtain the left inequality in (7.5.11).",
+          "ref": "Theorem 7.18 proof, lines 28551-28553",
+          "source_pdf_lines": [
+            28551,
+            28553
+          ],
+          "math": "\\frac{1}{2\\gamma}\\|x_{k+1}-\\bar{x}_{k+1}\\|^2\\le \\langle\\phi_k'(x_{k+1}),x_{k+1}-\\bar{x}_{k+1}\\rangle\\le \\eta_k.",
+          "uses": [
+            "CndGAccuracy_7_5_7",
+            "previous_step:1"
+          ],
+          "produces": "model_solution_distance_bound_7_5_11"
+        }
+      ]
+    },
+    {
+      "name": "LinearApproximation_7_1_7",
+      "ref": "Eq. (7.1.7)",
+      "statement_math": "l_f(x;y):=f(x)+\\langle f'(x),y-x\\rangle.",
+      "role": "Theorem 7.9(c) uses the linearization notation to compare l_phi(u_t,v_t), l_phi(u_t,x), and phi(x).",
+      "proof": "cited"
+    },
+    {
+      "name": "SmoothUpperModel_7_1_8",
+      "ref": "Eq. (7.1.8)",
+      "statement_math": "f(y)\\le l_f(x;y)+\\frac{L}{2}\\|y-x\\|^2,\\quad \\forall x,y\\in X.",
+      "role": "Provides the smooth upper model used in the proof of Theorem 7.9(c) to derive (7.2.24).",
+      "proof": "cited"
+    },
+    {
+      "name": "DiameterDefinition_7_1_18",
+      "ref": "Eq. (7.1.18)",
+      "statement_math": "\\bar D_X\\equiv \\bar D_{X,\\|\\cdot\\|}:=\\max_{x,y\\in X}\\|x-y\\|.",
+      "role": "Bounds \\|v_j-u_j\\| by \\bar D_X in the proof of Theorem 7.9(c).",
+      "proof": "cited"
+    },
+    {
+      "name": "Theorem7_18RandomVariableRReference",
+      "ref": "Theorem 7.18 proof, lines 28610-28611",
+      "statement_math": "\\text{the definition of the random variable }R",
+      "role": "Records the theorem-local invocation of R after the summed inequality; this JSON does not use it to assert a distribution because the proof window does not restate a law compatible with the unweighted 1/N average.",
+      "proof": "cited"
+    },
+    {
+      "name": "CndGGapDefinition_7_2_4",
+      "ref": "Eq. (7.2.4)",
+      "statement_math": "V_{g,u,\\beta}(u_t):=\\max_{x\\in X}\\langle g+\\beta(u_t-u),u_t-x\\rangle.",
+      "role": "Defines the Wolfe gap and the linear oracle solution v_t used throughout Theorem 7.9(c).",
+      "proof": "cited"
+    },
+    {
+      "name": "CndGTerminationCriterion_Algorithm7_6_step3",
+      "ref": "Algorithm 7.6 CndG procedure step 3",
+      "statement_math": "\\text{If }V_{g,u,\\beta}(u_t)\\le \\eta,\\text{ set }u^+=u_t\\text{ and terminate the procedure.}",
+      "role": "Turns the Wolfe-gap bound in Theorem 7.9(c) into the claimed CndG inner-iteration stopping bound.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Algorithm 7.6 step 3 states that the CndG procedure terminates once the Wolfe gap is at most the prescribed tolerance eta.",
+          "ref": "Algorithm 7.6 CndG procedure step 3",
+          "source_pdf_lines": [
+            26583,
+            26584
+          ],
+          "math": "\\text{If }V_{g,u,\\beta}(u_t)\\le \\eta,\\text{ set }u^+=u_t\\text{ and terminate the procedure.}",
+          "uses": [
+            "CndGGapDefinition_7_2_4"
+          ],
+          "produces": "cndg_stops_when_wolfe_gap_at_most_eta"
+        }
+      ]
+    },
+    {
+      "name": "CndGLinearOracleOptimality_7_2_4",
+      "ref": "Algorithm 7.6 CndG procedure step 2 and Eq. (7.2.4)",
+      "statement_math": "\\text{Let }v_t\\text{ be an optimal solution for the subproblem of }V_{g,u,\\beta}(u_t):=\\max_{x\\in X}\\langle g+\\beta(u_t-u),u_t-x\\rangle.",
+      "role": "Supplies the explicit optimality of v_t used in Theorem 7.9(c) to compare l_phi(u_t,v_t) with l_phi(u_t,x).",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Algorithm 7.6 step 2 states that v_t is an optimal solution for the subproblem whose displayed objective defines V_{g,u,beta}(u_t).",
+          "ref": "Algorithm 7.6 CndG procedure step 2 and Eq. (7.2.4)",
+          "source_pdf_lines": [
+            26578,
+            26580
+          ],
+          "math": "V_{g,u,\\beta}(u_t):=\\max_{x\\in X}\\langle g+\\beta(u_t-u),u_t-x\\rangle.",
+          "uses": [],
+          "produces": "linear_oracle_optimal_solution_7_2_4: v_t solves the maximization subproblem defining V_{g,u,\\beta}(u_t)"
+        }
+      ]
+    },
+    {
+      "name": "CndGUpdateStep4",
+      "ref": "Algorithm 7.6 CndG procedure step 4 update clause",
+      "statement_math": "u_{t+1}=(1-\\alpha_t)u_t+\\alpha_t v_t",
+      "role": "Provides the CndG update formula used with the line-search optimality in Theorem 7.9(c).",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Algorithm 7.6 CndG procedure step 4 states the update clause before giving the separately labeled alpha_t formula.",
+          "ref": "Algorithm 7.6 CndG procedure step 4 update clause",
+          "source_pdf_lines": [
+            26584,
+            26584
+          ],
+          "math": "u_{t+1}=(1-\\alpha_t)u_t+\\alpha_t v_t",
+          "uses": [],
+          "produces": "cndg_update_step4"
+        }
+      ]
+    },
+    {
+      "name": "CndGLineSearch_7_2_6",
+      "ref": "Eq. (7.2.6)",
+      "statement_math": "\\alpha_t=\\operatorname*{argmin}_{\\alpha\\in[0,1]}\\phi((1-\\alpha)u_t+\\alpha v_t).",
+      "role": "Justifies the comparison \\phi(u_{t+1})\\le \\phi(\\bar u_{t+1}) in the proof of Theorem 7.9(c).",
+      "proof": "cited"
+    },
+    {
+      "name": "CndGPhiConvexity_7_2_7",
+      "ref": "Text before Eq. (7.2.7) and Theorem 7.9(c) proof after Eq. (7.2.24)",
+      "statement_math": "\\phi(x):=\\langle g,x\\rangle+\\frac{\\beta}{2}\\|x-u\\|^2.",
+      "role": "Supplies the convexity of the CndG quadratic objective used at the end of the linear-model comparison in Theorem 7.9(c).",
+      "proof": [
+        {
+          "step": 1,
+          "description": "The CndG discussion defines phi as the quadratic objective associated with the procedure.",
+          "ref": "Text before Eq. (7.2.7)",
+          "source_pdf_lines": [
+            26596,
+            26599
+          ],
+          "math": "\\phi(x):=\\langle g,x\\rangle+\\frac{\\beta}{2}\\|x-u\\|^2.",
+          "uses": [],
+          "produces": "cndg_phi_definition_for_convexity"
+        },
+        {
+          "step": 2,
+          "description": "The proof invokes the convexity of phi to pass from the affine lower model at u_t to phi(x).",
+          "ref": "Theorem 7.9(c) proof after Eq. (7.2.24)",
+          "source_pdf_lines": [
+            26767,
+            26771
+          ],
+          "math": "\\text{the convexity of }\\phi(\\cdot)",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "phi_convexity_invoked"
+        }
+      ]
+    },
+    {
+      "name": "Lemma3_17_RecursiveSequence",
+      "ref": "Lemma 3.17 / Eqs. (3.9.21)-(3.9.22)",
+      "statement_math": "\\text{Let }w_k\\in(0,1],\\ k=1,2,\\ldots,\\text{ be given. Also let }W_k:=\\begin{cases}1,&k=1,\\\\(1-w_k)W_{k-1},&k\\ge2.\\end{cases}\\text{ Suppose that }W_k>0\\text{ for all }k\\ge2\\text{ and that }\\delta_k\\le(1-w_k)\\delta_{k-1}+B_k,\\ k=1,2,\\ldots.\\text{ Then, we have }\\delta_k\\le W_k(1-w_1)\\delta_0+W_k\\sum_{i=1}^k(B_i/W_i).",
+      "role": "Unrolls the one-step recurrence in Theorem 7.9(c) to produce (7.2.25).",
+      "proof": "cited"
+    },
+    {
+      "name": "Theorem7_9c_CndGInnerIterations",
+      "ref": "Theorem 7.9(c) / Eq. (7.2.15)",
+      "statement_math": "\\text{Let }\\Gamma_k\\text{ be defined in (7.2.9). Suppose that }\\{\\beta_k\\}\\text{ and }\\{\\gamma_k\\}\\text{ in the CGS algorithm satisfy }\\gamma_1=1\\text{ and }L\\gamma_k\\le\\beta_k,\\ k\\ge 1.\\text{ (a) If }\\frac{\\beta_k\\gamma_k}{\\Gamma_k}\\ge\\frac{\\beta_{k-1}\\gamma_{k-1}}{\\Gamma_{k-1}},\\ k\\ge2,\\text{ then for any }x\\in X\\text{ and }k\\ge1,\\ f(y_k)-f(x^*)\\le\\frac{\\beta_k\\gamma_k}{2}\\bar D_X^2+\\Gamma_k\\sum_{i=1}^k\\frac{\\eta_i\\gamma_i}{\\Gamma_i}.\\text{ where }x^*\\text{ is an arbitrary optimal solution of (7.1.1) and }\\bar D_X\\text{ is defined in (7.1.18). (b) If }\\frac{\\beta_k\\gamma_k}{\\Gamma_k}\\le\\frac{\\beta_{k-1}\\gamma_{k-1}}{\\Gamma_{k-1}},\\ k\\ge2,\\text{ then for any }x\\in X\\text{ and }k\\ge1,\\ f(y_k)-f(x^*)\\le\\frac{\\beta_1\\Gamma_k}{2}\\|x_0-x^*\\|^2+\\Gamma_k\\sum_{i=1}^k\\frac{\\eta_i\\gamma_i}{\\Gamma_i}.\\text{ (c) Under the assumptions in either part (a) or (b), the number of inner iterations performed at the }k\\text{-th outer iteration can be bounded by }T_k:=\\left\\lceil\\frac{6\\beta_k\\bar D_X^2}{\\eta_k}\\right\\rceil,\\ \\forall k\\ge 1.",
+      "role": "Supplies the per-outer-iteration LO-call bound used in Corollary 7.13.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Begin part (c) by denoting phi as the k-th CndG subproblem objective and phi* as its minimum over X.",
+          "ref": "Theorem 7.9(c) proof",
+          "source_pdf_lines": [
+            26748,
+            26749
+          ],
+          "uses": [
+            "CndGGapDefinition_7_2_4"
+          ],
+          "produces": "cndg_phi_and_phi_star_context"
+        },
+        {
+          "step": 2,
+          "description": "Introduce the inner-loop weights.",
+          "ref": "Eq. (7.2.22)",
+          "source_pdf_lines": [
+            26749,
+            26752
+          ],
+          "math": "\\lambda_t:=\\frac{2}{t}\\quad\\text{and}\\quad \\Lambda_t=\\frac{2}{t(t-1)}.",
+          "uses": [],
+          "produces": "cndg_inner_weights"
+        },
+        {
+          "step": 3,
+          "description": "Record the recurrence relation for Lambda induced by the definitions of the weights.",
+          "ref": "Eq. (7.2.23)",
+          "source_pdf_lines": [
+            26753,
+            26755
+          ],
+          "math": "\\Lambda_{t+1}=\\Lambda_t(1-\\lambda_{t+1}),\\quad \\forall t\\ge2.",
+          "uses": [
+            "previous_step:2"
+          ],
+          "produces": "lambda_Lambda_recurrence_7_2_23"
+        },
+        {
+          "step": 4,
+          "description": "Define \\bar u_{t+1}, use that u_{t+1} is chosen by the line search (7.2.6), and obtain the comparison \\phi(u_{t+1})\\le\\phi(\\bar u_{t+1}).",
+          "ref": "Theorem 7.9(c) proof",
+          "source_pdf_lines": [
+            26757,
+            26760
+          ],
+          "math": "\\bar u_{t+1}:=(1-\\lambda_{t+1})u_t+\\lambda_{t+1}v_t,\\quad \\bar u_{t+1}-u_t=\\lambda_{t+1}(v_t-u_t),\\quad \\phi(u_{t+1})\\le\\phi(\\bar u_{t+1}).",
+          "uses": [
+            "CndGUpdateStep4",
+            "CndGLineSearch_7_2_6"
+          ],
+          "produces": "line_search_comparison_to_bar_u"
+        },
+        {
+          "step": 5,
+          "description": "Apply the smooth upper model (7.1.8) to phi at \\bar u_{t+1}, expand \\bar u_{t+1}-u_t=\\lambda_{t+1}(v_t-u_t), and use linearity of l_phi in the second argument.",
+          "ref": "Eq. (7.2.24)",
+          "source_pdf_lines": [
+            26760,
+            26765
+          ],
+          "math": "\\phi(u_{t+1})\\le \\phi(\\bar u_{t+1})\\le l_\\phi(u_t,\\bar u_{t+1})+\\frac{\\beta}{2}\\|\\bar u_{t+1}-u_t\\|^2\\le (1-\\lambda_{t+1})\\phi(u_t)+\\lambda_{t+1}l_\\phi(u_t,v_t)+\\frac{\\beta\\lambda_{t+1}^2}{2}\\|v_t-u_t\\|^2.",
+          "uses": [
+            "SmoothUpperModel_7_1_8",
+            "LinearApproximation_7_1_7",
+            "previous_step:4"
+          ],
+          "produces": "inner_descent_7_2_24"
+        },
+        {
+          "step": 6,
+          "description": "Use (7.1.7), the fact that v_t solves the linear subproblem in (7.2.4), and convexity of phi to compare the linear model at v_t with phi(x).",
+          "ref": "Theorem 7.9(c) proof",
+          "source_pdf_lines": [
+            26767,
+            26771
+          ],
+          "math": "l_\\phi(u_t,v_t)=\\phi(u_t)+\\langle\\phi'(u_t),v_t-u_t\\rangle\\le \\phi(u_t)+\\langle\\phi'(u_t),x-u_t\\rangle\\le \\phi(x)",
+          "uses": [
+            "LinearApproximation_7_1_7",
+            "CndGLinearOracleOptimality_7_2_4",
+            "CndGPhiConvexity_7_2_7"
+          ],
+          "produces": "linear_model_at_vt_bounded_by_phi_x"
+        },
+        {
+          "step": 7,
+          "description": "Combine the descent inequality (7.2.24) with the linear-model comparison and rearrange terms.",
+          "ref": "Theorem 7.9(c) proof",
+          "source_pdf_lines": [
+            26772,
+            26775
+          ],
+          "math": "\\phi(u_{t+1})-\\phi(x)\\le(1-\\lambda_{t+1})[\\phi(u_t)-\\phi(x)]+\\frac{\\beta\\lambda_{t+1}^2}{2}\\|v_t-u_t\\|^2,\\quad \\forall x\\in X,",
+          "uses": [
+            "previous_step:5",
+            "previous_step:6"
+          ],
+          "produces": "one_step_phi_residual_recurrence"
+        },
+        {
+          "step": 8,
+          "description": "Apply Lemma 3.17 to the residual recurrence.",
+          "ref": "Eq. (7.2.25)",
+          "source_pdf_lines": [
+            26777,
+            26781
+          ],
+          "math": "\\phi(u_{t+1})-\\phi(x)\\le \\Lambda_{t+1}(1-\\lambda_2)[\\phi(u_1)-\\phi(x)]+\\Lambda_{t+1}\\beta\\sum_{j=1}^t\\frac{\\lambda_{j+1}^2}{2\\Lambda_{j+1}}\\|v_j-u_j\\|^2",
+          "uses": [
+            "Lemma3_17_RecursiveSequence",
+            "previous_step:2",
+            "previous_step:3",
+            "previous_step:7"
+          ],
+          "produces": "cndg_function_residual_bound_7_2_25_before_diameter"
+        },
+        {
+          "step": 9,
+          "description": "Use the definitions of lambda_t and Lambda_t from (7.2.22), together with the diameter definition (7.1.18), to obtain the final bound in (7.2.25).",
+          "ref": "Eq. (7.2.25)",
+          "source_pdf_lines": [
+            26782,
+            26785
+          ],
+          "math": "\\phi(u_{t+1})-\\phi(x)\\le \\frac{2\\beta\\bar D_X^2}{t+1}.",
+          "uses": [
+            "DiameterDefinition_7_1_18",
+            "previous_step:2",
+            "previous_step:8"
+          ],
+          "produces": "cndg_function_residual_bound_7_2_25"
+        },
+        {
+          "step": 10,
+          "description": "Introduce the residual notation used in the subsequent weighted-gap telescope.",
+          "ref": "Theorem 7.9(c) proof",
+          "source_pdf_lines": [
+            26786,
+            26787
+          ],
+          "math": "\\Delta_j=\\phi(u_j)-\\phi^*.",
+          "uses": [],
+          "produces": "Delta_j_residual_definition"
+        },
+        {
+          "step": 11,
+          "description": "Use the definition of phi* as the minimum of phi over X together with the residual definition Delta_j=phi(u_j)-phi* to record the nonnegativity needed when the terminal telescope term is dropped.",
+          "ref": "Theorem 7.9(c) proof",
+          "source_pdf_lines": [
+            26748,
+            26787
+          ],
+          "uses": [
+            "previous_step:1",
+            "previous_step:10"
+          ],
+          "produces": "Delta_j_nonnegative_from_phi_star_minimum"
+        },
+        {
+          "step": 12,
+          "description": "Define the gap function as in (7.2.4), and combine (7.1.7), (7.2.4), (7.2.24), and the residual notation from step 10 to relate the weighted gap to the objective decrease.",
+          "ref": "Theorem 7.9(c) proof",
+          "source_pdf_lines": [
+            26786,
+            26794
+          ],
+          "math": "\\lambda_{j+1}V_{g,u,\\beta}(u_j)\\le \\phi(u_j)-\\phi(u_{j+1})+\\frac{\\beta\\lambda_{j+1}^2}{2}\\|v_j-u_j\\|^2=\\Delta_j-\\Delta_{j+1}+\\frac{\\beta\\lambda_{j+1}^2}{2}\\|v_j-u_j\\|^2.",
+          "uses": [
+            "LinearApproximation_7_1_7",
+            "CndGGapDefinition_7_2_4",
+            "previous_step:5",
+            "previous_step:10"
+          ],
+          "produces": "weighted_gap_descent_relation"
+        },
+        {
+          "step": 13,
+          "description": "Divide the weighted-gap inequality by \\Lambda_{j+1} and sum the resulting inequalities, preserving the telescoping residual terms printed in the proof.",
+          "ref": "Theorem 7.9(c) proof",
+          "source_pdf_lines": [
+            26796,
+            26807
+          ],
+          "math": "\\sum_{j=1}^t\\frac{\\lambda_{j+1}}{\\Lambda_{j+1}}V_{g,u,\\beta}(u_j)\\le -\\frac{1}{\\Lambda_{t+1}}\\Delta_{t+1}+\\sum_{j=2}^t\\left(\\frac{1}{\\Lambda_{j+1}}-\\frac{1}{\\Lambda_j}\\right)\\Delta_j+\\Delta_1+\\sum_{j=1}^t\\frac{\\beta\\lambda_{j+1}^2}{2\\Lambda_{j+1}}\\|v_j-u_j\\|^2",
+          "uses": [
+            "previous_step:3",
+            "previous_step:12"
+          ],
+          "produces": "summed_weighted_gap_with_telescope_terms"
+        },
+        {
+          "step": 14,
+          "description": "Drop the nonpositive terminal residual, bound \\|v_j-u_j\\| by the diameter, and use the definitions of lambda_t and Lambda_t in (7.2.22) to simplify the sum.",
+          "ref": "Theorem 7.9(c) proof",
+          "source_pdf_lines": [
+            26810,
+            26814
+          ],
+          "math": "\\sum_{j=1}^t\\frac{\\lambda_{j+1}}{\\Lambda_{j+1}}V_{g,u,\\beta}(u_j)\\le \\sum_{j=2}^t\\left(\\frac{1}{\\Lambda_{j+1}}-\\frac{1}{\\Lambda_j}\\right)\\Delta_j+\\Delta_1+\\sum_{j=1}^t\\frac{\\beta\\lambda_{j+1}^2}{2\\Lambda_{j+1}}\\bar D_X^2\\le \\sum_{j=1}^t j\\Delta_j+t\\beta\\bar D_X^2.",
+          "uses": [
+            "DiameterDefinition_7_1_18",
+            "previous_step:2",
+            "previous_step:11",
+            "previous_step:13"
+          ],
+          "produces": "summed_weighted_gap_bound"
+        },
+        {
+          "step": 15,
+          "description": "Use the summed weighted-gap bound together with the residual bound (7.2.25) to control the weighted minimum gap.",
+          "ref": "Theorem 7.9(c) proof",
+          "source_pdf_lines": [
+            26820,
+            26826
+          ],
+          "math": "\\min_{j=1,\\ldots,t}V_{g,u,\\beta}(u_j)\\sum_{j=1}^t\\frac{\\lambda_{j+1}}{\\Lambda_{j+1}}\\le \\sum_{j=1}^t\\frac{\\lambda_{j+1}}{\\Lambda_{j+1}}V_{g,u,\\beta}(u_j)\\le 3t\\beta\\bar D_X^2,",
+          "uses": [
+            "previous_step:9",
+            "previous_step:14"
+          ],
+          "produces": "weighted_min_gap_bound"
+        },
+        {
+          "step": 16,
+          "description": "Use the printed weight-sum identity \\sum_{j=1}^t\\lambda_{j+1}/\\Lambda_{j+1}=t(t+1)/2 to isolate the minimum Wolfe gap.",
+          "ref": "Eq. (7.2.26)",
+          "source_pdf_lines": [
+            26829,
+            26832
+          ],
+          "math": "\\min_{j=1,\\ldots,t}V_{g,u,\\beta}(u_j)\\le \\frac{6\\beta\\bar D_X^2}{t+1},\\quad \\forall t\\ge 1.",
+          "uses": [
+            "previous_step:2",
+            "previous_step:15"
+          ],
+          "produces": "cndg_gap_bound_7_2_26"
+        },
+        {
+          "step": 17,
+          "description": "Choose the first inner iteration count that makes the Wolfe gap at most eta_k, and apply the CndG stopping criterion from Algorithm 7.6 step 3 to convert the Wolfe-gap bound into termination of the inner procedure.",
+          "ref": "Eq. (7.2.15)",
+          "source_pdf_lines": [
+            26673,
+            26677
+          ],
+          "math": "T_k:=\\left\\lceil\\frac{6\\beta_k\\bar D_X^2}{\\eta_k}\\right\\rceil,\\quad \\forall k\\ge 1.",
+          "uses": [
+            "CndGTerminationCriterion_Algorithm7_6_step3",
+            "previous_step:16"
+          ],
+          "produces": "cndg_inner_iteration_bound_7_2_15"
+        }
+      ]
+    }
+  ]
+}

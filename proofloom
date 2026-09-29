@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+export PATH="$HOME/.elan/bin:$PATH"
+command="${1:-help}"
+if [[ $# -gt 0 ]]; then shift; fi
+python_bin="$(command -v python3)"
+ensure_setup() {
+  local mode="$1"
+  if [[ ! -f "$ROOT/.deps/$mode.ready" ]]; then
+    "$python_bin" "$ROOT/scripts/setup.py" --mode "$mode"
+  fi
+}
+case "$command" in
+  setup) exec "$python_bin" "$ROOT/scripts/setup.py" "$@" ;;
+  proofs)
+    ensure_setup proofs
+    exec "$python_bin" "$ROOT/scripts/verify_formalizations.py" "$@"
+    ;;
+  soptlib)
+    ensure_setup proofs
+    exec "$python_bin" "$ROOT/scripts/verify_formalizations.py" --manifest "$ROOT/soptlib/manifest.json" "$@"
+    ;;
+  check) exec "$python_bin" "$ROOT/scripts/check_package.py" "$@" ;;
+  help|--help|-h)
+    cat <<'HELP'
+ProofLoom · Melon Group · PKU CMLR
+  ./proofloom check                       Check source hashes and dependency closures (offline)
+  ./proofloom proofs [--algorithm ID]      Compile formalizations and inspect theorem dependencies
+  ./proofloom soptlib                     Compile the complete canonical library
+  ./proofloom setup                       Install pinned Lean dependencies
+
+First-time proof setup downloads dependencies.
+See docs/GETTING_STARTED.md and docs/TRUST.md for requirements and mathematical scope.
+HELP
+    ;;
+  *) echo "Unknown command: $command (use --help)" >&2; exit 2 ;;
+esac

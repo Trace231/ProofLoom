@@ -1,0 +1,2062 @@
+{
+  "algorithm": "RCDGD",
+  "full_name": "Deterministic Ratio-Broadcast Snapshot-Correction Decentralized Gradient Descent (R/C-DGD)",
+  "source_reference": "Anonymous research note RCDGD-1 (Theorem 4.2)",
+  "setup": {
+    "problem": {
+      "math": "\\min_{x\\in\\R^d} f(x):=\\frac1n\\sum_{i=1}^n f_i(x)",
+      "ref": "(1.1)",
+      "description": "n>=2 nodes jointly minimize the equal-weight aggregate; node i can query only f_i."
+    },
+    "variable_space": {
+      "math": "Y_k=[y_{1,k}^\\top;\\ldots;y_{n,k}^\\top]^\\top,\\quad \\widehat Y_k=A_kY_k,\\quad \\widehat y_{i,k}=\\sum_{j=1}^n(A_k)_{ij}y_{j,k};\\qquad X_k=[x_{1,k}^\\top;\\ldots;x_{n,k}^\\top]\\in\\R^{n\\times d},\\quad \\bar x_k=\\frac1n\\mathbf 1^\\top X_k,\\quad \\Delta_k=\\max_{i,j}\\|x_{i,k}-x_{j,k}\\|,\\quad g_{i,k}:=\\nabla f_i(x_{i,k}),\\quad a_k:=\\max_i\\|x_{i,k+1}-x_{i,k}\\|",
+      "ref": "(2.1), (2.2)",
+      "description": "Equation (2.1) gives the generic stacked-state row-stochastic mixing; equation (2.2) gives the model stack, arithmetic mean, diameter, local gradient, and one-round displacement."
+    }
+  },
+  "definitions": [
+    {
+      "name": "finite_horizon_l2_norm",
+      "math": "\\|u\\|_{\\ell_2[p,q)}:=\\left(\\sum_{k=p}^{q-1}u_k^2\\right)^{1/2}",
+      "ref": "Notation after (2.2), PDF lines 147-152",
+      "description": "For a nonnegative scalar sequence u_k, records the paper's finite-horizon ell_2 norm notation used in Lemma 5.6, Lemma 5.8, and Theorem 4.2."
+    }
+  ],
+  "assumptions": [
+    {
+      "name": "objective_smoothness_lower_bound",
+      "math": "每个 fi : Rd → R 可微且梯度全局 L-Lipschitz：\n\\[\n∥∇fi (x) − ∇fi (y)∥ ≤ L ∥x − y∥ .\n\\]\n只要求聚合目标 f = n−1 ∑i fi 有下界 f∗ := infx f (x) > −∞。",
+      "ref": "Assumption 2.1 (PDF lines 155-159)",
+      "parameters": [
+        "L",
+        "f_*",
+        "n",
+        "d"
+      ]
+    },
+    {
+      "name": "time_varying_row_stochastic_network",
+      "math": "存在整数 B\\ge 1 与 a_{\\min}\\in(0,1]，使每个 A_k\\in\\R^{n\\times n} 行随机，具有正对角元，每个正条目至少为 a_{\\min}，且任意连续 B 轮支持图的并图强连通。",
+      "ref": "Assumption 2.2 (PDF lines 161-162)",
+      "parameters": [
+        "B",
+        "a_{\\min}",
+        "A_k",
+        "n"
+      ]
+    },
+    {
+      "name": "synchronous_exact_real_arithmetic",
+      "math": "\\text{通信同步，消息和除法暂按精确实数处理。这个精确算术模型用于先回答算法能否在信息论层面去除行随机偏差；有限精度的影响在第 7 节单独讨论。}",
+      "ref": "Model paragraph after Assumption 2.2 (PDF lines 164-165)",
+      "parameters": []
+    },
+    {
+      "name": "theorem_stepsize_condition",
+      "math": "0<\\gamma\\le\\min\\left\\{\\frac1{4L},\\frac1{16LD(C_N+2)}\\right\\}",
+      "ref": "(4.6)",
+      "parameters": [
+        "gamma",
+        "L",
+        "D",
+        "C_N"
+      ]
+    },
+    {
+      "name": "algorithm_initialization",
+      "math": "g_{i,0}=\\nabla f_i(x_{i,0}),\\qquad c_{i,0}=R_{i,0}=0",
+      "ref": "Algorithm 1, line 1",
+      "parameters": []
+    },
+    {
+      "name": "non_endpoint_ledger",
+      "math": "k<t_\\ell+H-1:\\quad R_{i,k+1}=R_{i,k},\\qquad c_{i,k+1}=c_{i,k}",
+      "ref": "(3.10), k<t_\\ell+H-1",
+      "parameters": [
+        "R_{i,k}",
+        "c_{i,k}"
+      ]
+    },
+    {
+      "name": "endpoint_decode",
+      "math": "k=t_\\ell+H-1:\\quad\\widetilde z_{i,\\ell}=\\frac{\\widehat\\phi_{i,k}}{\\widehat\\psi_{i,k}}",
+      "ref": "(3.11), k=t_\\ell+H-1",
+      "parameters": [
+        "\\widetilde z_{i,\\ell}",
+        "\\widehat\\phi_{i,k}",
+        "\\widehat\\psi_{i,k}"
+      ]
+    },
+    {
+      "name": "endpoint_commit",
+      "math": "k=t_\\ell+H-1:\\quad R_{i,k+1}=R_{i,k}+\\widetilde z_{i,\\ell},\\qquad c_{i,k+1}=c_{i,k}+\\mathbf 1_{\\{i=s_\\ell\\}}\\widetilde z_{i,\\ell}",
+      "ref": "(3.12), k=t_\\ell+H-1",
+      "parameters": [
+        "R_{i,k}",
+        "c_{i,k}",
+        "\\widetilde z_{i,\\ell}",
+        "s_\\ell"
+      ]
+    }
+  ],
+  "cited_theorems": [
+    {
+      "name_in_source": "离散 Young 卷积不等式",
+      "upstream_alias": "Lemma 5.6 几何核应用",
+      "statement_math": "\\|e\\|_{\\ell_2}\\le \\frac{e_0}{\\sqrt{1-\\rho^2}}+\\frac{2\\gamma\\sqrt H}{1-\\rho}\\|b\\|_{\\ell_2}",
+      "ref": "Lemma 5.6 proof (PDF lines 789-794)",
+      "source_pdf_lines": [
+        789,
+        794
+      ],
+      "role": "Records the exact printed Young-inequality application for the geometric-kernel block response in Lemma 5.6.",
+      "proof_in_source": "cited"
+    },
+    {
+      "name_in_source": "离散 Young 不等式",
+      "upstream_alias": "Lemma 5.8 全一窗口应用",
+      "statement_math": "\\|w*a\\|_{\\ell_2}\\le \\|w\\|_{\\ell_1}\\|a\\|_{\\ell_2}=D\\|a\\|_{\\ell_2}",
+      "ref": "Lemma 5.8 proof (PDF lines 849-852)",
+      "source_pdf_lines": [
+        849,
+        852
+      ],
+      "role": "Records the exact printed Young-inequality application for the length-D all-ones snapshot-age window in Lemma 5.8.",
+      "proof_in_source": "cited"
+    }
+  ],
+  "algorithm_spec": {
+    "initialization": {
+      "math": "查询 g_{i,0}=\\nabla f_i(x_{i,0})；令 c_{i,0}=R_{i,0}=0",
+      "ref": "Algorithm 1, line 1",
+      "description": "The complete per-round control flow is recorded in steps 1-9: Algorithm 1 computes ell=floor(k/H), r=k mod H, and s=1+(ell mod n), initializes the broadcast lanes only when r=0, decodes and commits only when r=H-1, and queries g_{i,k+1} after the model update."
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "transaction_clock",
+        "math": "\\ell=\\lfloor k/H\\rfloor,\\quad r=k\\bmod H,\\quad s=1+(\\ell\\bmod n);\\qquad t_\\ell=\\ell H,\\quad \\mathcal I_\\ell=\\{t_\\ell,\\ldots,t_\\ell+H-1\\},\\quad s_\\ell=1+(\\ell\\bmod n)",
+        "ref": "Algorithm 1, line 3; (3.6)"
+      },
+      {
+        "step": 2,
+        "name": "payload_initialization",
+        "math": "r=0:\\quad z_\\ell=g_{s_\\ell,t_\\ell}-c_{s_\\ell,t_\\ell},\\qquad (\\phi_{i,t_\\ell},\\psi_{i,t_\\ell})=\\begin{cases}(z_\\ell,1),&i=s_\\ell,\\\\(0,0),&i\\ne s_\\ell,\\end{cases}",
+        "ref": "Algorithm 1, lines 4-7; (3.7)"
+      },
+      {
+        "step": 3,
+        "name": "ratio_lane_propagation",
+        "math": "\\phi_{k+1}=A_k\\phi_k,\\qquad\\psi_{k+1}=A_k\\psi_k",
+        "ref": "(3.4)"
+      },
+      {
+        "step": 4,
+        "name": "three_channel_mixing",
+        "math": "\\widehat x_{i,k}=\\sum_j(A_k)_{ij}x_{j,k},\\quad\\widehat\\phi_{i,k}=\\sum_j(A_k)_{ij}\\phi_{j,k},\\quad\\widehat\\psi_{i,k}=\\sum_j(A_k)_{ij}\\psi_{j,k}",
+        "ref": "(3.8)"
+      },
+      {
+        "step": 5,
+        "name": "model_direction_update",
+        "math": "d_{i,k}=R_{i,k}/n+g_{i,k}-c_{i,k},\\qquad x_{i,k+1}=\\widehat x_{i,k}-\\gamma d_{i,k},\\qquad(\\phi_{i,k+1},\\psi_{i,k+1})=(\\widehat\\phi_{i,k},\\widehat\\psi_{i,k})",
+        "ref": "(3.9)"
+      },
+      {
+        "step": 6,
+        "name": "non_endpoint_ledger",
+        "math": "k<t_\\ell+H-1:\\quad R_{i,k+1}=R_{i,k},\\qquad c_{i,k+1}=c_{i,k}",
+        "ref": "(3.10), k<t_\\ell+H-1"
+      },
+      {
+        "step": 7,
+        "name": "endpoint_decode",
+        "math": "k=t_\\ell+H-1:\\quad\\widetilde z_{i,\\ell}=\\frac{\\widehat\\phi_{i,k}}{\\widehat\\psi_{i,k}}",
+        "ref": "(3.11), k=t_\\ell+H-1"
+      },
+      {
+        "step": 8,
+        "name": "endpoint_commit",
+        "math": "k=t_\\ell+H-1:\\quad R_{i,k+1}=R_{i,k}+\\widetilde z_{i,\\ell},\\qquad c_{i,k+1}=c_{i,k}+\\mathbf 1_{\\{i=s_\\ell\\}}\\widetilde z_{i,\\ell}",
+        "ref": "(3.12), k=t_\\ell+H-1"
+      },
+      {
+        "step": 9,
+        "name": "gradient_query",
+        "math": "g_{i,k+1}=\\nabla f_i(x_{i,k+1})",
+        "ref": "(3.13)"
+      }
+    ],
+    "output": {
+      "math": "X_0,X_1,\\ldots,X_T",
+      "ref": "Algorithm 1 output; (3.6)-(3.13)",
+      "type": "all formal per-communication-round model states"
+    },
+    "parameters": [
+      {
+        "name": "H",
+        "math": "H=\\max\\{1,(n-1)B\\}",
+        "ref": "(2.3)"
+      },
+      {
+        "name": "K_0",
+        "math": "K_0=nH",
+        "ref": "(2.3)"
+      },
+      {
+        "name": "D",
+        "math": "D=(n+1)H",
+        "ref": "(2.3)"
+      },
+      {
+        "name": "gamma",
+        "math": "\\gamma>0",
+        "ref": "Algorithm 1 input; (4.6)"
+      }
+    ]
+  },
+  "main_theorem": {
+    "statement_math": "定理 4.2 (确定性单循环非凸收敛). 在假设 2.1--2.2 下，若\n\\[\n0<\\gamma\\le\\min\\left\\{\\frac1{4L},\\frac1{16LD(C_N+2)}\\right\\},\\tag{4.6}\n\\]\n则对任意允许的拓扑序列和任意 T\\ge 1，算法 1 满足\n\\[\n\\frac1T\\sum_{k=0}^{T-1}\\|\\nabla f(\\bar x_k)\\|^2\\le\\frac{C_{\\rm RC}}T,\\tag{4.7}\n\\]\n其中\n\\[\nC_{\\rm RC}:=C_{\\rm pre}+\\frac{4(f(\\bar x_{K_0})-f_*)}{\\gamma}+16(L+\\gamma^{-1})^2A_1^2.\\tag{4.8}\n\\]\n此外，\n\\[\n\\sum_{k=0}^{\\infty}\\Delta_k^2<\\infty,\\qquad \\Delta_k\\to0.\\tag{4.9}\n\\]",
+    "ref": "Theorem 4.2, (4.6)-(4.9)",
+    "rate": "O(1/T) in actual communication rounds T",
+    "measure": "average squared norm of the arithmetic-mean gradient, together with square-summable and vanishing consensus diameter",
+    "proof": [
+      {
+        "step": 1,
+        "description": "Restrict all post-prefix norms to the finite horizon [K_0,T) and define the gradient-energy quantity and feedback coefficient used in the theorem proof.",
+        "math": "G_T=\\|\\nabla f(\\bar x)\\|_{\\ell_2[K_0,T)},\\qquad q=2C_NLD\\gamma^2",
+        "ref": "Theorem 4.2 proof, after (5.18)",
+        "source_pdf_lines": [
+          936,
+          937
+        ],
+        "uses": [
+          "network_constants"
+        ],
+        "produces": [
+          "G_T",
+          "q"
+        ]
+      },
+      {
+        "step": 2,
+        "description": "Use the closed disagreement estimate and the drift bound, then apply (a+b)^2 <= 2a^2+2b^2 to split drift energy into transient and gradient-feedback terms.",
+        "math": "\\|v\\|_{\\ell_2[K_0,T)}^2\\le2(L+\\gamma^{-1})^2A_1^2+2(L+\\gamma^{-1})^2q^2G_T^2",
+        "ref": "(5.19)",
+        "source_pdf_lines": [
+          939,
+          944
+        ],
+        "uses": [
+          "snapshot_disagreement_small_gain",
+          "average_drift_bounds",
+          "network_constants",
+          "q"
+        ],
+        "produces": [
+          "drift_energy_bound"
+        ]
+      },
+      {
+        "step": 3,
+        "description": "Bound the loop gain using the step-size condition and gamma L <= 1/4.",
+        "math": "(L+\\gamma^{-1})q=2C_NLD\\gamma(1+L\\gamma)\\le\\frac52C_NLD\\gamma\\le\\frac{5C_N}{32(C_N+2)}<\\frac14",
+        "ref": "(5.20)",
+        "source_pdf_lines": [
+          945,
+          950
+        ],
+        "uses": [
+          "theorem_stepsize_condition",
+          "network_constants",
+          "q"
+        ],
+        "produces": [
+          "feedback_gain_lt_quarter"
+        ]
+      },
+      {
+        "step": 4,
+        "description": "Sum the drifted descent inequality from K_0 through T-1 and use the lower bound f_* together with (5.19).",
+        "math": "\\frac{\\gamma}{2}G_T^2\\le f(\\bar x_{K_0})-f_*+4\\gamma(L+\\gamma^{-1})^2A_1^2+4\\gamma(L+\\gamma^{-1})^2q^2G_T^2",
+        "ref": "Theorem 4.2 proof, summation after (5.20)",
+        "source_pdf_lines": [
+          952,
+          955
+        ],
+        "uses": [
+          "drifted_descent",
+          "objective_smoothness_lower_bound",
+          "drift_energy_bound",
+          "snapshot_disagreement_small_gain",
+          "average_drift_bounds",
+          "theorem_stepsize_condition"
+        ],
+        "produces": [
+          "pre_absorption_gradient_energy"
+        ]
+      },
+      {
+        "step": 5,
+        "description": "Use the gain bound to move the feedback term to the left-hand side.",
+        "math": "4\\gamma(L+\\gamma^{-1})^2q^2\\le\\frac\\gamma4,\\qquad\\frac{\\gamma}{4}G_T^2\\le f(\\bar x_{K_0})-f_*+4\\gamma(L+\\gamma^{-1})^2A_1^2",
+        "ref": "Theorem 4.2 proof, feedback absorption",
+        "source_pdf_lines": [
+          956,
+          959
+        ],
+        "uses": [
+          "pre_absorption_gradient_energy",
+          "feedback_gain_lt_quarter",
+          "theorem_stepsize_condition",
+          "network_constants"
+        ],
+        "produces": [
+          "absorbed_gradient_energy"
+        ]
+      },
+      {
+        "step": 6,
+        "description": "Multiply by 4/gamma to obtain the uniform post-prefix energy bound used in the stated constant.",
+        "math": "G_T^2\\le\\frac{4(f(\\bar x_{K_0})-f_*)}{\\gamma}+16(L+\\gamma^{-1})^2A_1^2",
+        "ref": "(5.21)",
+        "source_pdf_lines": [
+          960,
+          963
+        ],
+        "uses": [
+          "absorbed_gradient_energy",
+          "theorem_stepsize_condition",
+          "network_constants"
+        ],
+        "produces": [
+          "post_prefix_gradient_energy"
+        ]
+      },
+      {
+        "step": 7,
+        "description": "Use the proof sentence that adding the fixed prefix gives (4.7)-(4.8), whose displayed statement is the communication-round average rate with C_RC.",
+        "math": "\\frac1T\\sum_{k=0}^{T-1}\\|\\nabla f(\\bar x_k)\\|^2\\le\\frac{C_{\\rm RC}}T",
+        "ref": "(4.7)-(4.8), conclusion of Theorem 4.2 proof",
+        "source_pdf_lines": [
+          529,
+          538
+        ],
+        "uses": [
+          "finite_prefix_finiteness",
+          "post_prefix_gradient_energy",
+          "network_constants"
+        ],
+        "produces": [
+          "main_rate"
+        ]
+      },
+      {
+        "step": 8,
+        "description": "Since the right side of (5.21) is independent of T, the post-prefix gradient energy is uniformly bounded; substitute the disagreement gain to uniformly bound the cumulative squared diameter.",
+        "math": "\\sup_{T>K_0}\\sum_{k=K_0}^{T-1}\\Delta_k^2<\\infty",
+        "ref": "Theorem 4.2 proof, consensus-energy step",
+        "source_pdf_lines": [
+          965,
+          971
+        ],
+        "uses": [
+          "snapshot_disagreement_small_gain",
+          "post_prefix_gradient_energy",
+          "network_constants"
+        ],
+        "produces": [
+          "uniform_disagreement_energy"
+        ]
+      },
+      {
+        "step": 9,
+        "description": "Let T tend to infinity, add the finite prefix, and infer square summability of the full diameter sequence.",
+        "math": "\\sum_{k=0}^{\\infty}\\Delta_k^2<\\infty",
+        "ref": "(4.9), Theorem 4.2 proof",
+        "source_pdf_lines": [
+          973,
+          977
+        ],
+        "uses": [
+          "finite_prefix_finiteness",
+          "snapshot_disagreement_small_gain",
+          "uniform_disagreement_energy"
+        ],
+        "produces": [
+          "diameter_square_summability"
+        ]
+      },
+      {
+        "step": 10,
+        "description": "Use the contradiction argument for a nonnegative sequence: if Delta_k did not tend to zero, infinitely many terms would exceed an epsilon and the square sum would diverge.",
+        "math": "\\Delta_k\\to0",
+        "ref": "(4.9), final sentence of Theorem 4.2 proof",
+        "source_pdf_lines": [
+          973,
+          977
+        ],
+        "uses": [
+          "diameter_square_summability"
+        ],
+        "produces": [
+          "consensus_limit"
+        ]
+      }
+    ]
+  },
+  "key_lemmas": [
+    {
+      "name": "single_loop_resource",
+      "ref": "Proposition 3.1",
+      "statement_math": "\\text{算法 1 满足定义 2.3。每个节点保存 }x_i,g_i,c_i,R_i,\\phi_i\\text{ 五个 }d\\text{ 维向量、标量 }\\psi_i\\text{ 和常数个计时状态；每轮发送两个 }d\\text{ 维向量和一个标量。算法状态为 }O(d)\\text{，若计入长度为 }O(n)\\text{ 的接收权重行，则总存储为 }O(n+d)\\text{；单轮消息为 }2d+1=O(d).",
+      "role": "Records the paper's strict single-loop and resource claims for the algorithm object.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Observe that the three message channels are concatenated and acted on by the same A_k exactly once.",
+          "ref": "Proposition 3.1 proof",
+          "source_pdf_lines": [
+            425,
+            434
+          ],
+          "uses": [
+            "time_varying_row_stochastic_network"
+          ],
+          "produces": [
+            "one_communication_application_per_round"
+          ]
+        },
+        {
+          "step": 2,
+          "description": "Count one fixed-positive-step model update and one current-gradient query in every round.",
+          "math": "x_{i,k+1}=\\widehat x_{i,k}-\\gamma d_{i,k},\\qquad g_{i,k+1}=\\nabla f_i(x_{i,k+1})",
+          "ref": "(3.9), (3.13); Proposition 3.1 proof",
+          "source_pdf_lines": [
+            429,
+            434
+          ],
+          "uses": [
+            "time_varying_row_stochastic_network",
+            "synchronous_exact_real_arithmetic"
+          ],
+          "produces": [
+            "strict_single_loop"
+          ]
+        },
+        {
+          "step": 3,
+          "description": "The transaction freezes only the payload used for ratio decoding, not the model, current gradients, or directions, and its H-round length is independent of the stopping horizon.",
+          "ref": "(3.7)-(3.9); Proposition 3.1 proof",
+          "source_pdf_lines": [
+            433,
+            434
+          ],
+          "uses": [
+            "time_varying_row_stochastic_network",
+            "synchronous_exact_real_arithmetic"
+          ],
+          "produces": [
+            "no_frozen_optimization_loop"
+          ]
+        },
+        {
+          "step": 4,
+          "description": "Count the five d-dimensional vectors, scalar psi, constant-size timer state, and the two d-vectors plus one scalar sent per round.",
+          "math": "2d+1=O(d)",
+          "ref": "Proposition 3.1",
+          "source_pdf_lines": [
+            425,
+            427
+          ],
+          "uses": [
+            "time_varying_row_stochastic_network",
+            "synchronous_exact_real_arithmetic"
+          ],
+          "produces": [
+            "resource_bounds"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "transaction_schedule",
+      "ref": "(2.3), (3.6)",
+      "statement_math": "H=\\max\\{1,(n-1)B\\},\\qquad t_\\ell=\\ell H,\\qquad\\mathcal I_\\ell=\\{t_\\ell,\\ldots,t_\\ell+H-1\\},\\qquad s_\\ell=1+(\\ell\\bmod n)",
+      "role": "Fixes the deterministic source rotation and H-round transaction windows used in the age argument.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Record the global H horizon used by the fixed-length transaction windows.",
+          "math": "H=\\max\\{1,(n-1)B\\}",
+          "ref": "(2.3)",
+          "source_pdf_lines": [
+            194,
+            194
+          ],
+          "uses": [
+            "single_loop_resource"
+          ],
+          "produces": [
+            "H_definition"
+          ]
+        },
+        {
+          "step": 2,
+          "description": "Define the optimization-round start, the H-round interval, and the cyclic source index for transaction ell.",
+          "math": "t_\\ell=\\ell H,\\qquad\\mathcal I_\\ell=\\{t_\\ell,\\ldots,t_\\ell+H-1\\},\\qquad s_\\ell=1+(\\ell\\bmod n)",
+          "ref": "(3.6)",
+          "source_pdf_lines": [
+            322,
+            324
+          ],
+          "uses": [
+            "H_definition"
+          ],
+          "produces": [
+            "deterministic_transaction_clock"
+          ]
+        },
+        {
+          "step": 3,
+          "description": "Use the fixed H-round interval only for auxiliary payload propagation; each k in the interval still executes one full optimization update.",
+          "ref": "(3.6)-(3.9), algorithm description",
+          "source_pdf_lines": [
+            326,
+            327
+          ],
+          "uses": [
+            "single_loop_resource",
+            "deterministic_transaction_clock"
+          ],
+          "produces": [
+            "fixed_period_refresh"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "beta_definition",
+      "ref": "(4.1)",
+      "statement_math": "\\beta=a_{\\min}^H",
+      "role": "Records the pure definition of the H-step mass constant before it is used in Lemma 5.1.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "The main-results setup defines beta as a_min raised to the H-th power.",
+          "math": "\\beta=a_{\\min}^H",
+          "ref": "(4.1)",
+          "source_pdf_lines": [
+            437,
+            445
+          ],
+          "uses": [],
+          "produces": [
+            "beta_equals_amin_pow_H"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "uniform_temporal_coverage",
+      "ref": "Lemma 5.1, (5.2)",
+      "statement_math": "P=A_{t+H-1}\\cdots A_t,\\qquad P_{is}\\ge\\beta=a_{\\min}^H>0,\\quad i=1,\\ldots,n",
+      "role": "Provides a strictly positive common lower bound for every source-to-node entry of each H-round product.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Define the temporal-reachability sets S_q from source s and start with S_0={s}; positive self-loops preserve reached nodes.",
+          "math": "S_0=\\{s\\},\\qquad S_q\\subseteq S_{q+1}",
+          "ref": "Lemma 5.1 proof",
+          "source_pdf_lines": [
+            608,
+            610
+          ],
+          "uses": [
+            "time_varying_row_stochastic_network"
+          ],
+          "produces": [
+            "reachability_monotonicity"
+          ]
+        },
+        {
+          "step": 2,
+          "description": "Strong connectivity of every B-window union gives an edge from any nonempty proper reached set to its complement, so at least one new node is reached per B-round block.",
+          "math": "|S_{(q+1)B}|\\ge\\min\\{|S_{qB}|+1,n\\}",
+          "ref": "Lemma 5.1 proof",
+          "source_pdf_lines": [
+            611,
+            615
+          ],
+          "uses": [
+            "time_varying_row_stochastic_network",
+            "transaction_schedule",
+            "reachability_monotonicity"
+          ],
+          "produces": [
+            "B_window_reachability_growth"
+          ]
+        },
+        {
+          "step": 3,
+          "description": "Use the horizon definition H=max{1,(n-1)B} from (2.3) to expose the reachability-block bound needed for the induction.",
+          "math": "(n-1)B\\le H",
+          "ref": "(2.3); Lemma 5.1 proof",
+          "source_pdf_lines": [
+            617,
+            617
+          ],
+          "uses": [
+            "transaction_schedule",
+            "H_definition"
+          ],
+          "produces": [
+            "H_ge_reachability_blocks"
+          ]
+        },
+        {
+          "step": 4,
+          "description": "Induct from one reached source to all n nodes within (n-1)B <= H rounds.",
+          "math": "|S_0|=1\\quad\\Longrightarrow\\quad S_H=[n]",
+          "ref": "Lemma 5.1 proof",
+          "source_pdf_lines": [
+            617,
+            617
+          ],
+          "uses": [
+            "time_varying_row_stochastic_network",
+            "transaction_schedule",
+            "B_window_reachability_growth",
+            "H_ge_reachability_blocks"
+          ],
+          "produces": [
+            "all_nodes_reached_within_H"
+          ]
+        },
+        {
+          "step": 5,
+          "description": "Pad each source-to-terminal temporal path with positive self-loops to obtain exactly H factors, each of weight at least a_min.",
+          "ref": "Lemma 5.1 proof",
+          "source_pdf_lines": [
+            621,
+            624
+          ],
+          "uses": [
+            "time_varying_row_stochastic_network",
+            "all_nodes_reached_within_H"
+          ],
+          "produces": [
+            "positive_path_product"
+          ]
+        },
+        {
+          "step": 6,
+          "description": "Nonnegativity of all other paths preserves the selected path lower bound and yields (5.2).",
+          "math": "P_{is}\\ge a_{\\min}^H=\\beta",
+          "ref": "(5.2)",
+          "source_pdf_lines": [
+            621,
+            624
+          ],
+          "uses": [
+            "time_varying_row_stochastic_network",
+            "positive_path_product",
+            "beta_definition"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "exact_ratio_decoding",
+      "ref": "Lemma 5.2, (3.4)",
+      "statement_math": "\\text{式 (3.4) 的事务末端，每个节点都精确得到同一个载荷 }z。",
+      "role": "Justifies the common payload used by every ledger commit.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Write the lane initialization in source-column form.",
+          "math": "\\phi_t=e_s z^\\top,\\qquad\\psi_t=e_s",
+          "ref": "Lemma 5.2 proof",
+          "source_pdf_lines": [
+            628,
+            628
+          ],
+          "uses": [
+            "payload_initialization"
+          ],
+          "produces": [
+            "source_lane_initialization"
+          ]
+        },
+        {
+          "step": 2,
+          "description": "Apply the identical H-round product to vector and scalar lanes.",
+          "math": "\\phi_{t+H}=Pe_s z^\\top,\\qquad\\psi_{t+H}=Pe_s",
+          "ref": "Lemma 5.2 proof",
+          "source_pdf_lines": [
+            628,
+            632
+          ],
+          "uses": [
+            "ratio_lane_propagation",
+            "synchronous_exact_real_arithmetic",
+            "source_lane_initialization"
+          ],
+          "produces": [
+            "H_round_ratio_lane_product"
+          ]
+        },
+        {
+          "step": 3,
+          "description": "Use the positive-column bound to show the scalar denominator is positive and the vector lane is the same scalar multiple of z.",
+          "math": "\\psi_{i,t+H}=e_i^\\top Pe_s=P_{is}\\ge\\beta>0,\\qquad\\phi_{i,t+H}=e_i^\\top Pe_s z^\\top=P_{is}z^\\top",
+          "ref": "Lemma 5.2 proof",
+          "source_pdf_lines": [
+            628,
+            632
+          ],
+          "uses": [
+            "uniform_temporal_coverage",
+            "H_round_ratio_lane_product"
+          ],
+          "produces": [
+            "positive_ratio_denominator",
+            "ratio_lane_scalar_multiple"
+          ]
+        },
+        {
+          "step": 4,
+          "description": "Divide coordinate by coordinate to cancel P_is.",
+          "math": "\\frac{(\\phi_{i,t+H})_r}{\\psi_{i,t+H}}=\\frac{P_{is}z_r}{P_{is}}=z_r,\\qquad r=1,\\ldots,d",
+          "ref": "Lemma 5.2 proof",
+          "source_pdf_lines": [
+            634,
+            637
+          ],
+          "uses": [
+            "uniform_temporal_coverage",
+            "synchronous_exact_real_arithmetic",
+            "positive_ratio_denominator",
+            "ratio_lane_scalar_multiple"
+          ],
+          "produces": [
+            "coordinate_ratio_equals_z"
+          ]
+        },
+        {
+          "step": 5,
+          "description": "Conclude that decoding does not require knowledge of P or a Perron vector.",
+          "ref": "Lemma 5.2 proof",
+          "source_pdf_lines": [
+            639,
+            641
+          ],
+          "uses": [
+            "synchronous_exact_real_arithmetic",
+            "positive_ratio_denominator",
+            "coordinate_ratio_equals_z"
+          ],
+          "produces": [
+            "common_decoded_payload"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "snapshot_ledger_invariant",
+      "ref": "Lemma 5.3, (3.5), (5.3)",
+      "statement_math": "R_{1,k}=\\cdots=R_{n,k}=\\sum_{j=1}^n c_{j,k},\\qquad\\frac1n\\sum_{i=1}^n d_{i,k}=\\frac1n\\sum_{i=1}^n\\nabla f_i(x_{i,k})\\quad(k\\ge0)",
+      "role": "Provides the exact arithmetic-average direction and the invariant needed to cancel ledger terms in disagreement bounds.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Initialize the invariant from R_i,0=c_i,0=0.",
+          "math": "R_{i,0}=c_{i,0}=0\\quad\\Longrightarrow\\quad R_{1,0}=\\cdots=R_{n,0}=\\sum_jc_{j,0}",
+          "ref": "Lemma 5.3 proof",
+          "source_pdf_lines": [
+            654,
+            654
+          ],
+          "uses": [
+            "algorithm_initialization"
+          ]
+        },
+        {
+          "step": 2,
+          "description": "At non-endpoint rounds the ledger variables do not change.",
+          "math": "R_{i,k+1}=R_{i,k},\\qquad c_{i,k+1}=c_{i,k}",
+          "ref": "(3.10), Lemma 5.3 proof",
+          "source_pdf_lines": [
+            654,
+            655
+          ],
+          "uses": [
+            "non_endpoint_ledger"
+          ],
+          "produces": [
+            "non_endpoint_preserves_ledger"
+          ]
+        },
+        {
+          "step": 3,
+          "description": "At an endpoint, exact ratio decoding gives one common z; every R_i increases by z and only source s changes its c_s by z.",
+          "math": "R_i^+=R_i+z,\\qquad c_s^+=c_s+z,\\qquad c_j^+=c_j\\ (j\\ne s)",
+          "ref": "(3.11)-(3.12), Lemma 5.3 proof",
+          "source_pdf_lines": [
+            654,
+            659
+          ],
+          "uses": [
+            "exact_ratio_decoding",
+            "endpoint_decode",
+            "endpoint_commit"
+          ],
+          "produces": [
+            "endpoint_common_payload_update"
+          ]
+        },
+        {
+          "step": 4,
+          "description": "Expand the endpoint sum to preserve the ledger equality.",
+          "math": "R^+=R+z=\\sum_{j\\ne s}c_j+(c_s+z)=\\sum_jc_j^+",
+          "ref": "Lemma 5.3 proof",
+          "source_pdf_lines": [
+            656,
+            659
+          ],
+          "uses": [
+            "endpoint_common_payload_update"
+          ],
+          "produces": [
+            "endpoint_sum_preserves_ledger"
+          ]
+        },
+        {
+          "step": 5,
+          "description": "Induction gives the invariant for every k, and substituting R=sum c into the direction definition cancels the snapshot terms in the arithmetic average.",
+          "math": "\\frac1n\\sum_i d_{i,k}=\\frac{R_k}{n}+\\frac1n\\sum_i(g_{i,k}-c_{i,k})=\\frac1n\\sum_i g_{i,k}",
+          "ref": "(5.3), Lemma 5.3 proof",
+          "source_pdf_lines": [
+            661,
+            665
+          ],
+          "uses": [
+            "algorithm_initialization",
+            "exact_ratio_decoding",
+            "non_endpoint_preserves_ledger",
+            "endpoint_sum_preserves_ledger"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "direction_identity",
+      "ref": "(3.1)-(3.3)",
+      "statement_math": "d_{i,k}=R_k/n+g_{i,k}-c_{i,k},\\qquad\\frac1n\\sum_i d_{i,k}=\\frac1n\\sum_i g_{i,k},\\qquad d_{i,k}-d_{j,k}=(g_{i,k}-c_{i,k})-(g_{j,k}-c_{j,k})",
+      "role": "Records the exact arithmetic direction average and the cancellation of the common ledger term in direction differences.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Define each node direction from the common snapshot ledger and its local current-minus-snapshot innovation.",
+          "math": "d_{i,k}=R_k/n+g_{i,k}-c_{i,k}",
+          "ref": "(3.1)",
+          "source_pdf_lines": [
+            218,
+            220
+          ],
+          "uses": [
+            "snapshot_ledger_invariant"
+          ],
+          "produces": [
+            "direction_definition"
+          ]
+        },
+        {
+          "step": 2,
+          "description": "Expand the cross-node arithmetic average and cancel the snapshot sum against R_k=sum_i c_i,k.",
+          "math": "\\frac1n\\sum_i d_{i,k}=\\frac{R_k}{n}+\\frac1n\\sum_i g_{i,k}-\\frac{R_k}{n}=\\frac1n\\sum_i g_{i,k}",
+          "ref": "(3.2)",
+          "source_pdf_lines": [
+            223,
+            231
+          ],
+          "uses": [
+            "snapshot_ledger_invariant",
+            "snapshot_ledger_invariant"
+          ],
+          "produces": [
+            "exact_arithmetic_direction_average"
+          ]
+        },
+        {
+          "step": 3,
+          "description": "Subtract two node directions so the common R_k/n term vanishes.",
+          "math": "d_{i,k}-d_{j,k}=(g_{i,k}-c_{i,k})-(g_{j,k}-c_{j,k})",
+          "ref": "(3.3)",
+          "source_pdf_lines": [
+            245,
+            247
+          ],
+          "uses": [
+            "snapshot_ledger_invariant"
+          ],
+          "produces": [
+            "direction_difference_cancellation"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "network_constants",
+      "ref": "(4.1)-(4.3)",
+      "statement_math": "\\beta=a_{\\min}^H,\\qquad\\rho=1-n\\beta,\\qquad C_N=\\frac{6H}{n\\beta},\\qquad A_{\\rm pre}=\\sum_{k=0}^{K_0-1}a_k,\\qquad C_{\\rm pre}=\\sum_{k=0}^{K_0-1}\\|\\nabla f(\\bar x_k)\\|^2,\\qquad A_0=\\sqrt{\\frac{2H}{1-\\rho^2}}\\,\\Delta_{K_0},\\qquad H_0=L\\sqrt D\\,A_{\\rm pre},\\qquad B_0=2[H_0+LD(1+\\gamma L)A_0],\\qquad A_1=A_0+C_N\\gamma B_0",
+      "role": "Defines the network, prefix, and small-gain constants used by the finite-horizon estimates and C_RC.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Define beta as the positive H-step mass, rho as the Dobrushin contraction factor, and C_N as the disagreement gain constant.",
+          "math": "\\beta=a_{\\min}^H,\\qquad\\rho=1-n\\beta,\\qquad C_N=\\frac{6H}{n\\beta}",
+          "ref": "(4.1)",
+          "source_pdf_lines": [
+            437,
+            445
+          ],
+          "uses": [],
+          "produces": [
+            "beta_rho_CN"
+          ]
+        },
+        {
+          "step": 2,
+          "description": "Use row-stochasticity together with the positive H-step mass to record the range of rho used by the geometric-series estimates.",
+          "math": "0\\le\\rho<1",
+          "ref": "Text after (4.1)",
+          "source_pdf_lines": [
+            446,
+            446
+          ],
+          "uses": [
+            "time_varying_row_stochastic_network",
+            "uniform_temporal_coverage",
+            "beta_rho_CN"
+          ],
+          "produces": [
+            "rho_range"
+          ]
+        },
+        {
+          "step": 3,
+          "description": "Define the finite-prefix energy and the initial, stale-error, and closed-disagreement constants.",
+          "math": "A_{\\rm pre}=\\sum_{k=0}^{K_0-1}a_k,\\quad C_{\\rm pre}=\\sum_{k=0}^{K_0-1}\\|\\nabla f(\\bar x_k)\\|^2,\\quad A_0=\\sqrt{\\frac{2H}{1-\\rho^2}}\\Delta_{K_0},\\quad H_0=L\\sqrt D A_{\\rm pre},\\quad B_0=2[H_0+LD(1+\\gamma L)A_0],\\quad A_1=A_0+C_N\\gamma B_0",
+          "ref": "(4.2)-(4.3)",
+          "source_pdf_lines": [
+            446,
+            460
+          ],
+          "uses": [
+            "snapshot_ledger_invariant",
+            "rho_range"
+          ],
+          "produces": [
+            "proof_constants"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "finite_prefix_finiteness",
+      "ref": "Lemma 4.1, (4.4)-(4.5)",
+      "statement_math": "5\\gamma LK_0<1,\\quad X_{\\max}^0=\\max_i\\|x_{i,0}\\|,\\qquad G_{\\max}^0=\\max_i\\|\\nabla f_i(x_{i,0})\\|,\\quad Z_{\\rm pre}:=\\frac{X_{\\max}^0+5\\gamma K_0(G_{\\max}^0+LX_{\\max}^0)}{1-5\\gamma LK_0},\\quad G_{\\rm pre}:=G_{\\max}^0+L(Z_{\\rm pre}+X_{\\max}^0),\\quad\\max_{0\\le k\\le K_0}\\max_i\\|x_{i,k}\\|\\le Z_{\\rm pre},\\quad A_{\\rm pre}\\le K_0(2Z_{\\rm pre}+5\\gamma G_{\\rm pre}),\\quad C_{\\rm pre}\\le K_0G_{\\rm pre}^2",
+      "role": "Supplies the finite initial prefix constants used in A_0,H_0,B_0,A_1 and C_RC.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Assume temporarily that all prefix iterates through time k lie in the Z_pre ball and use Lipschitz gradients to bound current and sampled snapshot gradients.",
+          "math": "\\|\\nabla f_i(x_{i,t})\\|\\le\\|\\nabla f_i(x_{i,0})\\|+L\\|x_{i,t}-x_{i,0}\\|\\le G_{\\rm pre}",
+          "ref": "Lemma 4.1 proof",
+          "source_pdf_lines": [
+            481,
+            486
+          ],
+          "uses": [
+            "objective_smoothness_lower_bound",
+            "algorithm_initialization"
+          ],
+          "produces": [
+            "prefix_gradient_bound"
+          ]
+        },
+        {
+          "step": 2,
+          "description": "Bound each ledger and snapshot term during the first source cycle and then bound the correction direction.",
+          "math": "\\|R_i\\|\\le nG_{\\rm pre}\\le(n+2)G_{\\rm pre},\\qquad\\|c_i\\|\\le G_{\\rm pre},\\qquad\\|d_{i,k}\\|\\le5G_{\\rm pre}",
+          "ref": "Lemma 4.1 proof",
+          "source_pdf_lines": [
+            488,
+            493
+          ],
+          "uses": [
+            "snapshot_ledger_invariant",
+            "objective_smoothness_lower_bound",
+            "prefix_gradient_bound"
+          ],
+          "produces": [
+            "prefix_direction_bound"
+          ]
+        },
+        {
+          "step": 3,
+          "description": "Use row-stochastic convexity and the direction bound to close the iterate induction at exactly the definition of Z_pre.",
+          "math": "\\max_i\\|x_{i,k}\\|\\le X_{\\max}^0+5\\gamma kG_{\\rm pre}\\le X_{\\max}^0+5\\gamma K_0[G_{\\max}^0+L(Z_{\\rm pre}+X_{\\max}^0)]=Z_{\\rm pre}",
+          "ref": "(4.4), Lemma 4.1 proof",
+          "source_pdf_lines": [
+            494,
+            507
+          ],
+          "uses": [
+            "time_varying_row_stochastic_network",
+            "objective_smoothness_lower_bound",
+            "prefix_direction_bound"
+          ],
+          "produces": [
+            "prefix_iterate_bound"
+          ]
+        },
+        {
+          "step": 4,
+          "description": "Bound each displacement using the diameter of the Z_pre ball and the direction bound, then sum over the prefix.",
+          "math": "a_k\\le\\left\\|\\sum_j(A_k)_{ij}x_{j,k}-x_{i,k}\\right\\|+\\gamma\\|d_{i,k}\\|\\le2Z_{\\rm pre}+5\\gamma G_{\\rm pre},\\qquad A_{\\rm pre}\\le K_0(2Z_{\\rm pre}+5\\gamma G_{\\rm pre})",
+          "ref": "(4.5), Lemma 4.1 proof",
+          "source_pdf_lines": [
+            508,
+            511
+          ],
+          "uses": [
+            "time_varying_row_stochastic_network",
+            "prefix_iterate_bound",
+            "prefix_direction_bound"
+          ],
+          "produces": [
+            "A_pre_bound"
+          ]
+        },
+        {
+          "step": 5,
+          "description": "Use that the arithmetic mean is a convex combination of node states and apply smoothness to bound the mean gradient by G_pre.",
+          "math": "\\|\\nabla f(\\bar x_k)\\|\\le\\frac1n\\sum_i[\\|\\nabla f_i(x_{i,0})\\|+L\\|\\bar x_k-x_{i,0}\\|]\\le G_{\\rm pre}",
+          "ref": "Lemma 4.1 proof",
+          "source_pdf_lines": [
+            512,
+            516
+          ],
+          "uses": [
+            "objective_smoothness_lower_bound",
+            "time_varying_row_stochastic_network",
+            "prefix_iterate_bound"
+          ],
+          "produces": [
+            "prefix_mean_gradient_bound"
+          ]
+        },
+        {
+          "step": 6,
+          "description": "Sum the squared mean-gradient bound to obtain C_pre and complete the finite-prefix estimates.",
+          "math": "C_{\\rm pre}\\le K_0G_{\\rm pre}^2",
+          "ref": "(4.5), Lemma 4.1 proof",
+          "source_pdf_lines": [
+            518,
+            521
+          ],
+          "uses": [
+            "objective_smoothness_lower_bound",
+            "prefix_mean_gradient_bound"
+          ]
+        },
+        {
+          "step": 7,
+          "description": "The main theorem step-size restriction implies the prefix condition, so the denominator in Z_pre is positive without adding a bounded-trajectory assumption.",
+          "math": "5\\gamma LK_0\\le\\frac{5K_0}{16D(C_N+2)}<1",
+          "ref": "Finite-prefix discussion after Lemma 4.1",
+          "source_pdf_lines": [
+            520,
+            521
+          ],
+          "uses": [
+            "network_constants",
+            "theorem_stepsize_condition"
+          ],
+          "produces": [
+            "prefix_condition_from_main_stepsize"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "uniform_snapshot_age",
+      "ref": "Lemma 5.4, (5.4)-(5.5)",
+      "statement_math": "0\\le k-\\tau_i(k)\\le D=(n+1)H,\\qquad h_k:=\\max_i\\|g_{i,k}-c_{i,k}\\|\\le L\\sum_{t=(k-D)_+}^{k-1}a_t\\quad(k\\ge K_0)",
+      "role": "Converts stale snapshot error into a finite moving sum of recent model displacements.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Use the cyclic schedule: a source is sampled every nH rounds and the sample becomes official H rounds later.",
+          "ref": "Lemma 5.4 proof",
+          "source_pdf_lines": [
+            683,
+            685
+          ],
+          "uses": [
+            "transaction_schedule"
+          ]
+        },
+        {
+          "step": 2,
+          "description": "Before the next commit, the current snapshot was sampled at q and its age lies in the stated interval.",
+          "math": "q+H\\le k<q+(n+1)H\\quad\\Longrightarrow\\quad0\\le k-q<(n+1)H=D",
+          "ref": "(5.4), Lemma 5.4 proof",
+          "source_pdf_lines": [
+            687,
+            693
+          ],
+          "uses": [
+            "transaction_schedule"
+          ],
+          "produces": [
+            "snapshot_age_interval_bound"
+          ]
+        },
+        {
+          "step": 3,
+          "description": "After the endpoint commit the age drops back to H; after K_0 every source has completed one such submission, so the same bound applies to every source.",
+          "ref": "Lemma 5.4 proof",
+          "source_pdf_lines": [
+            691,
+            693
+          ],
+          "uses": [
+            "transaction_schedule"
+          ],
+          "produces": [
+            "uniform_snapshot_age_bound"
+          ]
+        },
+        {
+          "step": 4,
+          "description": "Apply gradient Lipschitzness and telescope the model path from the sample time to k.",
+          "math": "\\|g_{i,k}-c_{i,k}\\|\\le L\\|x_{i,k}-x_{i,\\tau_i(k)}\\|\\le L\\sum_{t=\\tau_i(k)}^{k-1}\\|x_{i,t+1}-x_{i,t}\\|",
+          "ref": "Lemma 5.4 proof",
+          "source_pdf_lines": [
+            694,
+            700
+          ],
+          "uses": [
+            "objective_smoothness_lower_bound",
+            "transaction_schedule"
+          ],
+          "produces": [
+            "snapshot_lipschitz_telescope_bound"
+          ]
+        },
+        {
+          "step": 5,
+          "description": "Replace the sample-time lower index by (k-D)^+ and maximize over i.",
+          "math": "h_k\\le L\\sum_{t=(k-D)^+}^{k-1}a_t",
+          "ref": "(5.5), Lemma 5.4 proof",
+          "source_pdf_lines": [
+            701,
+            703
+          ],
+          "uses": [
+            "transaction_schedule",
+            "uniform_snapshot_age_bound",
+            "snapshot_lipschitz_telescope_bound"
+          ],
+          "produces": [
+            "uniform_stale_error_moving_sum"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "dobrushin_diameter_contraction",
+      "ref": "Lemma 5.5, (5.6)",
+      "statement_math": "\\text{对任意行随机矩阵 }P\\text{ 和任意向量组 }Y=[y_1^\\top;\\ldots;y_n^\\top]\\text{，有}\\quad\\max_{i,j}\\|(PY)_i-(PY)_j\\|\\le\\delta(P)\\max_{r,s}\\|y_r-y_s\\|,\\qquad\\delta(P):=\\frac12\\max_{i,j}\\sum_{\\ell=1}^n|P_{i\\ell}-P_{j\\ell}|.\\qquad\\text{若 }P_{i\\ell}\\ge\\beta\\text{ 对所有 }i,\\ell\\text{ 成立，则 }\\delta(P)\\le1-n\\beta",
+      "role": "Supplies the diameter contraction used in the H-step disagreement recursion.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Work under the lemma's local hypotheses: P is an arbitrary row-stochastic matrix and Y is an arbitrary vector group.",
+          "math": "\\text{对任意行随机矩阵 }P\\text{ 和任意向量组 }Y=[y_1^\\top;\\ldots;y_n^\\top]",
+          "ref": "Lemma 5.5 statement",
+          "source_pdf_lines": [
+            717,
+            720
+          ],
+          "uses": [],
+          "produces": [
+            "P_row_stochastic_for_dobrushin",
+            "Y_vector_group_for_dobrushin"
+          ]
+        },
+        {
+          "step": 2,
+          "description": "For two rows define their common mass and normalize the residual row masses.",
+          "math": "m_\\ell=\\min\\{p_{i\\ell},p_{j\\ell}\\},\\qquad\\alpha=\\sum_\\ell m_\\ell",
+          "ref": "Lemma 5.5 proof",
+          "source_pdf_lines": [
+            725,
+            727
+          ],
+          "uses": [
+            "P_row_stochastic_for_dobrushin"
+          ],
+          "produces": [
+            "common_mass_definition"
+          ]
+        },
+        {
+          "step": 3,
+          "description": "The common mass cancels from the row difference, leaving (1-alpha) times a difference of two convex combinations of the y_l.",
+          "math": "(PY)_i-(PY)_j=(1-\\alpha)\\left(\\sum_\\ell u_\\ell y_\\ell-\\sum_\\ell v_\\ell y_\\ell\\right)",
+          "ref": "Lemma 5.5 proof",
+          "source_pdf_lines": [
+            728,
+            731
+          ],
+          "uses": [
+            "P_row_stochastic_for_dobrushin",
+            "Y_vector_group_for_dobrushin",
+            "common_mass_definition"
+          ],
+          "produces": [
+            "common_mass_row_difference_decomposition"
+          ]
+        },
+        {
+          "step": 4,
+          "description": "Bound the convex-combination difference by the point-set diameter and identify 1-alpha with the total variation row distance.",
+          "math": "\\left\\|\\sum_\\ell u_\\ell y_\\ell-\\sum_\\ell v_\\ell y_\\ell\\right\\|\\le\\max_{r,s}\\|y_r-y_s\\|,\\qquad1-\\alpha=\\frac12\\sum_\\ell|p_{i\\ell}-p_{j\\ell}|",
+          "ref": "Lemma 5.5 proof",
+          "source_pdf_lines": [
+            733,
+            736
+          ],
+          "uses": [
+            "P_row_stochastic_for_dobrushin",
+            "Y_vector_group_for_dobrushin",
+            "common_mass_definition",
+            "common_mass_row_difference_decomposition"
+          ],
+          "produces": [
+            "convex_combination_diameter_bound",
+            "total_variation_identity"
+          ]
+        },
+        {
+          "step": 5,
+          "description": "Maximize over row pairs to obtain (5.6).",
+          "math": "\\max_{i,j}\\|(PY)_i-(PY)_j\\|\\le\\delta(P)\\max_{r,s}\\|y_r-y_s\\|",
+          "ref": "(5.6)",
+          "source_pdf_lines": [
+            717,
+            720
+          ],
+          "uses": [
+            "P_row_stochastic_for_dobrushin",
+            "Y_vector_group_for_dobrushin",
+            "common_mass_row_difference_decomposition",
+            "convex_combination_diameter_bound",
+            "total_variation_identity"
+          ],
+          "produces": [
+            "dobrushin_pairwise_diameter_bound"
+          ]
+        },
+        {
+          "step": 6,
+          "description": "For the second conclusion of the lemma, take the local positive-entry hypothesis for the arbitrary row-stochastic matrix P.",
+          "math": "P_{i\\ell}\\ge\\beta\\ \\forall i,\\ell",
+          "ref": "Lemma 5.5 proof",
+          "source_pdf_lines": [
+            723,
+            724
+          ],
+          "uses": [],
+          "produces": [
+            "positive_entry_hypothesis_for_dobrushin"
+          ]
+        },
+        {
+          "step": 7,
+          "description": "Under the positive-entry hypothesis, each common-mass coordinate is at least beta, so the common mass alpha is at least n beta.",
+          "math": "\\alpha\\ge n\\beta",
+          "ref": "Lemma 5.5 proof",
+          "source_pdf_lines": [
+            735,
+            736
+          ],
+          "uses": [
+            "common_mass_definition",
+            "positive_entry_hypothesis_for_dobrushin"
+          ],
+          "produces": [
+            "common_mass_lower_bound_under_positive_entries"
+          ]
+        },
+        {
+          "step": 8,
+          "description": "Combine the total-variation identity with the lower bound on alpha to obtain the advertised positive-entry Dobrushin bound.",
+          "math": "\\delta(P)\\le1-n\\beta",
+          "ref": "Lemma 5.5 proof",
+          "source_pdf_lines": [
+            735,
+            736
+          ],
+          "uses": [
+            "total_variation_identity",
+            "common_mass_lower_bound_under_positive_entries"
+          ],
+          "produces": [
+            "positive_entry_dobrushin_bound"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "disagreement_gain",
+      "ref": "Lemma 5.6, (5.7)-(5.9)",
+      "statement_math": "\\text{对 }k\\ge K_0\\text{，}\\quad\\Delta_{k+H}\\le\\rho\\Delta_k+2\\gamma\\sum_{t=k}^{k+H-1}h_t,\\qquad\\text{并且对任意有限时域 }[K_0,T)\\text{，}\\quad\\norm{\\Delta}_{\\ell_2[K_0,T)}\\le A_0+C_N\\gamma\\norm{h}_{\\ell_2[K_0,T)},\\quad C_N=\\frac{6H}{n\\beta}",
+      "role": "Bounds disagreement as a finite-horizon response to stale-gradient error.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Use the ledger invariant to cancel the common R/n term in direction differences and bound the direction diameter by 2h_k.",
+          "math": "\\|d_{i,k}-d_{j,k}\\|\\le\\|g_{i,k}-c_{i,k}\\|+\\|g_{j,k}-c_{j,k}\\|\\le2h_k",
+          "ref": "Lemma 5.6 proof",
+          "source_pdf_lines": [
+            756,
+            759
+          ],
+          "uses": [
+            "direction_identity",
+            "snapshot_ledger_invariant"
+          ],
+          "produces": [
+            "h_step_direction_diameter_bound"
+          ]
+        },
+        {
+          "step": 2,
+          "description": "Define the stacked direction matrix and matrix products, then expand the model recursion over H rounds.",
+          "math": "D_k=[d_{1,k}^\\top;\\ldots;d_{n,k}^\\top],\\qquad P_{b:a}=A_bA_{b-1}\\cdots A_a,\\qquad X_{k+H}=P_{k+H-1:k}X_k-\\gamma\\sum_{t=k}^{k+H-1}P_{k+H-1:t+1}D_t",
+          "ref": "(5.9)",
+          "source_pdf_lines": [
+            760,
+            767
+          ],
+          "uses": [
+            "three_channel_mixing",
+            "model_direction_update",
+            "direction_identity"
+          ],
+          "produces": [
+            "H_round_unrolled_update"
+          ]
+        },
+        {
+          "step": 3,
+          "description": "Contract the initial term by rho using the Dobrushin lemma.",
+          "ref": "Lemma 5.6 proof",
+          "source_pdf_lines": [
+            769,
+            770
+          ],
+          "uses": [
+            "dobrushin_diameter_contraction",
+            "uniform_temporal_coverage",
+            "H_round_unrolled_update"
+          ],
+          "produces": [
+            "H_product_contraction"
+          ]
+        },
+        {
+          "step": 4,
+          "description": "Each perturbation product is row stochastic and cannot enlarge the direction diameter; combine the perturbations by the triangle inequality.",
+          "ref": "Lemma 5.6 proof",
+          "source_pdf_lines": [
+            769,
+            775
+          ],
+          "uses": [
+            "snapshot_ledger_invariant",
+            "dobrushin_diameter_contraction",
+            "uniform_temporal_coverage",
+            "H_round_unrolled_update",
+            "h_step_direction_diameter_bound"
+          ],
+          "produces": [
+            "perturbation_diameter_nonexpansion"
+          ]
+        },
+        {
+          "step": 5,
+          "description": "Obtain the H-step disagreement recursion.",
+          "math": "\\Delta_{k+H}\\le\\rho\\Delta_k+2\\gamma\\sum_{t=k}^{k+H-1}h_t",
+          "ref": "(5.7)",
+          "source_pdf_lines": [
+            772,
+            777
+          ],
+          "uses": [
+            "dobrushin_diameter_contraction",
+            "direction_identity",
+            "H_product_contraction",
+            "perturbation_diameter_nonexpansion",
+            "h_step_direction_diameter_bound",
+            "H_round_unrolled_update"
+          ],
+          "produces": [
+            "h_step_disagreement_recursion"
+          ]
+        },
+        {
+          "step": 6,
+          "description": "Block the recursion at K_0+mH and define block disagreement and stale-error energies.",
+          "math": "e_m=\\Delta_{K_0+mH},\\qquad b_m^2=\\sum_{t=K_0+mH}^{K_0+(m+1)H-1}h_t^2,\\qquad e_{m+1}\\le\\rho e_m+2\\gamma\\sqrt H b_m",
+          "ref": "Lemma 5.6 proof",
+          "source_pdf_lines": [
+            778,
+            781
+          ],
+          "uses": [
+            "h_step_disagreement_recursion",
+            "network_constants"
+          ],
+          "produces": [
+            "block_scalar_recursion"
+          ]
+        },
+        {
+          "step": 7,
+          "description": "Iterate the scalar recursion into initial response plus a geometric convolution.",
+          "math": "e_m\\le\\rho^m e_0+2\\gamma\\sqrt H\\sum_{q=0}^{m-1}\\rho^{m-1-q}b_q",
+          "ref": "Lemma 5.6 proof",
+          "source_pdf_lines": [
+            783,
+            788
+          ],
+          "uses": [
+            "block_scalar_recursion",
+            "network_constants",
+            "rho_range"
+          ],
+          "produces": [
+            "geometric_convolution_bound"
+          ]
+        },
+        {
+          "step": 8,
+          "description": "Apply the l1 geometric-kernel norm and discrete Young convolution inequality to bound the block sequence.",
+          "math": "\\|e\\|_{\\ell_2}\\le\\frac{e_0}{\\sqrt{1-\\rho^2}}+\\frac{2\\gamma\\sqrt H}{1-\\rho}\\|b\\|_{\\ell_2}",
+          "ref": "Lemma 5.6 proof",
+          "source_pdf_lines": [
+            789,
+            794
+          ],
+          "uses": [
+            "离散 Young 卷积不等式",
+            "geometric_convolution_bound",
+            "network_constants",
+            "rho_range"
+          ],
+          "produces": [
+            "block_sequence_l2_bound"
+          ]
+        },
+        {
+          "step": 9,
+          "description": "Control within-block diameters by expanding only r<H rounds and using nonexpansion of row-stochastic products.",
+          "math": "\\Delta_{K_0+mH+r}\\le e_m+2\\gamma\\sqrt H b_m\\quad(0\\le r<H)",
+          "ref": "Lemma 5.6 proof",
+          "source_pdf_lines": [
+            796,
+            796
+          ],
+          "uses": [
+            "H_round_unrolled_update",
+            "h_step_direction_diameter_bound",
+            "perturbation_diameter_nonexpansion"
+          ],
+          "produces": [
+            "within_block_bound"
+          ]
+        },
+        {
+          "step": 10,
+          "description": "Square and sum the within-block bound, then take the l2 norm.",
+          "math": "\\sum_{m,r}\\Delta_{K_0+mH+r}^2\\le2H\\sum_me_m^2+8\\gamma^2H^2\\sum_mb_m^2,\\qquad\\|\\Delta\\|_{\\ell_2}\\le\\sqrt{2H}\\|e\\|_{\\ell_2}+2\\sqrt2\\gamma H\\|b\\|_{\\ell_2}",
+          "ref": "Lemma 5.6 proof",
+          "source_pdf_lines": [
+            797,
+            802
+          ],
+          "uses": [
+            "within_block_bound",
+            "block_sequence_l2_bound"
+          ],
+          "produces": [
+            "block_l2_delta_bound"
+          ]
+        },
+        {
+          "step": 11,
+          "description": "Identify ||b||_2 with ||h||_2, substitute the block estimate, use 1-rho=n beta, and relax 4 sqrt(2)<6.",
+          "math": "\\|\\Delta\\|_{\\ell_2[K_0,T)}\\le\\sqrt{\\frac{2H}{1-\\rho^2}}\\Delta_{K_0}+\\frac{4\\sqrt2 H}{n\\beta}\\gamma\\|h\\|_{\\ell_2[K_0,T)}\\le A_0+C_N\\gamma\\|h\\|_{\\ell_2[K_0,T)}",
+          "ref": "(5.8), Lemma 5.6 proof",
+          "source_pdf_lines": [
+            804,
+            810
+          ],
+          "uses": [
+            "block_l2_delta_bound",
+            "block_sequence_l2_bound",
+            "network_constants"
+          ],
+          "produces": [
+            "finite_horizon_disagreement_gain"
+          ]
+        },
+        {
+          "step": 12,
+          "description": "Zero-extend an incomplete final block and truncate the bound, making the constants independent of T.",
+          "ref": "Lemma 5.6 proof",
+          "source_pdf_lines": [
+            810,
+            811
+          ],
+          "uses": [
+            "finite_horizon_disagreement_gain",
+            "network_constants"
+          ],
+          "produces": [
+            "incomplete_block_truncation"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "single_step_movement",
+      "ref": "Lemma 5.7, (5.10)",
+      "statement_math": "a_k\\le(1+\\gamma L)\\Delta_k+\\gamma\\|\\nabla f(\\bar x_k)\\|+2\\gamma h_k\\quad(k\\ge K_0)",
+      "role": "Closes the motion side of the stale-error/disagreement feedback loop.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Row-stochastic convexity bounds the communication displacement by the current diameter.",
+          "math": "\\left\\|\\sum_j(A_k)_{ij}x_{j,k}-x_{i,k}\\right\\|\\le\\Delta_k",
+          "ref": "Lemma 5.7 proof",
+          "source_pdf_lines": [
+            821,
+            821
+          ],
+          "uses": [
+            "time_varying_row_stochastic_network"
+          ],
+          "produces": [
+            "communication_displacement_diameter_bound"
+          ]
+        },
+        {
+          "step": 2,
+          "description": "Insert and subtract local gradients at the arithmetic mean while using R=sum c.",
+          "math": "\\frac Rn=\\nabla f(\\bar x_k)+\\frac1n\\sum_j[\\nabla f_j(x_{j,k})-\\nabla f_j(\\bar x_k)]+\\frac1n\\sum_j(c_{j,k}-g_{j,k})",
+          "ref": "Lemma 5.7 proof",
+          "source_pdf_lines": [
+            821,
+            826
+          ],
+          "uses": [
+            "snapshot_ledger_invariant"
+          ],
+          "produces": [
+            "ledger_average_decomposition"
+          ]
+        },
+        {
+          "step": 3,
+          "description": "Use that the arithmetic mean lies in the convex hull and smoothness to bound the common ledger average.",
+          "math": "\\|R/n\\|\\le\\|\\nabla f(\\bar x_k)\\|+L\\Delta_k+h_k",
+          "ref": "Lemma 5.7 proof",
+          "source_pdf_lines": [
+            828,
+            830
+          ],
+          "uses": [
+            "objective_smoothness_lower_bound",
+            "snapshot_ledger_invariant",
+            "ledger_average_decomposition"
+          ],
+          "produces": [
+            "ledger_average_norm_bound"
+          ]
+        },
+        {
+          "step": 4,
+          "description": "Bound the update displacement by communication displacement plus gamma times the direction norm.",
+          "math": "\\|x_{i,k+1}-x_{i,k}\\|\\le\\Delta_k+\\gamma(\\|R/n\\|+\\|g_{i,k}-c_{i,k}\\|)",
+          "ref": "Lemma 5.7 proof",
+          "source_pdf_lines": [
+            832,
+            837
+          ],
+          "uses": [
+            "single_loop_resource",
+            "model_direction_update",
+            "direction_identity",
+            "time_varying_row_stochastic_network",
+            "snapshot_ledger_invariant",
+            "communication_displacement_diameter_bound"
+          ],
+          "produces": [
+            "update_displacement_bound"
+          ]
+        },
+        {
+          "step": 5,
+          "description": "Substitute the ledger-average bound and maximize over nodes.",
+          "math": "a_k\\le(1+\\gamma L)\\Delta_k+\\gamma\\|\\nabla f(\\bar x_k)\\|+2\\gamma h_k",
+          "ref": "(5.10)",
+          "source_pdf_lines": [
+            836,
+            839
+          ],
+          "uses": [
+            "single_loop_resource",
+            "time_varying_row_stochastic_network",
+            "objective_smoothness_lower_bound",
+            "snapshot_ledger_invariant",
+            "communication_displacement_diameter_bound",
+            "ledger_average_norm_bound",
+            "update_displacement_bound"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "snapshot_disagreement_small_gain",
+      "ref": "Lemma 5.8, (5.11)-(5.14)",
+      "statement_math": "\\text{若 }\\gamma\\text{ 满足式 }(4.6)\\text{，则对任意 }T>K_0:\\qquad\\|h\\|_{\\ell_2[K_0,T)}\\le B_0+2LD\\gamma\\|\\nabla f(\\bar x)\\|_{\\ell_2[K_0,T)},\\qquad\\|\\Delta\\|_{\\ell_2[K_0,T)}\\le A_1+2C_NLD\\gamma^2\\|\\nabla f(\\bar x)\\|_{\\ell_2[K_0,T)}",
+      "role": "Closes the endogenous stale-snapshot/disagreement loop on every finite horizon under (4.6).",
+      "proof": [
+        {
+          "step": 1,
+          "description": "The pre-prefix displacements enter the moving sum for at most D times, so their l2 contribution is bounded by H_0.",
+          "math": "H_0=L\\sqrt D\\,A_{\\rm pre}",
+          "ref": "Lemma 5.8 proof; (4.2)",
+          "source_pdf_lines": [
+            846,
+            848
+          ],
+          "uses": [
+            "uniform_snapshot_age",
+            "finite_prefix_finiteness",
+            "network_constants"
+          ],
+          "produces": [
+            "pre_prefix_h_energy_bound"
+          ]
+        },
+        {
+          "step": 2,
+          "description": "Zero-extend post-prefix a outside the finite interval and introduce the length-D all-ones window.",
+          "math": "w=(1,\\ldots,1)",
+          "ref": "Lemma 5.8 proof",
+          "source_pdf_lines": [
+            849,
+            850
+          ],
+          "uses": [
+            "uniform_snapshot_age",
+            "finite_prefix_finiteness"
+          ],
+          "produces": [
+            "post_prefix_zero_extension",
+            "length_D_ones_window"
+          ]
+        },
+        {
+          "step": 3,
+          "description": "Use the length-D window to bound the post-prefix tail of (5.5) by convolution.",
+          "math": "\\text{式 }(5.5)\\text{ 的尾部不超过卷积 }L(w*a)_k",
+          "ref": "Lemma 5.8 proof",
+          "source_pdf_lines": [
+            850,
+            850
+          ],
+          "uses": [
+            "uniform_snapshot_age",
+            "post_prefix_zero_extension",
+            "length_D_ones_window"
+          ],
+          "produces": [
+            "post_prefix_tail_convolution"
+          ]
+        },
+        {
+          "step": 4,
+          "description": "Apply discrete Young's convolution inequality to the all-ones window and the zero-extended movement sequence.",
+          "math": "\\|w*a\\|_{\\ell_2}\\le\\|w\\|_{\\ell_1}\\|a\\|_{\\ell_2}=D\\|a\\|_{\\ell_2}",
+          "ref": "Lemma 5.8 proof",
+          "source_pdf_lines": [
+            850,
+            852
+          ],
+          "uses": [
+            "离散 Young 不等式",
+            "post_prefix_tail_convolution",
+            "post_prefix_zero_extension",
+            "length_D_ones_window"
+          ],
+          "produces": [
+            "young_window_movement_bound"
+          ]
+        },
+        {
+          "step": 5,
+          "description": "Combine the pre-prefix H0 contribution with the Young-bounded post-prefix tail to obtain the finite-horizon stale-error bound in terms of movement.",
+          "math": "\\|h\\|\\le H_0+LD\\|a\\|",
+          "ref": "(5.13)",
+          "source_pdf_lines": [
+            852,
+            852
+          ],
+          "uses": [
+            "pre_prefix_h_energy_bound",
+            "young_window_movement_bound"
+          ],
+          "produces": [
+            "stale_error_movement_bound"
+          ]
+        },
+        {
+          "step": 6,
+          "description": "Take l2 norms in the pointwise movement lemma over the finite interval.",
+          "math": "\\|a\\|\\le(1+\\gamma L)\\|\\Delta\\|+\\gamma\\|\\nabla f(\\bar x)\\|+2\\gamma\\|h\\|",
+          "ref": "Lemma 5.8 proof",
+          "source_pdf_lines": [
+            855,
+            857
+          ],
+          "uses": [
+            "single_step_movement"
+          ],
+          "produces": [
+            "movement_pre_substitution_norm_bound"
+          ]
+        },
+        {
+          "step": 7,
+          "description": "Substitute the disagreement gain (5.8) into the first movement-norm bound.",
+          "math": "\\|a\\|\\le(1+\\gamma L)A_0+\\gamma\\|\\nabla f(\\bar x)\\|+\\gamma[(1+\\gamma L)C_N+2]\\|h\\|",
+          "ref": "Lemma 5.8 proof",
+          "source_pdf_lines": [
+            855,
+            857
+          ],
+          "uses": [
+            "movement_pre_substitution_norm_bound",
+            "disagreement_gain",
+            "network_constants"
+          ],
+          "produces": [
+            "movement_norm_bound"
+          ]
+        },
+        {
+          "step": 8,
+          "description": "Substitute the movement estimate into (5.13) and collect the stale-error coefficient.",
+          "math": "(1-\\alpha)\\|h\\|\\le H_0+LD(1+\\gamma L)A_0+LD\\gamma\\|\\nabla f(\\bar x)\\|,\\qquad\\alpha:=LD\\gamma[(1+\\gamma L)C_N+2]",
+          "ref": "(5.14)",
+          "source_pdf_lines": [
+            859,
+            863
+          ],
+          "uses": [
+            "single_step_movement",
+            "disagreement_gain",
+            "network_constants",
+            "stale_error_movement_bound",
+            "movement_norm_bound"
+          ],
+          "produces": [
+            "stale_error_pre_absorption"
+          ]
+        },
+        {
+          "step": 9,
+          "description": "Use (4.6) to show gamma L <= 1/4 and alpha < 1/2.",
+          "math": "\\alpha\\le\\frac{(5/4)C_N+2}{16(C_N+2)}<\\frac12",
+          "ref": "Lemma 5.8 proof",
+          "source_pdf_lines": [
+            865,
+            868
+          ],
+          "uses": [
+            "theorem_stepsize_condition",
+            "network_constants",
+            "stale_error_pre_absorption"
+          ],
+          "produces": [
+            "stale_error_absorption_gain"
+          ]
+        },
+        {
+          "step": 10,
+          "description": "Absorb 1-alpha using (1-alpha)^(-1)<=2 and identify B_0 to obtain (5.11).",
+          "math": "\\|h\\|\\le B_0+2LD\\gamma\\|\\nabla f(\\bar x)\\|",
+          "ref": "(5.11), Lemma 5.8 proof",
+          "source_pdf_lines": [
+            872,
+            875
+          ],
+          "uses": [
+            "theorem_stepsize_condition",
+            "network_constants",
+            "stale_error_pre_absorption",
+            "stale_error_absorption_gain"
+          ],
+          "produces": [
+            "stale_error_closed_bound"
+          ]
+        },
+        {
+          "step": 11,
+          "description": "Substitute the stale-error estimate into the disagreement gain and use A_1=A_0+C_N gamma B_0.",
+          "math": "\\|\\Delta\\|\\le A_1+2C_NLD\\gamma^2\\|\\nabla f(\\bar x)\\|",
+          "ref": "(5.12), Lemma 5.8 proof",
+          "source_pdf_lines": [
+            876,
+            880
+          ],
+          "uses": [
+            "disagreement_gain",
+            "theorem_stepsize_condition",
+            "network_constants",
+            "stale_error_closed_bound"
+          ],
+          "produces": [
+            "closed_disagreement_bound"
+          ]
+        },
+        {
+          "step": 12,
+          "description": "Note that all estimates use the same constants for every finite T, so no infinite square-summability is assumed in closing the loop.",
+          "ref": "Lemma 5.8 proof",
+          "source_pdf_lines": [
+            880,
+            881
+          ],
+          "uses": [
+            "theorem_stepsize_condition",
+            "network_constants",
+            "stale_error_closed_bound",
+            "closed_disagreement_bound"
+          ],
+          "produces": [
+            "finite_horizon_small_gain"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "average_drift_bounds",
+      "ref": "(5.15)-(5.17)",
+      "statement_math": "\\|\\zeta_k\\|\\le\\Delta_k,\\qquad\\|e_k^g\\|\\le L\\Delta_k,\\qquad\\bar x_{k+1}=\\bar x_k-\\gamma\\bigl(\\nabla f(\\bar x_k)+v_k\\bigr),\\quad v_k=e_k^g-\\zeta_k/\\gamma,\\quad\\|v_k\\|\\le(L+\\gamma^{-1})\\Delta_k",
+      "role": "Quantifies the row-stochastic arithmetic-mean drift that remains after exact direction averaging.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Define the mixing drift and local-gradient heterogeneity.",
+          "math": "\\zeta_k:=\\frac1n\\mathbf1^\\top(A_k-I)X_k,\\qquad e_k^g:=\\frac1n\\sum_i\\nabla f_i(x_{i,k})-\\nabla f(\\bar x_k)",
+          "ref": "(5.15)-(5.16)",
+          "source_pdf_lines": [
+            886,
+            890
+          ],
+          "uses": [
+            "single_loop_resource"
+          ],
+          "produces": [
+            "average_drift_definitions"
+          ]
+        },
+        {
+          "step": 2,
+          "description": "Express both the mixed mean and arithmetic mean as convex combinations of the same node states to bound the mixing drift by the diameter.",
+          "math": "\\|\\zeta_k\\|\\le\\Delta_k",
+          "ref": "(5.15), proof preceding (5.16)",
+          "source_pdf_lines": [
+            892,
+            903
+          ],
+          "uses": [
+            "time_varying_row_stochastic_network",
+            "average_drift_definitions"
+          ],
+          "produces": [
+            "mixing_drift_bound"
+          ]
+        },
+        {
+          "step": 3,
+          "description": "Apply L-smoothness and ||x_{i,k}-\\bar x_k|| <= \\Delta_k to bound gradient heterogeneity.",
+          "math": "\\|e_k^g\\|\\le L\\Delta_k",
+          "ref": "(5.15), proof preceding (5.16)",
+          "source_pdf_lines": [
+            905,
+            910
+          ],
+          "uses": [
+            "objective_smoothness_lower_bound",
+            "time_varying_row_stochastic_network",
+            "average_drift_definitions"
+          ],
+          "produces": [
+            "gradient_heterogeneity_bound"
+          ]
+        },
+        {
+          "step": 4,
+          "description": "Average the model update and use the exact direction-average identity to obtain the perturbed gradient recursion.",
+          "math": "\\bar x_{k+1}=\\bar x_k-\\gamma\\bigl(\\nabla f(\\bar x_k)+v_k\\bigr),\\qquad v_k=e_k^g-\\zeta_k/\\gamma",
+          "ref": "(5.16)",
+          "source_pdf_lines": [
+            911,
+            914
+          ],
+          "uses": [
+            "snapshot_ledger_invariant",
+            "three_channel_mixing",
+            "model_direction_update",
+            "average_drift_definitions"
+          ],
+          "produces": [
+            "average_recursion_and_v_definition"
+          ]
+        },
+        {
+          "step": 5,
+          "description": "Combine the two drift components by the triangle inequality.",
+          "math": "\\|v_k\\|\\le(L+\\gamma^{-1})\\Delta_k",
+          "ref": "(5.17)",
+          "source_pdf_lines": [
+            915,
+            916
+          ],
+          "uses": [
+            "objective_smoothness_lower_bound",
+            "time_varying_row_stochastic_network",
+            "average_drift_definitions",
+            "mixing_drift_bound",
+            "gradient_heterogeneity_bound",
+            "average_recursion_and_v_definition"
+          ],
+          "produces": [
+            "average_drift_v_bound"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "drifted_descent",
+      "ref": "Lemma 5.9, (5.18)",
+      "statement_math": "\\gamma L\\le\\frac14\\Longrightarrow f(\\bar x_{k+1})\\le f(\\bar x_k)-\\frac\\gamma2\\|\\nabla f(\\bar x_k)\\|^2+2\\gamma\\|v_k\\|^2",
+      "role": "Converts the perturbed average recursion into a summable gradient-energy inequality.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Record the local hypothesis of Lemma 5.9.",
+          "math": "\\gamma L\\le\\frac14",
+          "ref": "Lemma 5.9 hypothesis",
+          "source_pdf_lines": [
+            918,
+            918
+          ],
+          "uses": [],
+          "produces": [
+            "gamma_L_le_quarter"
+          ]
+        },
+        {
+          "step": 2,
+          "description": "Apply L-smoothness to the update (5.16), writing g=nabla f(xbar-k).",
+          "math": "f(\\bar x_{k+1})\\le f(\\bar x_k)-\\gamma\\|g\\|^2-\\gamma\\langle g,v_k\\rangle+\\frac{L\\gamma^2}{2}\\|g+v_k\\|^2",
+          "ref": "Lemma 5.9 proof",
+          "source_pdf_lines": [
+            922,
+            925
+          ],
+          "uses": [
+            "average_drift_bounds",
+            "objective_smoothness_lower_bound"
+          ],
+          "produces": [
+            "raw_smoothness_inequality"
+          ]
+        },
+        {
+          "step": 3,
+          "description": "Use the printed inequalities for the cross term and the squared sum.",
+          "math": "-\\langle g,v\\rangle\\le\\frac14\\|g\\|^2+\\|v\\|^2,\\qquad\\|g+v\\|^2\\le2\\|g\\|^2+2\\|v\\|^2",
+          "ref": "Lemma 5.9 proof",
+          "source_pdf_lines": [
+            926,
+            926
+          ],
+      "uses": [
+        "raw_smoothness_inequality"
+      ],
+          "produces": [
+            "young_and_squared_sum_bounds"
+          ]
+        },
+        {
+          "step": 4,
+          "description": "Collect the coefficients after substitution.",
+          "math": "f(\\bar x_{k+1})\\le f(\\bar x_k)-\\gamma(3/4-L\\gamma)\\|g\\|^2+\\gamma(1+L\\gamma)\\|v_k\\|^2",
+          "ref": "Lemma 5.9 proof",
+          "source_pdf_lines": [
+            928,
+            929
+          ],
+      "uses": [
+        "raw_smoothness_inequality",
+        "young_and_squared_sum_bounds"
+      ],
+          "produces": [
+            "collected_coefficient_inequality"
+          ]
+        },
+        {
+          "step": 5,
+          "description": "Use gamma L <= 1/4 to weaken the coefficients to the stated descent inequality.",
+          "math": "f(\\bar x_{k+1})\\le f(\\bar x_k)-\\frac\\gamma2\\|\\nabla f(\\bar x_k)\\|^2+2\\gamma\\|v_k\\|^2",
+          "ref": "(5.18)",
+          "source_pdf_lines": [
+            928,
+            932
+          ],
+      "uses": [
+        "gamma_L_le_quarter",
+        "collected_coefficient_inequality",
+        "average_drift_bounds"
+          ],
+          "produces": [
+            "drifted_descent_bound"
+          ]
+        }
+      ]
+    }
+  ]
+}

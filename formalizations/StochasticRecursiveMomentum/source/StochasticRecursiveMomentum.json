@@ -1,0 +1,1216 @@
+{
+  "algorithm": "Storm",
+  "full_name": "STOchastic Recursive Momentum",
+  "source_reference": "Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, arXiv:1905.10018v3 (Theorem 1)",
+  "setup": {
+    "problem": {
+      "math": "F : \\mathbb{R}^d \\to \\mathbb{R},\\quad \\text{find } x \\in \\mathbb{R}^d \\text{ such that } F(x) \\text{ is as small as possible}",
+      "ref": "Introduction, p. 1, lines 28-31",
+      "description": "Stochastic optimization with access to sample losses f(\\cdot,\\xi) whose expectation is F."
+    },
+    "variable_space": {
+      "math": "x \\in \\mathbb{R}^d,\\quad \\xi_1, \\ldots, \\xi_T \\in \\Xi",
+      "ref": "Introduction, p. 1, lines 28-29; Section 3, p. 3, lines 112-113"
+    }
+  },
+  "definitions": [
+    {
+      "name": "epsilon_t",
+      "math": "\\epsilon_t := d_t - \\nabla F(x_t)",
+      "ref": "Section 4, p. 3, lines 151-153",
+      "description": "The paper denotes the error in d_t by epsilon_t; it measures the error incurred by using d_t instead of the unknown direction \\nabla F(x_t)."
+    }
+  ],
+  "cited_theorems": [
+    {
+      "name_in_source": "concavity of x^{1/3}",
+      "statement_math": "(x + y)^{1/3} \\leq x^{1/3} + yx^{-2/3}/3",
+      "ref": "Proof of Theorem 1, p. 6, lines 364-367",
+      "proof_in_source": "cited",
+      "role": "Bounds the reciprocal stepsize increment in the proof of Theorem 1."
+    },
+    {
+      "name_in_source": "Cauchy-Schwarz inequality",
+      "statement_math": "\\mathbb{E}[A^2]\\mathbb{E}[B^2] \\geq \\mathbb{E}[AB]^2",
+      "ref": "Proof of Theorem 1, p. 7, lines 444-448 and p. 8, line 556",
+      "proof_in_source": "cited",
+      "role": "Relates weighted squared-gradient control to the expected root sum and then to the average gradient norm."
+    },
+    {
+      "name_in_source": "subadditivity of x^{1/3}",
+      "statement_math": "(a+b)^{1/3} \\leq a^{1/3}+b^{1/3}",
+      "ref": "Proof of Theorem 1, p. 8, lines 518-520 and 556-563",
+      "proof_in_source": "cited",
+      "role": "Splits one-third powers in the stochastic-gradient and final-rate bounds."
+    },
+    {
+      "name_in_source": "concavity of x^a for a <= 1",
+      "statement_math": "\\text{the concavity of } x \\mapsto x^a \\text{ for all } a \\leq 1",
+      "ref": "Proof of Theorem 1, p. 8, lines 537-545",
+      "proof_in_source": "cited",
+      "role": "Moves expectations inside fractional exponents in the final scalar-gradient argument."
+    },
+    {
+      "name_in_source": "Young's inequality",
+      "statement_math": "\\mathbb{E}\\left[F(x_t)-\\frac{\\eta_t}{2}\\|\\nabla F(x_t)\\|^2+\\frac{\\eta_t}{2}\\|\\epsilon_t\\|^2+\\frac{L\\eta_t^2}{2}\\|d_t\\|^2\\right]",
+      "ref": "Appendix A, p. 12, lines 724-728 and 735",
+      "proof_in_source": "cited",
+      "role": "Bounds the cross term in Lemma 1."
+    },
+    {
+      "name_in_source": "squared norm two-term inequality",
+      "statement_math": "\\|x+y\\|^2 \\leq 2\\|x\\|^2+2\\|y\\|^2",
+      "ref": "Appendix A, p. 12, lines 729-736 and Appendix A.1, p. 13, lines 878-895",
+      "proof_in_source": "cited",
+      "role": "Splits squared norms in Lemma 1 and Lemma 2."
+    },
+    {
+      "name_in_source": "concavity of log function",
+      "statement_math": "\\ln\\left(a_0+\\sum_{i=1}^t a_i\\right)-\\ln\\left(a_0+\\sum_{i=1}^{t-1}a_i\\right) \\geq \\frac{a_t}{a_0+\\sum_{i=1}^t a_i}",
+      "ref": "Appendix A, p. 12, lines 776-783",
+      "proof_in_source": "cited",
+      "role": "Supplies the log-increment inequality used in Lemma 4."
+    }
+  ],
+  "assumptions": [
+    {
+      "name": "independent_samples",
+      "math": "\\text{We assume access to a stream of independent random variables } \\xi_1, \\ldots, \\xi_T \\in \\Xi",
+      "ref": "Section 3, p. 3, lines 112-113",
+      "parameters": [
+        "\\xi_t",
+        "\\Xi",
+        "T"
+      ]
+    },
+    {
+      "name": "function_oracle",
+      "math": "\\text{for all } t \\text{ and for all } x,\\quad \\mathbb{E}[f(x, \\xi_t)|x] = F(x)",
+      "ref": "Section 3, p. 3, lines 112-113",
+      "parameters": [
+        "f",
+        "F",
+        "x",
+        "\\xi_t"
+      ]
+    },
+    {
+      "name": "gradient_noise_bound",
+      "math": "\\mathbb{E}[\\|\\nabla f(x, \\xi_t) - \\nabla F(x)\\|^2] \\leq \\sigma^2",
+      "ref": "Section 3, p. 3, lines 116-117",
+      "parameters": [
+        "\\sigma",
+        "f",
+        "F"
+      ]
+    },
+    {
+      "name": "finite_lower_bound",
+      "math": "F^* = \\inf_x F(x)\\quad\\text{and}\\quad F^* > -\\infty",
+      "ref": "Section 3, p. 3, lines 118-119",
+      "parameters": [
+        "F^*",
+        "F"
+      ]
+    },
+    {
+      "name": "differentiable_losses",
+      "math": "\\text{We assume that } f(x, \\xi_t) \\text{ is differentiable, and } L\\text{-smooth as a function of } x \\text{ with probability } 1.",
+      "ref": "Section 3, p. 3, lines 119-121",
+      "parameters": [
+        "L",
+        "f",
+        "x",
+        "\\xi_t"
+      ]
+    },
+    {
+      "name": "L_smooth_losses",
+      "math": "\\text{Define a differentiable function } f : \\mathbb{R}^d \\to \\mathbb{R} \\text{ to be } L\\text{-smooth iff } \\|\\nabla f(x) - \\nabla f(y)\\| \\leq L\\|x-y\\| \\text{ for all } x \\text{ and } y. \\text{ We assume that } f(x, \\xi_t) \\text{ is differentiable, and } L\\text{-smooth as a function of } x \\text{ with probability } 1.",
+      "ref": "Section 3, p. 3, lines 119-121",
+      "parameters": [
+        "L",
+        "f",
+        "x",
+        "y"
+      ]
+    },
+    {
+      "name": "G_lipschitz_losses",
+      "math": "\\text{Define a differentiable function } f : \\mathbb{R}^d \\to \\mathbb{R} \\text{ to be } G\\text{-Lipschitz iff } \\|\\nabla f(x)\\| \\leq G \\text{ for all } x. \\text{ We will also assume that } f(x, \\xi_t) \\text{ is } G\\text{-Lipschitz for our adaptive analysis.}",
+      "ref": "Section 3, p. 3, lines 119-122",
+      "parameters": [
+        "G",
+        "f",
+        "x"
+      ]
+    },
+    {
+      "name": "Theorem1_parameter_choice",
+      "math": "b > 0,\\quad k = bG^{2/3}/L,\\quad c = 28L^2 + G^2/(7Lk^3) = L^2(28 + 1/(7b^3)),\\quad w = \\max\\left((4Lk)^3, 2G^2, \\left(ck/(4L)\\right)^3\\right)",
+      "ref": "Theorem 1, p. 4, lines 204-208",
+      "parameters": [
+        "b",
+        "k",
+        "c",
+        "w",
+        "G",
+        "L"
+      ]
+    }
+  ],
+  "algorithm_spec": {
+    "initialization": {
+      "name": "algorithm_initialization",
+      "math": "\\text{Input: Parameters } k,w,c, \\text{ initial point } x_1;\\quad \\text{Sample } \\xi_1;\\quad G_1 \\leftarrow \\|\\nabla f(x_1,\\xi_1)\\|;\\quad d_1 \\leftarrow \\nabla f(x_1,\\xi_1);\\quad \\eta_0 \\leftarrow \\frac{k}{w^{1/3}}",
+      "ref": "Algorithm 1, p. 4, lines 160-165"
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "loop_bounds",
+        "math": "\\text{for } t = 1 \\text{ to } T \\text{ do}",
+        "ref": "Algorithm 1, p. 4, line 166"
+      },
+      {
+        "step": 2,
+        "name": "adaptive_stepsize",
+        "math": "\\eta_t \\leftarrow \\frac{k}{\\left(w+\\sum_{i=1}^t G_i^2\\right)^{1/3}}",
+        "ref": "Algorithm 1, p. 4, lines 167-168"
+      },
+      {
+        "step": 3,
+        "name": "iterate_update",
+        "math": "x_{t+1} \\leftarrow x_t - \\eta_t d_t",
+        "ref": "Algorithm 1, p. 4, line 169"
+      },
+      {
+        "step": 4,
+        "name": "momentum_weight",
+        "math": "a_{t+1} \\leftarrow c\\eta_t^2",
+        "ref": "Algorithm 1, p. 4, line 170"
+      },
+      {
+        "step": 5,
+        "name": "next_sample_and_gradient_norm",
+        "math": "\\text{Sample } \\xi_{t+1};\\quad G_{t+1} \\leftarrow \\|\\nabla f(x_{t+1},\\xi_{t+1})\\|",
+        "ref": "Algorithm 1, p. 4, lines 171-172"
+      },
+      {
+        "step": 6,
+        "name": "recursive_momentum_direction",
+        "math": "d_{t+1} \\leftarrow \\nabla f(x_{t+1},\\xi_{t+1}) + (1-a_{t+1})(d_t - \\nabla f(x_t,\\xi_{t+1}))",
+        "ref": "Algorithm 1, p. 4, line 173"
+      },
+      {
+        "step": 7,
+        "name": "end_for",
+        "math": "\\text{end for}",
+        "ref": "Algorithm 1, p. 4, line 174"
+      }
+    ],
+    "output": {
+      "math": "\\text{Choose } \\hat{x} \\text{ uniformly at random from } x_1, \\ldots, x_T. \\text{ (In practice, set } \\hat{x} = x_T\\text{). return } \\hat{x}",
+      "ref": "Algorithm 1, p. 4, lines 175-176",
+      "type": "random iterate"
+    },
+    "parameters": [
+      {
+        "name": "k",
+        "math": "k = bG^{2/3}/L",
+        "ref": "Theorem 1, p. 4, line 204"
+      },
+      {
+        "name": "c",
+        "math": "c = 28L^2 + G^2/(7Lk^3) = L^2(28 + 1/(7b^3))",
+        "ref": "Theorem 1, p. 4, lines 204-208"
+      },
+      {
+        "name": "w",
+        "math": "w = \\max\\left((4Lk)^3, 2G^2, \\left(ck/(4L)\\right)^3\\right) = G^2 \\max\\left((4b)^3, 2, (28b + 1/(7b^2))^3/64\\right)",
+        "ref": "Theorem 1, p. 4, lines 204-208"
+      }
+    ]
+  },
+  "main_theorem": {
+    "statement_math": "\\text{Under the assumptions in Section 3, for any } b > 0, \\text{ we write } k = bG^{2/3}/L. \\text{ Set } c = 28L^2 + G^2/(7Lk^3) = L^2(28 + 1/(7b^3)) \\text{ and } w = \\max\\left((4Lk)^3, 2G^2, \\left(ck/(4L)\\right)^3\\right) = G^2\\max\\left((4b)^3, 2, (28b + 1/(7b^2))^3/64\\right). \\text{ Then, Storm satisfies }\\quad \\mathbb{E}[\\|\\nabla F(\\hat{x})\\|] = \\mathbb{E}\\left[\\frac{1}{T}\\sum_{t=1}^T \\|\\nabla F(x_t)\\|\\right] \\leq \\frac{w^{1/6}\\sqrt{2M} + 2M^{3/4}}{\\sqrt{T}} + \\frac{2\\sigma^{1/3}}{T^{1/3}},\\quad \\text{where } M = \\frac{8}{k}(F(x_1)-F^*) + \\frac{w^{1/3}\\sigma^2}{4L^2k^2} + \\frac{k^2c^2}{2L^2}\\ln(T+2).",
+    "ref": "Theorem 1, p. 4, lines 204-217",
+    "rate": "Noiseless rate O(ln(T)/sqrt(T)); stochastic term O(sigma^{1/3}/T^{1/3}).",
+    "measure": "Expected norm of the gradient at a uniformly random iterate, equivalently the expected average of gradient norms over x_1,...,x_T.",
+    "proof": [
+      {
+        "step": 1,
+        "description": "Introduce the Lyapunov potential and derive the two parameter side conditions used throughout the proof.",
+        "ref": "Proof of Theorem 1, p. 6, lines 308-313",
+        "source_pdf_lines": [
+          308,
+          313
+        ],
+        "uses": [
+          "epsilon_t",
+          "adaptive_stepsize",
+          "momentum_weight",
+          "Theorem1_parameter_choice"
+        ],
+        "produces": "Potential \\Phi_t = F(x_t) + (32L^2\\eta_{t-1})^{-1}\\|\\epsilon_t\\|^2, plus \\eta_t \\leq 1/(4L) and a_{t+1}\\leq 1."
+      },
+      {
+        "step": 2,
+        "description": "Apply Lemma 2 with index shifted from t to t+1 to bound the change in the weighted error term.",
+        "ref": "Proof of Theorem 1, p. 6, lines 315-324",
+        "source_pdf_lines": [
+          315,
+          324
+        ],
+        "math": "\\mathbb{E}\\left[\\eta_t^{-1}\\|\\epsilon_{t+1}\\|^2-\\eta_{t-1}^{-1}\\|\\epsilon_t\\|^2\\right] \\leq \\mathbb{E}\\left[2c^2\\eta_t^3G_{t+1}^2 + \\frac{(1-a_{t+1})^2(1+4L^2\\eta_t^2)\\|\\epsilon_t\\|^2}{\\eta_t} + 4(1-a_{t+1})^2L^2\\eta_t\\|\\nabla F(x_t)\\|^2 - \\frac{\\|\\epsilon_t\\|^2}{\\eta_{t-1}}\\right]",
+        "uses": [
+          "Lemma2_error_recurrence",
+          "previous_step:1"
+        ],
+        "produces": "First displayed upper bound for the weighted error increment."
+      },
+      {
+        "step": 3,
+        "description": "Use a_{t+1}\\leq 1 to simplify the error increment bound and label the three displayed contributions A_t, B_t, and C_t.",
+        "ref": "Proof of Theorem 1, p. 6, lines 327-332",
+        "source_pdf_lines": [
+          327,
+          332
+        ],
+        "math": "\\mathbb{E}\\left[2c^2\\eta_t^3G_{t+1}^2 + \\left(\\eta_t^{-1}(1-a_{t+1})(1+4L^2\\eta_t^2)-\\eta_{t-1}^{-1}\\right)\\|\\epsilon_t\\|^2 + 4L^2\\eta_t\\|\\nabla F(x_t)\\|^2\\right]",
+        "uses": [
+          "previous_step:1",
+          "previous_step:2"
+        ],
+        "produces": "Definitions A_t := 2c^2\\eta_t^3G_{t+1}^2, B_t := (\\eta_t^{-1}(1-a_{t+1})(1+4L^2\\eta_t^2)-\\eta_{t-1}^{-1})\\|\\epsilon_t\\|^2, C_t := 4L^2\\eta_t\\|\\nabla F(x_t)\\|^2."
+      },
+      {
+        "step": 4,
+        "description": "For A_t, substitute the adaptive stepsize and compare the denominator with the shifted cumulative gradient norm sum.",
+        "ref": "Proof of Theorem 1, p. 6, lines 335-349",
+        "source_pdf_lines": [
+          335,
+          349
+        ],
+        "math": "\\sum_{t=1}^T A_t = \\sum_{t=1}^T 2c^2\\eta_t^3G_{t+1}^2 = \\sum_{t=1}^T \\frac{2k^3c^2G_{t+1}^2}{w+\\sum_{i=1}^tG_i^2} \\leq \\sum_{t=1}^T \\frac{2k^3c^2G_{t+1}^2}{G^2+\\sum_{i=1}^{t+1}G_i^2}",
+        "uses": [
+          "adaptive_stepsize",
+          "previous_step:3",
+          "Theorem1_parameter_choice",
+          "G_lipschitz_losses"
+        ],
+        "produces": "The summand for A_t is put into the form required by Lemma 4."
+      },
+      {
+        "step": 5,
+        "description": "Apply Lemma 4 to the shifted A_t sum and use the G-Lipschitz bound to obtain the logarithmic estimate.",
+        "ref": "Proof of Theorem 1, p. 6, lines 340-353",
+        "source_pdf_lines": [
+          340,
+          353
+        ],
+        "math": "\\sum_{t=1}^T A_t \\leq 2k^3c^2\\ln\\left(1+\\frac{\\sum_{t=1}^{T+1}G_t^2}{G^2}\\right) \\leq 2k^3c^2\\ln(T+2)",
+        "uses": [
+          "Lemma4_log_sum_bound",
+          "G_lipschitz_losses",
+          "previous_step:4"
+        ],
+        "produces": "A_t_sum_bound"
+      },
+      {
+        "step": 6,
+        "description": "Expand B_t and substitute a_{t+1}=c\\eta_t^2, isolating the reciprocal stepsize difference and the coefficient 4L^2-c.",
+        "ref": "Proof of Theorem 1, p. 6, lines 354-360",
+        "source_pdf_lines": [
+          354,
+          360
+        ],
+        "math": "B_t \\leq \\left(\\eta_t^{-1}-\\eta_{t-1}^{-1}+\\eta_t^{-1}(4L^2\\eta_t^2-a_{t+1})\\right)\\|\\epsilon_t\\|^2 = \\left(\\eta_t^{-1}-\\eta_{t-1}^{-1}+\\eta_t(4L^2-c)\\right)\\|\\epsilon_t\\|^2",
+        "uses": [
+          "previous_step:3",
+          "Theorem1_parameter_choice"
+        ],
+        "produces": "B_t_reduced_to_stepsize_difference"
+      },
+      {
+        "step": 7,
+        "description": "Use concavity of x^{1/3} to start bounding \\eta_t^{-1}-\\eta_{t-1}^{-1}.",
+        "ref": "Proof of Theorem 1, p. 6, lines 364-373",
+        "source_pdf_lines": [
+          364,
+          373
+        ],
+        "math": "\\frac{1}{\\eta_t}-\\frac{1}{\\eta_{t-1}} = \\frac{1}{k}\\left[\\left(w+\\sum_{i=1}^tG_i^2\\right)^{1/3}-\\left(w+\\sum_{i=1}^{t-1}G_i^2\\right)^{1/3}\\right] \\leq \\frac{G_t^2}{3k\\left(w+\\sum_{i=1}^{t-1}G_i^2\\right)^{2/3}}",
+        "uses": [
+          "adaptive_stepsize",
+          "concavity of x^{1/3}",
+          "previous_step:1"
+        ],
+        "produces": "first_reciprocal_stepsize_bound"
+      },
+      {
+        "step": 8,
+        "description": "Use w\\geq 2G^2 and then G_t\\leq G to continue the reciprocal stepsize estimate.",
+        "ref": "Proof of Theorem 1, p. 6, lines 373-380",
+        "source_pdf_lines": [
+          373,
+          380
+        ],
+        "math": "\\frac{G_t^2}{3k\\left(w+\\sum_{i=1}^{t-1}G_i^2\\right)^{2/3}} \\leq \\frac{G_t^2}{3k\\left(w-G^2+\\sum_{i=1}^{t}G_i^2\\right)^{2/3}} \\leq \\frac{G_t^2}{3k\\left(w/2+\\sum_{i=1}^{t}G_i^2\\right)^{2/3}} \\leq \\frac{2^{2/3}G_t^2}{3k\\left(w+\\sum_{i=1}^{t}G_i^2\\right)^{2/3}} \\leq \\frac{2^{2/3}G^2}{3k^3}\\eta_t^2",
+        "uses": [
+          "adaptive_stepsize",
+          "Theorem1_parameter_choice",
+          "G_lipschitz_losses",
+          "previous_step:7"
+        ],
+        "produces": "reciprocal_stepsize_bound_by_eta_squared"
+      },
+      {
+        "step": 9,
+        "description": "Use \\eta_t\\leq 1/(4L) to finish the reciprocal stepsize difference estimate.",
+        "ref": "Proof of Theorem 1, p. 6, lines 378-382",
+        "source_pdf_lines": [
+          378,
+          382
+        ],
+        "math": "\\frac{2^{2/3}G^2}{3k^3}\\eta_t^2 \\leq \\frac{2^{2/3}G^2}{12Lk^3}\\eta_t \\leq \\frac{G^2}{7Lk^3}\\eta_t",
+        "uses": [
+          "previous_step:1",
+          "previous_step:8"
+        ],
+        "produces": "reciprocal_stepsize_difference_bound"
+      },
+      {
+        "step": 10,
+        "description": "Use the theorem's definition of c to bound the coefficient \\eta_t(4L^2-c).",
+        "ref": "Proof of Theorem 1, p. 7, lines 386-388",
+        "source_pdf_lines": [
+          386,
+          388
+        ],
+        "math": "\\eta_t(4L^2-c) \\leq -24L^2\\eta_t - G^2\\eta_t/(7Lk^3)",
+        "uses": [
+          "Theorem1_parameter_choice"
+        ],
+        "produces": "negative_c_coefficient_bound"
+      },
+      {
+        "step": 11,
+        "description": "Combine the reciprocal stepsize estimate with the coefficient bound to obtain the negative B_t bound.",
+        "ref": "Proof of Theorem 1, p. 7, line 390",
+        "source_pdf_lines": [
+          390,
+          390
+        ],
+        "uses": [
+          "previous_step:6",
+          "previous_step:9",
+          "previous_step:10"
+        ],
+        "produces": "B_t \\leq -24L^2\\eta_t\\|\\epsilon_t\\|^2"
+      },
+      {
+        "step": 12,
+        "description": "Put together the A_t bound, B_t bound, and the C_t contribution to get equation (4).",
+        "ref": "Equation (4), p. 7, lines 390-397",
+        "source_pdf_lines": [
+          390,
+          397
+        ],
+        "math": "\\frac{1}{32L^2}\\sum_{t=1}^T\\left(\\frac{\\|\\epsilon_{t+1}\\|^2}{\\eta_t}-\\frac{\\|\\epsilon_t\\|^2}{\\eta_{t-1}}\\right) \\leq \\frac{k^3c^2}{16L^2}\\ln(T+2)+\\sum_{t=1}^T\\left[\\frac{\\eta_t}{8}\\|\\nabla F(x_t)\\|^2-\\frac{3\\eta_t}{4}\\|\\epsilon_t\\|^2\\right].",
+        "uses": [
+          "previous_step:2",
+          "previous_step:3",
+          "previous_step:5",
+          "previous_step:11"
+        ],
+        "produces": "equation_4"
+      },
+      {
+        "step": 13,
+        "description": "Use Lemma 1 and the Lyapunov definition to bound one-step potential change.",
+        "ref": "Proof of Theorem 1, p. 7, lines 399-405",
+        "source_pdf_lines": [
+          399,
+          405
+        ],
+        "math": "\\mathbb{E}[\\Phi_{t+1}-\\Phi_t] \\leq \\mathbb{E}\\left[-\\frac{\\eta_t}{4}\\|\\nabla F(x_t)\\|^2+\\frac{3\\eta_t}{4}\\|\\epsilon_t\\|^2+\\frac{1}{32L^2\\eta_t}\\|\\epsilon_{t+1}\\|^2-\\frac{1}{32L^2\\eta_{t-1}}\\|\\epsilon_t\\|^2\\right].",
+        "uses": [
+          "Lemma1_biased_sgd_descent",
+          "previous_step:1"
+        ],
+        "produces": "one_step_potential_bound"
+      },
+      {
+        "step": 14,
+        "description": "Sum the one-step potential bound and substitute equation (4) so the error terms cancel.",
+        "ref": "Proof of Theorem 1, p. 7, lines 406-419",
+        "source_pdf_lines": [
+          406,
+          419
+        ],
+        "math": "\\mathbb{E}[\\Phi_{T+1}-\\Phi_1] \\leq \\sum_{t=1}^T\\mathbb{E}\\left[-\\frac{\\eta_t}{4}\\|\\nabla F(x_t)\\|^2+\\frac{3\\eta_t}{4}\\|\\epsilon_t\\|^2+\\frac{1}{32L^2\\eta_t}\\|\\epsilon_{t+1}\\|^2-\\frac{1}{32L^2\\eta_{t-1}}\\|\\epsilon_t\\|^2\\right] \\leq \\mathbb{E}\\left[\\frac{k^3c^2}{16L^2}\\ln(T+2)-\\sum_{t=1}^T\\frac{\\eta_t}{8}\\|\\nabla F(x_t)\\|^2\\right].",
+        "uses": [
+          "previous_step:12",
+          "previous_step:13"
+        ],
+        "produces": "summed_potential_descent"
+      },
+      {
+        "step": 15,
+        "description": "Reorder the summed potential inequality to bound the weighted gradient norm sum by the initial/final potentials and logarithmic term.",
+        "ref": "Proof of Theorem 1, p. 7, lines 421-428",
+        "source_pdf_lines": [
+          421,
+          428
+        ],
+        "math": "\\mathbb{E}\\left[\\sum_{t=1}^T\\eta_t\\|\\nabla F(x_t)\\|^2\\right] \\leq \\mathbb{E}\\left[8(\\Phi_1-\\Phi_{T+1})+k^3c^2/(2L^2)\\ln(T+2)\\right]",
+        "uses": [
+          "previous_step:14"
+        ],
+        "produces": "weighted_gradient_bound_by_potential"
+      },
+      {
+        "step": 16,
+        "description": "Use the lower bound F^* and nonnegativity of the error term in \\Phi_{T+1} to replace potentials by F(x_1)-F^* and the initial error.",
+        "ref": "Proof of Theorem 1, p. 7, lines 429-430",
+        "source_pdf_lines": [
+          429,
+          430
+        ],
+        "math": "\\mathbb{E}\\left[\\sum_{t=1}^T\\eta_t\\|\\nabla F(x_t)\\|^2\\right] \\leq 8(F(x_1)-F^*) + \\mathbb{E}[\\|\\epsilon_1\\|^2]/(4L^2\\eta_0) + k^3c^2/(2L^2)\\ln(T+2)",
+        "uses": [
+          "finite_lower_bound",
+          "previous_step:1",
+          "previous_step:15"
+        ],
+        "produces": "weighted_gradient_bound_with_initial_error"
+      },
+      {
+        "step": 17,
+        "description": "Use d_1=\\nabla f(x_1,\\xi_1), \\eta_0=k/w^{1/3}, and the gradient noise bound to control the initial error.",
+        "ref": "Proof of Theorem 1, p. 7, lines 430-434",
+        "source_pdf_lines": [
+          430,
+          434
+        ],
+        "math": "\\mathbb{E}\\left[\\sum_{t=1}^T\\eta_t\\|\\nabla F(x_t)\\|^2\\right] \\leq 8(F(x_1)-F^*) + w^{1/3}\\sigma^2/(4L^2k) + k^3c^2/(2L^2)\\ln(T+2)",
+        "uses": [
+          "gradient_noise_bound",
+          "algorithm_initialization",
+          "previous_step:16"
+        ],
+        "produces": "weighted_gradient_bound_final"
+      },
+      {
+        "step": 18,
+        "description": "Derive the proof's monotonicity fact: since the adaptive denominator w+\\sum_{i=1}^tG_i^2 is nondecreasing, \\eta_t is decreasing.",
+        "ref": "Proof of Theorem 1, p. 7, lines 435-436",
+        "source_pdf_lines": [
+          435,
+          436
+        ],
+        "uses": [
+          "adaptive_stepsize"
+        ],
+        "produces": "eta_t_decreasing"
+      },
+      {
+        "step": 19,
+        "description": "Use the decreasing stepsizes to lower bound the weighted gradient sum by \\eta_T times the unweighted squared-gradient sum.",
+        "ref": "Proof of Theorem 1, p. 7, lines 436-442",
+        "source_pdf_lines": [
+          436,
+          442
+        ],
+        "math": "\\mathbb{E}\\left[\\sum_{t=1}^T\\eta_t\\|\\nabla F(x_t)\\|^2\\right] \\geq \\mathbb{E}\\left[\\eta_T\\sum_{t=1}^T\\|\\nabla F(x_t)\\|^2\\right].",
+        "uses": [
+          "previous_step:17",
+          "previous_step:18"
+        ],
+        "produces": "eta_T_lower_bound"
+      },
+      {
+        "step": 20,
+        "description": "Apply Cauchy-Schwarz with A = sqrt(eta_T sum ||grad||^2) and B = 1/sqrt(eta_T).",
+        "ref": "Proof of Theorem 1, p. 7, lines 444-457",
+        "source_pdf_lines": [
+          444,
+          457
+        ],
+        "math": "\\mathbb{E}[1/\\eta_T] \\; \\mathbb{E}\\left[\\eta_T\\sum_{t=1}^T\\|\\nabla F(x_t)\\|^2\\right] \\geq \\mathbb{E}\\left[\\sqrt{\\sum_{t=1}^T\\|\\nabla F(x_t)\\|^2}\\right]^2.",
+        "uses": [
+          "Cauchy-Schwarz inequality",
+          "previous_step:19"
+        ],
+        "produces": "cauchy_schwarz_root_sum_bound"
+      },
+      {
+        "step": 21,
+        "description": "Define M as in the proof and combine the weighted gradient bound with Cauchy-Schwarz up to the displayed kM/\\eta_T term.",
+        "ref": "Proof of Theorem 1, p. 7, lines 458-477",
+        "source_pdf_lines": [
+          458,
+          477
+        ],
+        "math": "\\mathbb{E}\\left[\\sqrt{\\sum_{t=1}^T\\|\\nabla F(x_t)\\|^2}\\right]^2 \\leq \\mathbb{E}\\left[\\frac{8(F(x_1)-F^*)+w^{1/3}\\sigma^2/(4L^2k)+k^3c^2/(2L^2)\\ln(T+2)}{\\eta_T}\\right] = \\mathbb{E}\\left[\\frac{kM}{\\eta_T}\\right].",
+        "uses": [
+          "previous_step:17",
+          "previous_step:20"
+        ],
+        "produces": "root_sum_bound_kM_over_eta_T"
+      },
+      {
+        "step": 22,
+        "description": "Use the adaptive stepsize identity for \\eta_T to replace kM/\\eta_T by the cumulative sampled-gradient expression.",
+        "ref": "Proof of Theorem 1, p. 7, lines 471-477",
+        "source_pdf_lines": [
+          471,
+          477
+        ],
+        "math": "\\mathbb{E}\\left[\\frac{kM}{\\eta_T}\\right] \\leq \\mathbb{E}\\left[M\\left(w+\\sum_{t=1}^TG_t^2\\right)^{1/3}\\right].",
+        "uses": [
+          "adaptive_stepsize",
+          "previous_step:21"
+        ],
+        "produces": "root_sum_bound_with_G"
+      },
+      {
+        "step": 23,
+        "description": "Define the noise variable \\zeta_t and split each sampled gradient norm into deterministic gradient and noise parts; because \\xi_t is independent of the past algorithm history, the fixed-x gradient-noise assumption applies at the random iterate x_t.",
+        "ref": "Proof of Theorem 1, p. 8, lines 518-519",
+        "source_pdf_lines": [
+          518,
+          519
+        ],
+        "math": "G_t^2 = \\|\\nabla F(x_t)+\\zeta_t\\|^2 \\leq 2\\|\\nabla F(x_t)\\|^2+2\\|\\zeta_t\\|^2",
+        "uses": [
+          "squared norm two-term inequality",
+          "gradient_noise_bound",
+          "independent_samples",
+          "algorithm_initialization",
+          "adaptive_stepsize",
+          "iterate_update",
+          "recursive_momentum_direction",
+          "next_sample_and_gradient_norm"
+        ],
+        "produces": "\\zeta_t := \\nabla f(x_t,\\xi_t)-\\nabla F(x_t), with conditional_noise_bound_at_random_iterate: \\mathbb{E}\\|\\zeta_t\\|^2\\leq\\sigma^2 after conditioning on the past history that determines x_t."
+      },
+      {
+        "step": 24,
+        "description": "Plug the G_t split into the root-sum bound and use (a+b)^{1/3}\\leq a^{1/3}+b^{1/3} to separate noise and deterministic-gradient contributions.",
+        "ref": "Proof of Theorem 1, p. 8, lines 520-527",
+        "source_pdf_lines": [
+          520,
+          527
+        ],
+        "math": "\\mathbb{E}\\left[\\sqrt{\\sum_{t=1}^T\\|\\nabla F(x_t)\\|^2}\\right]^2 \\leq \\mathbb{E}\\left[M\\left(w+2\\sum_{t=1}^T\\|\\zeta_t\\|^2\\right)^{1/3}+M2^{1/3}\\left(\\sum_{t=1}^T\\|\\nabla F(x_t)\\|^2\\right)^{1/3}\\right]",
+        "uses": [
+          "subadditivity of x^{1/3}",
+          "previous_step:22",
+          "previous_step:23"
+        ],
+        "produces": "root_sum_bound_split_noise_gradient"
+      },
+      {
+        "step": 25,
+        "description": "Use the variance bound on \\zeta_t and concavity to replace the noise contribution by M(w+2T\\sigma^2)^{1/3}, while leaving the deterministic-gradient expectation as printed.",
+        "ref": "Proof of Theorem 1, p. 8, lines 528-535",
+        "source_pdf_lines": [
+          528,
+          535
+        ],
+        "math": "\\mathbb{E}\\left[\\sqrt{\\sum_{t=1}^T\\|\\nabla F(x_t)\\|^2}\\right]^2 \\leq M(w+2T\\sigma^2)^{1/3}+\\mathbb{E}\\left[2^{1/3}M\\left(\\sqrt{\\sum_{t=1}^T\\|\\nabla F(x_t)\\|^2}\\right)^{2/3}\\right]",
+        "uses": [
+          "concavity of x^a for a <= 1",
+          "gradient_noise_bound",
+          "previous_step:23",
+          "previous_step:24"
+        ],
+        "produces": "root_sum_bound_noise_expectation_moved"
+      },
+      {
+        "step": 26,
+        "description": "Use concavity of x \\mapsto x^a for a\\leq 1 on the deterministic-gradient term to move expectation inside the exponent.",
+        "ref": "Proof of Theorem 1, p. 8, lines 537-545",
+        "source_pdf_lines": [
+          537,
+          545
+        ],
+        "math": "\\mathbb{E}\\left[\\sqrt{\\sum_{t=1}^T\\|\\nabla F(x_t)\\|^2}\\right]^2 \\leq M(w+2T\\sigma^2)^{1/3}+2^{1/3}M\\left(\\mathbb{E}\\left[\\sqrt{\\sum_{t=1}^T\\|\\nabla F(x_t)\\|^2}\\right]\\right)^{2/3}",
+        "uses": [
+          "concavity of x^a for a <= 1",
+          "previous_step:25"
+        ],
+        "produces": "root_sum_scalar_pre_X_bound"
+      },
+      {
+        "step": 27,
+        "description": "Set X to the square root of the squared-gradient sum and rewrite the preceding estimate as a scalar inequality.",
+        "ref": "Proof of Theorem 1, p. 8, lines 543-550",
+        "source_pdf_lines": [
+          543,
+          550
+        ],
+        "math": "(\\mathbb{E}[X])^2 \\leq M(w+2T\\sigma^2)^{1/3}+2^{1/3}M(\\mathbb{E}[X])^{2/3}.",
+        "uses": [
+          "previous_step:26"
+        ],
+        "produces": "scalar_X_inequality"
+      },
+      {
+        "step": 28,
+        "description": "Record the paper's two alternatives implied by the scalar inequality.",
+        "ref": "Proof of Theorem 1, p. 8, lines 551-552",
+        "source_pdf_lines": [
+          551,
+          552
+        ],
+        "math": "\\text{either }(\\mathbb{E}[X])^2 \\leq 2M(w+T\\sigma^2)^{1/3},\\quad \\text{or }(\\mathbb{E}[X])^2 \\leq 2\\cdot 2^{1/3}M(\\mathbb{E}[X])^{2/3}.",
+        "uses": [
+          "previous_step:27"
+        ],
+        "produces": "scalar_X_case_split"
+      },
+      {
+        "step": 29,
+        "description": "Solve the first alternative for \\mathbb{E}[X]; the proof's final displayed bound uses the larger earlier quantity w+2T\\sigma^2.",
+        "ref": "Proof of Theorem 1, p. 8, lines 551-554",
+        "source_pdf_lines": [
+          551,
+          554
+        ],
+        "uses": [
+          "previous_step:28"
+        ],
+        "produces": "first_case_bound: \\mathbb{E}[X] \\leq \\sqrt{2M}(w+2T\\sigma^2)^{1/6}"
+      },
+      {
+        "step": 30,
+        "description": "Solve the second alternative by dividing by (\\mathbb{E}[X])^{2/3} and raising to the 3/4 power.",
+        "ref": "Proof of Theorem 1, p. 8, lines 551-554",
+        "source_pdf_lines": [
+          551,
+          554
+        ],
+        "uses": [
+          "previous_step:28"
+        ],
+        "produces": "second_case_bound: \\mathbb{E}[X] \\leq 2M^{3/4}"
+      },
+      {
+        "step": 31,
+        "description": "Combine the solved cases to obtain the paper's displayed bound for \\mathbb{E}[X].",
+        "ref": "Proof of Theorem 1, p. 8, lines 552-554",
+        "source_pdf_lines": [
+          552,
+          554
+        ],
+        "math": "\\mathbb{E}[X] \\leq \\sqrt{2M}(w+2T\\sigma^2)^{1/6}+2M^{3/4}.",
+        "uses": [
+          "previous_step:29",
+          "previous_step:30"
+        ],
+        "produces": "expected_root_sum_bound"
+      },
+      {
+        "step": 32,
+        "description": "Use Cauchy-Schwarz to pass from the root of the squared-gradient sum to the average gradient norm, then split (w+2T\\sigma^2)^{1/6}.",
+        "ref": "Proof of Theorem 1, p. 8, lines 556-563",
+        "source_pdf_lines": [
+          556,
+          563
+        ],
+        "math": "\\mathbb{E}\\left[\\sum_{t=1}^T\\frac{\\|\\nabla F(x_t)\\|}{T}\\right] \\leq \\frac{\\sqrt{2M}(w+2T\\sigma^2)^{1/6}+2M^{3/4}}{\\sqrt{T}} \\leq \\frac{w^{1/6}\\sqrt{2M}+2M^{3/4}}{\\sqrt{T}}+\\frac{2\\sigma^{1/3}}{T^{1/3}}.",
+        "uses": [
+          "Cauchy-Schwarz inequality",
+          "subadditivity of x^{1/3}",
+          "previous_step:31"
+        ],
+        "produces": "Theorem 1 bound for the uniformly random output."
+      }
+    ]
+  },
+  "key_lemmas": [
+    {
+      "name": "Lemma1_biased_sgd_descent",
+      "ref": "Lemma 1, p. 5 and Appendix A p. 12",
+      "statement_math": "\\text{Suppose } \\eta_t \\leq \\frac{1}{4L} \\text{ for all } t. \\text{ Then}\\quad \\mathbb{E}[F(x_{t+1})-F(x_t)] \\leq \\mathbb{E}\\left[-\\eta_t/4\\|\\nabla F(x_t)\\|^2+3\\eta_t/4\\|\\epsilon_t\\|^2\\right].",
+      "role": "Provides the biased-gradient one-step descent inequality used to control the Lyapunov potential in Theorem 1.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Record the lemma hypothesis that is used in the final coefficient collection.",
+          "ref": "Lemma 1, Appendix A, p. 12, lines 707-710",
+          "source_pdf_lines": [
+            707,
+            710
+          ],
+          "math": "\\text{Suppose } \\eta_t \\leq \\frac{1}{4L} \\text{ for all } t.",
+          "uses": [],
+          "produces": "lemma1_eta_t_le_one_over_4L"
+        },
+        {
+          "step": 2,
+          "description": "Derive the smoothness of F invoked by the paper from the sample-loss oracle and the almost-sure differentiability and L-smoothness assumptions; this records the prerequisite behind the phrase \"Using the smoothness of F\" without introducing a non-printed displayed formula.",
+          "ref": "Section 3, p. 3, lines 112-121 and Appendix A, p. 12, line 713",
+          "source_pdf_lines": [
+            713,
+            713
+          ],
+          "uses": [
+            "function_oracle",
+            "differentiable_losses",
+            "L_smooth_losses"
+          ],
+          "produces": "derived_F_smoothness_used_in_Lemma1"
+        },
+        {
+          "step": 3,
+          "description": "Apply the derived smoothness of F and the algorithmic update x_{t+1}=x_t-\\eta_t d_t.",
+          "ref": "Appendix A, p. 12, lines 713-718",
+          "source_pdf_lines": [
+            713,
+            718
+          ],
+          "math": "\\mathbb{E}[F(x_{t+1})] \\leq \\mathbb{E}\\left[F(x_t)-\\nabla F(x_t)\\cdot \\eta_td_t + \\frac{L\\eta_t^2}{2}\\|d_t\\|^2\\right]",
+          "uses": [
+            "previous_step:2",
+            "iterate_update"
+          ],
+          "produces": "smoothness_descent_with_d_t"
+        },
+        {
+          "step": 4,
+          "description": "Substitute d_t=\\nabla F(x_t)+\\epsilon_t and expand the inner product.",
+          "ref": "Appendix A, p. 12, lines 719-723",
+          "source_pdf_lines": [
+            719,
+            723
+          ],
+          "math": "\\mathbb{E}\\left[F(x_t)-\\eta_t\\|\\nabla F(x_t)\\|^2-\\eta_t\\nabla F(x_t)\\cdot\\epsilon_t+\\frac{L\\eta_t^2}{2}\\|d_t\\|^2\\right]",
+          "uses": [
+            "epsilon_t",
+            "previous_step:3"
+          ],
+          "produces": "expanded_error_inner_product"
+        },
+        {
+          "step": 5,
+          "description": "Apply Young's inequality to the cross term.",
+          "ref": "Appendix A, p. 12, lines 724-728 and 735",
+          "source_pdf_lines": [
+            724,
+            735
+          ],
+          "math": "\\mathbb{E}\\left[F(x_t)-\\frac{\\eta_t}{2}\\|\\nabla F(x_t)\\|^2+\\frac{\\eta_t}{2}\\|\\epsilon_t\\|^2+\\frac{L\\eta_t^2}{2}\\|d_t\\|^2\\right]",
+          "uses": [
+            "Young's inequality",
+            "previous_step:4"
+          ],
+          "produces": "young_cross_term_bound"
+        },
+        {
+          "step": 6,
+          "description": "Use \\|x+y\\|^2\\leq 2\\|x\\|^2+2\\|y\\|^2 on d_t=\\nabla F(x_t)+\\epsilon_t.",
+          "ref": "Appendix A, p. 12, lines 729-731 and 735-736",
+          "source_pdf_lines": [
+            729,
+            736
+          ],
+          "math": "\\mathbb{E}\\left[F(x_t)-\\frac{\\eta_t}{2}\\|\\nabla F(x_t)\\|^2+\\frac{\\eta_t}{2}\\|\\epsilon_t\\|^2+L\\eta_t^2\\|\\epsilon_t\\|^2+L\\eta_t^2\\|\\nabla F(x_t)\\|^2\\right]",
+          "uses": [
+            "squared norm two-term inequality",
+            "previous_step:5"
+          ],
+          "produces": "d_t_norm_split"
+        },
+        {
+          "step": 7,
+          "description": "Use \\eta_t\\leq 1/(4L) to collect coefficients and subtract F(x_t) from both sides.",
+          "ref": "Appendix A, p. 12, lines 732-736",
+          "source_pdf_lines": [
+            732,
+            736
+          ],
+          "math": "\\mathbb{E}\\left[F(x_t)-\\frac{\\eta_t}{2}\\|\\nabla F(x_t)\\|^2+\\frac{3\\eta_t}{4}\\|\\epsilon_t\\|^2+\\frac{\\eta_t}{4}\\|\\nabla F(x_t)\\|^2\\right]",
+          "uses": [
+            "previous_step:1",
+            "previous_step:6"
+          ],
+          "produces": "Lemma 1 inequality"
+        }
+      ]
+    },
+    {
+      "name": "Lemma3_cross_terms_zero",
+      "ref": "Lemma 3, Appendix A p. 12",
+      "statement_math": "\\mathbb{E}\\left[(\\nabla f(x_t,\\xi_t)-\\nabla F(x_t))\\cdot \\eta_{t-1}^{-1}(1-a_t)^2\\epsilon_{t-1}\\right]=0,\\quad \\mathbb{E}\\left[(\\nabla f(x_t,\\xi_t)-\\nabla f(x_{t-1},\\xi_t)-\\nabla F(x_t)+\\nabla F(x_{t-1}))\\cdot \\eta_{t-1}^{-1}(1-a_t)^2\\epsilon_{t-1}\\right]=0.",
+      "role": "Eliminates cross terms in the squared-error expansion in Lemma 2.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Observe from the update formula that \\epsilon_{t-1}=d_{t-1}-\\nabla F(x_{t-1}) and x_t are independent of \\xi_t.",
+          "ref": "Appendix A, p. 12, lines 747-749",
+          "source_pdf_lines": [
+            747,
+            749
+          ],
+          "uses": [
+            "epsilon_t",
+            "independent_samples",
+            "iterate_update",
+            "recursive_momentum_direction"
+          ],
+          "produces": "conditioning_independence_for_x_t_and_epsilon_{t-1}"
+        },
+        {
+          "step": 2,
+          "description": "From the function-value oracle, differentiability, L-smoothness, and the independence just recorded, derive the conditional gradient-unbiasedness identities used after conditioning on \\xi_1,\\ldots,\\xi_{t-1}; this is the prerequisite that makes the inner conditional expectations vanish.",
+          "ref": "Section 3, p. 3, lines 112-121 and Appendix A, p. 12, lines 747-749",
+          "source_pdf_lines": [
+            747,
+            749
+          ],
+          "uses": [
+            "function_oracle",
+            "differentiable_losses",
+            "L_smooth_losses",
+            "independent_samples",
+            "previous_step:1"
+          ],
+          "produces": "conditional_gradient_unbiasedness_after_past_conditioning"
+        },
+        {
+          "step": 3,
+          "description": "Take conditional expectation with respect to \\xi_t and then with respect to the past variables to prove the first equality.",
+          "ref": "Appendix A, p. 12, lines 750-757",
+          "source_pdf_lines": [
+            750,
+            757
+          ],
+          "math": "\\mathbb{E}\\left[(\\nabla f(x_t,\\xi_t)-\\nabla F(x_t))\\cdot \\eta_{t-1}^{-1}(1-a_t)^2\\epsilon_{t-1}\\right] = \\mathbb{E}\\left[\\mathbb{E}\\left[(\\nabla f(x_t,\\xi_t)-\\nabla F(x_t))\\cdot \\eta_{t-1}^{-1}(1-a_t)^2\\epsilon_{t-1}\\mid \\xi_1,\\ldots,\\xi_{t-1}\\right]\\right]=0.",
+          "uses": [
+            "previous_step:1",
+            "previous_step:2"
+          ],
+          "produces": "first_cross_term_zero"
+        },
+        {
+          "step": 4,
+          "description": "Repeat the same conditioning argument for the stochastic gradient difference centered by \\nabla F(x_t)-\\nabla F(x_{t-1}).",
+          "ref": "Appendix A, p. 12, lines 758-767",
+          "source_pdf_lines": [
+            758,
+            767
+          ],
+          "math": "\\mathbb{E}\\left[(\\nabla f(x_t,\\xi_t)-\\nabla f(x_{t-1},\\xi_t)-\\nabla F(x_t)+\\nabla F(x_{t-1}))\\cdot \\eta_{t-1}^{-1}(1-a_t)^2\\epsilon_{t-1}\\right] = \\mathbb{E}\\left[\\mathbb{E}\\left[(\\nabla f(x_t,\\xi_t)-\\nabla f(x_{t-1},\\xi_t)-(\\nabla F(x_t)-\\nabla F(x_{t-1})))\\cdot \\eta_{t-1}^{-1}(1-a_t)^2\\epsilon_{t-1}\\mid \\xi_1,\\ldots,\\xi_{t-1}\\right]\\right]=0.",
+          "uses": [
+            "previous_step:1",
+            "previous_step:2"
+          ],
+          "produces": "second_cross_term_zero"
+        }
+      ]
+    },
+    {
+      "name": "Lemma4_log_sum_bound",
+      "ref": "Lemma 4, Appendix A p. 12",
+      "statement_math": "\\text{Let } a_0>0 \\text{ and } a_1,\\ldots,a_T\\geq 0. \\text{ Then}\\quad \\sum_{t=1}^T\\frac{a_t}{a_0+\\sum_{i=1}^ta_i}\\leq \\ln\\left(1+\\frac{\\sum_{i=1}^Ta_i}{a_0}\\right).",
+      "role": "Turns the adaptive A_t summation in Theorem 1 into a logarithmic bound.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Use concavity of log to lower bound each log increment by the ratio with the cumulative denominator.",
+          "ref": "Appendix A, p. 12, lines 776-783",
+          "source_pdf_lines": [
+            776,
+            783
+          ],
+          "math": "\\ln\\left(a_0+\\sum_{i=1}^t a_i\\right)-\\ln\\left(a_0+\\sum_{i=1}^{t-1}a_i\\right) \\geq \\frac{a_t}{a_0+\\sum_{i=1}^t a_i}.",
+          "uses": [
+            "concavity of log function"
+          ],
+          "produces": "log_increment_ratio_bound"
+        },
+        {
+          "step": 2,
+          "description": "Sum the displayed inequalities from t=1 to T; the logarithms telescope to the stated bound.",
+          "ref": "Appendix A, p. 12, lines 785-785",
+          "source_pdf_lines": [
+            785,
+            785
+          ],
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "Lemma 4 inequality"
+        }
+      ]
+    },
+    {
+      "name": "Lemma2_error_recurrence",
+      "ref": "Lemma 2, p. 5 and Appendix A.1 p. 13",
+      "statement_math": "\\text{With the notation in Algorithm 1, we have}\\quad \\mathbb{E}\\left[\\|\\epsilon_t\\|^2/\\eta_{t-1}\\right] \\leq \\mathbb{E}\\left[2c^2\\eta_{t-1}^3G_t^2 + (1-a_t)^2(1+4L^2\\eta_{t-1}^2)\\|\\epsilon_{t-1}\\|^2/\\eta_{t-1} + 4(1-a_t)^2L^2\\eta_{t-1}\\|\\nabla F(x_{t-1})\\|^2\\right].",
+      "role": "Provides the variance-reduction recurrence used to control the Lyapunov error term in Theorem 1.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Start equation (5) by expanding the squared centered stochastic gradient norm.",
+          "ref": "Equation (5), Appendix A.1, p. 13, lines 801-809",
+          "source_pdf_lines": [
+            801,
+            809
+          ],
+          "math": "\\mathbb{E}\\left[\\eta_{t-1}^3\\|\\nabla f(x_t,\\xi_t)-\\nabla F(x_t)\\|^2\\right] = \\mathbb{E}\\left[\\eta_{t-1}^3\\left(\\|\\nabla f(x_t,\\xi_t)\\|^2+\\|\\nabla F(x_t)\\|^2-2\\nabla f(x_t,\\xi_t)\\cdot\\nabla F(x_t)\\right)\\right]",
+          "uses": [
+            "independent_samples"
+          ],
+          "produces": "equation_5_expanded_square"
+        },
+        {
+          "step": 2,
+          "description": "Record the algorithm-history prerequisite for the conditioning step: before \\xi_t is sampled, x_t, x_{t-1}, and \\eta_{t-1} are determined by \\xi_1,\\ldots,\\xi_{t-1} through Algorithm 1, while \\xi_t is the fresh independent sample used in the displayed conditional expectation.",
+          "ref": "Algorithm 1, p. 4, lines 160-173 and Equation (5), Appendix A.1, p. 13, lines 809-812",
+          "source_pdf_lines": [
+            160,
+            173
+          ],
+          "uses": [
+            "algorithm_initialization",
+            "loop_bounds",
+            "adaptive_stepsize",
+            "iterate_update",
+            "momentum_weight",
+            "next_sample_and_gradient_norm",
+            "recursive_momentum_direction",
+            "independent_samples"
+          ],
+          "produces": "past_measurability_for_Lemma2_conditioning: x_t, x_{t-1}, and \\eta_{t-1} are fixed under conditioning on \\xi_1,\\ldots,\\xi_{t-1}, and \\xi_t is independent of that past."
+        },
+        {
+          "step": 3,
+          "description": "Condition on the past variables \\xi_1,\\ldots,\\xi_{t-1} so that x_t and \\eta_{t-1} are fixed while taking the inner expectation over \\xi_t.",
+          "ref": "Equation (5), Appendix A.1, p. 13, lines 809-812",
+          "source_pdf_lines": [
+            809,
+            812
+          ],
+          "math": "\\mathbb{E}\\left[\\eta_{t-1}^3\\mathbb{E}\\left[\\|\\nabla f(x_t,\\xi_t)\\|^2+\\|\\nabla F(x_t)\\|^2-2\\nabla f(x_t,\\xi_t)\\cdot\\nabla F(x_t)\\mid \\xi_1,\\ldots,\\xi_{t-1}\\right]\\right]",
+          "uses": [
+            "previous_step:1",
+            "previous_step:2",
+            "independent_samples"
+          ],
+          "produces": "equation_5_conditioned_on_past"
+        },
+        {
+          "step": 4,
+          "description": "Derive the conditional gradient-unbiasedness transition for equation (5) from the function-value oracle, differentiability, L-smoothness, independence, and the conditioning setup; this supplies the missing prerequisite for replacing the cross term inside the conditional expectation.",
+          "ref": "Section 3, p. 3, lines 112-121 and Equation (5), Appendix A.1, p. 13, lines 809-816",
+          "source_pdf_lines": [
+            809,
+            816
+          ],
+          "uses": [
+            "function_oracle",
+            "differentiable_losses",
+            "L_smooth_losses",
+            "independent_samples",
+            "previous_step:2",
+            "previous_step:3"
+          ],
+          "produces": "equation_5_conditional_gradient_unbiasedness"
+        },
+        {
+          "step": 5,
+          "description": "Use the unbiased oracle identity inside the conditional expectation so the cross term becomes \\|\\nabla F(x_t)\\|^2.",
+          "ref": "Equation (5), Appendix A.1, p. 13, lines 813-816",
+          "source_pdf_lines": [
+            813,
+            816
+          ],
+          "math": "\\mathbb{E}\\left[\\eta_{t-1}^3\\left(\\|\\nabla f(x_t,\\xi_t)\\|^2-\\|\\nabla F(x_t)\\|^2\\right)\\right]",
+          "uses": [
+            "previous_step:2",
+            "previous_step:3",
+            "previous_step:4"
+          ],
+          "produces": "equation_5_unbiasedness_substitution"
+        },
+        {
+          "step": 6,
+          "description": "Drop the nonpositive term -\\|\\nabla F(x_t)\\|^2 to obtain inequality (5).",
+          "ref": "Equation (5), Appendix A.1, p. 13, lines 817-822",
+          "source_pdf_lines": [
+            817,
+            822
+          ],
+          "math": "\\mathbb{E}\\left[\\eta_{t-1}^3\\left(\\|\\nabla f(x_t,\\xi_t)\\|^2-\\|\\nabla F(x_t)\\|^2\\right)\\right] \\leq \\mathbb{E}\\left[\\eta_{t-1}^3\\|\\nabla f(x_t,\\xi_t)\\|^2\\right]",
+          "uses": [
+            "previous_step:5"
+          ],
+          "produces": "equation_5"
+        },
+        {
+          "step": 7,
+          "description": "Derive the analogous conditional gradient-unbiasedness transition for the two-point gradient difference in equation (6), with x_t and x_{t-1} fixed under the past conditioning.",
+          "ref": "Section 3, p. 3, lines 112-121 and Equation (6), Appendix A.1, p. 13, lines 823-831",
+          "source_pdf_lines": [
+            823,
+            831
+          ],
+          "uses": [
+            "function_oracle",
+            "differentiable_losses",
+            "L_smooth_losses",
+            "independent_samples",
+            "previous_step:2",
+            "previous_step:3"
+          ],
+          "produces": "equation_6_conditional_gradient_difference_unbiasedness"
+        },
+        {
+          "step": 8,
+          "description": "Apply the same centered-square argument to the gradient difference term to get inequality (6).",
+          "ref": "Equation (6), Appendix A.1, p. 13, lines 823-831",
+          "source_pdf_lines": [
+            823,
+            831
+          ],
+          "math": "\\mathbb{E}\\left[\\eta_{t-1}^{-1}(1-a_t)^2\\|\\nabla f(x_t,\\xi_t)-\\nabla f(x_{t-1},\\xi_t)-\\nabla F(x_t)+\\nabla F(x_{t-1})\\|^2\\right] \\leq \\mathbb{E}\\left[\\eta_{t-1}^{-1}(1-a_t)^2\\|\\nabla f(x_t,\\xi_t)-\\nabla f(x_{t-1},\\xi_t)\\|^2\\right]",
+          "uses": [
+            "previous_step:7"
+          ],
+          "produces": "equation_6"
+        },
+        {
+          "step": 9,
+          "description": "Rewrite \\epsilon_t from the algorithmic direction recursion and split it into noise, gradient-difference, and previous-error components.",
+          "ref": "Appendix A.1, p. 13, lines 833-842",
+          "source_pdf_lines": [
+            833,
+            842
+          ],
+          "math": "\\mathbb{E}\\left[\\eta_{t-1}^{-1}\\|\\epsilon_t\\|^2\\right] = \\mathbb{E}\\left[\\eta_{t-1}^{-1}\\|a_t(\\nabla f(x_t,\\xi_t)-\\nabla F(x_t))+(1-a_t)(\\nabla f(x_t,\\xi_t)-\\nabla f(x_{t-1},\\xi_t)-\\nabla F(x_t)+\\nabla F(x_{t-1}))+(1-a_t)(d_{t-1}-\\nabla F(x_{t-1}))\\|^2\\right]",
+          "uses": [
+            "epsilon_t",
+            "recursive_momentum_direction",
+            "previous_step:6",
+            "previous_step:8"
+          ],
+          "produces": "epsilon_t_three_term_decomposition"
+        },
+        {
+          "step": 10,
+          "description": "Use Lemma 3 to drop cross terms with the previous error and use \\|x+y\\|^2\\leq 2\\|x\\|^2+2\\|y\\|^2 for the remaining two fresh terms.",
+          "ref": "Appendix A.1, p. 13, lines 844-853 and 893-894",
+          "source_pdf_lines": [
+            844,
+            853
+          ],
+          "math": "\\mathbb{E}\\left[2c^2\\eta_{t-1}^3\\|\\nabla f(x_t,\\xi_t)-\\nabla F(x_t)\\|^2 + 2\\eta_{t-1}^{-1}(1-a_t)^2\\|\\nabla f(x_t,\\xi_t)-\\nabla f(x_{t-1},\\xi_t)-\\nabla F(x_t)+\\nabla F(x_{t-1})\\|^2 + \\eta_{t-1}^{-1}(1-a_t)^2\\|\\epsilon_{t-1}\\|^2\\right]",
+          "uses": [
+            "Lemma3_cross_terms_zero",
+            "squared norm two-term inequality",
+            "momentum_weight",
+            "previous_step:9"
+          ],
+          "produces": "cross_terms_removed_bound"
+        },
+        {
+          "step": 11,
+          "description": "Substitute equations (5) and (6) into the bound.",
+          "ref": "Appendix A.1, p. 13, lines 855-858 and 893-895",
+          "source_pdf_lines": [
+            855,
+            858
+          ],
+          "math": "\\mathbb{E}\\left[2c^2\\eta_{t-1}^3\\|\\nabla f(x_t,\\xi_t)\\|^2 + 2\\eta_{t-1}^{-1}(1-a_t)^2\\|\\nabla f(x_t,\\xi_t)-\\nabla f(x_{t-1},\\xi_t)\\|^2 + \\eta_{t-1}^{-1}(1-a_t)^2\\|\\epsilon_{t-1}\\|^2\\right]",
+          "uses": [
+            "previous_step:6",
+            "previous_step:8",
+            "previous_step:10"
+          ],
+          "produces": "centered_terms_replaced"
+        },
+        {
+          "step": 12,
+          "description": "Use the notation G_t and L-smoothness of each sample loss to bound the two stochastic-gradient terms.",
+          "ref": "Appendix A.1, p. 13, lines 860-864 and 893-895",
+          "source_pdf_lines": [
+            860,
+            864
+          ],
+          "math": "\\mathbb{E}\\left[2c^2\\eta_{t-1}^3G_t^2 + 2\\eta_{t-1}^{-1}(1-a_t)^2L^2\\|x_t-x_{t-1}\\|^2 + \\eta_{t-1}^{-1}(1-a_t)^2\\|\\epsilon_{t-1}\\|^2\\right]",
+          "uses": [
+            "algorithm_initialization",
+            "next_sample_and_gradient_norm",
+            "L_smooth_losses",
+            "previous_step:11"
+          ],
+          "produces": "smoothness_bound_for_sample_difference"
+        },
+        {
+          "step": 13,
+          "description": "Use x_t-x_{t-1}=-\\eta_{t-1}d_{t-1} from the algorithm to replace the iterate displacement by d_{t-1}.",
+          "ref": "Appendix A.1, p. 13, lines 866-870",
+          "source_pdf_lines": [
+            866,
+            870
+          ],
+          "math": "\\mathbb{E}\\left[2c^2\\eta_{t-1}^3G_t^2 + 2(1-a_t)^2L^2\\eta_{t-1}\\|d_{t-1}\\|^2 + \\eta_{t-1}^{-1}(1-a_t)^2\\|\\epsilon_{t-1}\\|^2\\right]",
+          "uses": [
+            "iterate_update",
+            "previous_step:12"
+          ],
+          "produces": "displacement_replaced_by_direction"
+        },
+        {
+          "step": 14,
+          "description": "Substitute d_{t-1}=\\epsilon_{t-1}+\\nabla F(x_{t-1}).",
+          "ref": "Appendix A.1, p. 13, lines 872-876",
+          "source_pdf_lines": [
+            872,
+            876
+          ],
+          "math": "\\mathbb{E}\\left[2c^2\\eta_{t-1}^3G_t^2 + 2(1-a_t)^2L^2\\eta_{t-1}\\|\\epsilon_{t-1}+\\nabla F(x_{t-1})\\|^2 + \\eta_{t-1}^{-1}(1-a_t)^2\\|\\epsilon_{t-1}\\|^2\\right]",
+          "uses": [
+            "epsilon_t",
+            "previous_step:13"
+          ],
+          "produces": "d_previous_split_into_error_and_gradient"
+        },
+        {
+          "step": 15,
+          "description": "Use \\|x+y\\|^2\\leq 2\\|x\\|^2+2\\|y\\|^2 on \\epsilon_{t-1}+\\nabla F(x_{t-1}).",
+          "ref": "Appendix A.1, p. 13, lines 878-882 and 893-895",
+          "source_pdf_lines": [
+            878,
+            882
+          ],
+          "math": "\\mathbb{E}\\left[2c^2\\eta_{t-1}^3G_t^2 + 4(1-a_t)^2L^2\\eta_{t-1}(\\|\\epsilon_{t-1}\\|^2+\\|\\nabla F(x_{t-1})\\|^2) + \\eta_{t-1}^{-1}(1-a_t)^2\\|\\epsilon_{t-1}\\|^2\\right]",
+          "uses": [
+            "squared norm two-term inequality",
+            "previous_step:14"
+          ],
+          "produces": "previous_direction_norm_split"
+        },
+        {
+          "step": 16,
+          "description": "Collect the two \\epsilon_{t-1} terms to obtain Lemma 2's recurrence.",
+          "ref": "Appendix A.1, p. 13, lines 884-890",
+          "source_pdf_lines": [
+            884,
+            890
+          ],
+          "math": "\\mathbb{E}\\left[2c^2\\eta_{t-1}^3G_t^2 + \\eta_{t-1}^{-1}(1-a_t)^2(1+4L^2\\eta_{t-1}^2)\\|\\epsilon_{t-1}\\|^2 + 4(1-a_t)^2L^2\\eta_{t-1}\\|\\nabla F(x_{t-1})\\|^2\\right]",
+          "uses": [
+            "previous_step:15"
+          ],
+          "produces": "Lemma 2 recurrence"
+        }
+      ]
+    }
+  ]
+}

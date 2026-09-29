@@ -1,0 +1,183 @@
+{
+  "algorithm": "StochasticAcceleratedGradientDescent",
+  "full_name": "Stochastic Accelerated Gradient Descent for Composite Convex Stochastic Optimization",
+  "source_reference": "Lan, First-order and Stochastic Optimization Methods for Machine Learning, Springer 2020 (Theorem 4.4)",
+  "setup": {
+    "problem": {
+      "math": "\\Psi^* := \\min_{x \\in X} \\left\\{ \\Psi(x) := f(x) + h(x) \\right\\}",
+      "ref": "Eq. (4.2.1)",
+      "description": "Composite convex stochastic optimization over a closed convex set"
+    },
+    "variable_space": {
+      "math": "X \\subseteq \\mathbb{R}^m \\text{ closed convex}; \\; f(x) = \\mathbb{E}[F(x, \\xi)]; \\; h : X \\to \\mathbb{R} \\text{ simple convex}",
+      "ref": "Section 4.2"
+    }
+  },
+  "assumptions": [
+    {
+      "name": "Curvature model",
+      "math": "\\mu V(x, y) \\le f(y) - f(x) - \\langle f'(x), y - x \\rangle \\le \\frac{L}{2} \\|y - x\\|^2 + M \\|y - x\\|, \\quad \\forall x, y \\in X",
+      "ref": "Eq. (4.2.2)",
+      "parameters": ["\\mu \\ge 0", "L \\ge 0", "M \\ge 0"]
+    },
+    {
+      "name": "Unbiased stochastic oracle",
+      "math": "\\mathbb{E}[G(x, \\xi)] = f'(x) \\in \\partial f(x), \\quad \\forall x \\in X",
+      "ref": "Eq. (4.1.3)",
+      "parameters": []
+    },
+    {
+      "name": "Bounded variance (Assumption 3)",
+      "math": "\\mathbb{E}\\left[\\|G(x, \\xi_t) - f'(x)\\|_*^2\\right] \\le \\sigma^2, \\quad \\forall x \\in X",
+      "ref": "Section 4.2",
+      "parameters": ["\\sigma^2 \\ge 0"]
+    },
+    {
+      "name": "Distance generating function",
+      "math": "v : X \\to \\mathbb{R} \\text{ is continuously differentiable and 1-strongly convex w.r.t. } \\|\\cdot\\|; \\; V(x, z) = v(z) - [v(x) + \\langle \\nabla v(x), z - x \\rangle]",
+      "ref": "Eq. (3.2.2)",
+      "parameters": []
+    },
+    {
+      "name": "Parameter conditions",
+      "math": "\\frac{q_t(1 - \\alpha_t)}{\\alpha_t(1 - q_t)} = \\frac{1}{1 + \\mu \\gamma_t}, \\quad 1 + \\mu \\gamma_t > L \\alpha_t \\gamma_t, \\quad \\frac{\\alpha_t}{\\gamma_t \\Gamma_t} \\le \\frac{\\alpha_{t-1}(1 + \\mu \\gamma_{t-1})}{\\gamma_{t-1} \\Gamma_{t-1}}",
+      "ref": "Eqs. (4.2.9), (4.2.10), (4.2.22)",
+      "parameters": ["\\alpha_1 = 1"]
+    }
+  ],
+  "algorithm_spec": {
+    "ref": "Eqs. (4.2.5)-(4.2.7)",
+    "initialization": {
+      "math": "(x_0, \\tilde{x}_0) \\in X \\times X",
+      "ref": "Section 4.2"
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "Search point computation",
+        "math": "\\underline{x}_t = (1 - q_t) \\tilde{x}_{t-1} + q_t x_{t-1}",
+        "ref": "Eq. (4.2.5)"
+      },
+      {
+        "step": 2,
+        "name": "Stochastic prox update",
+        "math": "x_t = \\operatorname{argmin}_{x \\in X} \\left\\{ \\gamma_t \\left[ \\langle G(\\underline{x}_t, \\xi_t), x \\rangle + h(x) + \\mu V(\\underline{x}_t, x) \\right] + V(x_{t-1}, x) \\right\\}",
+        "ref": "Eq. (4.2.6)"
+      },
+      {
+        "step": 3,
+        "name": "Output averaging",
+        "math": "\\tilde{x}_t = (1 - \\alpha_t) \\tilde{x}_{t-1} + \\alpha_t x_t",
+        "ref": "Eq. (4.2.7)"
+      }
+    ],
+    "output": {
+      "math": "\\tilde{x}_k",
+      "ref": "Theorem 4.4",
+      "type": "weighted_average"
+    },
+    "parameters": [
+      {
+        "name": "\\Gamma_t",
+        "math": "\\Gamma_t := \\begin{cases} 1, & t = 1, \\\\ (1 - \\alpha_t) \\Gamma_{t-1}, & t \\ge 2 \\end{cases}",
+        "ref": "Eq. (4.2.21)"
+      },
+      {
+        "name": "\\delta_t",
+        "math": "\\delta_t := G(\\underline{x}_t, \\xi_t) - f'(\\underline{x}_t)",
+        "ref": "Eq. (4.2.8)"
+      },
+      {
+        "name": "x_{t-1}^+",
+        "math": "x_{t-1}^+ := \\frac{\\mu \\gamma_t}{1 + \\mu \\gamma_t} \\underline{x}_t + \\frac{1}{1 + \\mu \\gamma_t} x_{t-1}",
+        "ref": "Eq. (4.2.14)"
+      }
+    ]
+  },
+  "main_theorem": {
+    "ref": "Theorem 4.4",
+    "statement_math": "\\mathbb{E}[\\Psi(\\tilde{x}_k) - \\Psi^*] \\le \\mathrm{B}_e(k) := \\frac{\\Gamma_k}{\\gamma_1} V(x_0, x^*) + \\Gamma_k \\sum_{t=1}^{k} \\frac{\\alpha_t \\gamma_t (M^2 + \\sigma^2)}{\\Gamma_t (1 + \\mu \\gamma_t - L \\alpha_t \\gamma_t)}",
+    "rate": "O(1/\\sqrt{k}) \\text{ for } \\mu = 0; \\; O(1/k) \\text{ for } \\mu > 0",
+    "measure": "expected suboptimality",
+    "proof": [
+      {
+        "step": 1,
+        "description": "Apply Lemma 4.4 with z = x_t to bound Psi(x_tilde_t) using the composite upper model, then apply Lemma 3.5 to the prox update (4.2.6)",
+        "math": "\\Psi(\\tilde{x}_t) \\le (1 - \\alpha_t) \\Psi(\\tilde{x}_{t-1}) + \\alpha_t [f(\\underline{x}_t) + \\langle f'(\\underline{x}_t), x_t - \\underline{x}_t \\rangle + h(x_t)] + \\frac{L}{2} \\|\\tilde{x}_t - \\underline{x}_t\\|^2 + M \\|\\tilde{x}_t - \\underline{x}_t\\|",
+        "uses": ["Lemma 4.4", "Lemma 3.5"]
+      },
+      {
+        "step": 2,
+        "description": "Derive the one-step recursion (Proposition 4.2) using d_t = x_t - x_{t-1}^+, strong convexity of V, and the completion-of-squares inequality",
+        "math": "\\Psi(\\tilde{x}_t) \\le (1 - \\alpha_t) \\Psi(\\tilde{x}_{t-1}) + \\alpha_t l_\\Psi(\\underline{x}_t, x) + \\frac{\\alpha_t}{\\gamma_t} [V(x_{t-1}, x) - (1 + \\mu \\gamma_t) V(x_t, x)] + \\Delta_t(x)",
+        "uses": []
+      },
+      {
+        "step": 3,
+        "description": "Divide by Gamma_t and telescope over t = 1 to k using the recurrence Gamma_t = (1 - alpha_t) Gamma_{t-1} (Proposition 4.3)",
+        "math": "\\Psi(\\tilde{x}_k) - \\Gamma_k \\sum_{t=1}^{k} \\frac{\\alpha_t}{\\Gamma_t} l_\\Psi(\\underline{x}_t, x) \\le \\Gamma_k (1 - \\alpha_1) \\Psi(\\tilde{x}_1) + \\Gamma_k \\sum_{t=1}^{k} \\frac{\\alpha_t}{\\gamma_t \\Gamma_t} [V(x_{t-1}, x) - (1 + \\mu \\gamma_t) V(x_t, x)] + \\Gamma_k \\sum_{t=1}^{k} \\frac{\\Delta_t(x)}{\\Gamma_t}",
+        "uses": []
+      },
+      {
+        "step": 4,
+        "description": "Use the identity sum alpha_t / Gamma_t = 1 / Gamma_k (Eq. 4.2.28), Jensen's inequality via convexity of l_Psi, and the monotonicity condition (4.2.22) to telescope the V-terms",
+        "math": "\\Psi(\\tilde{x}_k) - \\Psi(x) \\le \\frac{\\Gamma_k}{\\gamma_1} V(x_0, x) - \\frac{\\alpha_k (1 + \\mu \\gamma_k)}{\\gamma_k} V(x_k, x) + \\Gamma_k \\sum_{t=1}^{k} \\frac{\\Delta_t(x)}{\\Gamma_t}",
+        "uses": []
+      },
+      {
+        "step": 5,
+        "description": "Take expectation: E[<delta_t, x^* - x_{t-1}^+> | xi_{[t-1]}] = 0 by the martingale property (Eq. 4.2.32), E[||delta_t||_*^2] <= sigma^2, drop non-negative V(x_k, x*)",
+        "math": "\\mathbb{E}[\\Psi(\\tilde{x}_k)] - \\Psi^* \\le \\frac{\\Gamma_k}{\\gamma_1} V(x_0, x^*) + \\Gamma_k \\sum_{t=1}^{k} \\frac{\\alpha_t \\gamma_t (M^2 + \\sigma^2)}{\\Gamma_t (1 + \\mu \\gamma_t - L \\alpha_t \\gamma_t)}",
+        "uses": []
+      }
+    ]
+  },
+  "key_lemmas": [
+    {
+      "name": "Lemma 3.5",
+      "ref": "Lemma 3.5",
+      "statement_math": "\\text{Let } p : X \\to \\mathbb{R} \\text{ be convex, } \\tilde{x}, \\tilde{y} \\in X, \\; \\mu_1, \\mu_2 \\ge 0. \\text{ If } \\hat{u} \\in \\operatorname{Argmin}_{u \\in X} \\{ p(u) + \\mu_1 V(\\tilde{x}, u) + \\mu_2 V(\\tilde{y}, u) \\}, \\text{ then } p(\\hat{u}) + \\mu_1 V(\\tilde{x}, \\hat{u}) + \\mu_2 V(\\tilde{y}, \\hat{u}) \\le p(u) + \\mu_1 V(\\tilde{x}, u) + \\mu_2 V(\\tilde{y}, u) - (\\mu_1 + \\mu_2) V(\\hat{u}, u), \\; \\forall u \\in X",
+      "role": "Provides the composite prox inequality that converts the prox update (4.2.6) into a descent bound with a negative Bregman term",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Write the first-order optimality condition for the argmin defining u_hat",
+          "math": "\\langle p'(\\hat{u}) + \\mu_1 \\nabla V(\\tilde{x}, \\hat{u}) + \\mu_2 \\nabla V(\\tilde{y}, \\hat{u}), u - \\hat{u} \\rangle \\ge 0, \\quad \\forall u \\in X",
+          "uses": []
+        },
+        {
+          "step": 2,
+          "description": "Use the Bregman three-point identity V(x, u) = V(x, u_hat) + <nabla V(x, u_hat), u - u_hat> + V(u_hat, u) for each center x_tilde and y_tilde",
+          "math": "V(\\tilde{x}, u) = V(\\tilde{x}, \\hat{u}) + \\langle \\nabla v(\\hat{u}) - \\nabla v(\\tilde{x}), u - \\hat{u} \\rangle + V(\\hat{u}, u)",
+          "uses": []
+        },
+        {
+          "step": 3,
+          "description": "Combine the optimality condition with the three-point identities and convexity of p to obtain the result",
+          "math": "p(\\hat{u}) + \\mu_1 V(\\tilde{x}, \\hat{u}) + \\mu_2 V(\\tilde{y}, \\hat{u}) \\le p(u) + \\mu_1 V(\\tilde{x}, u) + \\mu_2 V(\\tilde{y}, u) - (\\mu_1 + \\mu_2) V(\\hat{u}, u)",
+          "uses": []
+        }
+      ]
+    },
+    {
+      "name": "Lemma 4.4",
+      "ref": "Lemma 4.4",
+      "statement_math": "\\text{Let } \\tilde{x}_t := (1 - \\alpha_t) \\tilde{x}_{t-1} + \\alpha_t x_t \\text{ for } \\alpha_t \\in [0,1], \\; (\\tilde{x}_{t-1}, x_t) \\in X \\times X. \\text{ Then } \\Psi(\\tilde{x}_t) \\le (1 - \\alpha_t) \\Psi(\\tilde{x}_{t-1}) + \\alpha_t [f(z) + \\langle f'(z), x_t - z \\rangle + h(x_t)] + \\frac{L}{2} \\|\\tilde{x}_t - z\\|^2 + M \\|\\tilde{x}_t - z\\|, \\quad \\forall z \\in X",
+      "role": "Provides the composite upper model bound for Psi(x_tilde_t) that initiates the one-step recursion",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Use x_tilde_t = (1-alpha_t) x_tilde_{t-1} + alpha_t x_t and convexity of f to split f(z) + <f'(z), x_tilde_t - z> into a convex combination at x_tilde_{t-1} and x_t",
+          "math": "f(z) + \\langle f'(z), \\tilde{x}_t - z \\rangle = (1 - \\alpha_t)[f(z) + \\langle f'(z), \\tilde{x}_{t-1} - z \\rangle] + \\alpha_t [f(z) + \\langle f'(z), x_t - z \\rangle]",
+          "uses": []
+        },
+        {
+          "step": 2,
+          "description": "Apply the curvature model (4.2.2) to upgrade f(z) + <f'(z), x_tilde_t - z> into an upper bound on f(x_tilde_t), then add h(x_tilde_t) <= (1-alpha_t)h(x_tilde_{t-1}) + alpha_t h(x_t) by convexity",
+          "math": "\\Psi(\\tilde{x}_t) \\le (1 - \\alpha_t) \\Psi(\\tilde{x}_{t-1}) + \\alpha_t [f(z) + \\langle f'(z), x_t - z \\rangle + h(x_t)] + \\frac{L}{2} \\|\\tilde{x}_t - z\\|^2 + M \\|\\tilde{x}_t - z\\|",
+          "uses": []
+        }
+      ]
+    }
+  ]
+}

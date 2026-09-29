@@ -1,0 +1,362 @@
+{
+  "algorithm": "StochasticAcceleratedPrimalDual",
+  "full_name": "Stochastic Accelerated Primal-Dual Method for Stochastic Bilinear Saddle-Point Problems",
+  "source_reference": "Lan, First-order and Stochastic Optimization Methods for Machine Learning, Springer 2020, Section 4.4.2, Algorithm 4.3, Theorem 4.8, Corollary 4.3",
+  "setup": {
+    "problem": {
+      "math": "\\min_{x \\in X} \\left\\{ f(x) := \\max_{y \\in Y} \\left\\{ \\hat{f}(x) + \\langle Ax, y \\rangle - \\hat{g}(y) \\right\\} \\right\\}",
+      "ref": "Eq. (4.4.1)",
+      "description": "Stochastic bilinear saddle-point problem with smooth primal"
+    },
+    "variable_space": {
+      "math": "X \\subseteq \\mathbb{R}^n, \\; Y \\subseteq \\mathbb{R}^m \\text{ are closed convex sets equipped with inner products and norms}; \\; A \\text{ is a linear operator}",
+      "ref": "Section 4.4"
+    }
+  },
+  "assumptions": [
+    {
+      "name": "Smoothness of hat_f",
+      "math": "\\hat{f}(u) - \\hat{f}(x) - \\langle \\nabla \\hat{f}(x), u - x \\rangle \\le \\frac{L_{\\hat{f}}}{2} \\|u - x\\|^2, \\quad \\forall x, u \\in X",
+      "ref": "Eq. (4.4.2)",
+      "parameters": [
+        "L_{\\hat{f}} \\ge 0"
+      ]
+    },
+    {
+      "name": "Bounded linear operator",
+      "math": "\\|Au - Ax\\|_* \\le \\|A\\| \\cdot \\|u - x\\|, \\quad \\forall x, u \\in X",
+      "ref": "Eq. (4.4.2)",
+      "parameters": [
+        "\\|A\\| \\ge 0"
+      ]
+    },
+    {
+      "name": "Simple convex function hat_g",
+      "math": "\\hat{g} : Y \\to \\mathbb{R} \\text{ is a relatively simple, proper, convex, lower semi-continuous function}",
+      "ref": "Section 4.4",
+      "parameters": []
+    },
+    {
+      "name": "Bregman divergences",
+      "math": "V_X(x, u) := \\nu_X(x) - \\nu_X(u) - \\langle \\nabla \\nu_X(u), x - u \\rangle, \\quad V_Y(y, v) := \\nu_Y(y) - \\nu_Y(v) - \\langle \\nabla \\nu_Y(v), y - v \\rangle, \\text{ where } \\nu_X, \\nu_Y \\text{ are strongly convex functions with modulus } 1",
+      "ref": "Eq. (4.4.12)--(4.4.13)",
+      "parameters": [
+        "\\nu_X, \\nu_Y \\text{ have strong convexity modulus } 1"
+      ]
+    },
+    {
+      "name": "Stochastic first-order oracle and iid samples",
+      "math": "\\text{At the } i\\text{-th SFO call, input } (x_i,y_i) \\in X \\times Y \\text{ produces } (\\hat{G}(x_i),\\hat{A}_x(x_i),\\hat{A}_y(y_i)) := (G(x_i,\\xi_i), A_x(x_i,\\xi_i), A_y(y_i,\\xi_i)), \\text{ where } \\{\\xi_i\\}_{i\\ge 1} \\text{ is i.i.d.}",
+      "ref": "Eq. (4.4.6) and the paragraph after it",
+      "parameters": []
+    },
+    {
+      "name": "Unbiased stochastic oracle",
+      "math": "\\mathbb{E}[\\hat{G}(x_i)] = \\nabla \\hat{f}(x_i), \\quad \\mathbb{E}\\begin{bmatrix} -\\hat{A}_x(x_i) \\\\ \\hat{A}_y(y_i) \\end{bmatrix} = \\begin{bmatrix} -Ax_i \\\\ A^T y_i \\end{bmatrix}, \\quad (x_i,y_i) \\in X \\times Y",
+      "ref": "Eq. (4.4.6)",
+      "parameters": []
+    },
+    {
+      "name": "Assumption 8 (Bounded variance)",
+      "math": "\\mathbb{E}[\\|\\hat{G}(x_i) - \\nabla \\hat{f}(x_i)\\|_*^2] \\le \\sigma_{x,\\hat{f}}^2, \\quad \\mathbb{E}[\\|\\hat{A}_x(x_i) - Ax_i\\|_*^2] \\le \\sigma_y^2, \\quad \\mathbb{E}[\\|\\hat{A}_y(y_i) - A^T y_i\\|_*^2] \\le \\sigma_{x,A}^2, \\quad \\forall x_i \\in X,\\; y_i \\in Y",
+      "ref": "Assumption 8, immediately after Eq. (4.4.6)",
+      "parameters": [
+        "\\sigma_{x,\\hat{f}} \\ge 0",
+        "\\sigma_y \\ge 0",
+        "\\sigma_{x,A} \\ge 0",
+        "\\sigma_x := \\sqrt{\\sigma_{x,\\hat{f}}^2 + \\sigma_{x,A}^2}"
+      ]
+    },
+    {
+      "name": "Bounded domain (for Theorem 4.8)",
+      "math": "\\sup_{x_1, x_2 \\in X} V_X(x_1, x_2) \\le D_X^2, \\quad \\sup_{y_1, y_2 \\in Y} V_Y(y_1, y_2) \\le D_Y^2",
+      "ref": "Eq. (4.4.34)",
+      "parameters": [
+        "D_X > 0",
+        "D_Y > 0"
+      ]
+    },
+    {
+      "name": "Assumption 9 (Light-tail condition, for high probability)",
+      "math": "\\mathbb{E}[\\exp\\{\\|\\nabla \\hat{f}(x) - \\hat{G}(x)\\|_*^2 / \\sigma_{x,\\hat{f}}^2\\}] \\le \\exp\\{1\\}, \\quad \\mathbb{E}[\\exp\\{\\|Ax - \\hat{A}_x(x)\\|_*^2 / \\sigma_y^2\\}] \\le \\exp\\{1\\}, \\quad \\mathbb{E}[\\exp\\{\\|A^T y - \\hat{A}_y(y)\\|_*^2 / \\sigma_{x,A}^2\\}] \\le \\exp\\{1\\}, \\quad x \\in X,\\; y \\in Y",
+      "ref": "Assumption 9",
+      "parameters": []
+    }
+  ],
+  "algorithm_spec": {
+    "ref": "Algorithm 4.3",
+    "initialization": {
+      "math": "x_1 \\in X, \\; y_1 \\in Y. \\; \\text{Set } \\bar{x}_1 = x_1, \\; \\bar{y}_1 = y_1, \\; \\tilde{x}_1 = x_1",
+      "ref": "Algorithm 4.3"
+    },
+    "iteration_range": {
+      "math": "t = 1,2,\\ldots,N-1",
+      "ref": "Algorithm 4.3"
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "Midpoint computation",
+        "math": "x_t^{md} = (1 - \\beta_t^{-1}) \\bar{x}_t + \\beta_t^{-1} x_t",
+        "ref": "Eq. (4.4.14)"
+      },
+      {
+        "step": 2,
+        "name": "Dual proximal update",
+        "math": "y_{t+1} = \\operatorname{argmin}_{y \\in Y} \\left\\{ \\langle -\\hat{A}_x(\\tilde{x}_t), y \\rangle + \\hat{g}(y) + \\frac{1}{\\tau_t} V_Y(y, y_t) \\right\\}",
+        "ref": "Eq. (4.4.56)"
+      },
+      {
+        "step": 3,
+        "name": "Primal proximal update",
+        "math": "x_{t+1} = \\operatorname{argmin}_{x \\in X} \\left\\{ \\langle \\hat{G}(x_t), x \\rangle + \\langle x, \\hat{A}_y(y_{t+1}) \\rangle + \\frac{1}{\\eta_t} V_X(x, x_t) \\right\\}",
+        "ref": "Eq. (4.4.57)"
+      },
+      {
+        "step": 4,
+        "name": "Extrapolation",
+        "math": "\\tilde{x}_{t+1} = \\theta_{t+1}(x_{t+1} - x_t) + x_{t+1}",
+        "ref": "Eq. (4.4.17)"
+      },
+      {
+        "step": 5,
+        "name": "Primal averaging",
+        "math": "\\bar{x}_{t+1} = (1 - \\beta_t^{-1}) \\bar{x}_t + \\beta_t^{-1} x_{t+1}",
+        "ref": "Eq. (4.4.18)"
+      },
+      {
+        "step": 6,
+        "name": "Dual averaging",
+        "math": "\\bar{y}_{t+1} = (1 - \\beta_t^{-1}) \\bar{y}_t + \\beta_t^{-1} y_{t+1}",
+        "ref": "Eq. (4.4.19)"
+      }
+    ],
+    "output": {
+      "math": "\\bar{z}_{t+1} = (\\bar{x}_{t+1}, \\bar{y}_{t+1})",
+      "ref": "Algorithm 4.3",
+      "type": "weighted_average"
+    },
+    "parameters": [
+      {
+        "name": "\\beta_t",
+        "math": "\\beta_1 = 1, \\; \\beta_{t+1} - 1 = \\beta_t \\theta_{t+1}",
+        "ref": "Eq. (4.4.24)"
+      },
+      {
+        "name": "\\gamma_t",
+        "math": "\\gamma_t = \\begin{cases} 1, & t = 1 \\\\ \\theta_t^{-1} \\gamma_{t-1}, & t \\ge 2 \\end{cases}",
+        "ref": "Eq. (4.4.22)"
+      },
+      {
+        "name": "\\theta_t",
+        "math": "0 < \\theta_t \\le \\min\\left\\{\\frac{\\eta_{t-1}}{\\eta_t}, \\frac{\\tau_{t-1}}{\\tau_t}\\right\\}, \\quad t \\ge 2",
+        "ref": "Eq. (4.4.25)"
+      },
+      {
+        "name": "\\eta_t, \\tau_t",
+        "math": "\\frac{q}{\\eta_t} - \\frac{L_{\\hat{f}}}{\\beta_t} - \\frac{\\|A\\|^2 \\tau_t}{p} \\ge 0 \\quad \\text{for some } p, q \\in (0,1)",
+        "ref": "Eq. (4.4.58)"
+      },
+      {
+        "name": "Q(\\tilde{z}, z)",
+        "math": "Q(\\tilde{z}, z) := \\left[\\hat{f}(\\tilde{x}) + \\langle A\\tilde{x}, y \\rangle - \\hat{g}(y)\\right] - \\left[\\hat{f}(x) + \\langle Ax, \\tilde{y} \\rangle - \\hat{g}(\\tilde{y})\\right]",
+        "ref": "Eq. (4.4.20)"
+      },
+      {
+        "name": "g(\\tilde{z})",
+        "math": "g(\\tilde{z}) := \\max_{z \\in Z} Q(\\tilde{z}, z)",
+        "ref": "Eq. (4.4.21)"
+      }
+    ]
+  },
+  "main_theorem": {
+    "ref": "Theorem 4.8",
+    "conditions": [
+      "\\text{Bounded-domain condition (4.4.34) holds for some } D_X,D_Y>0",
+      "\\text{For all } t\\ge 1, \\beta_t,\\theta_t,\\eta_t,\\tau_t \\text{ in Algorithm 4.3 satisfy (4.4.24), (4.4.25), and (4.4.58) for some } p,q\\in(0,1)"
+    ],
+    "statement_math": "\\text{(a) Under Assumption 8, for all } t \\ge 1, \\quad \\mathbb{E}[g(\\bar{z}_{t+1})] \\le Q_0(t), \\quad \\text{where } Q_0(t) := \\frac{1}{\\beta_t \\gamma_t} \\left\\{ \\frac{4\\gamma_t}{\\eta_t} D_X^2 + \\frac{4\\gamma_t}{\\tau_t} D_Y^2 \\right\\} + \\frac{1}{2\\beta_t \\gamma_t} \\sum_{i=1}^{t} \\left\\{ \\frac{(2-q)\\eta_i \\gamma_i}{1-q} \\sigma_x^2 + \\frac{(2-p)\\tau_i \\gamma_i}{1-p} \\sigma_y^2 \\right\\}. \\quad \\text{(b) Under Assumption 9, for all } \\lambda > 0 \\text{ and } t \\ge 1, \\quad \\mathrm{Prob}\\{g(\\bar{z}_{t+1}) > Q_0(t) + \\lambda Q_1(t)\\} \\le 3\\exp\\{-\\lambda^2/3\\} + 3\\exp\\{-\\lambda\\}, \\quad \\text{where } Q_1(t) := \\frac{1}{\\beta_t \\gamma_t} \\left( 2\\sigma_x D_X + \\sqrt{2}\\sigma_y D_Y \\right) \\sqrt{2\\sum_{i=1}^{t} \\gamma_i^2} + \\frac{1}{2\\beta_t \\gamma_t} \\sum_{i=1}^{t} \\left\\{ \\frac{(2-q)\\eta_i \\gamma_i}{1-q} \\sigma_x^2 + \\frac{(2-p)\\tau_i \\gamma_i}{1-p} \\sigma_y^2 \\right\\}.",
+    "rate": "Theorem 4.8 gives the Q_0(t) and Q_1(t) bounds above. The simplified big-O rate is obtained only after the specific parameter choice in Corollary 4.3.",
+    "corollary_4_3": {
+      "ref": "Corollary 4.3, Eq. (4.4.76)--(4.4.78)",
+      "parameter_choice_math": "\\beta_t = \\frac{t+1}{2}, \\quad \\theta_t = \\frac{t-1}{t}, \\quad \\eta_t = \\frac{2\\sqrt{2}D_X t}{6\\sqrt{2}L_{\\hat f}D_X + 3\\sqrt{2}\\|A\\|D_Y t + 3\\sigma_x t^{3/2}}, \\quad \\tau_t = \\frac{2\\sqrt{2}D_Y}{3\\sqrt{2}\\|A\\|D_X + 3\\sigma_y\\sqrt{t}}",
+      "statement_math": "\\text{With the parameter choice (4.4.76), under Assumption 8, } Q_0(t) \\le \\frac{12L_{\\hat f}D_X^2}{t(t+1)} + \\frac{12\\|A\\|D_XD_Y}{t} + \\frac{6\\sqrt{2}(\\sigma_xD_X+\\sigma_yD_Y)}{\\sqrt{t}}. \\text{ If Assumption 9 also holds, } Q_1(t) \\le \\frac{5\\sqrt{2}\\sigma_xD_X + 4\\sqrt{2}\\sigma_yD_Y}{\\sqrt{t}}.",
+      "rate": "O\\left(L_{\\hat f}D_X^2/t^2 + \\|A\\|D_XD_Y/t + (\\sigma_xD_X+\\sigma_yD_Y)/\\sqrt{t}\\right)"
+    },
+    "measure": "saddle gap g(\\bar{z}_{t+1}) in expectation, and with high probability under Assumption 9",
+    "proof": [
+      {
+        "step": 1,
+        "description": "Apply Proposition 4.12 to obtain the deterministic one-step recursion for beta_t Q(bar_z_{t+1}, z) - (beta_t - 1) Q(bar_z_t, z)",
+        "math": "\\beta_t Q(\\bar{z}_{t+1}, z) - (\\beta_t - 1)Q(\\bar{z}_t, z) \\le \\langle \\nabla \\hat{f}(x_t^{md}), x_{t+1} - x \\rangle + \\frac{L_{\\hat{f}}}{2\\beta_t} \\|x_{t+1} - x_t\\|^2 + [\\hat{g}(y_{t+1}) - \\hat{g}(y)] + \\langle Ax_{t+1}, y \\rangle - \\langle Ax, y_{t+1} \\rangle",
+        "uses": [
+          "Proposition 4.12"
+        ]
+      },
+      {
+        "step": 2,
+        "description": "Substitute the optimality conditions of the stochastic prox updates (4.4.56)--(4.4.57) into Proposition 4.12, isolate noise terms Delta^i, and telescope using Lemma 4.9",
+        "math": "\\beta_t \\gamma_t Q(\\bar{z}_{t+1}, z) \\le B_t(z, z_{[t]}) + \\gamma_t \\langle A(x_{t+1} - x_t), y - y_{t+1} \\rangle - \\gamma_t \\left(\\frac{q}{2\\eta_t} - \\frac{L_{\\hat{f}}}{2\\beta_t}\\right) \\|x_{t+1} - x_t\\|^2 + \\sum_{i=1}^{t} \\Lambda_i(z)",
+        "uses": [
+          "Lemma 4.9"
+        ]
+      },
+      {
+        "step": 3,
+        "description": "Control the stochastic error sum via the auxiliary prox sequence from Lemma 4.10",
+        "math": "\\sum_{i=1}^{t} \\Lambda_i(z) \\le B_t(z, z_{[t]}^v) + \\frac{1}{2} \\sum_{i=1}^{t} \\left( \\frac{(2-q)\\eta_i \\gamma_i}{1-q} \\|\\Delta_x^i\\|_*^2 + \\frac{(2-p)\\tau_i \\gamma_i}{1-p} \\|\\Delta_y^i\\|_*^2 \\right) + \\sum_{i=1}^{t} \\gamma_i \\langle \\Delta^i, z_i^v - z_i \\rangle",
+        "uses": [
+          "Lemma 4.10"
+        ]
+      },
+      {
+        "step": 4,
+        "description": "Take expectations: \\mathbb{E}[\\langle \\Delta^i, z_i^v - z_i \rangle] = 0 by the martingale property, \\mathbb{E}[\\|\\Delta_x^i\\|_*^2] \\le \\sigma_x^2, \\mathbb{E}[\\|\\Delta_y^i\\|_*^2] \\le \\sigma_y^2; use the B_t bounds with D_X^2 and D_Y^2",
+        "math": "\\mathbb{E}[g(\\bar{z}_{t+1})] \\le Q_0(t)",
+        "uses": []
+      },
+      {
+        "step": 5,
+        "description": "For the high-probability bound (part b), apply Lemma 4.1 to the martingale-difference terms and Markov's inequality to the quadratic noise terms under Assumption 9",
+        "math": "\\mathrm{Prob}\\{g(\\bar{z}_{t+1}) > Q_0(t) + \\lambda Q_1(t)\\} \\le 3\\exp\\{-\\lambda^2/3\\} + 3\\exp\\{-\\lambda\\}",
+        "uses": [
+          "Lemma 4.1"
+        ]
+      }
+    ]
+  },
+  "source_scope_notes": [
+    "Theorem 4.8 itself is recorded only as the Q_0(t)/Q_1(t) bounds under (4.4.34), (4.4.24), (4.4.25), (4.4.58), and Assumptions 8/9 as stated above.",
+    "The simplified big-O rate is recorded under Corollary 4.3, not as an unconditional part of Theorem 4.8.",
+    "No Lean-only measurability, integrability, or selector-existence obligations are added as source assumptions in this JSON.",
+    "Eq. (4.4.57) uses \\hat{G}(x_t), while the following noise definition compares it to \\nabla\\hat{f}(x_t^{md}); this JSON keeps that source notation and does not silently replace \\hat{G}(x_t) by \\hat{G}(x_t^{md}).",
+    "Eq. (4.4.6) states SFO inputs in X \\times Y, while Algorithm 4.3 calls \\hat{A}_x(\\tilde{x}_t); this JSON records the book's statements as written and does not add an extra hypothesis such as \\tilde{x}_t \\in X or an ambient oracle-domain assumption."
+  ],
+  "key_lemmas": [
+    {
+      "name": "Three-point lemma (Lemma 3.5)",
+      "ref": "Lemma 3.5",
+      "statement_math": "\\text{If } \\hat{u} \\in \\operatorname{Argmin}\\{p(u) + \\mu_1 V(\\tilde{x}, u) + \\mu_2 V(\\tilde{y}, u) : u \\in X\\}, \\text{ then } \\forall u \\in X: \\quad p(\\hat{u}) + \\mu_1 V(\\tilde{x}, \\hat{u}) + \\mu_2 V(\\tilde{y}, \\hat{u}) \\le p(u) + \\mu_1 V(\\tilde{x}, u) + \\mu_2 V(\\tilde{y}, u) - (\\mu_1 + \\mu_2) V(\\hat{u}, u)",
+      "role": "Provides the per-step prox inequality used in deriving the optimality conditions for both primal and dual updates",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Write the first-order optimality condition of the minimization defining hat_u",
+          "math": "\\langle p'(\\hat{u}) + \\mu_1(\\nabla \\omega(\\hat{u}) - \\nabla \\omega(\\tilde{x})) + \\mu_2(\\nabla \\omega(\\hat{u}) - \\nabla \\omega(\\tilde{y})), u - \\hat{u} \\rangle \\ge 0",
+          "uses": []
+        },
+        {
+          "step": 2,
+          "description": "Use the Bregman three-point identity to rewrite the linear terms and obtain the decrease inequality",
+          "math": "p(\\hat{u}) + \\mu_1 V(\\tilde{x}, \\hat{u}) + \\mu_2 V(\\tilde{y}, \\hat{u}) \\le p(u) + \\mu_1 V(\\tilde{x}, u) + \\mu_2 V(\\tilde{y}, u) - (\\mu_1 + \\mu_2) V(\\hat{u}, u)",
+          "uses": []
+        }
+      ]
+    },
+    {
+      "name": "Mirror-descent summation lemma (Lemma 4.3)",
+      "ref": "Lemma 4.3",
+      "statement_math": "\\text{Let } \\zeta_1, \\ldots, \\zeta_j \\text{ be a sequence of elements of } \\mathbb{R}^n. \\text{ Define } v_{t+1} = \\operatorname{argmin}_{x \\in X}\\{\\langle \\zeta_t, x \\rangle + V(v_t, x)\\}. \\text{ Then for any } x \\in X, \\quad \\langle \\zeta_t, v_t - x \\rangle \\le V(v_t, x) - V(v_{t+1}, x) + \\frac{\\|\\zeta_t\\|_*^2}{2}, \\quad \\sum_{t=1}^{j} \\langle \\zeta_t, v_t - x \\rangle \\le V(v_1, x) + \\frac{1}{2} \\sum_{t=1}^{j} \\|\\zeta_t\\|_*^2",
+      "role": "Provides the one-step mirror-descent bound used inside the auxiliary prox sequence of Lemma 4.10",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Apply the prox three-point inequality to the update defining v_{t+1}",
+          "math": "\\langle \\zeta_t, v_t - x \\rangle \\le V(v_t, x) - V(v_{t+1}, x) + \\langle \\zeta_t, v_t - v_{t+1} \\rangle - V(v_t, v_{t+1})",
+          "uses": []
+        },
+        {
+          "step": 2,
+          "description": "Bound the residual by Cauchy-Schwarz and strong convexity of the distance generating function",
+          "math": "\\langle \\zeta_t, v_t - v_{t+1} \\rangle - V(v_t, v_{t+1}) \\le \\frac{\\|\\zeta_t\\|_*^2}{2}",
+          "uses": []
+        }
+      ]
+    },
+    {
+      "name": "Proposition 4.12",
+      "ref": "Proposition 4.12",
+      "statement_math": "\\text{If } \\bar{z}_{t+1} = (\\bar{x}_{t+1}, \\bar{y}_{t+1}) \\text{ is generated by Algorithm 4.2 with } \\beta_t \\ge 1, \\text{ then } \\forall z = (x,y) \\in Z: \\quad \\beta_t Q(\\bar{z}_{t+1}, z) - (\\beta_t - 1) Q(\\bar{z}_t, z) \\le \\langle \\nabla \\hat{f}(x_t^{md}), x_{t+1} - x \\rangle + \\frac{L_{\\hat{f}}}{2\\beta_t} \\|x_{t+1} - x_t\\|^2 + [\\hat{g}(y_{t+1}) - \\hat{g}(y)] + \\langle Ax_{t+1}, y \\rangle - \\langle Ax, y_{t+1} \\rangle",
+      "role": "Provides the deterministic one-step saddle-gap recursion that forms the basis for the stochastic analysis",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Use convexity of hat_f and the aggregate update to bound beta_t hat_f(bar_x_{t+1}) - (beta_t - 1) hat_f(bar_x_t)",
+          "math": "\\beta_t \\hat{f}(\\bar{x}_{t+1}) \\le (\\beta_t - 1) \\hat{f}(\\bar{x}_t) + \\hat{f}(x) + \\langle \\nabla \\hat{f}(x_t^{md}), x_{t+1} - x \\rangle + \\frac{L_{\\hat{f}}}{2\\beta_t} \\|x_{t+1} - x_t\\|^2",
+          "uses": []
+        },
+        {
+          "step": 2,
+          "description": "Use convexity of hat_g and the aggregate y-update to handle the dual term",
+          "math": "\\beta_t [\\hat{g}(\\bar{y}_{t+1}) - \\hat{g}(y)] \\le (\\beta_t - 1)[\\hat{g}(\\bar{y}_t) - \\hat{g}(y)] + \\hat{g}(y_{t+1}) - \\hat{g}(y)",
+          "uses": []
+        },
+        {
+          "step": 3,
+          "description": "Combine with the definition of Q in Eq. (4.4.20) and the bilinear coupling term",
+          "math": "\\beta_t Q(\\bar{z}_{t+1}, z) - (\\beta_t - 1) Q(\\bar{z}_t, z) \\le \\langle \\nabla \\hat{f}(x_t^{md}), x_{t+1} - x \\rangle + \\frac{L_{\\hat{f}}}{2\\beta_t} \\|x_{t+1} - x_t\\|^2 + [\\hat{g}(y_{t+1}) - \\hat{g}(y)] + \\langle Ax_{t+1}, y \\rangle - \\langle Ax, y_{t+1} \\rangle",
+          "uses": []
+        }
+      ]
+    },
+    {
+      "name": "Lemma 4.9",
+      "ref": "Lemma 4.9",
+      "statement_math": "\\text{Assume the parameters } \\beta_t, \\theta_t, \\eta_t, \\tau_t \\text{ satisfy (4.4.24), (4.4.25), and } \\frac{q}{\\eta_t} - \\frac{L_{\\hat{f}}}{\\beta_t} - \\frac{\\|A\\|^2 \\tau_t}{p} \\ge 0 \\text{ for some } p,q\\in(0,1). \\text{ Then } \\forall z \\in Z: \\quad \\beta_t \\gamma_t Q(\\bar{z}_{t+1}, z) \\le B_t(z, z_{[t]}) + \\gamma_t \\langle A(x_{t+1} - x_t), y - y_{t+1} \\rangle - \\gamma_t \\left(\\frac{q}{2\\eta_t} - \\frac{L_{\\hat{f}}}{2\\beta_t}\\right) \\|x_{t+1} - x_t\\|^2 + \\sum_{i=1}^{t} \\Lambda_i(z), \\quad \\Lambda_i(z) := - \\frac{(1-q)\\gamma_i}{2\\eta_i} \\|x_{i+1} - x_i\\|^2 - \\frac{(1-p)\\gamma_i}{2\\tau_i} \\|y_{i+1} - y_i\\|^2 - \\gamma_i \\langle \\Delta^i, z_{i+1} - z \\rangle",
+      "role": "Lifts the deterministic APD recursion to the stochastic setting by isolating the noise in Lambda_i(z)",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Write the optimality conditions of the stochastic prox updates (4.4.56)--(4.4.57) and substitute into Proposition 4.12",
+          "math": "\\beta_t \\gamma_t Q(\\bar{z}_{t+1}, z) - (\\beta_t - 1) \\gamma_t Q(\\bar{z}_t, z) \\le \\frac{\\gamma_t}{\\eta_t} V_X(x, x_t) - \\frac{\\gamma_t}{\\eta_t} V_X(x, x_{t+1}) + \\frac{\\gamma_t}{\\tau_t} V_Y(y, y_t) - \\frac{\\gamma_t}{\\tau_t} V_Y(y, y_{t+1}) + \\gamma_t \\langle A(x_{t+1} - x_t), y - y_{t+1} \\rangle - \\gamma_{t-1} \\langle A(x_t - x_{t-1}), y - y_t \\rangle - \\gamma_t \\left(\\frac{1}{2\\eta_t} - \\frac{L_{\\hat{f}}}{2\\beta_t}\\right) \\|x_{t+1} - x_t\\|^2 - \\frac{\\gamma_t}{2\\tau_t} \\|y_{t+1} - y_t\\|^2 - \\gamma_{t-1} \\langle A(x_t - x_{t-1}), y_t - y_{t+1} \\rangle - \\gamma_t \\langle \\Delta_{x,t}^{\\hat{f}} + \\Delta_{x,t}^A, x_{t+1} - x \\rangle - \\gamma_t \\langle \\Delta_t^y, y_{t+1} - y \\rangle",
+          "uses": [
+            "Proposition 4.12",
+            "Three-point lemma (Lemma 3.5)"
+          ]
+        },
+        {
+          "step": 2,
+          "description": "Bound the coupling term by Cauchy-Schwarz/Young using Eq. (4.4.25) and telescope inductively",
+          "math": "(\\beta_{t+1} - 1)\\gamma_{t+1} Q(\\bar{z}_{t+1}, z) - (\\beta_1 - 1)\\gamma_1 Q(\\bar{z}_1, z) \\le B_t(z, z_{[t]}) + \\gamma_t \\langle A(x_{t+1} - x_t), y - y_{t+1} \\rangle - \\gamma_t \\left(\\frac{q}{2\\eta_t} - \\frac{L_{\\hat{f}}}{2\\beta_t}\\right) \\|x_{t+1} - x_t\\|^2 - \\sum_{i=1}^{t-1} \\gamma_i \\left(\\frac{q}{2\\eta_i} - \\frac{L_{\\hat{f}}}{2\\beta_i} - \\frac{\\|A\\|^2 \\tau_i}{2p}\\right) \\|x_{i+1} - x_i\\|^2 + \\sum_{i=1}^{t} \\Lambda_i(z)",
+          "uses": []
+        }
+      ]
+    },
+    {
+      "name": "Lemma 4.10",
+      "ref": "Lemma 4.10",
+      "statement_math": "\\text{Let } \\eta_i, \\tau_i \\text{ and } \\gamma_i, \\; i = 1, 2, \\ldots, \\text{ be given positive constants. For any } z_1 \\in Z, \\text{ if we define } z_1^v = z_1 \\text{ and } z_{i+1}^v = \\operatorname{argmin}_{z=(x,y) \\in Z} \\{-\\eta_i \\langle \\Delta_x^i, x \\rangle - \\tau_i \\langle \\Delta_y^i, y \\rangle + V(z, z_i^v)\\}, \\text{ then } \\sum_{i=1}^{t} \\gamma_i \\langle -\\Delta^i, z_i^v - z \\rangle \\le B_t(z, z_{[t]}^v) + \\sum_{i=1}^{t} \\frac{\\eta_i \\gamma_i}{2} \\|\\Delta_x^i\\|_*^2 + \\sum_{i=1}^{t} \\frac{\\tau_i \\gamma_i}{2} \\|\\Delta_y^i\\|_*^2",
+      "role": "Constructs an auxiliary prox process that absorbs the martingale noise terms in sum_i Lambda_i(z)",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Split the prox update into separate x- and y-components and apply Lemma 4.3 to each block",
+          "math": "V_X(x, x_{i+1}^v) \\le V_X(x, x_i^v) - \\eta_i \\langle \\Delta_x^i, x - x_i^v \\rangle + \\frac{\\eta_i^2 \\|\\Delta_x^i\\|_*^2}{2}",
+          "uses": [
+            "Mirror-descent summation lemma (Lemma 4.3)"
+          ]
+        },
+        {
+          "step": 2,
+          "description": "Multiply by gamma_i and sum over i to telescope the Bregman divergences",
+          "math": "\\sum_{i=1}^{t} \\gamma_i \\langle -\\Delta^i, z_i^v - z \\rangle \\le B_t(z, z_{[t]}^v) + \\sum_{i=1}^{t} \\frac{\\eta_i \\gamma_i}{2} \\|\\Delta_x^i\\|_*^2 + \\sum_{i=1}^{t} \\frac{\\tau_i \\gamma_i}{2} \\|\\Delta_y^i\\|_*^2",
+          "uses": []
+        }
+      ]
+    },
+    {
+      "name": "Lemma 4.1",
+      "ref": "Lemma 4.1",
+      "statement_math": "\\text{Let } \\zeta_t = \\zeta_t(\\xi_{[t]}) \\text{ with } \\mathbb{E}_{|\\xi_{[t-1]}}[\\zeta_t] = 0 \\text{ a.s. and } \\mathbb{E}_{|\\xi_{[t-1]}}[\\exp\\{\\zeta_t^2/\\sigma_t^2\\}] \\le \\exp\\{1\\}. \\text{ Then } \\forall \\lambda \\ge 0: \\; \\mathrm{Prob}\\left\\{\\sum_{t=1}^N \\zeta_t > \\lambda \\sqrt{\\sum_{t=1}^N \\sigma_t^2}\\right\\} \\le \\exp\\{-\\lambda^2/3\\}",
+      "role": "Provides the large-deviation bound for martingale-difference sums used in the high-probability part of Theorem 4.8",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Control the conditional exponential moment and apply the exponential-supermartingale argument",
+          "math": "\\mathrm{Prob}\\left\\{\\sum_{t=1}^N \\zeta_t > \\lambda \\sqrt{\\sum_{t=1}^N \\sigma_t^2}\\right\\} \\le \\exp\\{-\\lambda^2/3\\}",
+          "uses": []
+        }
+      ]
+    }
+  ]
+}

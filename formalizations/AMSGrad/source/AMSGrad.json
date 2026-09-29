@@ -1,0 +1,1346 @@
+{
+  "algorithm": "AMSGrad",
+  "full_name": "AMSGrad: A New Exponential Moving Average Variant",
+  "source_reference": "Reddi, Kale, and Kumar, ICLR 2018, On the Convergence of Adam and Beyond (Algorithm 2 and Theorem 4)",
+  "setup": {
+    "problem": {
+      "math": "R_T = \\sum_{t=1}^T f_t(x_t)-\\min_{x\\in\\mathcal{F}}\\sum_{t=1}^T f_t(x)",
+      "ref": "Section 2, p.2",
+      "description": "Online convex optimization in the full-information feedback setting; the algorithm chooses x_t in the feasible set, observes f_t, and regret is measured against the best fixed point in the feasible set."
+    },
+    "variable_space": {
+      "math": "x_t \\in \\mathcal{F}, \\text{ where } \\mathcal{F}\\in \\mathbb{R}^d \\text{ is the feasible set of points}",
+      "ref": "Section 2, p.2"
+    }
+  },
+  "assumptions": [
+    {
+      "name": "Online_convex_functions",
+      "math": "\\text{The first inequality is due to convexity of function } f_t.",
+      "ref": "Appendix D, immediately after Eq. (16), p.16",
+      "parameters": [
+        "f_t"
+      ]
+    },
+    {
+      "name": "Convex_feasible_set",
+      "math": "For any Q\\in S_+^d \\text{ and convex feasible set } \\mathcal{F}\\subset\\mathbb{R}^d, \\text{ suppose } u_1=\\min_{x\\in\\mathcal{F}}\\|Q^{1/2}(x-z_1)\\| \\text{ and } u_2=\\min_{x\\in\\mathcal{F}}\\|Q^{1/2}(x-z_2)\\|",
+      "ref": "Appendix G, Lemma 4, p.22",
+      "parameters": [
+        "\\mathcal{F}",
+        "d",
+        "Q",
+        "u_1",
+        "u_2"
+      ]
+    },
+    {
+      "name": "Bounded_diameter",
+      "math": "\\|x-y\\|_\\infty \\le D_\\infty \\text{ for all } x,y\\in\\mathcal{F}",
+      "ref": "Section 2, p.2; Theorem 4, p.6",
+      "parameters": [
+        "D_\\infty",
+        "\\mathcal{F}"
+      ]
+    },
+    {
+      "name": "Bounded_gradients",
+      "math": "\\|\\nabla f_t(x)\\|_\\infty \\le G_\\infty \\text{ for all } t\\in[T] \\text{ and } x\\in\\mathcal{F}",
+      "ref": "Theorem 4, p.6",
+      "parameters": [
+        "G_\\infty",
+        "f_t",
+        "\\mathcal{F}"
+      ]
+    },
+    {
+      "name": "Alpha_schedule",
+      "math": "\\alpha_t = \\alpha/\\sqrt{t}",
+      "ref": "Theorem 4, p.6",
+      "parameters": [
+        "\\alpha",
+        "\\alpha_t"
+      ]
+    },
+    {
+      "name": "Beta_schedule",
+      "math": "\\beta_1=\\beta_{11},\\quad \\beta_{1t}\\le \\beta_1 \\text{ for all } t\\in[T] \\text{ and } \\gamma=\\beta_1/\\sqrt{\\beta_2}<1",
+      "ref": "Theorem 4, p.6",
+      "parameters": [
+        "\\beta_1",
+        "\\beta_{1t}",
+        "\\beta_2",
+        "\\gamma"
+      ]
+    }
+  ],
+  "algorithm_spec": {
+    "initialization": {
+      "math": "x_1\\in\\mathcal{F},\\quad m_0=0,\\quad v_0=0,\\quad \\hat v_0=0",
+      "ref": "Algorithm 2, p.5"
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "gradient",
+        "math": "g_t=\\nabla f_t(x_t)",
+        "ref": "Algorithm 2, p.5"
+      },
+      {
+        "step": 2,
+        "name": "first_moment",
+        "math": "m_t=\\beta_{1t}m_{t-1}+(1-\\beta_{1t})g_t",
+        "ref": "Algorithm 2, p.5"
+      },
+      {
+        "step": 3,
+        "name": "second_moment",
+        "math": "v_t=\\beta_2v_{t-1}+(1-\\beta_2)g_t^2",
+        "ref": "Algorithm 2, p.5"
+      },
+      {
+        "step": 4,
+        "name": "long_term_memory",
+        "math": "\\hat v_t=\\max(\\hat v_{t-1},v_t)\\quad\\text{and}\\quad \\hat V_t=\\operatorname{diag}(\\hat v_t)",
+        "ref": "Algorithm 2, p.5"
+      },
+      {
+        "step": 5,
+        "name": "projected_update",
+        "math": "x_{t+1}=\\Pi_{\\mathcal{F},\\sqrt{\\hat V_t}}(x_t-\\alpha_t m_t/\\sqrt{\\hat v_t})",
+        "ref": "Algorithm 2, p.5"
+      }
+    ],
+    "output": {
+      "description": "Algorithm 2 has no printed output line; it generates the online prediction sequence x_t through the displayed projected-update loop.",
+      "ref": "Algorithm 2, p.5",
+      "type": "online prediction sequence"
+    },
+    "parameters": [
+      {
+        "name": "step_size",
+        "math": "\\{\\alpha_t\\}_{t=1}^T",
+        "ref": "Algorithm 2, p.5"
+      },
+      {
+        "name": "first_moment_schedule",
+        "math": "\\{\\beta_{1t}\\}_{t=1}^T",
+        "ref": "Algorithm 2, p.5"
+      },
+      {
+        "name": "second_moment_parameter",
+        "math": "\\beta_2",
+        "ref": "Algorithm 2, p.5"
+      },
+      {
+        "name": "gradient_history_notation",
+        "math": "g_{1:t}=[g_1\\ldots g_t]",
+        "ref": "Section 4, p.6"
+      }
+    ]
+  },
+  "main_theorem": {
+    "statement_math": "Let \\{x_t\\} and \\{v_t\\} be the sequences obtained from Algorithm 2, \\alpha_t=\\alpha/\\sqrt{t}, \\beta_1=\\beta_{11}, \\beta_{1t}\\le\\beta_1 for all t\\in[T] and \\gamma=\\beta_1/\\sqrt{\\beta_2}<1. Assume that \\mathcal{F} has bounded diameter D_\\infty and \\|\\nabla f_t(x)\\|_\\infty\\le G_\\infty for all t\\in[T] and x\\in\\mathcal{F}. For x_t generated using the AMSGRAD (Algorithm 2), we have the following bound on the regret\n\\[\nR_T\\le \\frac{D_\\infty^2\\sqrt{T}}{\\alpha(1-\\beta_1)}\\sum_{i=1}^d \\hat v_{T,i}^{1/2}+\\frac{D_\\infty^2}{2(1-\\beta_1)}\\sum_{t=1}^T\\sum_{i=1}^d \\frac{\\beta_{1t}\\hat v_{t,i}^{1/2}}{\\alpha_t}+\\frac{\\alpha\\sqrt{1+\\log T}}{(1-\\beta_1)^2(1-\\gamma)\\sqrt{1-\\beta_2}}\\sum_{i=1}^d\\|g_{1:T,i}\\|_2.\n\\]",
+    "rate": "Data-dependent regret bound; with the decreasing momentum schedules discussed after Theorem 4, the regret is O(sqrt(T)) up to coordinate-adaptive gradient-history terms.",
+    "measure": "Online regret R_T of AMSGrad against the best fixed point in the feasible set.",
+    "proof": [
+      {
+        "step": 1,
+        "description": "Apply convexity to convert regret into a sum of gradient inner products and use the projected AMSGrad update to obtain the one-step inequality.",
+        "math": "\\sum_{t=1}^T f_t(x_t)-f_t(x^*)\\le \\sum_{t=1}^T\\langle g_t,x_t-x^*\\rangle",
+        "ref": "Appendix D, Eq. (16), p.16",
+        "uses": [
+          "Online_convex_functions",
+          "One_step_AMSGrad_projection_bound"
+        ]
+      },
+      {
+        "step": 2,
+        "description": "Sum the one-step inequality to get the regret decomposition with a telescoping metric term, a momentum-history term, and a beta-one correction term.",
+        "math": "\\sum_{t=1}^T f_t(x_t)-f_t(x^*)\\le\\sum_{t=1}^T\\left[\\frac{\\|\\hat V_t^{1/4}(x_t-x^*)\\|^2-\\|\\hat V_t^{1/4}(x_{t+1}-x^*)\\|^2}{2\\alpha_t(1-\\beta_{1t})}+\\frac{\\alpha_t\\|\\hat V_t^{-1/4}m_t\\|^2}{2(1-\\beta_{1t})}+\\frac{\\beta_{1t}\\alpha_t\\|\\hat V_t^{-1/4}m_{t-1}\\|^2}{2(1-\\beta_{1t})}+\\frac{\\beta_{1t}\\|\\hat V_t^{1/4}(x_t-x^*)\\|^2}{2\\alpha_t(1-\\beta_{1t})}\\right]",
+        "ref": "Appendix D, Eq. (16), p.16",
+        "uses": [
+          "One_step_AMSGrad_projection_bound",
+          "Beta_schedule"
+        ]
+      },
+      {
+        "step": 3,
+        "description": "Bound the accumulated adaptive momentum norm by the coordinate-wise gradient-history quantity.",
+        "math": "\\sum_{t=1}^T\\alpha_t\\|\\hat V_t^{-1/4}m_t\\|^2\\le \\frac{\\alpha\\sqrt{1+\\log T}}{(1-\\beta_1)(1-\\gamma)\\sqrt{1-\\beta_2}}\\sum_{i=1}^d\\|g_{1:T,i}\\|_2",
+        "ref": "Appendix D, Lemma 2, p.16-18",
+        "uses": [
+          "AMSGrad_momentum_sum_bound",
+          "Beta_schedule"
+        ]
+      },
+      {
+        "step": 4,
+        "description": "Use the monotonicity of the AMSGrad denominator and the bounded diameter of the feasible set to telescope the metric terms.",
+        "math": "\\frac{\\hat v_{t,i}^{1/2}}{\\alpha_t}\\ge \\frac{\\hat v_{t-1,i}^{1/2}}{\\alpha_{t-1}}",
+        "ref": "Appendix D, after Eq. (18), p.18",
+        "uses": [
+          "AMSGrad_inverse_learning_rate_monotone",
+          "Bounded_diameter",
+          "Alpha_schedule"
+        ]
+      },
+      {
+        "step": 5,
+        "description": "Use the telescopic sum and the L_infty bound on the feasible region to obtain the appendix final display; the printed Theorem 4 head on p.6 omits the factor 1/2 in this first term.",
+        "math": "\\frac{D_\\infty^2}{2\\alpha_T(1-\\beta_1)}\\sum_{i=1}^d\\hat v_{T,i}^{1/2}+\\frac{D_\\infty^2}{2(1-\\beta_1)}\\sum_{t=1}^T\\sum_{i=1}^d\\frac{\\beta_{1t}\\hat v_{t,i}^{1/2}}{\\alpha_t}+\\frac{\\alpha\\sqrt{1+\\log T}}{(1-\\beta_1)^2(1-\\gamma)\\sqrt{1-\\beta_2}}\\sum_{i=1}^d\\|g_{1:T,i}\\|_2.",
+        "ref": "Appendix D, final display before Algorithm 3, p.18",
+        "uses": [
+          "Alpha_schedule",
+          "AMSGrad_momentum_sum_bound",
+          "AMSGrad_inverse_learning_rate_monotone",
+          "Bounded_diameter"
+        ]
+      }
+    ]
+  },
+  "key_lemmas": [
+    {
+      "name": "Projection_nonexpansiveness",
+      "ref": "Appendix G, Lemma 4, p.22",
+      "statement_math": "For any Q\\in S_+^d and convex feasible set \\mathcal{F}\\subset\\mathbb{R}^d, suppose u_1=\\min_{x\\in\\mathcal{F}}\\|Q^{1/2}(x-z_1)\\| and u_2=\\min_{x\\in\\mathcal{F}}\\|Q^{1/2}(x-z_2)\\| then we have \\|Q^{1/2}(u_1-u_2)\\|\\le\\|Q^{1/2}(z_1-z_2)\\|.",
+      "role": "Provides the weighted projection contraction used at the start of the Theorem 4 proof.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Use the variational property of the two weighted projections.",
+          "math": "\\langle z_1-u_1,Q(z_2-z_1)\\rangle\\ge0\\quad\\text{and}\\quad \\langle z_2-u_2,Q(z_1-z_2)\\rangle\\ge0",
+          "ref": "Appendix G, Lemma 4 proof, p.22",
+          "uses": [
+            "Convex_feasible_set"
+          ]
+        },
+        {
+          "step": 2,
+          "description": "Combine the projection inequalities and the positive definiteness of Q to compare the projected and unprojected displacements.",
+          "math": "\\langle u_2-u_1,Q(z_2-z_1)\\rangle\\ge\\langle z_2-z_1,Q(z_2-z_1)\\rangle",
+          "ref": "Appendix G, Eq. (24), p.22",
+          "uses": [
+            "Convex_feasible_set"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "One_step_AMSGrad_projection_bound",
+      "ref": "Appendix D, Eq. (15), p.16",
+      "statement_math": "\\langle g_t,x_t-x^*\\rangle\\le \\frac{1}{2\\alpha_t(1-\\beta_{1t})}\\left[\\|\\hat V_t^{1/4}(x_t-x^*)\\|^2-\\|\\hat V_t^{1/4}(x_{t+1}-x^*)\\|^2\\right]+\\frac{\\alpha_t}{2(1-\\beta_{1t})}\\|\\hat V_t^{-1/4}m_t\\|^2+\\frac{\\beta_{1t}}{2(1-\\beta_{1t})}\\alpha_t\\|\\hat V_t^{-1/4}m_{t-1}\\|^2+\\frac{\\beta_{1t}}{2\\alpha_t(1-\\beta_{1t})}\\|\\hat V_t^{1/4}(x_t-x^*)\\|^2.",
+      "role": "Transforms one AMSGrad projected update into the per-round inequality that drives the regret proof.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Apply the weighted projection lemma to the AMSGrad update and x^*.",
+          "math": "\\|\\hat V_t^{1/4}(x_{t+1}-x^*)\\|^2\\le \\|\\hat V_t^{1/4}(x_t-\\alpha_t\\hat V_t^{-1/2}m_t-x^*)\\|^2",
+          "ref": "Appendix D, proof before Eq. (15), p.16",
+          "uses": [
+            "Projection_nonexpansiveness"
+          ]
+        },
+        {
+          "step": 2,
+          "description": "Expand the square, substitute m_t=\\beta_{1t}m_{t-1}+(1-\\beta_{1t})g_t, and rearrange.",
+          "math": "m_t=\\beta_{1t}m_{t-1}+(1-\\beta_{1t})g_t",
+          "ref": "Appendix D, proof before Eq. (15), p.16; Algorithm 2, p.5",
+          "uses": []
+        },
+        {
+          "step": 3,
+          "description": "Bound the cross term involving m_{t-1} by Cauchy-Schwarz and Young's inequality.",
+          "math": "\\langle g_t,x_t-x^*\\rangle\\le \\frac{1}{2\\alpha_t(1-\\beta_{1t})}\\left[\\|\\hat V_t^{1/4}(x_t-x^*)\\|^2-\\|\\hat V_t^{1/4}(x_{t+1}-x^*)\\|^2\\right]+\\frac{\\alpha_t}{2(1-\\beta_{1t})}\\|\\hat V_t^{-1/4}m_t\\|^2+\\frac{\\beta_{1t}}{2(1-\\beta_{1t})}\\alpha_t\\|\\hat V_t^{-1/4}m_{t-1}\\|^2+\\frac{\\beta_{1t}}{2\\alpha_t(1-\\beta_{1t})}\\|\\hat V_t^{1/4}(x_t-x^*)\\|^2.",
+          "ref": "Appendix D, Eq. (15) and following sentence, p.16",
+          "uses": []
+        }
+      ]
+    },
+    {
+      "name": "AMSGrad_momentum_sum_bound",
+      "ref": "Appendix D, Lemma 2, p.16",
+      "statement_math": "For the parameter settings and conditions assumed in Theorem 4, we have\n\\[\n\\sum_{t=1}^T \\alpha_t\\|\\hat V_t^{-1/4}m_t\\|^2\\le \\frac{\\alpha\\sqrt{1+\\log T}}{(1-\\beta_1)(1-\\gamma)\\sqrt{1-\\beta_2}}\\sum_{i=1}^d\\|g_{1:T,i}\\|_2.\n\\]",
+      "role": "Controls the accumulated momentum term in the regret decomposition by a data-dependent gradient-history norm.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Use the repeated terminal-time bound from Eq. (17) at every time step to bound the whole adaptive momentum sum.",
+          "math": "\\sum_{t=1}^T\\alpha_t\\|\\hat V_t^{-1/4}m_t\\|^2\\le \\sum_{t=1}^T\\frac{\\alpha}{(1-\\beta_1)\\sqrt{t(1-\\beta_2)}}\\sum_{i=1}^d\\sum_{j=1}^t\\gamma^{t-j}|g_{j,i}|",
+          "ref": "Appendix D, display after Eq. (17), p.18",
+          "uses": [
+            "Beta_schedule",
+            "Alpha_schedule"
+          ]
+        },
+        {
+          "step": 2,
+          "description": "Sum over time, exchange the order of summation, and bound the geometric tail by 1/(1-\\gamma).",
+          "math": "\\sum_{j=t}^T\\gamma^{j-t}\\le \\frac{1}{1-\\gamma}",
+          "ref": "Appendix D, Lemma 2 proof, p.18",
+          "uses": [
+            "Beta_schedule"
+          ]
+        },
+        {
+          "step": 3,
+          "description": "Apply Cauchy-Schwarz and the harmonic-sum estimate to obtain the displayed bound.",
+          "math": "\\sum_{t=1}^T\\frac{1}{t}\\le 1+\\log T",
+          "ref": "Appendix D, Lemma 2 proof, p.18",
+          "uses": []
+        }
+      ]
+    },
+    {
+      "name": "AMSGrad_inverse_learning_rate_monotone",
+      "ref": "Appendix D, after Eq. (18), p.18",
+      "statement_math": "\\frac{\\hat v_{t,i}^{1/2}}{\\alpha_t}\\ge \\frac{\\hat v_{t-1,i}^{1/2}}{\\alpha_{t-1}}.",
+      "role": "This is the AMSGrad long-term-memory property that makes the metric terms telescope with the correct sign.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "By the definition of \\hat v_t as an elementwise maximum, \\hat v_{t,i}\\ge\\hat v_{t-1,i}.",
+          "math": "\\hat v_t=\\max(\\hat v_{t-1},v_t)",
+          "ref": "Algorithm 2, p.5; Appendix D, after Eq. (18), p.18",
+          "uses": []
+        },
+        {
+          "step": 2,
+          "description": "Since \\alpha_t=\\alpha/\\sqrt t, the reciprocal step size is nondecreasing, so the product is nondecreasing.",
+          "math": "\\alpha_t=\\alpha/\\sqrt t",
+          "ref": "Theorem 4, p.6; Appendix D, after Eq. (18), p.18",
+          "uses": [
+            "Alpha_schedule"
+          ]
+        }
+      ]
+    }
+  ],
+  "extension": {
+    "base_id": "6e7cf8196b196ae4fa27e308bd5ba773baecabad52c22035248d9558e8d871d2",
+    "request": "Add the paper-facing AMSGrad Theorem 4 incrementally on top of the current 6206-line AMSGrad formalization. Preserve all existing proved algorithm and extension material. Close the source-facing public Theorem 4 without weakening it into a guarded extension theorem; use existing theorem4 proof infrastructure and record any genuine source boundary precisely.",
+    "reuse": [
+      {
+        "base_json_pointer": "/algorithm_spec",
+        "base_symbols": [
+          "SGD.AMSGrad.Run",
+          "SGD.AMSGrad.WellDefinedRunOnHorizon",
+          "SGD.AMSGrad.IsTheorem4Bound"
+        ],
+        "target_json_pointer": "/extension/additions/algorithm_spec",
+        "method": "adapt",
+        "reason": "The extension keeps the inherited Algorithm 2 recursion but adapts it to the checked finite-horizon run boundary needed for the PDF quotient/projection notation."
+      },
+      {
+        "base_json_pointer": "/key_lemmas/0",
+        "base_symbols": [
+          "SGD.AMSGrad.weightedProjection_nonexpansive"
+        ],
+        "target_json_pointer": "/extension/additions/key_lemmas/0",
+        "method": "reuse",
+        "reason": "Appendix D invokes Lemma 4 with the AMSGrad weighted projection; the baseline contains the source-facing weighted projection nonexpansiveness theorem."
+      },
+      {
+        "base_json_pointer": "/key_lemmas/1",
+        "base_symbols": [
+          "_private.Algorithms.Unverified.AMSGrad.0.SGD.AMSGrad.amsgrad_projection_young_bound_on_horizon",
+          "_private.Algorithms.Unverified.AMSGrad.0.SGD.AMSGrad.amsgrad_projection_pre_young_bound_on_horizon"
+        ],
+        "target_json_pointer": "/extension/additions/key_lemmas/1",
+        "method": "adapt",
+        "reason": "The inherited one-step Eq. (15) record is refined by the baseline's checked projection, first-moment substitution, and Young-bound helpers."
+      },
+      {
+        "base_json_pointer": "/key_lemmas/2",
+        "base_symbols": [
+          "_private.Algorithms.Unverified.AMSGrad.0.SGD.AMSGrad.amsgrad_eq17_denominator_transport",
+          "_private.Algorithms.Unverified.AMSGrad.0.SGD.AMSGrad.amsgrad_triangular_history_sum_le_history_l1",
+          "_private.Algorithms.Unverified.AMSGrad.0.SGD.AMSGrad.amsgrad_history_l1_over_sqrt_le_sqrt_log_l2"
+        ],
+        "target_json_pointer": "/extension/additions/key_lemmas/2",
+        "method": "adapt",
+        "reason": "The inherited Lemma 2 bound is expanded to the PDF's Eq. (17), geometric-tail, Cauchy-Schwarz, and harmonic-log transitions."
+      },
+      {
+        "base_json_pointer": "/key_lemmas/3",
+        "base_symbols": [
+          "_private.Algorithms.Unverified.AMSGrad.0.SGD.AMSGrad.amsgrad_metric_beta_telescope_scalar"
+        ],
+        "target_json_pointer": "/extension/additions/key_lemmas/3",
+        "method": "adapt",
+        "reason": "The inverse-learning-rate monotonicity is consumed by the scalar metric/beta telescope used after Eq. (18)."
+      },
+      {
+        "base_json_pointer": "/main_theorem/proof/0",
+        "base_symbols": [
+          "SGD.AMSGrad.AMSGrad_theorem4_wellDefinedRunOnHorizon_extension",
+          "SGD.AMSGrad.theorem4Bound_exists_of_rhsCompatibility",
+          "_private.Algorithms.Unverified.AMSGrad.0.SGD.AMSGrad.convex_regret_le_gradient_sum",
+          "_private.Algorithms.Unverified.AMSGrad.0.SGD.AMSGrad.regretAgainstInfimum_le_of_uniform_comparator_bound"
+        ],
+        "target_json_pointer": "/extension/additions/main_theorem/proof/0",
+        "method": "adapt",
+        "reason": "The public extension theorem closes the corrected source-facing bound by combining the PDF proof route with the explicit infimum-regret and relational-RHS adapters."
+      }
+    ],
+    "additions": {
+      "algorithm_spec": {
+        "name": "Algorithm2_AMSGrad_checked_finite_horizon_run",
+        "description": "The inherited Algorithm 2 update equations are reused, while the extension records the checked finite-horizon boundary needed to interpret the printed quotient and weighted projection.",
+        "initialization": {
+          "math": "x_1\\in\\mathcal{F},\\quad m_0=0,\\quad v_0=0,\\quad \\hat v_0=0",
+          "ref": "Algorithm 2, p.5"
+        },
+        "steps": [
+          {
+            "step": 1,
+            "name": "gradient",
+            "math": "g_t=\\nabla f_t(x_t)",
+            "ref": "Algorithm 2, p.5",
+            "source_pdf_lines": [
+              274,
+              286
+            ]
+          },
+          {
+            "step": 2,
+            "name": "first_moment",
+            "math": "m_t=\\beta_{1t}m_{t-1}+(1-\\beta_{1t})g_t",
+            "ref": "Algorithm 2, p.5",
+            "source_pdf_lines": [
+              274,
+              286
+            ]
+          },
+          {
+            "step": 3,
+            "name": "second_moment_and_memory",
+            "math": "v_t=\\beta_2v_{t-1}+(1-\\beta_2)g_t^2,\\quad \\hat v_t=\\max(\\hat v_{t-1},v_t),\\quad \\hat V_t=\\operatorname{diag}(\\hat v_t)",
+            "ref": "Algorithm 2, p.5",
+            "source_pdf_lines": [
+              274,
+              286
+            ]
+          },
+          {
+            "step": 4,
+            "name": "projected_update",
+            "math": "x_{t+1}=\\Pi_{\\mathcal{F},\\sqrt{\\hat V_t}}(x_t-\\alpha_t m_t/\\sqrt{\\hat v_t})",
+            "ref": "Algorithm 2, p.5",
+            "source_pdf_lines": [
+              274,
+              286
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Algorithm2_AMSGrad_steps",
+            "math": "\\{\\alpha_t\\}_{t=1}^T,\\{\\beta_{1t}\\}_{t=1}^T,\\beta_2",
+            "ref": "Algorithm 2, p.5"
+          },
+          {
+            "name": "Corrected_Algorithm2_run_domain",
+            "math": "x_{t+1}=\\Pi_{\\mathcal{F},\\sqrt{\\hat V_t}}(x_t-\\alpha_t m_t/\\sqrt{\\hat v_t})",
+            "ref": "Algorithm 2, p.5; Section 2 notation paragraph",
+            "description": "Extension-side checked interpretation of the printed quotient-bearing projected update."
+          },
+          {
+            "name": "Theorem4_parameter_domain_boundary",
+            "math": "2\\alpha_t(1-\\beta_{1t})",
+            "ref": "Appendix D, Eq. (15), p.16",
+            "description": "Proof-side sign/domain obligation exposed by the Eq. (15) denominators; this is not inserted into the inherited theorem head."
+          },
+          {
+            "name": "Theorem4_beta1_nonincreasing_boundary",
+            "math": "\\text{the proof requires a decreasing schedule for proving convergence of the algorithm}",
+            "ref": "Section 4, p.5, prose before Theorem 4",
+            "description": "Source-prose boundary consumed by the Eq. (18) metric/beta telescope."
+          },
+          {
+            "name": "Theorem4_RHS_compatibility_boundary",
+            "math": "\\frac{\\beta_{1t}\\hat v_{t,i}^{1/2}}{\\alpha_t}\\quad\\text{and}\\quad\\frac{1}{(1-\\beta_1)^2(1-\\gamma)\\sqrt{1-\\beta_2}}",
+            "ref": "Theorem 4 displayed RHS, p.6",
+            "description": "Relational quotient/root witness package for the displayed RHS."
+          }
+        ],
+        "source_boundary": {
+          "name": "Corrected_Algorithm2_run_domain",
+          "lean_symbol": "SGD.AMSGrad.WellDefinedRunOnHorizon",
+          "description": "The PDF prints ordinary elementwise division and a weighted projection; the extension exposes the denominator and projection-domain witnesses required by those notations."
+        }
+      },
+      "assumptions": [
+        {
+          "name": "Theorem4_alpha_schedule_printed",
+          "math": "\\alpha_t = \\alpha/\\sqrt{t}",
+          "ref": "Theorem 4, p.6",
+          "source_pdf_lines": [
+            351,
+            353
+          ],
+          "parameters": [
+            "\\alpha",
+            "\\alpha_t"
+          ],
+          "inherits": "/assumptions/4"
+        },
+        {
+          "name": "Theorem4_beta_gamma_printed",
+          "math": "\\beta_1=\\beta_{11},\\quad \\beta_{1t}\\le \\beta_1 \\text{ for all } t\\in[T] \\text{ and } \\gamma=\\beta_1/\\sqrt{\\beta_2}<1",
+          "ref": "Theorem 4, p.6",
+          "source_pdf_lines": [
+            351,
+            354
+          ],
+          "parameters": [
+            "\\beta_1",
+            "\\beta_{1t}",
+            "\\beta_2",
+            "\\gamma"
+          ],
+          "inherits": "/assumptions/5"
+        },
+        {
+          "name": "Theorem4_bounded_diameter_and_gradients_printed",
+          "math": "\\mathcal{F}\\text{ has bounded diameter }D_\\infty\\text{ and }\\|\\nabla f_t(x)\\|_\\infty\\le G_\\infty\\text{ for all }t\\in[T]\\text{ and }x\\in\\mathcal{F}",
+          "ref": "Theorem 4, p.6",
+          "source_pdf_lines": [
+            353,
+            355
+          ],
+          "parameters": [
+            "\\mathcal{F}",
+            "D_\\infty",
+            "G_\\infty"
+          ],
+          "inherits": [
+            "/assumptions/2",
+            "/assumptions/3"
+          ]
+        }
+      ],
+      "source_boundaries": [
+        {
+          "name": "Theorem4_parameter_domain_boundary",
+          "lean_symbol": "SGD.AMSGrad.Theorem4ParameterDomainOnHorizon",
+          "ref": "Algorithm 1 input notation, Algorithm 2 p.5, Appendix D Eq. (15)-(18)",
+          "source_pdf_lines": [
+            1097,
+            1147
+          ],
+          "description": "The proof divides by \\alpha_t and 1-\\beta_{1t}; the extension exposes positive step sizes and nonnegative beta-one weights as proof obligations rather than changing the printed theorem head."
+        },
+        {
+          "name": "Theorem4_beta1_nonincreasing_boundary",
+          "lean_symbol": "SGD.AMSGrad.Theorem4Beta1NonincreasingOnHorizon",
+          "ref": "Section 4, p.5, prose before Theorem 4",
+          "source_pdf_lines": [
+            323,
+            325
+          ],
+          "description": "The paper says the proof requires a decreasing schedule for convergence; the Eq. (18) metric/beta telescope consumes this monotonicity explicitly."
+        },
+        {
+          "name": "Theorem4_RHS_compatibility_boundary",
+          "lean_symbol": "SGD.AMSGrad.totalizedRHSCompatibilityObligation",
+          "ref": "Theorem 4 displayed RHS, p.6",
+          "source_pdf_lines": [
+            356,
+            360
+          ],
+          "description": "The displayed RHS contains quotients and square roots; the extension uses relational RHS witnesses instead of relying on totalized division or square-root fallback values, and the bridge from the appendix final display to the printed theorem also needs nonnegativity of the terminal coordinate sum."
+        },
+        {
+          "name": "Theorem4_minimum_to_infimum_bridge",
+          "lean_symbols": [
+            "_private.Algorithms.Unverified.AMSGrad.0.SGD.AMSGrad.regretAgainstInfimum_le_of_uniform_comparator_bound",
+            "SGD.AMSGrad.fixedComparatorInfimumValue",
+            "SGD.AMSGrad.fixedComparatorInfimumValue_eq_of_isBest",
+            "SGD.AMSGrad.regretAgainstInfimum"
+          ],
+          "ref": "Section 2 regret definition, p.2; Lean Algorithms/Unverified/AMSGrad.lean:2644-2674",
+          "source_pdf_lines": [
+            106,
+            109
+          ],
+          "paper_math": "R_T=\\sum_{t=1}^T f_t(x_t)-\\min_{x\\in\\mathcal{F}}\\sum_{t=1}^T f_t(x)",
+          "description": "Lean-side adapter, not a PDF theorem: Section 2 prints the minimum-form regret definition, while the public extension theorem proves the corresponding infimum-form boundary through the named Lean declarations.",
+          "adapter_proof": [
+            {
+              "step": 1,
+              "description": "Use feasibility of the initialized comparator domain to show the fixed-comparator value set S is nonempty; the Lean proof uses the setup's x_1 in F.",
+              "ref": "Lean proof of regretAgainstInfimum_le_of_uniform_comparator_bound",
+              "source_pdf_lines": [
+                101,
+                109
+              ],
+              "uses": [
+                "Algorithm2_AMSGrad_steps",
+                "Theorem4_regret_minimum_definition"
+              ],
+              "produces": "S.Nonempty, needed for the csInf lower-bound rule."
+            },
+            {
+              "step": 2,
+              "description": "Translate the uniform fixed-comparator regret bound into a lower bound A-B\\le y for every feasible value y in S.",
+              "ref": "Lean proof of regretAgainstInfimum_le_of_uniform_comparator_bound",
+              "source_pdf_lines": [
+                106,
+                109
+              ],
+              "uses": [
+                "Theorem4_regret_minimum_definition"
+              ],
+              "produces": "Lower-bound hypothesis for applying le_csInf to the comparator value set."
+            },
+            {
+              "step": 3,
+              "description": "Apply the infimum lower-bound rule to obtain A-B\\le\\inf S.",
+              "ref": "Lean proof of regretAgainstInfimum_le_of_uniform_comparator_bound",
+              "source_pdf_lines": [
+                106,
+                109
+              ],
+              "uses": [
+                "previous_step:1",
+                "previous_step:2"
+              ],
+              "produces": "Infimum comparison for the corrected regret boundary."
+            },
+            {
+              "step": 4,
+              "description": "Rearrange the preceding inequality into the extension's infimum-form regret conclusion.",
+              "ref": "Lean proof of regretAgainstInfimum_le_of_uniform_comparator_bound",
+              "source_pdf_lines": [
+                106,
+                109
+              ],
+              "uses": [
+                "previous_step:3"
+              ],
+              "produces": "regretAgainstInfimum setup run T \\le B."
+            }
+          ]
+        }
+      ],
+      "main_theorem": {
+        "name": "AMSGrad_Theorem4_checked_source_boundary",
+        "statement_math": "Let \\{x_t\\} and \\{v_t\\} be the sequences obtained from Algorithm 2, \\alpha_t=\\alpha/\\sqrt{t}, \\beta_1=\\beta_{11}, \\beta_{1t}\\le\\beta_1 for all t\\in[T] and \\gamma=\\beta_1/\\sqrt{\\beta_2}<1. Assume that \\mathcal{F} has bounded diameter D_\\infty and \\|\\nabla f_t(x)\\|_\\infty\\le G_\\infty for all t\\in[T] and x\\in\\mathcal{F}. For x_t generated using the AMSGRAD (Algorithm 2), we have the following bound on the regret\n\\[\nR_T\\le \\frac{D_\\infty^2\\sqrt{T}}{\\alpha(1-\\beta_1)}\\sum_{i=1}^d \\hat v_{T,i}^{1/2}+\\frac{D_\\infty^2}{2(1-\\beta_1)}\\sum_{t=1}^T\\sum_{i=1}^d \\frac{\\beta_{1t}\\hat v_{t,i}^{1/2}}{\\alpha_t}+\\frac{\\alpha\\sqrt{1+\\log T}}{(1-\\beta_1)^2(1-\\gamma)\\sqrt{1-\\beta_2}}\\sum_{i=1}^d\\|g_{1:T,i}\\|_2.\n\\]",
+        "ref": "Theorem 4, p.6",
+        "source_pdf_lines": [
+          351,
+          360
+        ],
+        "lean_root": "SGD.AMSGrad.AMSGrad_theorem4_wellDefinedRunOnHorizon_extension",
+        "rate": "Data-dependent regret bound with the same displayed three-term RHS as Theorem 4, interpreted through the extension's relational RHS boundary.",
+        "measure": "Infimum-form online regret corresponding to the paper's fixed-comparator regret expression.",
+        "proof": [
+          {
+            "step": 1,
+            "description": "Begin with Algorithm 2's weighted projected update and identify the displayed minimization form of the projection.",
+            "math": "x_{t+1}=\\Pi_{\\mathcal{F},\\sqrt{\\hat V_t}}(x_t-\\alpha_t\\hat V_t^{-1/2}m_t)=\\min_{x\\in\\mathcal{F}}\\|\\hat V_t^{1/4}(x-(x_t-\\alpha_t\\hat V_t^{-1/2}m_t))\\|.",
+            "ref": "Appendix D, opening display of proof, p.16",
+            "source_pdf_lines": [
+              1080,
+              1085
+            ],
+            "uses": [
+              "Algorithm2_AMSGrad_steps",
+              "Corrected_Algorithm2_run_domain"
+            ],
+            "produces": "Projected-update minimizer form for applying Lemma 4."
+          },
+          {
+            "step": 2,
+            "description": "Use that every feasible comparator is its own weighted projection and apply Lemma 4 with u_1=x_{t+1} and u_2=x^*.",
+            "math": "\\|\\hat V_t^{1/4}(x_{t+1}-x^*)\\|^2\\le \\|\\hat V_t^{1/4}(x_t-\\alpha_t\\hat V_t^{-1/2}m_t-x^*)\\|^2",
+            "ref": "Appendix D, display before Eq. (15), p.16",
+            "source_pdf_lines": [
+              1087,
+              1092
+            ],
+            "uses": [
+              "Projection_nonexpansiveness_expanded",
+              "Corrected_Algorithm2_run_domain",
+              "Convex_feasible_set"
+            ],
+            "produces": "Projection contraction specialized to the AMSGrad trial point."
+          },
+          {
+            "step": 3,
+            "description": "Expand the squared norm after the projection contraction.",
+            "math": "\\|\\hat V_t^{1/4}(x_t-x^*)\\|^2+\\alpha_t^2\\|\\hat V_t^{-1/4}m_t\\|^2-2\\alpha_t\\langle m_t,x_t-x^*\\rangle",
+            "ref": "Appendix D, display before Eq. (15), p.16",
+            "source_pdf_lines": [
+              1091,
+              1094
+            ],
+            "uses": [
+              "previous_step:2"
+            ],
+            "produces": "Expanded projection inequality before substituting the first-moment recursion."
+          },
+          {
+            "step": 4,
+            "description": "Substitute the Algorithm 2 first-moment recursion into the cross term.",
+            "math": "\\|\\hat V_t^{1/4}(x_t-x^*)\\|^2+\\alpha_t^2\\|\\hat V_t^{-1/4}m_t\\|^2-2\\alpha_t\\langle \\beta_{1t}m_{t-1}+(1-\\beta_{1t})g_t,x_t-x^*\\rangle",
+            "ref": "Appendix D, display before Eq. (15), p.16",
+            "source_pdf_lines": [
+              1093,
+              1095
+            ],
+            "uses": [
+              "previous_step:3",
+              "Algorithm2_AMSGrad_steps"
+            ],
+            "produces": "Momentum-substituted projection inequality."
+          },
+          {
+            "step": 5,
+            "description": "Rearrange the previous inequality to isolate the one-step gradient inner product before bounding the previous-momentum term.",
+            "math": "\\langle g_t,x_t-x^*\\rangle\\le\\frac{1}{2\\alpha_t(1-\\beta_{1t})}\\left[\\|\\hat V_t^{1/4}(x_t-x^*)\\|^2-\\|\\hat V_t^{1/4}(x_{t+1}-x^*)\\|^2\\right]+\\frac{\\alpha_t}{2(1-\\beta_{1t})}\\|\\hat V_t^{-1/4}m_t\\|^2+\\frac{\\beta_{1t}}{1-\\beta_{1t}}\\langle m_{t-1},x_t-x^*\\rangle",
+            "ref": "Appendix D, rearrangement before Eq. (15), p.16",
+            "source_pdf_lines": [
+              1097,
+              1105
+            ],
+            "uses": [
+              "previous_step:4",
+              "Theorem4_parameter_domain_boundary"
+            ],
+            "produces": "Pre-Young one-step inequality."
+          },
+          {
+            "step": 6,
+            "description": "Apply Cauchy-Schwarz and Young's inequality to the previous-momentum inner product to obtain Eq. (15).",
+            "math": "\\langle g_t,x_t-x^*\\rangle\\le \\frac{1}{2\\alpha_t(1-\\beta_{1t})}\\left[\\|\\hat V_t^{1/4}(x_t-x^*)\\|^2-\\|\\hat V_t^{1/4}(x_{t+1}-x^*)\\|^2\\right]+\\frac{\\alpha_t}{2(1-\\beta_{1t})}\\|\\hat V_t^{-1/4}m_t\\|^2+\\frac{\\beta_{1t}}{2(1-\\beta_{1t})}\\alpha_t\\|\\hat V_t^{-1/4}m_{t-1}\\|^2+\\frac{\\beta_{1t}}{2\\alpha_t(1-\\beta_{1t})}\\|\\hat V_t^{1/4}(x_t-x^*)\\|^2.",
+            "ref": "Appendix D, Eq. (15), p.16",
+            "source_pdf_lines": [
+              1106,
+              1116
+            ],
+            "uses": [
+              "previous_step:5",
+              "One_step_AMSGrad_projection_bound_expanded",
+              "Theorem4_parameter_domain_boundary"
+            ],
+            "produces": "Equation (15)."
+          },
+          {
+            "step": 7,
+            "description": "Use convexity to bound regret by the sum of gradient inner products, then insert Eq. (15) term by term.",
+            "math": "\\sum_{t=1}^T f_t(x_t)-f_t(x^*)\\le\\sum_{t=1}^T\\langle g_t,x_t-x^*\\rangle\\le\\sum_{t=1}^T\\left[\\frac{\\|\\hat V_t^{1/4}(x_t-x^*)\\|^2-\\|\\hat V_t^{1/4}(x_{t+1}-x^*)\\|^2}{2\\alpha_t(1-\\beta_{1t})}+\\frac{\\alpha_t\\|\\hat V_t^{-1/4}m_t\\|^2}{2(1-\\beta_{1t})}+\\frac{\\beta_{1t}\\alpha_t\\|\\hat V_t^{-1/4}m_{t-1}\\|^2}{2(1-\\beta_{1t})}+\\frac{\\beta_{1t}\\|\\hat V_t^{1/4}(x_t-x^*)\\|^2}{2\\alpha_t(1-\\beta_{1t})}\\right]",
+            "ref": "Appendix D, Eq. (16), p.16",
+            "source_pdf_lines": [
+              1128,
+              1148
+            ],
+            "uses": [
+              "Online_convex_functions",
+              "previous_step:6"
+            ],
+            "produces": "Equation (16)."
+          },
+          {
+            "step": 8,
+            "description": "Invoke Lemma 2 to replace the accumulated current-momentum sum in Eq. (16) by the coordinate gradient-history bound.",
+            "math": "\\sum_{t=1}^T \\alpha_t\\|\\hat V_t^{-1/4}m_t\\|^2\\le \\frac{\\alpha\\sqrt{1+\\log T}}{(1-\\beta_1)(1-\\gamma)\\sqrt{1-\\beta_2}}\\sum_{i=1}^d\\|g_{1:T,i}\\|_2",
+            "ref": "Appendix D, Lemma 2 and return to proof, p.16-18",
+            "source_pdf_lines": [
+              1150,
+              1154
+            ],
+            "uses": [
+              "AMSGrad_momentum_sum_bound_expanded",
+              "previous_step:7"
+            ],
+            "produces": "Eq. (16) with the current-momentum contribution bounded."
+          },
+          {
+            "step": 9,
+            "description": "After Lemma 2, use beta-one upper bounds in Eq. (16) to separate the metric drop, beta-metric term, and gradient-history term.",
+            "math": "\\sum_{t=1}^T f_t(x_t)-f_t(x^*)\\le \\sum_{t=1}^T\\left[\\frac{1}{2\\alpha_t(1-\\beta_{1t})}\\left(\\|\\hat V_t^{1/4}(x_t-x^*)\\|^2-\\|\\hat V_t^{1/4}(x_{t+1}-x^*)\\|^2\\right)+\\frac{\\beta_{1t}}{2\\alpha_t(1-\\beta_{1t})}\\|\\hat V_t^{1/4}(x_t-x^*)\\|^2\\right]+\\frac{\\alpha\\sqrt{1+\\log T}}{(1-\\beta_1)^2(1-\\gamma)\\sqrt{1-\\beta_2}}\\sum_{i=1}^d\\|g_{1:T,i}\\|_2",
+            "ref": "Appendix D, display after Lemma 2, p.18",
+            "source_pdf_lines": [
+              1276,
+              1290
+            ],
+            "uses": [
+              "previous_step:8",
+              "Theorem4_beta_gamma_printed",
+              "Theorem4_parameter_domain_boundary"
+            ],
+            "produces": "Post-Lemma-2 regret bound before metric/beta telescoping."
+          },
+          {
+            "step": 10,
+            "description": "Convert the metric terms into the coordinate display (18), again using beta-one upper bounds.",
+            "math": "\\frac{1}{2\\alpha_1(1-\\beta_1)}\\sum_{i=1}^d\\hat v_{1,i}^{1/2}(x_{1,i}-x_i^*)^2+\\frac{1}{2(1-\\beta_1)}\\sum_{t=2}^T\\sum_{i=1}^d(x_{t,i}-x_i^*)^2\\left[\\frac{\\hat v_{t,i}^{1/2}}{\\alpha_t}-\\frac{\\hat v_{t-1,i}^{1/2}}{\\alpha_{t-1}}\\right]+\\frac{1}{2(1-\\beta_1)}\\sum_{t=1}^T\\sum_{i=1}^d\\frac{\\beta_{1t}(x_{t,i}-x_i^*)^2\\hat v_{t,i}^{1/2}}{\\alpha_t}+\\frac{\\alpha\\sqrt{1+\\log T}}{(1-\\beta_1)^2(1-\\gamma)\\sqrt{1-\\beta_2}}\\sum_{i=1}^d\\|g_{1:T,i}\\|_2.",
+            "ref": "Appendix D, Eq. (18), p.18",
+            "source_pdf_lines": [
+              1291,
+              1317
+            ],
+            "uses": [
+              "previous_step:9",
+              "Theorem4_beta_gamma_printed",
+              "Theorem4_beta1_nonincreasing_boundary",
+              "AMSGrad_metric_beta_telescope_bound"
+            ],
+            "produces": "Equation (18)."
+          },
+          {
+            "step": 11,
+            "description": "Use AMSGrad long-term memory and the step-size schedule to establish the monotonic reciprocal-denominator property needed for the telescope.",
+            "math": "\\frac{\\hat v_{t,i}^{1/2}}{\\alpha_t}\\ge \\frac{\\hat v_{t-1,i}^{1/2}}{\\alpha_{t-1}}.",
+            "ref": "Appendix D, after Eq. (18), p.18",
+            "source_pdf_lines": [
+              1317,
+              1323
+            ],
+            "uses": [
+              "AMSGrad_inverse_learning_rate_monotone",
+              "Theorem4_alpha_schedule_printed",
+              "Corrected_Algorithm2_run_domain"
+            ],
+            "produces": "Nonnegative increments in the coordinate telescope."
+          },
+          {
+            "step": 12,
+            "description": "Use the L_infty diameter bound in Eq. (18) and the monotonicity from the previous step.",
+            "math": "\\sum_{t=1}^T f_t(x_t)-f_t(x^*)\\le \\frac{1}{2\\alpha_1(1-\\beta_1)}\\sum_{i=1}^d\\hat v_{1,i}^{1/2}D_\\infty^2+\\frac{1}{2(1-\\beta_1)}\\sum_{t=2}^T\\sum_{i=1}^dD_\\infty^2\\left[\\frac{\\hat v_{t,i}^{1/2}}{\\alpha_t}-\\frac{\\hat v_{t-1,i}^{1/2}}{\\alpha_{t-1}}\\right]+\\frac{1}{2(1-\\beta_1)}\\sum_{t=1}^T\\sum_{i=1}^d\\frac{D_\\infty^2\\beta_{1t}\\hat v_{t,i}^{1/2}}{\\alpha_t}+\\frac{\\alpha\\sqrt{1+\\log T}}{(1-\\beta_1)^2(1-\\gamma)\\sqrt{1-\\beta_2}}\\sum_{i=1}^d\\|g_{1:T,i}\\|_2",
+            "ref": "Appendix D, final display, first inequality, p.18",
+            "source_pdf_lines": [
+              1324,
+              1339
+            ],
+            "uses": [
+              "previous_step:10",
+              "previous_step:11",
+              "Bounded_diameter"
+            ],
+            "produces": "Diameter-bounded pre-telescope display."
+          },
+          {
+            "step": 13,
+            "description": "Telescope the first two coordinate sums to obtain the appendix final display; the PDF says the equality follows from a simple telescopic sum.",
+            "math": "\\frac{D_\\infty^2}{2\\alpha_T(1-\\beta_1)}\\sum_{i=1}^d\\hat v_{T,i}^{1/2}+\\frac{D_\\infty^2}{2(1-\\beta_1)}\\sum_{t=1}^T\\sum_{i=1}^d\\frac{\\beta_{1t}\\hat v_{t,i}^{1/2}}{\\alpha_t}+\\frac{\\alpha\\sqrt{1+\\log T}}{(1-\\beta_1)^2(1-\\gamma)\\sqrt{1-\\beta_2}}\\sum_{i=1}^d\\|g_{1:T,i}\\|_2.",
+            "ref": "Appendix D, final display before Algorithm 3, p.18",
+            "source_pdf_lines": [
+              1340,
+              1346
+            ],
+            "uses": [
+              "previous_step:12",
+              "Theorem4_alpha_schedule_printed"
+            ],
+            "produces": "Appendix final regret RHS with the explicit 1/2 in the terminal metric term."
+          },
+          {
+            "step": 14,
+            "description": "Record the public Theorem 4 endpoint as printed on p.6; its terminal metric term lacks the factor 1/2 present in the Appendix D final display.",
+            "math": "R_T\\le \\frac{D_\\infty^2\\sqrt{T}}{\\alpha(1-\\beta_1)}\\sum_{i=1}^d\\hat v_{T,i}^{1/2}+\\frac{D_\\infty^2}{2(1-\\beta_1)}\\sum_{t=1}^T\\sum_{i=1}^d\\frac{\\beta_{1t}\\hat v_{t,i}^{1/2}}{\\alpha_t}+\\frac{\\alpha\\sqrt{1+\\log T}}{(1-\\beta_1)^2(1-\\gamma)\\sqrt{1-\\beta_2}}\\sum_{i=1}^d\\|g_{1:T,i}\\|_2.",
+            "ref": "Theorem 4 displayed RHS, p.6",
+            "source_pdf_lines": [
+              351,
+              360
+            ],
+            "uses": [
+              "Theorem4_RHS_compatibility_boundary",
+              "Theorem4_alpha_schedule_printed"
+            ],
+            "produces": "Printed Theorem 4 RHS boundary, with the terminal metric coefficient D_infty^2 sqrt(T)/(alpha(1-beta_1))."
+          },
+          {
+            "step": 15,
+            "description": "Bridge the appendix final display to the printed Theorem 4 RHS: substituting alpha_T=alpha/sqrt(T) turns the appendix terminal coefficient into half of the printed coefficient, and the terminal coordinate sum is nonnegative, while the second and third terms match the printed display.",
+            "ref": "Derived comparison between Appendix D final display p.18 and Theorem 4 p.6",
+            "source_pdf_lines": [
+              356,
+              360,
+              1340,
+              1346
+            ],
+            "uses": [
+              "previous_step:13",
+              "previous_step:14",
+              "Theorem4_alpha_schedule_printed",
+              "Theorem4_RHS_compatibility_boundary"
+            ],
+            "produces": "Appendix final regret RHS is bounded above by the printed Theorem 4 RHS; the source mismatch is recorded rather than silently erased."
+          },
+          {
+            "step": 16,
+            "description": "Construct the relational RHS witness package for the printed Theorem 4 display and bridge the fixed-comparator regret expression to the extension's infimum-form regret boundary.",
+            "ref": "Lean source boundary for Theorem 4 display and Section 2 regret minimum, derived from Theorem 4 p.6 and Appendix D p.16-18",
+            "source_pdf_lines": [
+              106,
+              109,
+              351,
+              360
+            ],
+            "uses": [
+              "previous_step:15",
+              "Theorem4_RHS_compatibility_boundary",
+              "Corrected_Algorithm2_run_domain",
+              "Theorem4_minimum_to_infimum_bridge"
+            ],
+            "produces": "Public extension theorem conclusion: an `IsTheorem4Bound` witness for the printed RHS and the corresponding infimum-form regret inequality."
+          }
+        ]
+      },
+      "key_lemmas": [
+        {
+          "name": "Projection_nonexpansiveness_expanded",
+          "ref": "Appendix G, Lemma 4, p.22",
+          "statement_math": "For any Q\\in S_+^d and convex feasible set \\mathcal{F}\\subset\\mathbb{R}^d, suppose u_1=\\min_{x\\in\\mathcal{F}}\\|Q^{1/2}(x-z_1)\\| and u_2=\\min_{x\\in\\mathcal{F}}\\|Q^{1/2}(x-z_2)\\| then we have \\|Q^{1/2}(u_1-u_2)\\|\\le\\|Q^{1/2}(z_1-z_2)\\|.",
+          "role": "Expanded proof trace for inherited Lemma 4, used in the first projection step of Theorem 4.",
+          "lean_symbol": "SGD.AMSGrad.weightedProjection_nonexpansive",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Use the projection-operator property for the two minimizers.",
+              "math": "\\langle z_1-u_1,Q(z_2-z_1)\\rangle\\ge0\\quad\\text{and}\\quad \\langle z_2-u_2,Q(z_1-z_2)\\rangle\\ge0",
+              "ref": "Appendix G, Lemma 4 proof, p.22",
+              "source_pdf_lines": [
+                1688,
+                1691
+              ],
+              "uses": [
+                "Convex_feasible_set"
+              ]
+            },
+            {
+              "step": 2,
+              "description": "Combine the projection inequalities to obtain Eq. (24).",
+              "math": "\\langle u_2-u_1,Q(z_2-z_1)\\rangle\\ge\\langle z_2-z_1,Q(z_2-z_1)\\rangle.",
+              "ref": "Appendix G, Eq. (24), p.22",
+              "source_pdf_lines": [
+                1691,
+                1692
+              ],
+              "uses": [
+                "previous_step:1"
+              ]
+            },
+            {
+              "step": 3,
+              "description": "Use positive definiteness to bound the mixed term by the average of the projected and unprojected quadratic terms.",
+              "math": "\\langle u_2-u_1,Q(z_2-z_1)\\rangle\\le\\frac{1}{2}\\left[\\langle u_2-u_1,Q(u_2-u_1)\\rangle+\\langle z_2-z_1,Q(z_2-z_1)\\rangle\\right]",
+              "ref": "Appendix G, Lemma 4 proof after Eq. (24), p.22",
+              "source_pdf_lines": [
+                1693,
+                1699
+              ],
+              "uses": [
+                "Convex_feasible_set"
+              ]
+            },
+            {
+              "step": 4,
+              "description": "Combine Eq. (24) with the positive-definite rearrangement to get the norm contraction.",
+              "math": "\\|Q^{1/2}(u_1-u_2)\\|\\le\\|Q^{1/2}(z_1-z_2)\\|.",
+              "ref": "Appendix G, Lemma 4 conclusion, p.22",
+              "source_pdf_lines": [
+                1699,
+                1700
+              ],
+              "uses": [
+                "previous_step:2",
+                "previous_step:3"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "One_step_AMSGrad_projection_bound_expanded",
+          "ref": "Appendix D, Eq. (15), p.16",
+          "statement_math": "\\langle g_t,x_t-x^*\\rangle\\le \\frac{1}{2\\alpha_t(1-\\beta_{1t})}\\left[\\|\\hat V_t^{1/4}(x_t-x^*)\\|^2-\\|\\hat V_t^{1/4}(x_{t+1}-x^*)\\|^2\\right]+\\frac{\\alpha_t}{2(1-\\beta_{1t})}\\|\\hat V_t^{-1/4}m_t\\|^2+\\frac{\\beta_{1t}}{2(1-\\beta_{1t})}\\alpha_t\\|\\hat V_t^{-1/4}m_{t-1}\\|^2+\\frac{\\beta_{1t}}{2\\alpha_t(1-\\beta_{1t})}\\|\\hat V_t^{1/4}(x_t-x^*)\\|^2.",
+          "role": "Expanded Eq. (15) proof trace from the checked projection update through Young's inequality.",
+          "lean_symbol": "_private.Algorithms.Unverified.AMSGrad.0.SGD.AMSGrad.amsgrad_projection_young_bound_on_horizon",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Apply Lemma 4 to the checked AMSGrad projected update and comparator self-projection.",
+              "math": "\\|\\hat V_t^{1/4}(x_{t+1}-x^*)\\|^2\\le \\|\\hat V_t^{1/4}(x_t-\\alpha_t\\hat V_t^{-1/2}m_t-x^*)\\|^2",
+              "ref": "Appendix D, before Eq. (15), p.16",
+              "source_pdf_lines": [
+                1087,
+                1092
+              ],
+              "uses": [
+                "Projection_nonexpansiveness_expanded",
+                "Corrected_Algorithm2_run_domain"
+              ]
+            },
+            {
+              "step": 2,
+              "description": "Expand the trial-point square.",
+              "math": "\\|\\hat V_t^{1/4}(x_t-x^*)\\|^2+\\alpha_t^2\\|\\hat V_t^{-1/4}m_t\\|^2-2\\alpha_t\\langle m_t,x_t-x^*\\rangle",
+              "ref": "Appendix D, before Eq. (15), p.16",
+              "source_pdf_lines": [
+                1091,
+                1094
+              ],
+              "uses": [
+                "previous_step:1"
+              ]
+            },
+            {
+              "step": 3,
+              "description": "Substitute m_t=\\beta_{1t}m_{t-1}+(1-\\beta_{1t})g_t from Algorithm 2.",
+              "math": "m_t=\\beta_{1t}m_{t-1}+(1-\\beta_{1t})g_t",
+              "ref": "Appendix D before Eq. (15), p.16; Algorithm 2, p.5",
+              "source_pdf_lines": [
+                1093,
+                1095
+              ],
+              "uses": [
+                "previous_step:2",
+                "Algorithm2_AMSGrad_steps"
+              ]
+            },
+            {
+              "step": 4,
+              "description": "Rearrange the substituted projection inequality to isolate the gradient inner product while retaining the previous-momentum residual printed before Eq. (15).",
+              "math": "\\langle g_t,x_t-x^*\\rangle\\le \\frac{1}{2\\alpha_t(1-\\beta_{1t})}\\left[\\|\\hat V_t^{1/4}(x_t-x^*)\\|^2-\\|\\hat V_t^{1/4}(x_{t+1}-x^*)\\|^2\\right]+\\frac{\\alpha_t}{2(1-\\beta_{1t})}\\|\\hat V_t^{-1/4}m_t\\|^2+\\frac{\\beta_{1t}}{1-\\beta_{1t}}\\langle m_{t-1},x_t-x^*\\rangle",
+              "ref": "Appendix D, rearrangement before Eq. (15), p.16",
+              "source_pdf_lines": [
+                1097,
+                1105
+              ],
+              "uses": [
+                "previous_step:1",
+                "previous_step:2",
+                "previous_step:3",
+                "Theorem4_parameter_domain_boundary"
+              ],
+              "produces": "Printed pre-Young rearrangement with the residual term \\frac{\\beta_{1t}}{1-\\beta_{1t}}\\langle m_{t-1},x_t-x^*\\rangle."
+            },
+            {
+              "step": 5,
+              "description": "Apply Cauchy-Schwarz and Young's inequality to the previous-momentum term to produce the printed second inequality in Eq. (15).",
+              "math": "\\langle g_t,x_t-x^*\\rangle\\le \\frac{1}{2\\alpha_t(1-\\beta_{1t})}\\left[\\|\\hat V_t^{1/4}(x_t-x^*)\\|^2-\\|\\hat V_t^{1/4}(x_{t+1}-x^*)\\|^2\\right]+\\frac{\\alpha_t}{2(1-\\beta_{1t})}\\|\\hat V_t^{-1/4}m_t\\|^2+\\frac{\\beta_{1t}}{2(1-\\beta_{1t})}\\alpha_t\\|\\hat V_t^{-1/4}m_{t-1}\\|^2+\\frac{\\beta_{1t}}{2\\alpha_t(1-\\beta_{1t})}\\|\\hat V_t^{1/4}(x_t-x^*)\\|^2.",
+              "ref": "Appendix D, Eq. (15), p.16",
+              "source_pdf_lines": [
+                1106,
+                1116
+              ],
+              "uses": [
+                "previous_step:4",
+                "Theorem4_parameter_domain_boundary"
+              ],
+              "produces": "Equation (15); internally this uses the derived Young bound for the term \\beta_{1t}(1-\\beta_{1t})^{-1}\\langle m_{t-1},x_t-x^*\\rangle, which is described in the PDF prose but not printed as a separate display."
+            }
+          ]
+        },
+        {
+          "name": "AMSGrad_momentum_sum_bound_expanded",
+          "ref": "Appendix D, Lemma 2, p.16-18",
+          "statement_math": "For the parameter settings and conditions assumed in Theorem 4, we have\n\\[\n\\sum_{t=1}^T \\alpha_t\\|\\hat V_t^{-1/4}m_t\\|^2\\le \\frac{\\alpha\\sqrt{1+\\log T}}{(1-\\beta_1)(1-\\gamma)\\sqrt{1-\\beta_2}}\\sum_{i=1}^d\\|g_{1:T,i}\\|_2.\n\\]",
+          "role": "Expanded Lemma 2 proof trace, controlling the accumulated current-momentum term in Eq. (16).",
+          "lean_symbols": [
+            "_private.Algorithms.Unverified.AMSGrad.0.SGD.AMSGrad.amsgrad_eq17_denominator_transport",
+            "_private.Algorithms.Unverified.AMSGrad.0.SGD.AMSGrad.amsgrad_triangular_history_sum_le_history_l1",
+            "_private.Algorithms.Unverified.AMSGrad.0.SGD.AMSGrad.amsgrad_history_l1_over_sqrt_le_sqrt_log_l2"
+          ],
+          "proof": [
+            {
+              "step": 1,
+              "description": "Split off the terminal term in the time sum.",
+              "math": "\\sum_{t=1}^T\\alpha_t\\|\\hat V_t^{-1/4}m_t\\|^2=\\sum_{t=1}^{T-1}\\alpha_t\\|\\hat V_t^{-1/4}m_t\\|^2+\\alpha_T\\sum_{i=1}^d\\frac{m_{T,i}^2}{\\sqrt{\\hat v_{T,i}}}",
+              "ref": "Appendix D, Lemma 2 proof start, p.16-17",
+              "source_pdf_lines": [
+                1156,
+                1163
+              ],
+              "uses": []
+            },
+            {
+              "step": 2,
+              "description": "Use \\hat v_{T,i}\\ge v_{T,i} and then unroll Algorithm 2's m_t and v_t recursions.",
+              "math": "\\sum_{t=1}^{T-1}\\alpha_t\\|\\hat V_t^{-1/4}m_t\\|^2+\\alpha\\sum_{i=1}^d\\frac{(\\sum_{j=1}^T(1-\\beta_{1j})\\Pi_{k=1}^{T-j}\\beta_{1(T-k+1)}g_{j,i})^2}{\\sqrt{T((1-\\beta_2)\\sum_{j=1}^T\\beta_2^{T-j}g_{j,i}^2)}}",
+              "ref": "Appendix D, Lemma 2 proof, p.17",
+              "source_pdf_lines": [
+                1164,
+                1184
+              ],
+              "uses": [
+                "Algorithm2_AMSGrad_steps",
+                "Corrected_Algorithm2_run_domain"
+              ]
+            },
+            {
+              "step": 3,
+              "description": "Apply Cauchy-Schwarz to the squared weighted sum in the numerator.",
+              "math": "\\left(\\sum_{j=1}^T \\Pi_{k=1}^{T-j}\\beta_{1(T-k+1)}\\right)\\left(\\sum_{j=1}^T \\Pi_{k=1}^{T-j}\\beta_{1(T-k+1)}g_{j,i}^2\\right)",
+              "ref": "Appendix D, Lemma 2 proof leading to Eq. (17), p.17",
+              "source_pdf_lines": [
+                1186,
+                1197
+              ],
+              "uses": [
+                "previous_step:2"
+              ]
+            },
+            {
+              "step": 4,
+              "description": "Use \\beta_{1k}\\le\\beta_1 and \\sum_{j=1}^T\\beta_1^{T-j}\\le1/(1-\\beta_1).",
+              "math": "\\sum_{j=1}^T\\beta_1^{T-j}\\le\\frac{1}{1-\\beta_1}",
+              "ref": "Appendix D, Lemma 2 proof, p.17",
+              "source_pdf_lines": [
+                1199,
+                1237
+              ],
+              "uses": [
+                "Theorem4_beta_gamma_printed",
+                "Theorem4_parameter_domain_boundary",
+                "previous_step:3"
+              ]
+            },
+            {
+              "step": 5,
+              "description": "Transport the denominator using the v_t lower history term and \\gamma=\\beta_1/\\sqrt{\\beta_2}, producing Eq. (17).",
+              "math": "\\sum_{t=1}^T\\alpha_t\\|\\hat V_t^{-1/4}m_t\\|^2\\le\\sum_{t=1}^{T-1}\\alpha_t\\|\\hat V_t^{-1/4}m_t\\|^2+\\frac{\\alpha}{(1-\\beta_1)\\sqrt{T(1-\\beta_2)}}\\sum_{i=1}^d\\sum_{j=1}^T\\gamma^{T-j}|g_{j,i}|",
+              "ref": "Appendix D, Eq. (17), p.17",
+              "source_pdf_lines": [
+                1227,
+                1231
+              ],
+              "uses": [
+                "previous_step:4",
+                "Theorem4_beta_gamma_printed",
+                "Theorem4_RHS_compatibility_boundary"
+              ]
+            },
+            {
+              "step": 6,
+              "description": "Apply the same bound at every time step and exchange the triangular summation order.",
+              "math": "\\sum_{t=1}^T\\alpha_t\\|\\hat V_t^{-1/4}m_t\\|^2\\le\\sum_{t=1}^T\\frac{\\alpha}{(1-\\beta_1)\\sqrt{t(1-\\beta_2)}}\\sum_{i=1}^d\\sum_{j=1}^t\\gamma^{t-j}|g_{j,i}|",
+              "ref": "Appendix D, display after Eq. (17), p.18",
+              "source_pdf_lines": [
+                1246,
+                1256
+              ],
+              "uses": [
+                "previous_step:5"
+              ]
+            },
+            {
+              "step": 7,
+              "description": "Bound the geometric tail by 1/(1-\\gamma).",
+              "math": "\\sum_{j=t}^T\\gamma^{j-t}\\le\\frac{1}{1-\\gamma}",
+              "ref": "Appendix D, Lemma 2 proof, p.18",
+              "source_pdf_lines": [
+                1257,
+                1272
+              ],
+              "uses": [
+                "Theorem4_beta_gamma_printed",
+                "previous_step:6"
+              ]
+            },
+            {
+              "step": 8,
+              "description": "Apply Cauchy-Schwarz in each coordinate and the harmonic-sum estimate.",
+              "math": "\\sum_{t=1}^T\\frac{1}{t}\\le 1+\\log T",
+              "ref": "Appendix D, Lemma 2 proof, p.18",
+              "source_pdf_lines": [
+                1263,
+                1274
+              ],
+              "uses": [
+                "previous_step:7"
+              ]
+            },
+            {
+              "step": 9,
+              "description": "Supplement the inherited proof prefix by isolating the all-time post-Eq. (17) bound before the PDF changes summation order.",
+              "math": "\\sum_{t=1}^T\\alpha_t\\|\\hat V_t^{-1/4}m_t\\|^2\\le\\sum_{t=1}^T\\frac{\\alpha}{(1-\\beta_1)\\sqrt{t(1-\\beta_2)}}\\sum_{i=1}^d\\sum_{j=1}^t\\gamma^{t-j}|g_{j,i}|",
+              "ref": "Appendix D, display after Eq. (17), p.18",
+              "source_pdf_lines": [
+                1246,
+                1251
+              ],
+              "uses": [
+                "previous_step:5"
+              ],
+              "produces": "The first displayed line on p.18 after applying Eq. (17) at every time step."
+            },
+            {
+              "step": 10,
+              "description": "Exchange the triangular summation order exactly as printed, rewriting the history index into a future geometric tail.",
+              "math": "\\frac{\\alpha}{(1-\\beta_1)\\sqrt{1-\\beta_2}}\\sum_{i=1}^d\\sum_{t=1}^T\\frac{1}{\\sqrt t}\\sum_{j=1}^t\\gamma^{t-j}|g_{j,i}|=\\frac{\\alpha}{(1-\\beta_1)\\sqrt{1-\\beta_2}}\\sum_{i=1}^d\\sum_{t=1}^T|g_{t,i}|\\sum_{j=t}^T\\frac{\\gamma^{j-t}}{\\sqrt j}",
+              "ref": "Appendix D, summation-exchange display, p.18",
+              "source_pdf_lines": [
+                1252,
+                1256
+              ],
+              "uses": [
+                "previous_step:9"
+              ],
+              "produces": "The two displayed equalities changing from \\sum_{t=1}^T\\sum_{j=1}^t to \\sum_{t=1}^T\\sum_{j=t}^T."
+            },
+            {
+              "step": 11,
+              "description": "Use j\\ge t to replace 1/\\sqrt j by 1/\\sqrt t, then use the geometric-tail bound.",
+              "math": "\\frac{\\alpha}{(1-\\beta_1)\\sqrt{1-\\beta_2}}\\sum_{i=1}^d\\sum_{t=1}^T|g_{t,i}|\\sum_{j=t}^T\\frac{\\gamma^{j-t}}{\\sqrt j}\\le\\frac{\\alpha}{(1-\\beta_1)\\sqrt{1-\\beta_2}}\\sum_{i=1}^d\\sum_{t=1}^T|g_{t,i}|\\sum_{j=t}^T\\frac{\\gamma^{j-t}}{\\sqrt t}\\le\\frac{\\alpha}{(1-\\beta_1)\\sqrt{1-\\beta_2}}\\sum_{i=1}^d\\sum_{t=1}^T|g_{t,i}|\\frac{1}{(1-\\gamma)\\sqrt t}",
+              "ref": "Appendix D, geometric-tail inequality chain, p.18",
+              "source_pdf_lines": [
+                1257,
+                1262
+              ],
+              "uses": [
+                "previous_step:10",
+                "Theorem4_beta_gamma_printed",
+                "previous_step:7"
+              ],
+              "produces": "The PDF's two printed inequalities: first replace the denominator \\sqrt j by \\sqrt t for j\\ge t, then apply \\sum_{j=t}^T\\gamma^{j-t}\\le1/(1-\\gamma)."
+            },
+            {
+              "step": 12,
+              "description": "Apply coordinatewise Cauchy-Schwarz to the weighted absolute-gradient sum and then the printed harmonic-sum estimate.",
+              "math": "\\frac{\\alpha}{(1-\\beta_1)(1-\\gamma)\\sqrt{1-\\beta_2}}\\sum_{i=1}^d\\|g_{1:T,i}\\|_2\\sqrt{\\sum_{t=1}^T\\frac{1}{t}}\\le\\frac{\\alpha\\sqrt{1+\\log T}}{(1-\\beta_1)(1-\\gamma)\\sqrt{1-\\beta_2}}\\sum_{i=1}^d\\|g_{1:T,i}\\|_2",
+              "ref": "Appendix D, final Lemma 2 display, p.18",
+              "source_pdf_lines": [
+                1263,
+                1274
+              ],
+              "uses": [
+                "previous_step:11",
+                "previous_step:8"
+              ],
+              "produces": "The displayed endpoint of Lemma 2."
+            }
+          ]
+        },
+        {
+          "name": "AMSGrad_metric_beta_telescope_bound",
+          "ref": "Appendix D, Eq. (18) and final telescope, p.18",
+          "statement_math": "\\frac{\\hat v_{t,i}^{1/2}}{\\alpha_t}\\ge \\frac{\\hat v_{t-1,i}^{1/2}}{\\alpha_{t-1}}.",
+          "role": "Records the monotone denominator and coordinate telescope used to simplify Eq. (18).",
+          "lean_symbol": "_private.Algorithms.Unverified.AMSGrad.0.SGD.AMSGrad.amsgrad_metric_beta_telescope_scalar",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Use \\beta_{1t}\\le\\beta_1 to move from Eq. (16) to the coordinate display Eq. (18).",
+              "math": "\\beta_{1t}\\le\\beta_1",
+              "ref": "Appendix D, sentence after Eq. (18), p.18",
+              "source_pdf_lines": [
+                1276,
+                1318
+              ],
+              "uses": [
+                "Theorem4_beta_gamma_printed",
+                "Theorem4_beta1_nonincreasing_boundary"
+              ]
+            },
+            {
+              "step": 2,
+              "description": "Observe monotonicity of \\hat v_{t,i}^{1/2}/\\alpha_t.",
+              "math": "\\frac{\\hat v_{t,i}^{1/2}}{\\alpha_t}\\ge \\frac{\\hat v_{t-1,i}^{1/2}}{\\alpha_{t-1}}.",
+              "ref": "Appendix D, after Eq. (18), p.18",
+              "source_pdf_lines": [
+                1317,
+                1323
+              ],
+              "uses": [
+                "AMSGrad_inverse_learning_rate_monotone",
+                "Theorem4_alpha_schedule_printed"
+              ]
+            },
+            {
+              "step": 3,
+              "description": "Apply the L_infty diameter bound to each coordinate difference.",
+              "math": "(x_{t,i}-x_i^*)^2\\le D_\\infty^2",
+              "ref": "Appendix D, final display after Eq. (18), p.18",
+              "source_pdf_lines": [
+                1324,
+                1339
+              ],
+              "uses": [
+                "Bounded_diameter",
+                "previous_step:2"
+              ]
+            },
+            {
+              "step": 4,
+              "description": "Telescope the monotone coordinate increments to the terminal \\hat v_T term.",
+              "math": "\\frac{D_\\infty^2}{2\\alpha_T(1-\\beta_1)}\\sum_{i=1}^d\\hat v_{T,i}^{1/2}",
+              "ref": "Appendix D, final display, p.18",
+              "source_pdf_lines": [
+                1340,
+                1346
+              ],
+              "uses": [
+                "previous_step:3"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Theorem4_regret_minimum_definition",
+          "ref": "Section 2 regret definition, p.2",
+          "statement_math": "R_T=\\sum_{t=1}^T f_t(x_t)-\\min_{x\\in\\mathcal{F}}\\sum_{t=1}^T f_t(x)",
+          "role": "Records the paper's printed minimum-form regret definition; the separate source-boundary record `Theorem4_minimum_to_infimum_bridge` names the Lean-only infimum adapter.",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Start from the paper's Section 2 regret comparator set and record the printed minimum-form regret expression.",
+              "math": "R_T=\\sum_{t=1}^T f_t(x_t)-\\min_{x\\in\\mathcal{F}}\\sum_{t=1}^T f_t(x)",
+              "ref": "Section 2 regret definition, p.2",
+              "source_pdf_lines": [
+                106,
+                109
+              ],
+              "uses": [],
+              "produces": "Paper regret definition only; the infimum adapter is recorded under extension.additions.source_boundaries, not as paper statement math."
+            }
+          ]
+        }
+      ],
+      "source_corrections": [
+        {
+          "name": "Theorem4_first_term_display_mismatch",
+          "ref": "Theorem 4 p.6 versus Appendix D final display p.18",
+          "source_pdf_lines": [
+            356,
+            360,
+            1340,
+            1346
+          ],
+          "description": "The theorem statement on p.6 prints the terminal term without the factor 1/2, while the appendix proof's final display derives D_infty^2/(2 alpha_T(1-beta_1)) times the terminal sum. The inherited JSON already flags this mismatch; the extension keeps it as source evidence rather than rewriting the inherited theorem statement."
+        },
+        {
+          "name": "Theorem4_minimum_attainment_boundary",
+          "ref": "Section 2 regret definition, p.2",
+          "description": "The paper defines regret using a minimum over the feasible set. The Lean extension proves the infimum-form corrected boundary unless a separate attainment bridge is supplied."
+        }
+      ]
+    },
+    "new_obligations": [
+      "Discharge the checked finite-horizon Algorithm 2 run boundary `SGD.AMSGrad.WellDefinedRunOnHorizon`, including coordinate quotient nonzero denominators and weighted-projection metric-domain witnesses for the printed update.",
+      "Discharge `SGD.AMSGrad.totalizedRHSCompatibilityObligation` or use the relational `SGD.AMSGrad.IsTheorem4Bound` witnesses directly for the displayed Theorem 4 RHS quotients and square roots, including nonnegativity of the terminal coordinate sum needed to compare the Appendix D half-coefficient terminal term with the printed Theorem 4 terminal term.",
+      "Expose the source-backed horizon parameter domain `SGD.AMSGrad.Theorem4ParameterDomainOnHorizon`: positive active step sizes and nonnegative first-moment weights used in Eq. (15)-(18) divisions and Young inequalities.",
+      "Expose the decreasing beta-one schedule `SGD.AMSGrad.Theorem4Beta1NonincreasingOnHorizon`, because Section 4 says the proof requires a decreasing schedule and the Eq. (18) metric/beta telescope consumes it.",
+      "Account for the paper-source mismatch between Theorem 4's p.6 terminal term and the Appendix D final display, without silently changing inherited `main_theorem.statement_math`.",
+      "Bridge the paper's minimum comparator regret to the Lean infimum-form regret boundary, or provide an attainment proof through `SGD.AMSGrad.fixedComparatorInfimumValue_eq_of_isBest`."
+    ],
+    "proof_roots": [
+      "SGD.AMSGrad.AMSGrad_theorem4_generatedAlgorithm2_extension",
+      "SGD.AMSGrad.AMSGrad_theorem4_generatedAlgorithm2_globalSolvability_extension",
+      "SGD.AMSGrad.AMSGrad_theorem4_wellDefinedRunOnHorizon_extension"
+    ]
+  },
+  "extension_audit": {
+    "baseline_reviewed": true,
+    "delta_faithful": true,
+    "reuse_justified": true,
+    "no_duplicate_model": true,
+    "no_assumption_leakage": true,
+    "inherited_reference_repairs_reviewed": true,
+    "inherited_reference_repairs_evidence": "Mechanically detected inherited reference repairs were empty; inherited theorem, assumption, algorithm, and lemma records were left unchanged, and only the existing empty extension scaffold was populated.",
+    "evidence": "Reviewed the immutable baseline JSON and declaration index. Reuse points cite existing declarations including `SGD.AMSGrad.Run`, `SGD.AMSGrad.WellDefinedRunOnHorizon`, `SGD.AMSGrad.IsTheorem4Bound`, `SGD.AMSGrad.weightedProjection_nonexpansive`, `SGD.AMSGrad.theorem4Bound_exists_of_rhsCompatibility`, and the public proof root `SGD.AMSGrad.AMSGrad_theorem4_wellDefinedRunOnHorizon_extension`. New obligations explicitly record the checked Algorithm 2 run domain, RHS compatibility, horizon parameter/sign domain, decreasing beta-one schedule, comparator infimum bridge, and the Theorem 4/App. D terminal-factor source boundary; these are not inserted as original paper assumptions. Iteration 4 keeps the paper-facing regret key lemma at the Section 2 minimum definition and moves the infimum bridge to a source-boundary adapter."
+  }
+}

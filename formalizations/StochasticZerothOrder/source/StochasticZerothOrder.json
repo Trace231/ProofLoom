@@ -1,0 +1,1682 @@
+{
+  "algorithm": "StochasticZerothOrder",
+  "full_name": "Two-Phase Randomized Stochastic Gradient Free Method (2-RSGF) for Unconstrained Nonconvex Stochastic Zeroth-Order Optimization",
+  "source_reference": "Lan, First-Order and Stochastic Optimization Methods for Machine Learning, Springer 2020 (Theorem 6.4)",
+  "setup": {
+    "problem": {
+      "math": "f^* := \\inf_{x \\in \\mathbb{R}^n} \\left\\{ f(x) := \\int_{\\Xi} F(x,\\xi)\\,dP(\\xi) \\right\\}",
+      "ref": "(6.1.47)",
+      "description": "Unconstrained nonconvex stochastic optimization problem represented by an expectation and accessed through a stochastic zeroth-order oracle."
+    },
+    "variable_space": {
+      "math": "F(x,\\xi) \\in \\mathscr{C}_L^{1,1}(\\mathbb{R}^n) \\text{ almost surely, which clearly implies } f(x) \\in \\mathscr{C}_L^{1,1}(\\mathbb{R}^n)",
+      "ref": "p. 319, paragraph after (6.1.47)"
+    }
+  },
+  "assumptions": [
+    {
+      "name": "sample_function_smoothness",
+      "math": "F(x,\\xi) \\in \\mathscr{C}_L^{1,1}(\\mathbb{R}^n) \\text{ almost surely}",
+      "ref": "p. 319, paragraph after (6.1.47)",
+      "parameters": [
+        "L > 0"
+      ]
+    },
+    {
+      "name": "objective_smoothness",
+      "math": "f \\in \\mathscr{C}_L^{1,1}(\\mathbb{R}^n)",
+      "ref": "p. 306, definition of \\mathscr{C}_L^{1,1}; p. 319, paragraph after (6.1.47)",
+      "parameters": [
+        "L > 0"
+      ]
+    },
+    {
+      "name": "objective_descent_inequality_6_1_2",
+      "math": "\\left|f(y)-f(x)-\\langle\\nabla f(x),y-x\\rangle\\right|\\le\\frac{L}{2}\\|y-x\\|^2,\\quad \\forall x,y\\in\\mathbb{R}^n",
+      "ref": "(6.1.2), p. 306",
+      "parameters": [
+        "L > 0"
+      ]
+    },
+    {
+      "name": "Assumption_13_unbiased",
+      "math": "\\mathbb{E}[G(x_k,\\xi_k)] = \\nabla f(x_k), \\quad k \\ge 1",
+      "ref": "(6.1.5), Assumption 13(a)",
+      "parameters": []
+    },
+    {
+      "name": "Assumption_13_variance",
+      "math": "\\mathbb{E}\\left[\\|G(x_k,\\xi_k) - \\nabla f(x_k)\\|^2\\right] \\le \\sigma^2, \\quad k \\ge 1",
+      "ref": "(6.1.6), Assumption 13(b)",
+      "parameters": [
+        "\\sigma \\ge 0"
+      ]
+    },
+    {
+      "name": "Assumption_15_SZO",
+      "math": "\\mathbb{E}[F(x_k,\\xi_k)] = f(x_k), \\quad k \\ge 1",
+      "ref": "(6.1.48), Assumption 15",
+      "parameters": []
+    },
+    {
+      "name": "adaptive_filtration_conditional_oracle_prerequisite",
+      "math": "",
+      "ref": "Formalization prerequisite for (6.1.66)-(6.1.67), proof of Theorem 6.3, pp. 321-322",
+      "parameters": [
+        "k",
+        "\\mathcal{F}_{k-1}"
+      ],
+      "source_status": "Formalization-only prerequisite; not a paper assumption. The proof needs a history filtration making the adaptive iterate and its smoothed gradient history-measurable, together with conditional fresh-oracle unbiasedness and the conditional variance bound. The paper prints the resulting conditional identities in (6.1.66)-(6.1.67) but does not state this filtration/interface."
+    },
+    {
+      "name": "postoptimization_fixed_candidate_conditional_oracle_prerequisite",
+      "math": "",
+      "ref": "Formalization-only prerequisite for the random post-optimization candidate in (6.1.67)-(6.1.89), proof of Theorem 6.4, p. 327",
+      "parameters": [
+        "s",
+        "k",
+        "\\mathcal{F}_{s,k}"
+      ],
+      "source_status": "Formalization-only prerequisite; not a paper assumption and not derived from (6.1.60), Assumption 13, or Lemma 6.1. The Lean boundary must supply candidate measurability, a fresh post-optimization oracle boundary, conditional versions of the zeroth-order and first-order oracle facts, and residual measurability/integrability. The source uses the corresponding moment chain in (6.1.67)-(6.1.88) but does not expose this filtration/interface and does not assume independence of stochastic samples."
+    },
+    {
+      "name": "postoptimization_fixed_candidate_martingale_prerequisite",
+      "math": "",
+      "ref": "Formalization-only prerequisite for Lemma 6.1(a) in the proof of (6.1.89), p. 327; source residual bound (6.1.88)",
+      "parameters": [
+        "s",
+        "k",
+        "T",
+        "\\mathcal{F}_{s,k}",
+        "\\mathscr{D}_N"
+      ],
+      "source_status": "Formalization-only prerequisite, not paper mathematics. These obligations are the interface needed to instantiate Lemma 6.1(a) for the fixed-candidate event leading to (6.1.89); the source only prints the residual scale and tail calculation in (6.1.88)-(6.1.89).",
+      "formalization_prerequisites": [
+        "For each fixed s, provide an increasing filtration \\(\\mathcal{F}_{s,0}\\subseteq\\mathcal{F}_{s,1}\\subseteq\\cdots\\) and make \\(\\bar{x}_s\\) measurable with respect to \\(\\mathcal{F}_{s,0}\\).",
+        "For each k, make \\(\\Delta_{s,k}\\) measurable with respect to \\(\\mathcal{F}_{s,k}\\), square-integrable, and conditionally centered: \\(\\mathbb{E}[\\Delta_{s,k}\\mid\\mathcal{F}_{s,k-1}]=0\\).",
+        "Supply the per-increment second-moment bound \\(\\mathbb{E}[\\|\\Delta_{s,k}\\|^2]\\le\\mathscr{D}_N\\), where the source defines \\(\\mathscr{D}_N\\) in (6.1.88)."
+      ]
+    },
+    {
+      "name": "bounded_below",
+      "math": "f : \\mathbb{R}^n \\to \\mathbb{R} \\text{ is a differentiable (not necessarily convex), bounded from below, and its gradient }\\nabla f(\\cdot)\\text{ satisfies }\\|\\nabla f(y)-\\nabla f(x)\\|\\le L\\|y-x\\|,\\quad \\forall x,y\\in\\mathbb{R}^n",
+      "ref": "p. 305, paragraph defining (6.1.1)",
+      "parameters": []
+    },
+    {
+      "name": "independent_optimization_runs_prerequisite",
+      "math": "",
+      "ref": "Formalization-only prerequisite for the product factorization in (6.1.87), proof of Theorem 6.4, p. 327",
+      "parameters": [
+        "S"
+      ],
+      "source_status": "Formalization-only prerequisite for the product equality in (6.1.87). The 2-RSGF algorithm does not print this independence assumption; the cited p. 314 discussion belongs to the 2-RSGD method, and Assumption 13 explicitly says sample independence is not required."
+    },
+    {
+      "name": "selection_probability_policy",
+      "math": "P_R(k) := \\operatorname{Prob}\\{R=k\\} = \\frac{\\gamma_k-2L(n+4)\\gamma_k^2}{\\sum_{k=1}^N[\\gamma_k-2L(n+4)\\gamma_k^2]},\\quad k=1,\\ldots,N",
+      "ref": "(6.1.61)",
+      "parameters": [
+        "N"
+      ]
+    },
+    {
+      "name": "confidence_run_policy",
+      "math": "S(\\Lambda) := \\lceil\\log(2/\\Lambda)\\rceil",
+      "ref": "(6.1.32)",
+      "parameters": [
+        "\\Lambda"
+      ]
+    },
+    {
+      "name": "RSGF_stepsize_condition",
+      "math": "\\gamma_k < \\frac{1}{2(n+4)L}",
+      "ref": "Theorem 6.3, before (6.1.61)",
+      "parameters": [
+        "k"
+      ]
+    },
+    {
+      "name": "constant_stepsize_policy",
+      "math": "\\gamma_k = \\frac{1}{\\sqrt{n+4}}\\min\\left\\{\\frac{1}{4L\\sqrt{n+4}},\\frac{\\widetilde{D}}{\\sigma\\sqrt{N}}\\right\\},\\quad k=1,\\ldots,N",
+      "ref": "(6.1.70)",
+      "parameters": [
+        "k",
+        "N",
+        "\\widetilde{D}"
+      ]
+    },
+    {
+      "name": "smoothing_parameter_policy",
+      "math": "\\mu \\le \\frac{D_f}{(n+4)\\sqrt{2N}}",
+      "ref": "(6.1.71)",
+      "parameters": [
+        "N"
+      ]
+    },
+    {
+      "name": "smoothing_parameter_positive",
+      "math": "\\mu > 0",
+      "ref": "p. 319, paragraph before (6.1.49)",
+      "parameters": [
+        "\\mu"
+      ]
+    },
+    {
+      "name": "iteration_limit_policy",
+      "math": "N=\\hat{N}(\\varepsilon):=\\max\\left\\{\\frac{12(n+4)(6LD_f)^2}{\\varepsilon},\\left[72L\\sqrt{n+4}\\left(\\widetilde{D}+\\frac{D_f^2}{\\widetilde{D}}\\right)\\frac{\\sigma}{\\varepsilon}\\right]^2\\right\\}",
+      "ref": "(6.1.82)",
+      "parameters": [
+        "\\varepsilon"
+      ]
+    },
+    {
+      "name": "postoptimization_sample_policy",
+      "math": "T=\\hat{T}(\\varepsilon,\\Lambda):=\\frac{24(n+4)(S+1)}{\\Lambda}\\max\\left\\{1,\\frac{6\\sigma^2}{\\varepsilon}\\right\\}",
+      "ref": "(6.1.83)",
+      "parameters": [
+        "\\varepsilon",
+        "\\Lambda"
+      ]
+    }
+  ],
+  "algorithm_spec": {
+    "ref": "A Two-Phase RSGF (2-RSGF) Method, pp. 325-326",
+    "initialization": {
+      "math": "x_1,\\ \\text{number of runs }S,\\ \\text{iteration limit }N,\\ \\text{and sample size }T",
+      "ref": "p. 325, algorithm input"
+    },
+    "steps": [
+      {
+        "step": 0,
+        "name": "RSGF random stopping variable",
+        "math": "\\text{Let }R\\text{ be a random variable with probability mass function }P_R.",
+        "ref": "p. 320, A Randomized Stochastic Gradient Free (RSGF) Method, Step 0 (PDF lines 18780-18783)"
+      },
+      {
+        "step": 1,
+        "name": "RSGF loop range",
+        "math": "\\text{Step }k=1,\\ldots,R.",
+        "ref": "p. 320, A Randomized Stochastic Gradient Free (RSGF) Method, Step k (PDF lines 18784-18784)"
+      },
+      {
+        "step": 2,
+        "name": "Gaussian direction generation and SZO call",
+        "math": "\\text{Generate }u_k\\text{ by Gaussian random vector generator and call the stochastic zeroth-order oracle for computing }G_\\mu(x_k,\\xi_k,u_k)\\text{ given by}",
+        "ref": "p. 320, A Randomized Stochastic Gradient Free (RSGF) Method, Step k (PDF lines 18784-18787)"
+      },
+      {
+        "step": 3,
+        "name": "Gaussian finite-difference estimator",
+        "math": "G_\\mu(x_k,\\xi_k,u_k) = \\frac{F(x_k+\\mu u_k,\\xi_k)-F(x_k,\\xi_k)}{\\mu}u_k",
+        "ref": "(6.1.58)"
+      },
+      {
+        "step": 4,
+        "name": "RSGF update",
+        "math": "x_{k+1} = x_k - \\gamma_k G_\\mu(x_k,\\xi_k,u_k)",
+        "ref": "(6.1.59)"
+      },
+      {
+        "step": 5,
+        "name": "RSGF inner output",
+        "math": "x_R",
+        "ref": "p. 320, A Randomized Stochastic Gradient Free (RSGF) Method, Output (PDF lines 18789-18791)"
+      },
+      {
+        "step": 6,
+        "name": "Optimization phase",
+        "math": "\\text{For }s=1,\\ldots,S\\ \\text{Call the RSGF method with input }x_1,\\ \\text{iteration limit }N,\\ \\text{stepsizes }\\{\\gamma_k\\}\\text{ in (6.1.70), probability mass function }P_R\\text{ in (6.1.61), and the smoothing parameter }\\mu\\text{ satisfying (6.1.71). Let }\\bar{x}_s\\text{ be the output of this procedure.}",
+        "ref": "p. 325, Optimization phase (PDF lines 19120-19125)"
+      },
+      {
+        "step": 7,
+        "name": "Post-optimization selection",
+        "math": "\\|g_\\mu(\\bar{x}^*)\\| = \\min_{s=1,\\ldots,S} \\|g_\\mu(\\bar{x}_s)\\|, \\qquad g_\\mu(\\bar{x}_s) := \\frac{1}{T}\\sum_{k=1}^T G_\\mu(\\bar{x}_s,\\xi_k,u_k)",
+        "ref": "(6.1.80)"
+      }
+    ],
+    "output": {
+      "math": "\\bar{x}^*",
+      "ref": "(6.1.80)",
+      "type": "candidate with smallest empirical zeroth-order gradient norm"
+    },
+    "parameters": [
+      {
+        "name": "stepsize_policy",
+        "math": "\\gamma_k = \\frac{1}{\\sqrt{n+4}}\\min\\left\\{\\frac{1}{4L\\sqrt{n+4}},\\frac{\\widetilde{D}}{\\sigma\\sqrt{N}}\\right\\},\\quad k=1,\\ldots,N",
+        "ref": "(6.1.70)"
+      },
+      {
+        "name": "selection_probability",
+        "math": "P_R(k) := \\operatorname{Prob}\\{R=k\\} = \\frac{\\gamma_k-2L(n+4)\\gamma_k^2}{\\sum_{k=1}^N[\\gamma_k-2L(n+4)\\gamma_k^2]},\\quad k=1,\\ldots,N",
+        "ref": "(6.1.61)"
+      },
+      {
+        "name": "smoothing_parameter",
+        "math": "\\mu \\le \\frac{D_f}{(n+4)\\sqrt{2N}}",
+        "ref": "(6.1.71)"
+      },
+      {
+        "name": "D_f",
+        "math": "D_f := \\left[\\frac{2(f(x_1)-f^*)}{L}\\right]^{1/2}",
+        "ref": "(6.1.13)"
+      },
+      {
+        "name": "smoothing_definition",
+        "math": "f_\\mu(x) = \\frac{1}{(2\\pi)^{n/2}}\\int f(x+\\mu u)e^{-\\|u\\|^2/2}\\,du = \\mathbb{E}_u[f(x+\\mu u)]",
+        "ref": "(6.1.49)"
+      },
+      {
+        "name": "free_parameter",
+        "math": "\\widetilde{D} > 0",
+        "ref": "Corollary 6.3, before (6.1.70)"
+      },
+      {
+        "name": "confidence_runs",
+        "math": "S(\\Lambda) := \\lceil\\log(2/\\Lambda)\\rceil",
+        "ref": "(6.1.32)"
+      }
+    ]
+  },
+  "main_theorem": {
+    "ref": "Theorem 6.4",
+    "statement_math": "\\text{Under Assumptions 13 and 15, the following statements hold for the 2-RSGF method applied to problem (6.1.47). (a) Let }\\bar{\\mathscr{B}}_N\\text{ be defined in (6.1.72). We have }\\operatorname{Prob}\\left\\{\\|\\nabla f(\\bar{x}^*)\\|^2 \\ge 8L\\bar{\\mathscr{B}}_N + \\frac{3(n+4)L^2D_f^2}{2N} + \\frac{24(n+4)\\lambda}{T}\\left[L\\bar{\\mathscr{B}}_N + \\frac{(n+4)L^2D_f^2}{N} + \\sigma^2\\right]\\right\\} \\le \\frac{S+1}{\\lambda}+2^{-S},\\quad \\forall\\lambda>0;\\text{ (b) Let }\\varepsilon>0\\text{ and }\\Lambda\\in(0,1)\\text{ be given. If }S=S(\\Lambda)\\text{ as in (6.1.32), }N=\\hat{N}(\\varepsilon):=\\max\\left\\{\\frac{12(n+4)(6LD_f)^2}{\\varepsilon},\\left[72L\\sqrt{n+4}\\left(\\widetilde{D}+\\frac{D_f^2}{\\widetilde{D}}\\right)\\frac{\\sigma}{\\varepsilon}\\right]^2\\right\\},\\ T=\\hat{T}(\\varepsilon,\\Lambda):=\\frac{24(n+4)(S+1)}{\\Lambda}\\max\\left\\{1,\\frac{6\\sigma^2}{\\varepsilon}\\right\\},\\text{ then the 2-RSGF method can compute an }(\\varepsilon,\\Lambda)\\text{-solution of problem (6.1.47) after taking at most }2S(\\Lambda)[\\hat{N}(\\varepsilon)+\\hat{T}(\\varepsilon,\\Lambda)]\\text{ calls to the SZO.}",
+    "rate": "\\mathcal{O}\\left\\{\\frac{nL^2D_f^2\\log(1/\\Lambda)}{\\varepsilon}+nL^2\\left(\\widetilde{D}+\\frac{D_f^2}{\\widetilde{D}}\\right)^2\\frac{\\sigma^2}{\\varepsilon^2}\\log\\frac{1}{\\Lambda}+\\frac{n\\log^2(1/\\Lambda)}{\\Lambda}\\left(1+\\frac{\\sigma^2}{\\varepsilon}\\right)\\right\\}",
+    "measure": "high-probability stationarity guarantee and SZO oracle complexity",
+    "proof": [
+      {
+        "step": 1,
+        "description": "Apply the gradient-smoothing estimate (6.1.52) to obtain the first inequality in (6.1.85).",
+        "ref": "(6.1.52), proof of Theorem 6.4, p. 326",
+        "source_pdf_lines": [
+          19169,
+          19171
+        ],
+        "math": "\\|\\nabla f_\\mu(x)-\\nabla f(x)\\|^2 \\le \\frac{\\mu^2}{4}L^2(n+3)^3",
+        "uses": [
+          "Gaussian_smoothing_Lemma_6_2",
+          "smoothing_parameter_positive"
+        ],
+        "produces": "The first upper bound on the squared smoothing bias."
+      },
+      {
+        "step": 2,
+        "description": "Substitute the smoothing restriction (6.1.71) and simplify the dimension factors to obtain the second inequality in (6.1.85).",
+        "ref": "(6.1.85), proof of Theorem 6.4, p. 326",
+        "source_pdf_lines": [
+          19171,
+          19173
+        ],
+        "math": "\\frac{\\mu^2}{4}L^2(n+3)^3 \\le \\frac{(n+4)L^2D_f^2}{8N}",
+        "uses": [
+          "previous_step:1",
+          "smoothing_parameter_policy",
+          "smoothing_parameter_positive"
+        ],
+        "produces": "Uniform squared smoothing-bias bound used in both selector decompositions."
+      },
+      {
+        "step": 3,
+        "description": "Use the selector definition (6.1.80) and rewrite the selected empirical gradient as the true gradient plus its empirical error.",
+        "ref": "Proof of (6.1.86), p. 326",
+        "source_pdf_lines": [
+          19175,
+          19178
+        ],
+        "math": "\\|g_\\mu(\\bar{x}^*)\\|^2=\\min_{s=1,\\ldots,S}\\|g_\\mu(\\bar{x}_s)\\|^2=\\min_{s=1,\\ldots,S}\\|\\nabla f(\\bar{x}_s)+g_\\mu(\\bar{x}_s)-\\nabla f(\\bar{x}_s)\\|^2",
+        "uses": [
+          "selector_definition_6_1_80"
+        ],
+        "produces": "A minimum over candidate true gradients and empirical errors."
+      },
+      {
+        "step": 4,
+        "description": "Apply the elementary two-term norm inequality to the decomposition in step 2.",
+        "ref": "Proof of (6.1.86), p. 326",
+        "source_pdf_lines": [
+          19179,
+          19181
+        ],
+        "math": "\\le \\min_{s=1,\\ldots,S}\\left\\{2\\|\\nabla f(\\bar{x}_s)\\|^2+2\\|g_\\mu(\\bar{x}_s)-\\nabla f(\\bar{x}_s)\\|^2\\right\\}",
+        "uses": [
+          "previous_step:3"
+        ],
+        "produces": "A bound involving candidate true-gradient norms and candidate empirical-gradient errors."
+      },
+      {
+        "step": 5,
+        "description": "Split each empirical error into the post-optimization sampling error and the smoothing bias.",
+        "ref": "Proof of (6.1.86), p. 326",
+        "source_pdf_lines": [
+          19182,
+          19184
+        ],
+        "math": "\\le \\min_{s=1,\\ldots,S}\\left\\{2\\|\\nabla f(\\bar{x}_s)\\|^2+2\\|g_\\mu(\\bar{x}_s)-\\nabla f_\\mu(\\bar{x}_s)\\|^2+2\\|\\nabla f_\\mu(\\bar{x}_s)-\\nabla f(\\bar{x}_s)\\|^2\\right\\}",
+        "uses": [
+          "previous_step:4",
+          "Gaussian_smoothing_Lemma_6_2"
+        ],
+        "produces": "A bound separating estimator fluctuation from smoothing bias."
+      },
+      {
+        "step": 6,
+        "description": "Take the minimum of the first term, the maximum of the sampling-error term, and insert the bias bound from (6.1.85).",
+        "ref": "Proof of (6.1.86), p. 326",
+        "source_pdf_lines": [
+          19185,
+          19187
+        ],
+        "math": "\\le 2\\min_{s=1,\\ldots,S}\\|\\nabla f(\\bar{x}_s)\\|^2+4\\max_{s=1,\\ldots,S}\\|g_\\mu(\\bar{x}_s)-\\nabla f(\\bar{x}_s)\\|^2+\\frac{(n+4)L^2D_f^2}{2N}",
+        "uses": [
+          "previous_step:5",
+          "previous_step:2"
+        ],
+        "produces": "The first selector bound, before converting the selected point to the true gradient."
+      },
+      {
+        "step": 7,
+        "description": "Apply the two-term norm inequality to the selected true gradient and its empirical selector value.",
+        "ref": "Proof of (6.1.86), p. 326",
+        "source_pdf_lines": [
+          19190,
+          19191
+        ],
+        "math": "\\|\\nabla f(\\bar{x}^*)\\|^2\\le 2\\|g_\\mu(\\bar{x}^*)\\|^2+2\\|\\nabla f(\\bar{x}^*)-g_\\mu(\\bar{x}^*)\\|^2",
+        "uses": [
+          "selector_definition_6_1_80"
+        ],
+        "produces": "A two-term bound for the selected true gradient."
+      },
+      {
+        "step": 8,
+        "description": "Split the selected empirical error into the post-optimization sampling error and the selected-point smoothing bias.",
+        "ref": "Proof of (6.1.86), p. 326",
+        "source_pdf_lines": [
+          19191,
+          19193
+        ],
+        "math": "\\|\\nabla f(\\bar{x}^*)\\|^2\\le 2\\|g_\\mu(\\bar{x}^*)\\|^2+4\\|\\nabla f_\\mu(\\bar{x}^*)-g_\\mu(\\bar{x}^*)\\|^2+4\\|\\nabla f(\\bar{x}^*)-\\nabla f_\\mu(\\bar{x}^*)\\|^2",
+        "uses": [
+          "previous_step:7",
+          "Gaussian_smoothing_Lemma_6_2"
+        ],
+        "produces": "A true-gradient bound in terms of the selected empirical error and selected-point smoothing bias."
+      },
+      {
+        "step": 9,
+        "description": "Substitute the selector bound from step 5 into the first term of step 6 and retain the selected-point bias term separately.",
+        "ref": "Proof of (6.1.86), p. 326",
+        "source_pdf_lines": [
+          19194,
+          19199
+        ],
+        "math": "\\le 4\\min_{s=1,\\ldots,S}\\|\\nabla f(\\bar{x}_s)\\|^2+8\\max_{s=1,\\ldots,S}\\|g_\\mu(\\bar{x}_s)-\\nabla f(\\bar{x}_s)\\|^2+\\frac{(n+4)L^2D_f^2}{N}+4\\|\\nabla f_\\mu(\\bar{x}^*)-g_\\mu(\\bar{x}^*)\\|^2+4\\|\\nabla f(\\bar{x}^*)-\\nabla f_\\mu(\\bar{x}^*)\\|^2",
+        "uses": [
+          "previous_step:6",
+          "previous_step:8"
+        ],
+        "produces": "The pre-final selector decomposition."
+      },
+      {
+        "step": 10,
+        "description": "Use (6.1.85) once more on the selected-point bias and simplify the two deterministic bias contributions to obtain the printed decomposition (6.1.86).",
+        "ref": "(6.1.86), proof of Theorem 6.4, p. 326",
+        "source_pdf_lines": [
+          19201,
+          19204
+        ],
+        "math": "\\|\\nabla f(\\bar{x}^*)\\|^2\\le 4\\min_{s=1,\\ldots,S}\\|\\nabla f(\\bar{x}_s)\\|^2+8\\max_{s=1,\\ldots,S}\\|g_\\mu(\\bar{x}_s)-\\nabla f(\\bar{x}_s)\\|^2+4\\|\\nabla f_\\mu(\\bar{x}^*)-g_\\mu(\\bar{x}^*)\\|^2+\\frac{3(n+4)L^2D_f^2}{2N}",
+        "uses": [
+          "previous_step:9",
+          "previous_step:2"
+        ],
+        "produces": "The deterministic/probabilistic decomposition used to prove (6.1.81)."
+      },
+      {
+        "step": 11,
+        "description": "Use (6.1.78) with \\lambda=2 for each independent optimization run and rewrite the probability of the minimum event as a product.",
+        "ref": "(6.1.87), proof of Theorem 6.4, p. 327",
+        "source_pdf_lines": [
+          19209,
+          19213
+        ],
+        "math": "\\operatorname{Prob}\\left\\{\\min_{s=1,\\ldots,S}\\|\\nabla f(\\bar{x}_s)\\|^2\\ge 2L\\bar{\\mathscr{B}}_N\\right\\}=\\prod_{s=1}^S\\operatorname{Prob}\\left\\{\\|\\nabla f(\\bar{x}_s)\\|^2\\ge 2L\\bar{\\mathscr{B}}_N\\right\\}",
+        "uses": [
+          "Markov_tail_6_1_78",
+          "independent_optimization_runs_prerequisite"
+        ],
+        "produces": "The product representation for the independent optimization-run failure event."
+      },
+      {
+        "step": 12,
+        "description": "Apply the single-run bound in each factor of the product to obtain the optimization failure probability.",
+        "ref": "(6.1.87), proof of Theorem 6.4, p. 327",
+        "source_pdf_lines": [
+          19211,
+          19214
+        ],
+        "math": "\\prod_{s=1}^S\\operatorname{Prob}\\left\\{\\|\\nabla f(\\bar{x}_s)\\|^2\\ge 2L\\bar{\\mathscr{B}}_N\\right\\}\\le 2^{-S}",
+        "uses": [
+          "previous_step:11",
+          "Markov_tail_6_1_78"
+        ],
+        "produces": "Failure probability at most 2^{-S} for the optimization term."
+      },
+      {
+        "step": 13,
+        "description": "Introduce the post-optimization residual used to express each empirical estimator error.",
+        "ref": "Proof of (6.1.88), p. 327",
+        "source_pdf_lines": [
+          19215,
+          19216
+        ],
+        "math": "\\Delta_{s,k}:=G_\\mu(\\bar{x}_s,\\xi_k,u_k)-\\nabla f_\\mu(\\bar{x}_s),\\quad k=1,\\ldots,T",
+        "uses": [
+          "Gaussian_smoothing_Lemma_6_2",
+          "smoothing_parameter_positive"
+        ],
+        "produces": "Residual sequence \\Delta_{s,k} for the empirical gradient estimates."
+      },
+      {
+        "step": 14,
+        "description": "Apply the zeroth-order second-moment estimate to the sample function at the post-optimization candidate, under the explicitly supplied fixed-candidate post-optimization filtration/oracle interface. The interface supplies the candidate measurability, fresh post-optimization oracle boundary, conditional centering, and integrability needed to read this random-candidate estimate.",
+        "ref": "(6.1.67), proof of Theorem 6.4, p. 327",
+        "source_pdf_lines": [
+          19218,
+          19220
+        ],
+        "math": "\\mathbb{E}[\\|G_\\mu(\\bar{x}_s,\\xi_k,u_k)\\|^2]\\le 2(n+4)\\left[\\mathbb{E}[\\|G(\\bar{x}_s,\\xi)\\|^2]+\\frac{\\mu^2L^2(n+6)^3}{2}\\right]",
+        "uses": [
+          "sample_function_smoothness",
+          "Gaussian_smoothing_Lemma_6_2",
+          "postoptimization_fixed_candidate_conditional_oracle_prerequisite",
+          "postoptimization_fixed_candidate_martingale_interface"
+        ],
+        "produces": "The zeroth-order estimator moment bound before the first-order oracle substitution."
+      },
+      {
+        "step": 15,
+        "description": "Use Assumption 13 to replace the stochastic first-order moment by the true-gradient moment and variance, retaining the fixed-candidate post-optimization filtration/oracle interface as the prerequisite for applying the conditional first-order oracle bounds at the random candidate.",
+        "ref": "(6.1.67), proof of Theorem 6.4, p. 327",
+        "source_pdf_lines": [
+          19220,
+          19222
+        ],
+        "math": "\\le 2(n+4)\\left[\\mathbb{E}[\\|\\nabla f(\\bar{x}_s)\\|^2]+\\sigma^2\\right]+2\\mu^2L^2(n+4)^3",
+        "uses": [
+          "previous_step:14",
+          "Assumption_13_unbiased",
+          "Assumption_13_variance",
+          "postoptimization_fixed_candidate_conditional_oracle_prerequisite",
+          "postoptimization_fixed_candidate_martingale_interface"
+        ],
+        "produces": "A second-moment bound for each zeroth-order estimator."
+      },
+      {
+        "step": 16,
+        "description": "Bound the residual second moment by the estimator second moment, preserving the residual definition and using the fixed-candidate post-optimization filtration/oracle interface for the integrability and conditional-centering boundary at the random candidate.",
+        "ref": "(6.1.88), proof of Theorem 6.4, p. 327",
+        "source_pdf_lines": [
+          19224,
+          19226
+        ],
+        "math": "\\mathbb{E}[\\|\\Delta_{s,k}\\|^2]=\\mathbb{E}[\\|G_\\mu(\\bar{x}_s,\\xi_k,u_k)-\\nabla f_\\mu(\\bar{x}_s)\\|^2]\\le\\mathbb{E}[\\|G_\\mu(\\bar{x}_s,\\xi_k,u_k)\\|^2]",
+        "uses": [
+          "previous_step:13",
+          "previous_step:15",
+          "postoptimization_fixed_candidate_conditional_oracle_prerequisite",
+          "postoptimization_fixed_candidate_martingale_interface"
+        ],
+        "produces": "An intermediate residual bound still containing \\mu."
+      },
+      {
+        "step": 17,
+        "description": "Use the one-run bound to replace the true-gradient moment in the residual estimate.",
+        "ref": "(6.1.88), proof of Theorem 6.4, p. 327",
+        "source_pdf_lines": [
+          19226,
+          19229
+        ],
+        "math": "\\le 2(n+4)\\left[L\\bar{\\mathscr{B}}_N+\\sigma^2\\right]+2\\mu^2L^2(n+4)^3",
+        "uses": [
+          "previous_step:16",
+          "constant_stepsize_Corollary_6_3",
+          "postoptimization_fixed_candidate_conditional_oracle_prerequisite"
+        ],
+        "produces": "An intermediate residual bound still containing \\mu."
+      },
+      {
+        "step": 18,
+        "description": "Use the smoothing restriction (6.1.71) to remove \\mu and define the residual scale \\mathscr{D}_N, preserving the source definition.",
+        "ref": "(6.1.88), proof of Theorem 6.4, p. 327",
+        "source_pdf_lines": [
+          19230,
+          19233
+        ],
+        "math": "\\le 2(n+4)\\left[L\\bar{\\mathscr{B}}_N+\\sigma^2+\\frac{L^2D_f^2}{2N}\\right]=:\\mathscr{D}_N",
+        "uses": [
+          "previous_step:17",
+          "smoothing_parameter_policy",
+          "postoptimization_fixed_candidate_conditional_oracle_prerequisite"
+        ],
+        "produces": "Residual scale \\mathscr{D}_N used in all post-optimization tail bounds."
+      },
+      {
+        "step": 19,
+        "description": "Use the definition of the empirical gradient to express its error as the average of the residuals.",
+        "ref": "Proof immediately before (6.1.89), p. 327",
+        "source_pdf_lines": [
+          19235,
+          19236
+        ],
+        "math": "g_\\mu(\\bar{x}_s)-\\nabla f_\\mu(\\bar{x}_s)=\\frac{1}{T}\\sum_{k=1}^T\\Delta_{s,k}",
+        "uses": [
+          "previous_step:13",
+          "selector_definition_6_1_80",
+          "postoptimization_fixed_candidate_conditional_oracle_prerequisite"
+        ],
+        "produces": "The relation \\(g_\\mu(\\bar{x}_s)-\\nabla f_\\mu(\\bar{x}_s)=T^{-1}\\sum_{k=1}^T\\Delta_{s,k}\\)."
+      },
+      {
+        "step": 20,
+        "description": "Apply Lemma 6.1(a) to the residual sum for a fixed candidate and rewrite the resulting event in terms of the empirical-gradient error. The source explicitly cites Assumption 13 and Lemma 6.1(a); the filtration, residual measurability, square-integrability, and conditional-zero-mean premises are recorded separately as a formalization-only prerequisite rather than as paper assumptions.",
+        "ref": "Proof immediately before (6.1.89), p. 327",
+        "source_pdf_lines": [
+          19235,
+          19241
+        ],
+        "math": "\\operatorname{Prob}\\left\\{\\|g_\\mu(\\bar{x}_s)-\\nabla f_\\mu(\\bar{x}_s)\\|^2\\ge \\frac{\\lambda\\mathscr{D}_N}{T}\\right\\}=\\operatorname{Prob}\\left\\{\\left\\|\\sum_{k=1}^T\\Delta_{s,k}\\right\\|^2\\ge \\lambda T\\mathscr{D}_N\\right\\}",
+          "uses": [
+          "previous_step:18",
+          "previous_step:19",
+          "Assumption_13_unbiased",
+          "Assumption_13_variance",
+          "postoptimization_fixed_candidate_conditional_oracle_prerequisite",
+          "postoptimization_fixed_candidate_martingale_interface",
+          "postoptimization_fixed_candidate_martingale_prerequisite",
+          "martingale_second_moment_Lemma_6_1"
+        ],
+        "produces": "The fixed-candidate residual event in the form required by Lemma 6.1(a)."
+      },
+      {
+        "step": 21,
+        "description": "Use the martingale second-moment tail bound to obtain the fixed-candidate failure probability.",
+        "ref": "Proof immediately before (6.1.89), p. 327",
+        "source_pdf_lines": [
+          19239,
+          19241
+        ],
+        "math": "\\le \\frac{1}{\\lambda},\\quad \\forall\\lambda>0",
+        "uses": [
+          "previous_step:20",
+          "postoptimization_fixed_candidate_martingale_prerequisite",
+          "martingale_second_moment_Lemma_6_1"
+        ],
+        "produces": "A per-candidate post-optimization failure bound."
+      },
+      {
+        "step": 22,
+        "description": "Take a union bound over the S candidates.",
+        "ref": "(6.1.89), proof of Theorem 6.4, p. 327",
+        "source_pdf_lines": [
+          19243,
+          19249
+        ],
+        "math": "\\operatorname{Prob}\\left\\{\\max_{s=1,\\ldots,S}\\|g_\\mu(\\bar{x}_s)-\\nabla f_\\mu(\\bar{x}_s)\\|^2\\ge \\frac{\\lambda\\mathscr{D}_N}{T}\\right\\}\\le \\frac{S}{\\lambda},\\quad \\forall\\lambda>0",
+        "uses": [
+          "previous_step:21"
+        ],
+        "produces": "Failure probability at most S/\\lambda for all candidate estimation errors."
+      },
+      {
+        "step": 23,
+        "description": "Record the source proof's direct selected-candidate assertion after the fixed-candidate residual calculation, preserving the same-sample selector (6.1.80). The PDF does not print a selected-candidate filtration, conditional-martingale premise, or separate evaluation-sample boundary.",
+        "ref": "(6.1.90), proof of Theorem 6.4, p. 327",
+        "source_pdf_lines": [
+          19251,
+          19256
+        ],
+        "uses": [
+          "selector_definition_6_1_80",
+          "previous_step:18",
+          "previous_step:22",
+          "Assumption_13_unbiased",
+          "Assumption_13_variance",
+          "postoptimization_fixed_candidate_martingale_interface",
+          "martingale_second_moment_Lemma_6_1"
+        ],
+        "produces": "The source's direct same-sample selected-candidate assertion, with no unprinted pre-sample measurability or fresh-sample boundary inferred."
+      },
+      {
+        "step": 24,
+        "description": "Apply the source's direct selected-candidate assertion (6.1.90) as printed. This records the paper's endpoint without presenting an unprinted selected-candidate filtration or fresh-sample model as part of the source proof.",
+        "ref": "(6.1.90), proof of Theorem 6.4, p. 327",
+        "source_pdf_lines": [
+          19251,
+          19256
+        ],
+        "math": "\\operatorname{Prob}\\left\\{\\|g_\\mu(\\bar{x}^*)-\\nabla f_\\mu(\\bar{x}^*)\\|^2\\ge \\frac{\\lambda\\mathscr{D}_N}{T}\\right\\}\\le \\frac{1}{\\lambda},\\quad \\forall\\lambda>0",
+        "uses": [
+          "previous_step:23",
+          "previous_step:22",
+          "Assumption_13_unbiased",
+          "Assumption_13_variance",
+          "postoptimization_fixed_candidate_martingale_interface",
+          "martingale_second_moment_Lemma_6_1"
+        ],
+        "produces": "Failure probability at most 1/\\lambda for the selected empirical gradient error."
+      },
+      {
+        "step": 25,
+        "description": "Combine relations (6.1.86), (6.1.87), (6.1.88), (6.1.89), and (6.1.90). The source proof does not reprint the resulting endpoint; the exact fixed-parameter endpoint is the separately printed theorem display (6.1.81).",
+        "ref": "(6.1.81), theorem statement p. 326; proof conclusion p. 327",
+        "source_pdf_lines": [
+          19258,
+          19259
+        ],
+        "uses": [
+          "previous_step:10",
+          "previous_step:12",
+          "previous_step:18",
+          "previous_step:22",
+          "previous_step:24"
+        ],
+        "produces": "Derived endpoint: the fixed-parameter high-probability stationarity bound printed as (6.1.81) in the theorem statement."
+      },
+      {
+        "step": 26,
+        "description": "Record the theorem's exact SZO call-count bound after substituting the confidence-dependent run count S(\\Lambda), iteration limit \\hat{N}(\\varepsilon), and post-optimization sample size \\hat{T}(\\varepsilon,\\Lambda) into the two-calls-per-estimator count over all runs.",
+        "ref": "(6.1.84), Theorem 6.4(b), p. 326",
+        "source_pdf_lines": [
+          19164,
+          19167
+        ],
+        "math": "2S(\\Lambda)\\left[\\hat{N}(\\varepsilon)+\\hat{T}(\\varepsilon,\\Lambda)\\right]",
+        "uses": [
+          "iteration_limit_policy",
+          "postoptimization_sample_policy",
+          "confidence_run_policy"
+        ],
+        "produces": "The exact theorem call-count bound displayed in (6.1.84)."
+      },
+      {
+        "step": 27,
+        "description": "Substitute the definition of \\bar{\\mathscr{B}}_N and the first term of \\hat N(\\varepsilon) into the one-run bound.",
+        "ref": "Proof of Theorem 6.4(b), p. 327",
+        "source_pdf_lines": [
+          19262,
+          19270
+        ],
+        "math": "\\bar{\\mathscr{B}}_{\\hat{N}(\\varepsilon)}=\\frac{12(n+4)LD_f^2}{\\hat{N}(\\varepsilon)}+\\frac{4\\sigma\\sqrt{n+4}}{\\sqrt{\\hat{N}(\\varepsilon)}}\\left(\\widetilde{D}+\\frac{D_f^2}{\\widetilde{D}}\\right)\\le \\frac{\\varepsilon}{36L}+\\frac{\\varepsilon}{18L}",
+        "uses": [
+          "iteration_limit_policy",
+          "constant_stepsize_Corollary_6_3"
+        ],
+        "produces": "The two contributions to \\bar{\\mathscr{B}}_{\\hat N(\\varepsilon)} are bounded separately."
+      },
+      {
+        "step": 28,
+        "description": "Collect the two bounds in the previous step to obtain the source's bound on \\bar{\\mathscr{B}}_{\\hat N(\\varepsilon)}.",
+        "ref": "Proof of Theorem 6.4(b), p. 327",
+        "source_pdf_lines": [
+          19267,
+          19270
+        ],
+        "math": "\\frac{\\varepsilon}{36L}+\\frac{\\varepsilon}{18L}=\\frac{\\varepsilon}{12L}",
+          "uses": [
+          "previous_step:27"
+        ],
+        "produces": "The bound \\bar{\\mathscr{B}}_{\\hat N(\\varepsilon)}\\le\\varepsilon/(12L)."
+      },
+      {
+        "step": 29,
+        "description": "Use the preceding bound and the first component of \\hat N(\\varepsilon) to bound the deterministic threshold contribution.",
+        "ref": "Proof of Theorem 6.4(b), p. 328",
+        "source_pdf_lines": [
+          19273,
+          19277
+        ],
+        "math": "8L\\bar{\\mathscr{B}}_{\\hat{N}(\\varepsilon)}+\\frac{3(n+4)L^2D_f^2}{2\\hat{N}(\\varepsilon)}\\le \\frac{2\\varepsilon}{3}+\\frac{\\varepsilon}{288}",
+          "uses": [
+          "previous_step:28",
+          "iteration_limit_policy"
+        ],
+        "produces": "The unsimplified deterministic contribution bound."
+      },
+      {
+        "step": 30,
+        "description": "Simplify the deterministic contribution bound.",
+        "ref": "Proof of Theorem 6.4(b), p. 328",
+        "source_pdf_lines": [
+          19277,
+          19279
+        ],
+        "math": "\\frac{2\\varepsilon}{3}+\\frac{\\varepsilon}{288}\\le\\frac{17\\varepsilon}{24}",
+          "uses": [
+          "previous_step:29"
+        ],
+        "produces": "The deterministic contribution is at most 17\\varepsilon/24."
+      },
+      {
+        "step": 31,
+        "description": "Set \\lambda=2(S+1)/\\Lambda and use the definitions of \\hat N and \\hat T to bound the sampling term.",
+        "ref": "Proof of Theorem 6.4(b), p. 328",
+        "source_pdf_lines": [
+          19281,
+          19289
+        ],
+        "math": "\\frac{24(n+4)\\lambda}{\\hat{T}(\\varepsilon,\\Lambda)}\\left[L\\bar{\\mathscr{B}}_{\\hat{N}(\\varepsilon)}+\\frac{(n+4)L^2D_f^2}{\\hat{N}(\\varepsilon)}+\\sigma^2\\right]\\le\\frac{24(n+4)\\lambda}{\\hat{T}(\\varepsilon,\\Lambda)}\\left(\\frac{\\varepsilon}{12}+\\frac{\\varepsilon}{432}+\\sigma^2\\right)",
+          "uses": [
+          "previous_step:28",
+          "iteration_limit_policy",
+          "postoptimization_sample_policy",
+          "confidence_run_policy"
+        ],
+        "produces": "The parameter assignment \\lambda=2(S+1)/\\Lambda and the sampling term reduced to the bracketed numerical expression."
+      },
+      {
+        "step": 32,
+        "description": "Apply the max expression in \\hat T(\\varepsilon,\\Lambda) to replace the variance term.",
+        "ref": "Proof of Theorem 6.4(b), p. 328",
+        "source_pdf_lines": [
+          19288,
+          19290
+        ],
+        "math": "\\frac{24(n+4)\\lambda}{\\hat{T}(\\varepsilon,\\Lambda)}\\left(\\frac{\\varepsilon}{12}+\\frac{\\varepsilon}{432}+\\sigma^2\\right)\\le\\frac{\\varepsilon}{12}+\\frac{\\varepsilon}{432}+\\frac{\\varepsilon}{6}",
+          "uses": [
+          "previous_step:31",
+          "postoptimization_sample_policy"
+        ],
+        "produces": "The sampling term is bounded by the three numerical contributions."
+      },
+      {
+        "step": 33,
+        "description": "Simplify the three numerical contributions.",
+        "ref": "Proof of Theorem 6.4(b), p. 328",
+        "source_pdf_lines": [
+          19290,
+          19293
+        ],
+        "math": "\\frac{\\varepsilon}{12}+\\frac{\\varepsilon}{432}+\\frac{\\varepsilon}{6}\\le\\frac{7\\varepsilon}{24}",
+          "uses": [
+          "previous_step:32"
+        ],
+        "produces": "The sampling contribution is at most 7\\varepsilon/24."
+      },
+      {
+        "step": 34,
+        "description": "Use the deterministic and sampling bounds to establish the event inclusion for the target stationarity threshold.",
+        "ref": "Proof of Theorem 6.4(b), p. 328",
+        "source_pdf_lines": [
+          19295,
+          19306
+        ],
+        "math": "\\operatorname{Prob}\\{\\|\\nabla f(\\bar{x}^*)\\|^2\\ge\\varepsilon\\}\\le\\operatorname{Prob}\\left\\{\\|\\nabla f(\\bar{x}^*)\\|^2\\ge 8L\\bar{\\mathscr{B}}_{\\hat{N}(\\varepsilon)}+\\frac{3(n+4)L^2D_f^2}{2\\hat{N}(\\varepsilon)}+\\frac{24(n+4)\\lambda}{\\hat{T}(\\varepsilon,\\Lambda)}\\left[L\\bar{\\mathscr{B}}_{\\hat{N}(\\varepsilon)}+\\frac{(n+4)L^2D_f^2}{\\hat{N}(\\varepsilon)}+\\sigma^2\\right]\\right\\}",
+        "uses": [
+          "previous_step:29",
+          "previous_step:30",
+          "previous_step:33"
+        ],
+        "produces": "The target event is contained in the fixed-parameter event from Theorem 6.4(a)."
+      },
+      {
+        "step": 35,
+        "description": "Apply the fixed-parameter bound (6.1.81) to the event in step 34.",
+        "ref": "Proof of Theorem 6.4(b), p. 328",
+        "source_pdf_lines": [
+          19303,
+          19310
+        ],
+        "math": "\\le\\frac{S+1}{\\lambda}+2^{-S}",
+          "uses": [
+          "previous_step:34",
+          "previous_step:25"
+        ],
+        "produces": "The probability bound in terms of S and the selected \\lambda."
+      },
+      {
+        "step": 36,
+        "description": "Substitute \\lambda=2(S+1)/\\Lambda and S=S(\\Lambda) to obtain the target confidence level.",
+        "ref": "Proof of Theorem 6.4(b), p. 328",
+        "source_pdf_lines": [
+          19309,
+          19311
+        ],
+        "math": "\\frac{S+1}{\\lambda}+2^{-S}=\\Lambda",
+        "uses": [
+          "previous_step:35",
+          "previous_step:31",
+          "confidence_run_policy"
+        ],
+        "produces": "The selected point is an (\\varepsilon,\\Lambda)-solution."
+      },
+      {
+        "step": 37,
+        "description": "Finally substitute the choices (6.1.32), (6.1.82), and (6.1.83) into the exact call count and discard constant factors, yielding the displayed asymptotic complexity.",
+        "ref": "(6.1.91), p. 328",
+        "source_pdf_lines": [
+          19315,
+          19326
+        ],
+        "math": "\\mathcal{O}\\left\\{\\frac{nL^2D_f^2\\log(1/\\Lambda)}{\\varepsilon}+nL^2\\left(\\widetilde{D}+\\frac{D_f^2}{\\widetilde{D}}\\right)^2\\frac{\\sigma^2}{\\varepsilon^2}\\log\\frac{1}{\\Lambda}+\\frac{n\\log^2(1/\\Lambda)}{\\Lambda}\\left(1+\\frac{\\sigma^2}{\\varepsilon}\\right)\\right\\}",
+          "uses": [
+          "previous_step:26",
+          "confidence_run_policy",
+          "iteration_limit_policy",
+          "postoptimization_sample_policy"
+        ],
+        "produces": "The asymptotic SZO complexity stated after Theorem 6.4."
+      }
+    ]
+  },
+  "key_lemmas": [
+    {
+      "name": "Gaussian_smoothing_Lemma_6_2",
+      "ref": "Lemma 6.2, pp. 319-320",
+      "statement_math": "\\text{If }f\\in\\mathscr{C}_L^{1,1}(\\mathbb{R}^n),\\text{ then (a) }f_\\mu\\text{ is also Lipschitz continuously differentiable with gradient Lipschitz constant }L_\\mu\\le L\\text{ and }\\nabla f_\\mu(x)=\\frac{1}{(2\\pi)^{n/2}}\\int\\frac{f(x+\\mu v)-f(x)}{\\mu}v e^{-\\|v\\|^2/2}\\,dv;\\text{ (b) for any }x\\in\\mathbb{R}^n,\\ |f_\\mu(x)-f(x)|\\le\\frac{\\mu^2}{2}Ln,\\ \\|\\nabla f_\\mu(x)-\\nabla f(x)\\|\\le\\frac{\\mu}{2}L(n+3)^{3/2},\\ \\mathbb{E}_v\\left[\\left\\|\\frac{f(x+\\mu v)-f(x)}{\\mu}v\\right\\|^2\\right]\\le 2(n+4)\\|\\nabla f(x)\\|^2+\\frac{\\mu^2}{2}L^2(n+6)^3;\\text{ (c) }f_\\mu\\text{ is also convex provided }f\\text{ is convex.}",
+      "role": "Supplies smoothness of the Gaussian convolution, its gradient formula, the gradient bias bound, and the second-moment estimate used by the RSGF and 2-RSGF analyses.",
+      "proof": "cited",
+      "citation": "The paper cites [102] for Lemma 6.2."
+    },
+    {
+      "name": "D_f_definition_6_1_13",
+      "ref": "(6.1.13), p. 309",
+      "statement_math": "D_f:=\\left[\\frac{2(f(x_1)-f^*)}{L}\\right]^{1/2}",
+      "role": "Provides the named source definition substituted into the divided weighted inequality in the proof of Theorem 6.3(a).",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Record the source definition of D_f used in the statement and proof of Theorem 6.3(a).",
+          "ref": "(6.1.13), p. 309",
+          "source_pdf_lines": [
+            18142,
+            18147
+          ],
+          "math": "D_f:=\\left[\\frac{2(f(x_1)-f^*)}{L}\\right]^{1/2}",
+          "uses": [],
+          "produces": "The named source definition of D_f."
+        }
+      ]
+    },
+    {
+      "name": "smoothed_objective_infimum_definition_6_1_56",
+      "ref": "(6.1.56), p. 320",
+      "statement_math": "f_\\mu^*:=\\min_{x\\in\\mathbb{R}^n}f_\\mu(x)",
+      "role": "Provides the named definition used when telescoping the smoothed objective in Theorem 6.3(a) and when comparing the smoothed and original objective gaps.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Introduce the minimum of the Gaussian-smoothed objective before the RSGF proof uses f_mu^* <= f_mu(x_{N+1}).",
+          "ref": "(6.1.56), p. 320",
+          "source_pdf_lines": [
+            18768,
+            18770
+          ],
+          "math": "f_\\mu^*:=\\min_{x\\in\\mathbb{R}^n}f_\\mu(x)",
+          "uses": [
+            "Gaussian_smoothing_Lemma_6_2"
+          ],
+          "produces": "The source definition of f_mu^*."
+        }
+      ]
+    },
+    {
+      "name": "adaptive_RSGF_history_interface_6_1_66_67",
+      "ref": "Formalization prerequisite for (6.1.66)-(6.1.67), proof of Theorem 6.3, pp. 321-322",
+      "statement_math": "\\mathbb{E}[\\langle\\nabla f_\\mu(x_k),\\Delta_k\\rangle\\mid\\zeta_{[k-1]}]=0,\\qquad \\mathbb{E}[\\|G_\\mu(x_k,\\zeta_k)\\|^2\\mid\\zeta_{[k-1]}]\\le 2(n+4)\\left(\\mathbb{E}[\\|\\nabla f(x_k)\\|^2\\mid\\zeta_{[k-1]}]+\\sigma^2\\right)+\\frac{\\mu^2}{2}L^2(n+6)^3",
+      "role": "Names the adaptive-history interface implicit in the source proof: x_k and the smoothed gradient are history-measurable, while the fresh zeroth-order and first-order oracle laws admit the conditional forms used in (6.1.66)-(6.1.67).",
+      "source_status": "The displayed conditional identities are printed in the paper; the filtration, measurability, and conditional fresh-oracle interface are formalization prerequisites rather than additional paper assumptions.",
+      "formalization_prerequisites": [
+        "Derived: x_k and \\nabla f_\\mu(x_k) are measurable with respect to the history generated by \\zeta_{[k-1]}.",
+        "Derived interface: the conditional version of (6.1.60) is available at the adaptive iterate, and the conditional versions of Assumption 13(a)-(b) are available for the fresh first-order oracle sample.",
+        "These obligations are named by adaptive_filtration_conditional_oracle_prerequisite; they are not inferred from the paper's unconditional Assumptions 13 and 15."
+      ],
+      "proof": [
+        {
+          "step": 1,
+          "description": "Register the adaptive filtration, iterate measurability, and conditional fresh-oracle interface needed to read (6.1.66) and (6.1.67) as conditional-expectation statements. This is a named formalization-only prerequisite, not a consequence derived from the paper's unconditional assumptions.",
+          "ref": "Formalization prerequisite for (6.1.66)-(6.1.67), proof of Theorem 6.3, pp. 321-322",
+          "source_pdf_lines": [
+            18862,
+            18880
+          ],
+          "uses": [
+            "adaptive_filtration_conditional_oracle_prerequisite"
+          ],
+          "produces": "History measurability of x_k and \\nabla f_\\mu(x_k), together with the conditional fresh-oracle identities used by the source."
+        }
+      ]
+    },
+    {
+      "name": "inner_RSGF_history_conditioning_6_1_66_67",
+      "ref": "(6.1.66)-(6.1.67), proof of Theorem 6.3, pp. 321-322",
+      "statement_math": "\\mathbb{E}[\\langle\\nabla f_\\mu(x_k),\\Delta_k\\rangle\\mid\\zeta_{[k-1]}]=0,\\qquad \\mathbb{E}[\\|G_\\mu(x_k,\\zeta_k)\\|^2\\mid\\zeta_{[k-1]}]\\le 2(n+4)\\mathbb{E}[\\|G(x_k,\\xi_k)\\|^2\\mid\\zeta_{[k-1]}]+\\frac{\\mu^2}{2}L^2(n+6)^3\\le 2(n+4)\\left(\\mathbb{E}[\\|\\nabla f(x_k)\\|^2\\mid\\zeta_{[k-1]}]+\\sigma^2\\right)+\\frac{\\mu^2}{2}L^2(n+6)^3",
+      "role": "Records the source-level conditioning on the adaptive RSGF history used in (6.1.66) and (6.1.67), while exposing the history/conditional-oracle interface needed by a Lean proof.",
+      "source_status": "The displayed conditional identities are printed in the paper; the filtration interpretation below is a formalization prerequisite rather than a new paper assumption.",
+      "formalization_prerequisites": [
+        "Derived: \\(x_k\\) and \\(\\nabla f_\\mu(x_k)\\) are measurable with respect to the history generated by \\(\\zeta_{[k-1]}\\).",
+        "Derived interface: the conditional versions of the SZO unbiasedness identity and Assumption 13 are available at the adaptive iterate; the paper uses them in the displayed conditional equations without separately defining a filtration."
+      ],
+      "proof": [
+        {
+          "step": 1,
+          "description": "Condition the source identity (6.1.60) on the history \\(\\zeta_{[k-1]}\\), subtract \\(\\nabla f_\\mu(x_k)\\), and obtain the zero conditional residual inner product (6.1.66).",
+          "ref": "(6.1.66), proof of Theorem 6.3, p. 321",
+          "source_pdf_lines": [
+            18862,
+            18864
+          ],
+          "math": "\\mathbb{E}[\\langle\\nabla f_\\mu(x_k),\\Delta_k\\rangle\\mid\\zeta_{[k-1]}]=0",
+          "uses": [
+            "SZO_unbiasedness_6_1_60",
+            "adaptive_RSGF_history_interface_6_1_66_67",
+            "adaptive_filtration_conditional_oracle_prerequisite"
+          ],
+          "produces": "The conditional cross term vanishes in the one-step descent sum."
+        },
+        {
+          "step": 2,
+          "description": "Apply the zeroth-order second-moment estimate to \\(F(\\cdot,\\xi_k)\\), using the Gaussian estimator formula and conditioning on \\(\\zeta_{[k-1]}\\).",
+          "ref": "(6.1.67), proof of Theorem 6.3, pp. 321-322",
+          "source_pdf_lines": [
+            18866,
+            18873
+          ],
+          "math": "\\mathbb{E}[\\|G_\\mu(x_k,\\zeta_k)\\|^2\\mid\\zeta_{[k-1]}]\\le 2(n+4)\\mathbb{E}[\\|G(x_k,\\xi_k)\\|^2\\mid\\zeta_{[k-1]}]+\\frac{\\mu^2}{2}L^2(n+6)^3",
+          "uses": [
+            "sample_function_smoothness",
+            "Gaussian_smoothing_Lemma_6_2",
+            "adaptive_RSGF_history_interface_6_1_66_67",
+            "adaptive_filtration_conditional_oracle_prerequisite"
+          ],
+          "produces": "The conditional zeroth-order estimator moment bound."
+        },
+        {
+          "step": 3,
+          "description": "Use Assumption 13 to replace the conditional stochastic-gradient second moment by the conditional true-gradient moment plus \\(\\sigma^2\\), giving the second inequality in (6.1.67).",
+          "ref": "(6.1.67), proof of Theorem 6.3, p. 322",
+          "source_pdf_lines": [
+            18871,
+            18880
+          ],
+          "math": "\\le 2(n+4)\\left(\\mathbb{E}[\\|\\nabla f(x_k)\\|^2\\mid\\zeta_{[k-1]}]+\\sigma^2\\right)+\\frac{\\mu^2}{2}L^2(n+6)^3",
+          "uses": [
+            "previous_step:2",
+            "Assumption_13_unbiased",
+            "Assumption_13_variance",
+            "adaptive_RSGF_history_interface_6_1_66_67",
+            "adaptive_filtration_conditional_oracle_prerequisite"
+          ],
+          "produces": "The conditional moment estimate used after taking total expectation."
+        }
+      ]
+    },
+    {
+      "name": "RSGF_expected_bound_Theorem_6_3a",
+      "ref": "Theorem 6.3(a), (6.1.61)-(6.1.62)",
+      "statement_math": "\\text{Suppose that }\\gamma_k<\\frac{1}{2(n+4)L}\\text{ and }P_R(k):=\\operatorname{Prob}\\{R=k\\}=\\frac{\\gamma_k-2L(n+4)\\gamma_k^2}{\\sum_{k=1}^N[\\gamma_k-2L(n+4)\\gamma_k^2]},\\ k=1,\\ldots,N.\\text{ Then, under Assumptions 13 and 15, for any }N\\ge1,\\ \\frac{1}{L}\\mathbb{E}[\\|\\nabla f(x_R)\\|^2]\\le\\frac{D_f^2+2\\mu^2(n+4)\\left[1+L(n+4)^2\\sum_{k=1}^N\\left(\\frac{\\gamma_k}{4}+L\\gamma_k^2\\right)\\right]+2(n+4)\\sigma^2\\sum_{k=1}^N\\gamma_k^2}{\\sum_{k=1}^N[\\gamma_k-2L(n+4)\\gamma_k^2]}",
+      "role": "Provides the expected stationarity bound for one RSGF run that is specialized by Corollary 6.3 and converted to a tail bound in (6.1.78).",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Introduce the combined random input, define \\(\\mathbb{E}_{\\zeta_{[N]}}\\) as expectation with respect to \\(\\zeta_{[N]}\\), and introduce the RSGF residual.",
+          "ref": "Proof of Theorem 6.3, p. 321",
+          "source_pdf_lines": [
+            18847,
+            18850
+          ],
+          "math": "\\zeta_k\\equiv(\\xi_k,u_k),\\quad \\zeta_{[N]}:=(\\zeta_1,\\ldots,\\zeta_N),\\quad \\Delta_k\\equiv G_\\mu(x_k,\\xi_k,u_k)-\\nabla f_\\mu(x_k)\\equiv G_\\mu(x_k,\\zeta_k)-\\nabla f_\\mu(x_k)",
+          "uses": [
+            "Gaussian_smoothing_Lemma_6_2"
+          ],
+          "produces": "The filtration variables, the source expectation notation \\(\\mathbb{E}_{\\zeta_{[N]}}\\) for expectation with respect to \\(\\zeta_{[N]}\\), and the residual used in the one-run proof."
+        },
+        {
+          "step": 2,
+          "description": "Apply the smoothness inequality to f_mu and the RSGF update to get the first one-step descent inequality.",
+          "ref": "Proof of Theorem 6.3, (6.1.64), p. 321",
+          "source_pdf_lines": [
+            18849,
+            18854
+          ],
+          "math": "f_\\mu(x_{k+1})\\le f_\\mu(x_k)-\\gamma_k\\langle\\nabla f_\\mu(x_k),G_\\mu(x_k,\\zeta_k)\\rangle+\\frac{L}{2}\\gamma_k^2\\|G_\\mu(x_k,\\zeta_k)\\|^2",
+          "uses": [
+            "objective_smoothness",
+            "objective_descent_inequality_6_1_2",
+            "Gaussian_smoothing_Lemma_6_2"
+          ],
+          "produces": "One-step smooth-objective descent before residual expansion."
+        },
+        {
+          "step": 3,
+          "description": "Substitute G_mu = nabla f_mu + Delta into the inner product.",
+          "ref": "(6.1.64), proof of Theorem 6.3, p. 321",
+          "source_pdf_lines": [
+            18852,
+            18854
+          ],
+          "math": "=f_\\mu(x_k)-\\gamma_k\\|\\nabla f_\\mu(x_k)\\|^2-\\gamma_k\\langle\\nabla f_\\mu(x_k),\\Delta_k\\rangle+\\frac{L}{2}\\gamma_k^2\\|G_\\mu(x_k,\\zeta_k)\\|^2",
+          "uses": [
+            "previous_step:2",
+            "previous_step:1"
+          ],
+          "produces": "A descent inequality with an explicit martingale residual term."
+        },
+        {
+          "step": 4,
+          "description": "Sum the one-step inequalities, telescope f_mu, rearrange, and use f_mu^* <= f_mu(x_{N+1}).",
+          "ref": "(6.1.65), proof of Theorem 6.3, p. 321",
+          "source_pdf_lines": [
+            18856,
+            18860
+          ],
+          "math": "\\sum_{k=1}^N\\gamma_k\\|\\nabla f_\\mu(x_k)\\|^2\\le f_\\mu(x_1)-f_\\mu^*-\\sum_{k=1}^N\\gamma_k\\langle\\nabla f_\\mu(x_k),\\Delta_k\\rangle+\\frac{L}{2}\\sum_{k=1}^N\\gamma_k^2\\|G_\\mu(x_k,\\zeta_k)\\|^2",
+          "uses": [
+            "previous_step:3",
+            "smoothed_objective_infimum_definition_6_1_56"
+          ],
+          "produces": "Summed smooth-objective descent inequality."
+        },
+        {
+          "step": 5,
+          "description": "Use unbiasedness of the finite-difference estimator to establish the conditional zero-mean residual inner product.",
+          "ref": "(6.1.66), proof of Theorem 6.3, p. 321",
+          "source_pdf_lines": [
+            18862,
+            18864
+          ],
+          "math": "\\mathbb{E}[\\langle\\nabla f_\\mu(x_k),\\Delta_k\\rangle\\mid\\zeta_{[k-1]}]=0",
+          "uses": [
+            "SZO_unbiasedness_6_1_60",
+            "inner_RSGF_history_conditioning_6_1_66_67",
+            "adaptive_RSGF_history_interface_6_1_66_67",
+            "adaptive_filtration_conditional_oracle_prerequisite",
+            "previous_step:1"
+          ],
+          "produces": "The residual cross term vanishes after conditional expectation."
+        },
+        {
+          "step": 6,
+          "description": "Apply the zeroth-order second-moment inequality to F(.,xi_k) conditionally on the past.",
+          "ref": "(6.1.67), proof of Theorem 6.3, p. 321-322",
+          "source_pdf_lines": [
+            18866,
+            18873
+          ],
+          "math": "\\mathbb{E}[\\|G_\\mu(x_k,\\zeta_k)\\|^2\\mid\\zeta_{[k-1]}]\\le 2(n+4)\\mathbb{E}[\\|G(x_k,\\xi_k)\\|^2\\mid\\zeta_{[k-1]}]+\\frac{\\mu^2}{2}L^2(n+6)^3",
+          "uses": [
+            "sample_function_smoothness",
+            "Gaussian_smoothing_Lemma_6_2",
+            "inner_RSGF_history_conditioning_6_1_66_67",
+            "adaptive_RSGF_history_interface_6_1_66_67",
+            "adaptive_filtration_conditional_oracle_prerequisite"
+          ],
+          "produces": "Conditional zeroth-order estimator moment bound before the first-order oracle substitution."
+        },
+        {
+          "step": 7,
+          "description": "Use Assumption 13 to replace the conditional stochastic-gradient second moment by the true-gradient second moment plus sigma-squared.",
+          "ref": "(6.1.67), proof of Theorem 6.3, p. 322",
+          "source_pdf_lines": [
+            18871,
+            18880
+          ],
+          "math": "\\le 2(n+4)\\left(\\mathbb{E}[\\|\\nabla f(x_k)\\|^2\\mid\\zeta_{[k-1]}]+\\sigma^2\\right)+\\frac{\\mu^2}{2}L^2(n+6)^3",
+          "uses": [
+            "previous_step:6",
+            "Assumption_13_unbiased",
+            "Assumption_13_variance",
+            "inner_RSGF_history_conditioning_6_1_66_67",
+            "adaptive_RSGF_history_interface_6_1_66_67",
+            "adaptive_filtration_conditional_oracle_prerequisite"
+          ],
+          "produces": "Conditional moment bound used after taking total expectation."
+        },
+        {
+          "step": 8,
+          "description": "Take expectation of (6.1.65), use the zero conditional cross term and the moment estimate (6.1.67).",
+          "ref": "Displayed inequality after (6.1.67), proof of Theorem 6.3, p. 322",
+          "source_pdf_lines": [
+            18881,
+            18888
+          ],
+          "math": "\\sum_{k=1}^N\\gamma_k\\mathbb{E}_{\\zeta_{[N]}}[\\|\\nabla f_\\mu(x_k)\\|^2]\\le f_\\mu(x_1)-f_\\mu^*+\\frac{L}{2}\\sum_{k=1}^N\\gamma_k^2\\left(2(n+4)\\left[\\mathbb{E}_{\\zeta_{[N]}}[\\|\\nabla f(x_k)\\|^2]+\\sigma^2\\right]+\\frac{\\mu^2}{2}L^2(n+6)^3\\right)",
+          "uses": [
+            "previous_step:4",
+            "previous_step:5",
+            "previous_step:7",
+            "previous_step:1"
+          ],
+          "produces": "Expected summed inequality relating smoothed and original gradients."
+        },
+        {
+          "step": 9,
+          "description": "Square the gradient smoothing estimate to obtain the first comparison relation used in the proof.",
+          "ref": "(6.1.54), p. 320",
+          "source_pdf_lines": [
+            18760,
+            18764
+          ],
+          "math": "\\|\\nabla f_\\mu(x)\\|^2\\le 2\\|\\nabla f(x)\\|^2+\\frac{\\mu^2}{2}L^2(n+3)^3",
+          "uses": [
+            "Gaussian_smoothing_Lemma_6_2",
+            "smoothed_objective_infimum_definition_6_1_56"
+          ],
+          "produces": "The printed comparison from the smoothed gradient norm to the original gradient norm."
+        },
+        {
+          "step": 10,
+          "description": "Introduce the infimum of the Gaussian-smoothed objective used in the objective-gap comparison.",
+          "ref": "(6.1.56), p. 320",
+          "source_pdf_lines": [
+            18768,
+            18770
+          ],
+          "math": "f_\\mu^*:=\\min_{x\\in\\mathbb{R}^n}f_\\mu(x)",
+          "uses": [
+            "Gaussian_smoothing_Lemma_6_2"
+          ],
+          "produces": "The source definition of f_mu^*."
+        },
+        {
+          "step": 11,
+          "description": "Use the smoothing objective comparison to relate the smoothed and original objective gaps.",
+          "ref": "(6.1.57), p. 320",
+          "source_pdf_lines": [
+            18770,
+            18774
+          ],
+          "math": "-\\mu^2Ln\\le [f_\\mu(x)-f_\\mu^*]-[f(x)-f^*]\\le\\mu^2Ln",
+          "uses": [
+            "previous_step:10",
+            "Gaussian_smoothing_Lemma_6_2"
+          ],
+          "produces": "The printed objective-gap comparison used to replace f_mu(x_1)-f_mu^* by f(x_1)-f^*."
+        },
+        {
+          "step": 12,
+          "description": "Use the comparison inequality (6.1.54), the definition (6.1.56), and the objective-gap comparison (6.1.57) to move from f_mu and nabla f_mu to f and nabla f, producing the printed inequality (6.1.68).",
+          "ref": "(6.1.68), proof of Theorem 6.3, p. 322",
+          "source_pdf_lines": [
+            18893,
+            18901
+          ],
+          "math": "\\sum_{k=1}^N\\gamma_k\\mathbb{E}_{\\zeta_{[N]}}[\\|\\nabla f(x_k)\\|^2]-\\frac{\\mu^2}{2}L^2(n+3)^3\\le 2[f(x_1)-f^*]+2\\mu^2Ln+2L(n+4)\\sum_{k=1}^N\\gamma_k^2\\mathbb{E}_{\\zeta_{[N]}}[\\|\\nabla f(x_k)\\|^2]+\\left[2L(n+4)\\sigma^2+\\frac{\\mu^2L^3(n+6)^3}{2}\\right]\\sum_{k=1}^N\\gamma_k^2",
+          "uses": [
+            "previous_step:8",
+            "previous_step:9",
+            "previous_step:10",
+            "previous_step:11",
+            "previous_step:1"
+          ],
+          "produces": "The pre-rearrangement expected stationarity inequality."
+        },
+        {
+          "step": 13,
+          "description": "Move the gradient terms to the left and simplify constants, retaining the first displayed form of (6.1.69).",
+          "ref": "(6.1.69), first inequality, proof of Theorem 6.3, p. 322",
+          "source_pdf_lines": [
+            18902,
+            18909
+          ],
+          "math": "\\sum_{k=1}^N\\left(\\gamma_k-2L(n+4)\\gamma_k^2\\right)\\mathbb{E}_{\\zeta_{[N]}}[\\|\\nabla f(x_k)\\|^2]\\le 2[f(x_1)-f^*]+2L(n+4)\\sigma^2\\sum_{k=1}^N\\gamma_k^2+2\\mu^2Ln+\\mu^2L^2\\sum_{k=1}^N\\left(\\frac{(n+3)^3}{2}\\gamma_k+\\frac{(n+6)^3}{2}L\\gamma_k^2\\right)",
+          "uses": [
+            "previous_step:12",
+            "previous_step:1"
+          ],
+          "produces": "Weighted gradient inequality with the original constants."
+        },
+        {
+          "step": 14,
+          "description": "Upper-bound the numerical factors by n+4 and simplify the smoothing contribution to the second displayed form of (6.1.69).",
+          "ref": "(6.1.69), second inequality, proof of Theorem 6.3, p. 322",
+          "source_pdf_lines": [
+            18910,
+            18915
+          ],
+          "math": "\\le 2[f(x_1)-f^*]+2L(n+4)\\sigma^2\\sum_{k=1}^N\\gamma_k^2+2\\mu^2L(n+4)\\left[1+L(n+4)^2\\sum_{k=1}^N\\left(\\frac{\\gamma_k}{4}+L\\gamma_k^2\\right)\\right]",
+          "uses": [
+            "previous_step:13",
+            "previous_step:1"
+          ],
+          "produces": "The simplified weighted inequality matching the numerator of (6.1.62)."
+        },
+        {
+          "step": 15,
+          "description": "Divide by the positive weighted denominator and identify the randomized-output expectation using the probability mass function.",
+          "ref": "Proof of Theorem 6.3, p. 322",
+          "source_pdf_lines": [
+            18916,
+            18923
+          ],
+          "math": "\\mathbb{E}[\\|\\nabla f(x_R)\\|^2]=\\mathbb{E}_{R,\\zeta_{[N]}}[\\|\\nabla f(x_R)\\|^2]=\\frac{\\sum_{k=1}^N[\\gamma_k-2L(n+4)\\gamma_k^2]\\mathbb{E}_{\\zeta_{[N]}}[\\|\\nabla f(x_k)\\|^2]}{\\sum_{k=1}^N[\\gamma_k-2L(n+4)\\gamma_k^2]}",
+          "uses": [
+          "previous_step:14",
+          "selection_probability_policy",
+          "RSGF_stepsize_condition"
+          ],
+          "produces": "The weighted-random-output representation."
+        },
+        {
+          "step": 16,
+          "description": "Record the source definition of D_f that is substituted into the divided inequality in the next proof step.",
+          "ref": "(6.1.13), p. 309",
+          "source_pdf_lines": [
+            18142,
+            18147
+          ],
+          "math": "D_f:=\\left[\\frac{2(f(x_1)-f^*)}{L}\\right]^{1/2}",
+          "uses": [
+            "D_f_definition_6_1_13"
+          ],
+          "produces": "The source definition of D_f is available for the substitution into (6.1.62)."
+        },
+        {
+          "step": 17,
+        "description": "Substitute D_f from (6.1.13) into the divided weighted inequality; after the displayed weighted-random-output representation, the source prose concludes that we obtain (6.1.62). The full bound is printed in the theorem statement rather than reprinted in this proof window.",
+        "ref": "(6.1.62), proof of Theorem 6.3, p. 322",
+        "source_pdf_lines": [
+          18916,
+          18927
+        ],
+        "math": "",
+          "uses": [
+            "previous_step:15",
+            "previous_step:16",
+            "D_f_definition_6_1_13"
+          ],
+        "produces": "The preceding proof steps obtain the already stated expected RSGF stationarity bound (6.1.62)."
+        }
+      ]
+    },
+    {
+      "name": "constant_stepsize_Corollary_6_3",
+      "ref": "Corollary 6.3, (6.1.70)-(6.1.72)",
+      "statement_math": "\\text{Suppose that the stepsizes }\\{\\gamma_k\\}\\text{ are set to }\\gamma_k=\\frac{1}{\\sqrt{n+4}}\\min\\left\\{\\frac{1}{4L\\sqrt{n+4}},\\frac{\\widetilde{D}}{\\sigma\\sqrt{N}}\\right\\},\\ k=1,\\ldots,N,\\text{ for some }\\widetilde{D}>0.\\text{ Also assume that }P_R(\\cdot)\\text{ is set to (6.1.61) and }\\mu\\text{ is chosen such that }\\mu\\le\\frac{D_f}{(n+4)\\sqrt{2N}}.\\text{ Then, under Assumptions 13 and 15, }\\frac{1}{L}\\mathbb{E}[\\|\\nabla f(x_R)\\|^2]\\le\\bar{\\mathscr{B}}_N:=\\frac{12(n+4)LD_f^2}{N}+\\frac{4\\sigma\\sqrt{n+4}}{\\sqrt{N}}\\left(\\widetilde{D}+\\frac{D_f^2}{\\widetilde{D}}\\right)",
+      "role": "Provides the closed-form one-run bound \\bar{\\mathscr{B}}_N used in the optimization failure event and in the residual scale.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Use the minimum in the constant stepsize policy to establish the stepsize upper bound.",
+          "ref": "(6.1.74), proof of Corollary 6.3, p. 324",
+          "source_pdf_lines": [
+            19020,
+            19025
+          ],
+          "math": "\\gamma_k\\le\\frac{1}{4(n+4)L},\\quad k=1,\\ldots,N",
+          "uses": [
+            "RSGF_expected_bound_Theorem_6_3a",
+            "constant_stepsize_policy"
+          ],
+          "produces": "A stepsize condition ensuring positivity of the sampling denominator."
+        },
+        {
+          "step": 2,
+          "description": "With constant gamma, evaluate the denominator and use the stepsize upper bound to lower-bound it.",
+          "ref": "(6.1.75), proof of Corollary 6.3, p. 324",
+          "source_pdf_lines": [
+            19026,
+            19027
+          ],
+          "math": "\\sum_{k=1}^N[\\gamma_k-2L(n+4)\\gamma_k^2]=N\\gamma_1[1-2L(n+4)\\gamma_1]\\ge\\frac{N\\gamma_1}{2}",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "A denominator lower bound used in the specialization."
+        },
+        {
+          "step": 3,
+          "description": "Insert the denominator bound into the one-run estimate (6.1.62), preserving the first displayed specialized upper bound.",
+          "ref": "Proof of Corollary 6.3, p. 324",
+          "source_pdf_lines": [
+            19029,
+            19035
+          ],
+          "math": "\\frac{1}{L}\\mathbb{E}[\\|\\nabla f(x_R)\\|^2]\\le\\frac{2D_f^2+4\\mu^2(n+4)}{N\\gamma_1}+\\mu^2L(n+4)^3+4(n+4)\\left(\\mu^2L^2(n+4)^2+\\sigma^2\\right)\\gamma_1",
+          "uses": [
+            "RSGF_expected_bound_Theorem_6_3a",
+            "previous_step:2"
+          ],
+          "produces": "A constant-stepsize expression in gamma_1 and mu."
+        },
+        {
+          "step": 4,
+          "description": "Use the explicit minimum defining gamma_1 to replace reciprocal and direct gamma factors by maxima/minima involving L, sigma, N, and D-tilde.",
+          "ref": "Proof of Corollary 6.3, p. 324",
+          "source_pdf_lines": [
+            19035,
+            19042
+          ],
+          "math": "\\le\\frac{2D_f^2+4\\mu^2(n+4)}{N}\\max\\left\\{4L(n+4),\\frac{\\sigma\\sqrt{(n+4)N}}{\\widetilde{D}}\\right\\}+\\mu^2L(n+4)^2[(n+4)+1]+\\frac{4\\sqrt{n+4}\\widetilde{D}\\sigma}{\\sqrt{N}}",
+          "uses": [
+            "previous_step:3",
+            "constant_stepsize_policy"
+          ],
+          "produces": "A bound expressed in the two branches of the stepsize policy."
+        },
+        {
+          "step": 5,
+          "description": "Apply the smoothing restriction (6.1.71) to the mu-dependent terms and retain the first post-substitution inequality printed in the source.",
+          "ref": "Proof of Corollary 6.3, p. 324",
+          "source_pdf_lines": [
+            19042,
+            19052
+          ],
+          "math": "\\frac{1}{L}\\mathbb{E}[\\|\\nabla f(x_R)\\|^2]\\le\\frac{2D_f^2}{N}\\left[1+\\frac{1}{(n+4)N}\\right]\\left[4L(n+4)+\\frac{\\sigma\\sqrt{(n+4)N}}{\\widetilde{D}}\\right]+\\frac{LD_f^2}{2N}[(n+4)+1]+\\frac{4\\sqrt{n+4}\\widetilde{D}\\sigma}{\\sqrt{N}}",
+          "uses": [
+            "previous_step:4",
+            "smoothing_parameter_policy"
+          ],
+          "produces": "The post-smoothing bound before the source's algebraic equality."
+        },
+        {
+          "step": 6,
+          "description": "Expand the preceding products and collect the D_f and sigma terms, obtaining the displayed equality in the source proof.",
+          "ref": "Proof of Corollary 6.3, p. 324",
+          "source_pdf_lines": [
+            19052,
+            19060
+          ],
+          "math": "=\\frac{LD_f^2}{N}\\left[\\frac{17(n+4)}{2}+\\frac{8}{N}+\\frac{1}{2}\\right]+\\frac{2\\sigma\\sqrt{n+4}}{\\sqrt{N}}\\left[\\frac{D_f^2}{\\widetilde{D}}\\left(1+\\frac{1}{(n+4)N}\\right)+2\\widetilde{D}\\right]",
+          "uses": [
+            "previous_step:5"
+          ],
+          "produces": "The collected-terms expression immediately before the final constant relaxation."
+        },
+        {
+          "step": 7,
+          "description": "Upper-bound the remaining numerical factors and the extra D_f^2/((n+4)N) term to reach the closed form in (6.1.72).",
+          "ref": "(6.1.72), proof of Corollary 6.3, p. 324",
+          "source_pdf_lines": [
+            19063,
+            19065
+          ],
+          "math": "\\frac{1}{L}\\mathbb{E}[\\|\\nabla f(x_R)\\|^2]\\le\\frac{12L(n+4)D_f^2}{N}+\\frac{4\\sigma\\sqrt{n+4}}{\\sqrt{N}}\\left(\\widetilde{D}+\\frac{D_f^2}{\\widetilde{D}}\\right)",
+          "uses": [
+            "previous_step:6"
+          ],
+          "produces": "The closed-form one-run bound \\bar{\\mathscr{B}}_N."
+        }
+      ]
+    },
+    {
+      "name": "Markov_tail_6_1_78",
+      "ref": "(6.1.78)",
+      "statement_math": "\\operatorname{Prob}\\left\\{\\|\\nabla f(x_R)\\|^2\\ge\\lambda L\\bar{\\mathscr{B}}_N\\right\\}\\le\\frac{1}{\\lambda},\\quad \\forall\\lambda>0",
+      "role": "Converts the expected one-run bound into the optimization-phase failure probability used in (6.1.87).",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Apply Markov's inequality to the nonnegative random variable \\(\\|\\nabla f(x_R)\\|^2\\) and insert Corollary 6.3. The intermediate quotient by \\(\\lambda L\\bar{\\mathscr{B}}_N\\) is derived in this application but is not printed in the source display.",
+          "ref": "(6.1.78), p. 325",
+          "source_pdf_lines": [
+            19095,
+            19099
+          ],
+          "math": "\\operatorname{Prob}\\left\\{\\|\\nabla f(x_R)\\|^2\\ge\\lambda L\\bar{\\mathscr{B}}_N\\right\\}\\le\\frac{1}{\\lambda},\\quad \\forall\\lambda>0",
+          "uses": [
+            "constant_stepsize_Corollary_6_3"
+          ],
+          "produces": "The single-run stationarity tail estimate."
+        }
+      ]
+    },
+    {
+      "name": "SZO_unbiasedness_6_1_60",
+      "ref": "(6.1.60), p. 320",
+      "statement_math": "\\mathbb{E}_{\\xi,u}[G_\\mu(x,\\xi,u)]=\\mathbb{E}_u\\left[\\mathbb{E}_\\xi[G_\\mu(x,\\xi,u)\\mid u]\\right]=\\nabla f_\\mu(x)",
+      "role": "Records the paper's unconditional unbiasedness identity for the stochastic zeroth-order estimator; conditional uses in the adaptive and post-optimization proofs require the separately named formalization interfaces.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Condition first on the Gaussian direction, use Assumption 15 for the function-value oracle, and identify the remaining Gaussian expectation with the smoothed gradient formula. This is the paper's unconditional identity; it does not itself assert a filtration-level conditional expectation.",
+          "ref": "(6.1.60), p. 320",
+          "source_pdf_lines": [
+            18794,
+            18800
+          ],
+          "math": "\\mathbb{E}_{\\xi,u}[G_\\mu(x,\\xi,u)]=\\mathbb{E}_u\\left[\\mathbb{E}_\\xi[G_\\mu(x,\\xi,u)\\mid u]\\right]=\\nabla f_\\mu(x)",
+          "uses": [
+            "Assumption_15_SZO",
+            "Gaussian_smoothing_Lemma_6_2",
+            "smoothing_parameter_positive"
+          ],
+          "produces": "The source's unconditional estimator identity; the conditional martingale premises used later are supplied only through the separately labeled formalization interfaces."
+        }
+      ]
+    },
+    {
+      "name": "postoptimization_fixed_candidate_martingale_interface",
+      "ref": "Formalization interface for the proof of (6.1.88), p. 327; source identity (6.1.60)",
+      "statement_math": "\\mathbb{E}[\\|\\Delta_{s,k}\\|^2]=\\mathbb{E}[\\|G_\\mu(\\bar{x}_s,\\xi_k,u_k)-\\nabla f_\\mu(\\bar{x}_s)\\|^2]\\le\\mathbb{E}[\\|G_\\mu(\\bar{x}_s,\\xi_k,u_k)\\|^2]\\le 2(n+4)\\left[L\\bar{\\mathscr{B}}_N+\\sigma^2\\right]+2\\mu^2L^2(n+4)^3\\le 2(n+4)\\left[L\\bar{\\mathscr{B}}_N+\\sigma^2+\\frac{L^2D_f^2}{2N}\\right]=:\\mathscr{D}_N",
+      "role": "Records the source-printed fixed-candidate residual, moment, averaging, and tail chain used in (6.1.88)-(6.1.89). The filtration, fresh-sample boundary, measurability, integrability, and conditional-centering premises needed to instantiate Lemma 6.1(a) remain formalization-only metadata.",
+      "source_status": "The displayed residual and probability chain is source-printed in (6.1.88)-(6.1.89). Its filtration, fresh-sample boundary, measurability, integrability, and conditional-centering premises are formalization-only metadata, not additional assumptions stated by the paper and not consequences of the unconditional identity (6.1.60).",
+      "formalization_prerequisites": [
+        "Named prerequisite: postoptimization_fixed_candidate_conditional_oracle_prerequisite supplies the candidate measurability, post-optimization oracle boundary, conditional unbiasedness/variance facts, residual measurability, and integrability required by the source moment chain.",
+        "Named prerequisite: postoptimization_fixed_candidate_martingale_prerequisite supplies, for each fixed s, the increasing filtration and the residual measurability, square-integrability, conditional-centering, and per-increment second-moment obligations needed for Lemma 6.1(a).",
+        "The source display (6.1.88) is retained in statement_math; the later averaging and probability displays in (6.1.89), together with the filtration and conditional interface, are recorded in the proof steps and formalization metadata."
+      ],
+      "proof": [
+        {
+          "step": 1,
+          "description": "Define the post-optimization residual used to express the empirical estimator error at a fixed candidate.",
+          "ref": "Proof of (6.1.88), p. 327",
+          "source_pdf_lines": [
+            19215,
+            19216
+          ],
+          "math": "\\Delta_{s,k}:=G_\\mu(\\bar{x}_s,\\xi_k,u_k)-\\nabla f_\\mu(\\bar{x}_s),\\quad k=1,\\ldots,T",
+          "uses": [
+            "postoptimization_fixed_candidate_conditional_oracle_prerequisite",
+            "smoothing_parameter_positive"
+          ],
+          "produces": "The residual sequence \\Delta_{s,k} for the fixed candidate \\bar{x}_s."
+        },
+        {
+          "step": 2,
+          "description": "Apply the zeroth-order second-moment estimate at the post-optimization candidate, as in the source's earlier estimate (6.1.67).",
+          "ref": "(6.1.67), proof of Theorem 6.4, p. 327",
+          "source_pdf_lines": [
+            19218,
+            19220
+          ],
+          "math": "\\mathbb{E}[\\|G_\\mu(\\bar{x}_s,\\xi_k,u_k)\\|^2]\\le 2(n+4)\\left[\\mathbb{E}[\\|G(\\bar{x}_s,\\xi)\\|^2]+\\frac{\\mu^2L^2(n+6)^3}{2}\\right]",
+          "uses": [
+            "previous_step:1",
+            "sample_function_smoothness",
+            "Gaussian_smoothing_Lemma_6_2",
+            "postoptimization_fixed_candidate_conditional_oracle_prerequisite"
+          ],
+          "produces": "The zeroth-order estimator second-moment bound before substituting the first-order oracle moment."
+        },
+        {
+          "step": 3,
+          "description": "Use the first-order stochastic oracle moment and variance bounds to replace the stochastic first-order moment and simplify the smoothing remainder.",
+          "ref": "(6.1.67), proof of Theorem 6.4, p. 327",
+          "source_pdf_lines": [
+            19220,
+            19222
+          ],
+          "math": "\\le 2(n+4)\\left[\\mathbb{E}[\\|\\nabla f(\\bar{x}_s)\\|^2]+\\sigma^2\\right]+2\\mu^2L^2(n+4)^3",
+          "uses": [
+            "previous_step:2",
+            "Assumption_13_unbiased",
+            "Assumption_13_variance",
+            "postoptimization_fixed_candidate_conditional_oracle_prerequisite"
+          ],
+          "produces": "The estimator moment bound in terms of the candidate true-gradient moment, oracle variance, and smoothing parameter."
+        },
+        {
+          "step": 4,
+          "description": "Bound the residual second moment by the corresponding estimator second moment, retaining the residual definition.",
+          "ref": "(6.1.88), proof of Theorem 6.4, p. 327",
+          "source_pdf_lines": [
+            19224,
+            19226
+          ],
+          "math": "\\mathbb{E}[\\|\\Delta_{s,k}\\|^2]=\\mathbb{E}[\\|G_\\mu(\\bar{x}_s,\\xi_k,u_k)-\\nabla f_\\mu(\\bar{x}_s)\\|^2]\\le\\mathbb{E}[\\|G_\\mu(\\bar{x}_s,\\xi_k,u_k)\\|^2]",
+          "uses": [
+            "previous_step:1",
+            "previous_step:3",
+            "postoptimization_fixed_candidate_conditional_oracle_prerequisite"
+          ],
+          "produces": "An intermediate residual second-moment bound still containing \\mu."
+        },
+        {
+          "step": 5,
+          "description": "Substitute the one-run true-gradient moment bound into the residual estimate.",
+          "ref": "(6.1.88), proof of Theorem 6.4, p. 327",
+          "source_pdf_lines": [
+            19226,
+            19229
+          ],
+          "math": "\\le 2(n+4)\\left[L\\bar{\\mathscr{B}}_N+\\sigma^2\\right]+2\\mu^2L^2(n+4)^3",
+          "uses": [
+            "previous_step:4",
+            "constant_stepsize_Corollary_6_3",
+            "postoptimization_fixed_candidate_conditional_oracle_prerequisite"
+          ],
+          "produces": "The residual second-moment bound after inserting the optimization-phase estimate."
+        },
+        {
+          "step": 6,
+          "description": "Apply the smoothing-parameter restriction, simplify the smoothing contribution, and define the source's residual scale \\mathscr{D}_N.",
+          "ref": "(6.1.88), proof of Theorem 6.4, p. 327",
+          "source_pdf_lines": [
+            19230,
+            19233
+          ],
+          "math": "\\le 2(n+4)\\left[L\\bar{\\mathscr{B}}_N+\\sigma^2+\\frac{L^2D_f^2}{2N}\\right]=:\\mathscr{D}_N",
+          "uses": [
+            "previous_step:5",
+            "smoothing_parameter_policy",
+            "postoptimization_fixed_candidate_conditional_oracle_prerequisite"
+          ],
+          "produces": "The residual scale \\mathscr{D}_N used in the fixed-candidate tail estimate."
+        },
+        {
+          "step": 7,
+          "description": "Use the definition of the empirical zeroth-order gradient to express its error as the average of the residual sequence.",
+          "ref": "Proof immediately before (6.1.89), p. 327",
+          "source_pdf_lines": [
+            19235,
+            19236
+          ],
+          "math": "g_\\mu(\\bar{x}_s)-\\nabla f_\\mu(\\bar{x}_s)=\\frac{1}{T}\\sum_{k=1}^T\\Delta_{s,k}",
+          "uses": [
+            "previous_step:1",
+            "selector_definition_6_1_80"
+          ],
+          "produces": "The averaged-residual identity for the fixed candidate."
+        },
+        {
+          "step": 8,
+          "description": "Rewrite the fixed-candidate empirical-gradient event using the averaged-residual identity and the residual scale.",
+          "ref": "Proof immediately before (6.1.89), p. 327",
+          "source_pdf_lines": [
+            19235,
+            19240
+          ],
+          "math": "\\operatorname{Prob}\\left\\{\\|g_\\mu(\\bar{x}_s)-\\nabla f_\\mu(\\bar{x}_s)\\|^2\\ge \\frac{\\lambda\\mathscr{D}_N}{T}\\right\\}=\\operatorname{Prob}\\left\\{\\left\\|\\sum_{k=1}^T\\Delta_{s,k}\\right\\|^2\\ge\\lambda T\\mathscr{D}_N\\right\\}",
+          "uses": [
+            "previous_step:6",
+            "previous_step:7"
+          ],
+          "produces": "The fixed-candidate residual event in the form to which Lemma 6.1(a) applies."
+        },
+        {
+          "step": 9,
+          "description": "Apply Assumption 13 and Lemma 6.1(a) to the fixed-candidate residual sum to obtain the per-candidate tail bound.",
+          "ref": "Proof immediately before (6.1.89), p. 327",
+          "source_pdf_lines": [
+            19235,
+            19241
+          ],
+          "math": "\\le\\frac{1}{\\lambda},\\quad \\forall\\lambda>0",
+          "uses": [
+            "previous_step:8",
+            "Assumption_13_unbiased",
+            "Assumption_13_variance",
+            "postoptimization_fixed_candidate_martingale_prerequisite",
+            "martingale_second_moment_Lemma_6_1"
+          ],
+          "produces": "For each fixed s, the post-optimization empirical-gradient failure probability is at most 1/\\lambda."
+        },
+        {
+          "step": 10,
+          "description": "Take the union bound over the S fixed candidates to obtain the maximum-error tail estimate.",
+          "ref": "(6.1.89), proof of Theorem 6.4, p. 327",
+          "source_pdf_lines": [
+            19243,
+            19249
+          ],
+          "math": "\\operatorname{Prob}\\left\\{\\max_{s=1,\\ldots,S}\\|g_\\mu(\\bar{x}_s)-\\nabla f_\\mu(\\bar{x}_s)\\|^2\\ge\\frac{\\lambda\\mathscr{D}_N}{T}\\right\\}\\le\\frac{S}{\\lambda},\\quad \\forall\\lambda>0",
+          "uses": [
+            "previous_step:9"
+          ],
+          "produces": "The source's union-bound estimate (6.1.89) for all post-optimization candidate estimation errors."
+        }
+      ]
+    },
+    {
+      "name": "martingale_second_moment_Lemma_6_1",
+      "ref": "Lemma 6.1(a), p. 315",
+      "statement_math": "\\text{Assume that we are given a polish space with Borel probability measure }\\mu\\text{ and a sequence of }\\mathcal{F}_0=\\{\\varnothing,\\Omega\\}\\subseteq\\mathcal{F}_1\\subseteq\\mathcal{F}_2\\subseteq\\cdots\\text{ of }\\sigma\\text{-sub-algebras of the Borel }\\sigma\\text{-algebra of }\\Omega.\\text{ Let }\\zeta_i\\in\\mathbb{R}^n,\\ i=1,\\ldots,\\infty,\\text{ be a martingale-difference sequence of Borel functions on }\\Omega\\text{ such that }\\zeta_i\\text{ is }\\mathcal{F}_i\\text{ measurable and }\\mathbb{E}[\\zeta_i\\mid\\mathcal{F}_{i-1}]=0,\\text{ where }\\mathbb{E}[\\cdot\\mid\\mathcal{F}_i]\\text{ denotes conditional expectation with respect to }\\mathcal{F}_i\\text{ and }\\mathbb{E}\\equiv\\mathbb{E}[\\cdot\\mid\\mathcal{F}_0].\\text{ (a) If }\\mathbb{E}[\\|\\zeta_i\\|^2]\\le\\sigma_i^2\\text{ for any }i\\ge1,\\text{ then }\\mathbb{E}\\left[\\left\\|\\sum_{i=1}^N\\zeta_i\\right\\|^2\\right]\\le\\sum_{i=1}^N\\sigma_i^2.\\text{ As a consequence, }\\operatorname{Prob}\\left\\{\\left\\|\\sum_{i=1}^N\\zeta_i\\right\\|^2\\ge\\lambda\\sum_{i=1}^N\\sigma_i^2\\right\\}\\le\\frac{1}{\\lambda},\\quad \\forall N\\ge1,\\lambda\\ge0.",
+      "role": "Controls the averaged post-optimization residuals in (6.1.89) and (6.1.90).",
+      "proof": "cited",
+      "citation": "The paper cites Theorem 2.1 of [57] for Lemma 6.1."
+    },
+    {
+      "name": "selector_definition_6_1_80",
+      "ref": "(6.1.80)",
+      "statement_math": "\\|g_\\mu(\\bar{x}^*)\\|=\\min_{s=1,\\ldots,S}\\|g_\\mu(\\bar{x}_s)\\|,\\qquad g_\\mu(\\bar{x}_s):=\\frac{1}{T}\\sum_{k=1}^T G_\\mu(\\bar{x}_s,\\xi_k,u_k)",
+      "role": "Defines the candidate selected in the post-optimization phase and supplies the equality used at the start of the theorem-(a) decomposition.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Use the post-optimization phase definition to select the candidate with minimum empirical zeroth-order gradient norm.",
+          "ref": "(6.1.80), p. 325",
+          "source_pdf_lines": [
+            19126,
+            19132
+          ],
+          "math": "\\|g_\\mu(\\bar{x}^*)\\|=\\min_{s=1,\\ldots,S}\\|g_\\mu(\\bar{x}_s)\\|,\\qquad g_\\mu(\\bar{x}_s):=\\frac{1}{T}\\sum_{k=1}^T G_\\mu(\\bar{x}_s,\\xi_k,u_k)",
+          "uses": [],
+          "produces": "The selected candidate and its empirical gradient estimator."
+        }
+      ]
+    },
+    {
+      "name": "postoptimization_selected_candidate_tail_6_1_90",
+      "ref": "(6.1.90), proof of Theorem 6.4, p. 327; conditional-martingale premise not printed",
+      "statement_math": "\\operatorname{Prob}\\left\\{\\|g_\\mu(\\bar{x}^*)-\\nabla f_\\mu(\\bar{x}^*)\\|^2\\ge\\frac{\\lambda\\mathscr{D}_N}{T}\\right\\}\\le\\frac{1}{\\lambda},\\quad \\forall\\lambda>0",
+      "role": "Records the paper's direct selected-candidate tail bound after the fixed-candidate residual estimate and preserves the same-sample selector in (6.1.80).",
+      "source_status": "The probability inequality is printed in the paper. The PDF does not expose a selected-candidate filtration, conditional-martingale premise, second-moment transfer, or fresh-sample boundary; this entry records (6.1.90) as a direct source assertion rather than supplying those missing premises.",
+      "formalization_prerequisites": [
+        "The source defines \\(\\bar{x}^*\\) using the same post-optimization samples in (6.1.80) and then states (6.1.90) without spelling out the conditional premise or its derivation.",
+        "A Lean development that proves rather than imports this source assertion must separately choose and state a valid selected-candidate probability model; that additional obligation is deliberately not presented here as paper mathematics."
+      ],
+      "proof": [
+        {
+          "step": 1,
+          "description": "Record the source's direct selected-candidate assertion after the fixed-candidate residual calculation. The paper preserves the same-sample selector in (6.1.80) but does not print or derive a selected-candidate filtration or conditional-martingale premise.",
+          "ref": "(6.1.90), proof of Theorem 6.4, p. 327",
+          "source_pdf_lines": [
+            19251,
+            19256
+          ],
+          "uses": [
+            "selector_definition_6_1_80",
+            "postoptimization_fixed_candidate_martingale_interface",
+            "Assumption_13_unbiased",
+            "Assumption_13_variance",
+            "martingale_second_moment_Lemma_6_1"
+          ],
+          "math": "\\operatorname{Prob}\\left\\{\\|g_\\mu(\\bar{x}^*)-\\nabla f_\\mu(\\bar{x}^*)\\|^2\\ge\\frac{\\lambda\\mathscr{D}_N}{T}\\right\\}\\le\\frac{1}{\\lambda},\\quad \\forall\\lambda>0",
+          "produces": "The selected-candidate post-optimization tail bound used in the combination step, recorded as a direct source assertion."
+        }
+      ]
+    }
+  ]
+}

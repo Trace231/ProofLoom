@@ -1,0 +1,169 @@
+{
+  "algorithm": "StochasticMirrorDescent",
+  "full_name": "Stochastic Mirror Descent for General Nonsmooth Convex Stochastic Optimization",
+  "source_reference": "Lan, First-order and Stochastic Optimization Methods for Machine Learning, Springer 2020 (Theorem 4.1)",
+  "setup": {
+    "problem": {
+      "math": "f^* \\equiv \\min_{x \\in X} \\left\\{ f(x) := \\mathbb{E}[F(x, \\xi)] \\right\\}",
+      "ref": "Eq. (4.1.1)",
+      "description": "Stochastic convex optimization over a bounded convex set"
+    },
+    "variable_space": {
+      "math": "X \\subset \\mathbb{R}^m \\text{ nonempty bounded closed convex}; \\; \\xi \\text{ random vector on } \\Xi \\subset \\mathbb{R}^d; \\; F : X \\times \\Xi \\to \\mathbb{R}",
+      "ref": "Section 4.1"
+    }
+  },
+  "assumptions": [
+    {
+      "name": "Convexity",
+      "math": "F(\\cdot, \\xi) \\text{ is convex on } X \\text{ for every } \\xi \\in \\Xi",
+      "ref": "Section 4.1",
+      "parameters": []
+    },
+    {
+      "name": "Assumption 1 (i.i.d. sampling)",
+      "math": "\\text{It is possible to generate i.i.d. samples } \\xi_1, \\xi_2, \\ldots \\text{ of realizations of } \\xi",
+      "ref": "Assumption 1",
+      "parameters": []
+    },
+    {
+      "name": "Assumption 2 (Stochastic first-order oracle)",
+      "math": "\\forall x \\in X, \\; \\xi \\in \\Xi, \\text{ the SFO returns } G(x, \\xi) \\text{ such that } g(x) := \\mathbb{E}[G(x, \\xi)] \\text{ is well defined}",
+      "ref": "Assumption 2",
+      "parameters": []
+    },
+    {
+      "name": "Assumption 3a (Unbiased oracle)",
+      "math": "\\mathbb{E}[G(x, \\xi)] = f'(x) \\in \\partial f(x), \\quad \\forall x \\in X",
+      "ref": "Eq. (4.1.3)",
+      "parameters": []
+    },
+    {
+      "name": "Assumption 3b (Bounded variance)",
+      "math": "\\mathbb{E}\\left[\\|G(x, \\xi_t) - f'(x)\\|_*^2\\right] \\le \\sigma^2, \\quad \\forall x \\in X",
+      "ref": "Eq. (4.1.4)",
+      "parameters": ["\\sigma^2 \\ge 0"]
+    },
+    {
+      "name": "Distance generating function",
+      "math": "v : X \\to \\mathbb{R} \\text{ is continuously differentiable and } 1\\text{-strongly convex w.r.t. } \\|\\cdot\\|: \\; \\langle x' - x, \\nabla v(x') - \\nabla v(x) \\rangle \\ge \\|x' - x\\|^2, \\; \\forall x', x \\in X^o",
+      "ref": "Eq. (3.2.1)",
+      "parameters": ["D_X^2 := \\max_{x_1, x \\in X} V(x_1, x)"]
+    },
+    {
+      "name": "Bounded subgradients",
+      "math": "\\|g(x)\\|_* \\le M, \\quad \\forall x \\in X",
+      "ref": "Eq. (4.1.7)",
+      "parameters": ["M > 0"]
+    }
+  ],
+  "algorithm_spec": {
+    "ref": "Eq. (4.1.6)",
+    "initialization": {
+      "math": "x_1 \\in X",
+      "ref": "Section 4.1"
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "Stochastic mirror descent update",
+        "math": "x_{t+1} = \\operatorname{argmin}_{x \\in X} \\left\\{ \\gamma_t \\langle G_t, x \\rangle + V(x_t, x) \\right\\}, \\quad t = 1, 2, \\ldots",
+        "ref": "Eq. (4.1.6)"
+      }
+    ],
+    "output": {
+      "math": "\\bar{x}_s^k = \\left( \\sum_{t=s}^{k} \\gamma_t \\right)^{-1} \\sum_{t=s}^{k} \\gamma_t x_t",
+      "ref": "Eq. (3.1.9)",
+      "type": "weighted_average"
+    },
+    "parameters": [
+      {
+        "name": "\\gamma_t",
+        "math": "\\gamma_t > 0 \\text{ (variable step sizes; optimal constant choice: } \\gamma_t = D_X / \\sqrt{k(M^2 + \\sigma^2)} \\text{)}",
+        "ref": "Eq. (4.1.11)"
+      },
+      {
+        "name": "G_t",
+        "math": "G_t := G(x_t, \\xi_t) \\text{ (stochastic subgradient from SFO)}",
+        "ref": "Section 4.1"
+      },
+      {
+        "name": "V",
+        "math": "V(x, z) = v(z) - [v(x) + \\langle \\nabla v(x), z - x \\rangle] \\text{ (Bregman divergence associated with } v\\text{)}",
+        "ref": "Eq. (3.2.2)"
+      }
+    ]
+  },
+  "main_theorem": {
+    "ref": "Theorem 4.1",
+    "statement_math": "\\mathbb{E}\\left[f(\\bar{x}_s^k)\\right] - f^* \\le \\left( \\sum_{t=s}^{k} \\gamma_t \\right)^{-1} \\left[ \\mathbb{E}[V(x_s, x^*)] + (M^2 + \\sigma^2) \\sum_{t=s}^{k} \\gamma_t^2 \\right]",
+    "rate": "O\\left( D_X \\sqrt{(M^2 + \\sigma^2) / k} \\right)",
+    "measure": "expected suboptimality",
+    "proof": [
+      {
+        "step": 1,
+        "description": "By convexity of f and g_t in partial f(x_t), decompose using delta_t = G_t - g_t",
+        "math": "\\gamma_t [f(x_t) - f(x)] \\le \\gamma_t \\langle g_t, x_t - x \\rangle = \\gamma_t \\langle G_t, x_t - x \\rangle - \\gamma_t \\langle \\delta_t, x_t - x \\rangle",
+        "uses": []
+      },
+      {
+        "step": 2,
+        "description": "Split the G_t inner product at x_{t+1} and apply Lemma 3.4 (with g replaced by G_t) to bound the x_{t+1}-to-x term",
+        "math": "\\gamma_t \\langle G_t, x_t - x \\rangle \\le V(x_t, x) - V(x_{t+1}, x) + \\gamma_t \\langle G_t, x_t - x_{t+1} \\rangle - V(x_t, x_{t+1})",
+        "uses": ["Three-point lemma (Lemma 3.4)"]
+      },
+      {
+        "step": 3,
+        "description": "Bound the residual using Cauchy-Schwarz, strong convexity V(x_t, x_{t+1}) >= (1/2)||x_t - x_{t+1}||^2, and Young's inequality bt - at^2/2 <= b^2/(2a)",
+        "math": "\\gamma_t \\langle G_t, x_t - x_{t+1} \\rangle - V(x_t, x_{t+1}) \\le \\frac{1}{2} \\gamma_t^2 \\|G_t\\|_*^2",
+        "uses": []
+      },
+      {
+        "step": 4,
+        "description": "Apply variance decomposition ||G_t||^2_* = ||g_t + delta_t||^2_* <= 2(||g_t||^2_* + ||delta_t||^2_*) <= 2(M^2 + ||delta_t||^2_*), which absorbs the factor 1/2",
+        "math": "\\gamma_t [f(x_t) - f(x)] \\le V(x_t, x) - V(x_{t+1}, x) + \\gamma_t^2 (M^2 + \\|\\delta_t\\|_*^2) - \\gamma_t \\langle \\delta_t, x_t - x \\rangle",
+        "uses": []
+      },
+      {
+        "step": 5,
+        "description": "Sum over t = s, ..., k. V-terms telescope. Apply Jensen via convexity: f(x_bar_s^k) <= (sum gamma_t)^{-1} sum gamma_t f(x_t)",
+        "math": "f(\\bar{x}_s^k) - f^* \\le \\left( \\sum_{t=s}^{k} \\gamma_t \\right)^{-1} \\left[ V(x_s, x^*) - V(x_{k+1}, x^*) + \\sum_{t=s}^{k} \\gamma_t^2 (M^2 + \\|\\delta_t\\|_*^2) - \\sum_{t=s}^{k} \\gamma_t \\langle \\delta_t, x_t - x^* \\rangle \\right]",
+        "uses": []
+      },
+      {
+        "step": 6,
+        "description": "Take expectation: E[<delta_t, x_t - x>] = 0 (martingale: E[delta_t | xi_{[t-1]}] = 0, x_t is xi_{[t-1]}-measurable), E[||delta_t||^2_*] <= sigma^2, drop V(x_{k+1}, x*) >= 0",
+        "math": "\\mathbb{E}[f(\\bar{x}_s^k)] - f^* \\le \\left( \\sum_{t=s}^{k} \\gamma_t \\right)^{-1} \\left[ \\mathbb{E}[V(x_s, x^*)] + (M^2 + \\sigma^2) \\sum_{t=s}^{k} \\gamma_t^2 \\right]",
+        "uses": []
+      }
+    ]
+  },
+  "key_lemmas": [
+    {
+      "name": "Three-point lemma (Lemma 3.4)",
+      "ref": "Lemma 3.4",
+      "statement_math": "\\gamma_t \\langle g(x_t), x_{t+1} - x \\rangle + V(x_t, x_{t+1}) \\le V(x_t, x) - V(x_{t+1}, x), \\quad \\forall x \\in X",
+      "role": "Provides per-step descent bound relating the gradient inner product to telescoping Bregman divergence terms",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Write the first-order optimality condition of the prox-mapping (3.2.5)",
+          "math": "\\langle \\gamma_t g(x_t) + \\nabla v(x_{t+1}) - \\nabla v(x_t), x - x_{t+1} \\rangle \\ge 0, \\quad \\forall x \\in X",
+          "uses": []
+        },
+        {
+          "step": 2,
+          "description": "Verify the Bregman three-point identity (3.2.6) from the definition of V",
+          "math": "V(x_t, x) = V(x_t, x_{t+1}) + \\langle \\nabla v(x_{t+1}) - \\nabla v(x_t), x - x_{t+1} \\rangle + V(x_{t+1}, x), \\quad \\forall x \\in X",
+          "uses": []
+        },
+        {
+          "step": 3,
+          "description": "From step 1, isolate the gradient term; substitute step 2 to replace the inner product with Bregman terms; rearrange",
+          "math": "\\gamma_t \\langle g(x_t), x_{t+1} - x \\rangle \\le \\langle \\nabla v(x_{t+1}) - \\nabla v(x_t), x - x_{t+1} \\rangle = V(x_t, x) - V(x_t, x_{t+1}) - V(x_{t+1}, x)",
+          "uses": []
+        }
+      ]
+    }
+  ]
+}

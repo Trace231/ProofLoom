@@ -1,0 +1,3170 @@
+{
+  "algorithm": "SAMP",
+  "full_name": "Stochastic Accelerated Mirror-Prox Method",
+  "source_reference": "G. Lan, First-Order and Stochastic Optimization Methods for Machine Learning, Springer 2020, Section 4.5 (Algorithm 4.4, Theorem 4.10, Corollary 4.5)",
+  "setup": {
+    "problem": {
+      "math": "\\langle \\mathbb{E}_{\\xi,\\zeta}[F(u;\\xi,\\zeta)],u^*-u\\rangle\\le 0,\\ \\forall u\\in Z.",
+      "ref": "(4.5.1)",
+      "description": "Monotone stochastic variational inequality over a nonempty closed convex set."
+    },
+    "variable_space": {
+      "math": "\\text{Let }\\mathbb{R}^n\\text{ denote a finite dimensional vector space with inner product }\\langle\\cdot,\\cdot\\rangle\\text{ and norm }\\|\\cdot\\|\\text{ (not necessarily induced by }\\langle\\cdot,\\cdot\\rangle\\text{), and }Z\\text{ be a nonempty closed convex set in }\\mathbb{R}^n.",
+      "ref": "p.181 before (4.5.1)"
+    }
+  },
+  "assumptions": [
+    {
+      "name": "SVI_operator_decomposition",
+      "math": "F(u;\\xi,\\zeta)=G(u;\\xi)+H(u;\\zeta)+J'(u),\\ \\forall u\\in Z.",
+      "ref": "(4.5.2)",
+      "parameters": [
+        "F",
+        "G",
+        "H",
+        "J'",
+        "u",
+        "\\xi",
+        "\\zeta"
+      ]
+    },
+    {
+      "name": "J_subgradient_convex_simple",
+      "math": "J'(u)\\in\\partial J(u)\\text{ is a subgradient of a relatively simple and convex function }J\\text{ (see (4.5.9) below)}",
+      "ref": "p.181 after (4.5.2)",
+      "parameters": [
+        "J",
+        "J'",
+        "u"
+      ]
+    },
+    {
+      "name": "H_unbiased_monotone_Lipschitz",
+      "math": "\\mathbb{E}_{\\zeta}[H(u;\\zeta)]=H(u),\\ \\langle H(w)-H(v),w-v\\rangle\\ge 0,\\ \\text{and}\\ \\|H(w)-H(v)\\|_*\\le M\\|w-v\\|,\\ \\forall w,v\\in Z.",
+      "ref": "(4.5.3)",
+      "parameters": [
+        "H",
+        "M",
+        "u",
+        "w",
+        "v",
+        "\\zeta"
+      ]
+    },
+    {
+      "name": "G_unbiased_convex_L_smooth",
+      "math": "\\mathbb{E}_{\\xi}[G(u;\\xi)]=\\nabla G(u)\\ \\text{and}\\ 0\\le G(w)-G(v)-\\langle\\nabla G(v),w-v\\rangle\\le \\frac{L}{2}\\|w-v\\|^2,\\ \\forall w,v\\in Z.",
+      "ref": "(4.5.4)",
+      "parameters": [
+        "G",
+        "L",
+        "u",
+        "w",
+        "v",
+        "\\xi"
+      ]
+    },
+    {
+      "name": "Mean_operator_definition",
+      "math": "F(u):=\\mathbb{E}_{\\xi,\\zeta}[F(u;\\xi,\\zeta)]=\\nabla G(u)+H(u)+J'(u).",
+      "ref": "(4.5.5)",
+      "parameters": [
+        "F",
+        "G",
+        "H",
+        "J'"
+      ]
+    },
+    {
+      "name": "SFO_variance_bound",
+      "math": "\\text{At the }i\\text{-th call of SFOG and SFOH with input }z\\in Z,\\text{ the oracles SFOG and SFOH output stochastic information }G(z;\\xi_i)\\text{ and }H(z;\\zeta_i)\\text{ respectively, such that }\\mathbb{E}\\|G(u;\\xi_i)-\\nabla G(u)\\|_*^2\\le\\sigma_G^2\\ \\text{and}\\ \\mathbb{E}\\|H(u;\\zeta_i)-H(u)\\|_*^2\\le\\sigma_H^2,\\text{ for some }\\sigma_G,\\sigma_H\\ge0,\\text{ where }\\xi_i\\text{ and }\\zeta_i\\text{ are independently distributed random samples.}",
+      "ref": "Assumption 10",
+      "parameters": [
+        "G",
+        "H",
+        "z",
+        "u",
+        "\\xi_i",
+        "\\zeta_i",
+        "\\sigma_G",
+        "\\sigma_H"
+      ]
+    },
+    {
+      "name": "Oracle_independence",
+      "math": "\\xi_i\\text{ and }\\zeta_i\\text{ are independently distributed random samples.}",
+      "ref": "Assumption 10",
+      "parameters": [
+        "\\xi_i",
+        "\\zeta_i"
+      ]
+    },
+    {
+      "name": "Sigma_definition",
+      "math": "\\sigma:=\\sqrt{\\sigma_G^2+\\sigma_H^2}.",
+      "ref": "(4.5.7)",
+      "parameters": [
+        "\\sigma",
+        "\\sigma_G",
+        "\\sigma_H"
+      ]
+    },
+    {
+      "name": "Prox_subproblem_solvable",
+      "math": "\\arg\\min_{u\\in Z}\\langle\\eta,u-z\\rangle+V(z,u)+J(u).",
+      "ref": "(4.5.9)",
+      "parameters": [
+        "\\eta",
+        "z",
+        "V",
+        "J"
+      ]
+    },
+    {
+      "name": "omega_distance_generating_function_on_Z",
+      "math": "V(\\cdot,\\cdot)\\text{ is the prox-function associated with a distance generating function }\\omega:Z\\to\\mathbb{R}\\text{ given by }V(z,u):=\\omega(u)-\\omega(z)-\\langle\\nabla\\omega(z),u-z\\rangle,\\ \\forall u,z\\in Z.",
+      "ref": "p.183 before (4.5.10) and (4.5.10)",
+      "parameters": [
+        "V",
+        "\\omega",
+        "Z",
+        "z",
+        "u"
+      ]
+    },
+    {
+      "name": "Bregman_prox_definition",
+      "math": "V(z,u):=\\omega(u)-\\omega(z)-\\langle\\nabla\\omega(z),u-z\\rangle,\\ \\forall u,z\\in Z.",
+      "ref": "(4.5.10)",
+      "parameters": [
+        "V",
+        "\\omega",
+        "z",
+        "u"
+      ]
+    },
+    {
+      "name": "Distance_generating_function_strong_convexity",
+      "math": "\\langle x'-x,\\nabla\\nu(x')-\\nabla\\nu(x)\\rangle\\ge\\sigma_\\nu\\|x'-x\\|^2,\\ \\forall x',x\\in X^o.",
+      "ref": "(3.2.1)",
+      "parameters": [
+        "\\nu",
+        "\\sigma_\\nu",
+        "x'",
+        "x",
+        "X^o"
+      ]
+    },
+    {
+      "name": "Prox_function_strong_convexity_lower_bound",
+      "math": "V(x,z)\\ge\\frac{\\sigma_\\nu}{2}\\|x-z\\|^2.",
+      "ref": "(3.2.3)",
+      "parameters": [
+        "V",
+        "\\sigma_\\nu",
+        "x",
+        "z"
+      ]
+    },
+    {
+      "name": "Distance_generating_function_modulus_one_normalization",
+      "math": "\\text{Without loss of generality, we assume that the strong convexity modulus }\\sigma_\\nu\\text{ of }\\nu\\text{ is given by }1.",
+      "ref": "p.61 after (3.2.3)",
+      "parameters": [
+        "\\nu",
+        "\\sigma_\\nu"
+      ]
+    },
+    {
+      "name": "SAMP_search_point_update",
+      "math": "w_t=(1-\\alpha_t)\\bar w_t+\\alpha_t r_t,",
+      "ref": "(4.5.11)",
+      "parameters": [
+        "w_t",
+        "\\bar w_t",
+        "r_t",
+        "\\alpha_t"
+      ]
+    },
+    {
+      "name": "SAMP_first_prox_update",
+      "math": "w_{t+1}=\\arg\\min_{u\\in Z}\\gamma_t[\\langle H(r_t;\\zeta_{2t-1})+G(w_t;\\xi_t),u-r_t\\rangle+J(u)]+V(r_t,u),",
+      "ref": "(4.5.12)",
+      "parameters": [
+        "w_{t+1}",
+        "r_t",
+        "H",
+        "G",
+        "J",
+        "\\gamma_t"
+      ]
+    },
+    {
+      "name": "SAMP_second_prox_update",
+      "math": "r_{t+1}=\\arg\\min_{u\\in Z}\\gamma_t[\\langle H(w_{t+1};\\zeta_{2t})+G(w_t;\\xi_t),u-r_t\\rangle+J(u)]+V(r_t,u),",
+      "ref": "(4.5.13)",
+      "parameters": [
+        "r_{t+1}",
+        "w_{t+1}",
+        "r_t",
+        "H",
+        "G",
+        "J",
+        "\\gamma_t"
+      ]
+    },
+    {
+      "name": "SAMP_aggregate_update",
+      "math": "\\bar w_{t+1}=(1-\\alpha_t)\\bar w_t+\\alpha_t w_{t+1}.",
+      "ref": "(4.5.14)",
+      "parameters": [
+        "\\bar w_{t+1}",
+        "\\bar w_t",
+        "w_{t+1}",
+        "\\alpha_t"
+      ]
+    },
+    {
+      "name": "SAMP_convex_combination_alpha_range",
+      "math": "\\alpha_t\\in[0,1].",
+      "ref": "p.183 after (4.5.10)",
+      "parameters": [
+        "\\alpha_t"
+      ]
+    },
+    {
+      "name": "SAMP_initialization_membership",
+      "math": "\\text{Choose }r_1\\in Z.\\ \\text{Set }w_1=r_1,\\ \\bar w_1=r_1.",
+      "ref": "Algorithm 4.4",
+      "parameters": [
+        "r_1",
+        "w_1",
+        "\\bar w_1",
+        "Z"
+      ]
+    },
+    {
+      "name": "Q_definition",
+      "math": "\\text{For all }\\tilde u,u\\in Z,\\text{ we define }Q(\\tilde u,u):=G(\\tilde u)-G(u)+\\langle H(u),\\tilde u-u\\rangle+J(\\tilde u)-J(u).",
+      "ref": "(4.5.15)",
+      "parameters": [
+        "Q",
+        "\\tilde u",
+        "u"
+      ]
+    },
+    {
+      "name": "Gap_function_definition",
+      "math": "g(\\tilde u):=\\sup_{u\\in Z}Q(\\tilde u,u)",
+      "ref": "(4.5.16)",
+      "parameters": [
+        "g",
+        "Q",
+        "\\tilde u",
+        "Z"
+      ]
+    },
+    {
+      "name": "Gamma_definition",
+      "math": "\\Gamma_t=\\begin{cases}1, & \\text{when }t=1,\\\\ (1-\\alpha_t)\\Gamma_{t-1}, & \\text{when }t>1.\\end{cases}",
+      "ref": "(4.5.17)",
+      "parameters": [
+        "\\Gamma_t",
+        "\\alpha_t"
+      ]
+    },
+    {
+      "name": "Oracle_noise_definitions",
+      "math": "\\Delta H^{2t-1}:=H(r_t;\\zeta_{2t-1})-H(r_t),\\quad \\Delta H^{2t}:=H(w_{t+1};\\zeta_{2t})-H(w_{t+1}),\\quad \\Delta G^t:=G(w_t;\\xi_t)-\\nabla G(w_t).",
+      "ref": "(4.5.29)",
+      "parameters": [
+        "\\Delta H^{2t-1}",
+        "\\Delta H^{2t}",
+        "\\Delta G^t"
+      ]
+    },
+    {
+      "name": "Bounded_Bregman_diameter",
+      "math": "\\sup_{z_1,z_2\\in Z}V(z_1,z_2)\\le D_Z^2.",
+      "ref": "(4.5.36)",
+      "parameters": [
+        "D_Z",
+        "V",
+        "Z"
+      ]
+    },
+    {
+      "name": "SAMP_parameter_conditions",
+      "math": "\\alpha_1=1,\\ q-L\\alpha_t\\gamma_t-3M^2\\gamma_t^2\\ge 0\\ \\text{for some }q\\in(0,1),\\ \\text{and}\\ \\frac{\\alpha_t}{\\Gamma_t\\gamma_t}\\le\\frac{\\alpha_{t+1}}{\\Gamma_{t+1}\\gamma_{t+1}},\\ \\forall t\\ge 1.",
+      "ref": "(4.5.37)",
+      "parameters": [
+        "\\alpha_t",
+        "\\gamma_t",
+        "\\Gamma_t",
+        "q",
+        "L",
+        "M"
+      ]
+    },
+    {
+      "name": "Light_tail_oracle_noise",
+      "math": "\\text{For any }i\\text{-th call on oracles }SFOH\\text{ and }SFOH\\text{ with any input }u\\in Z,\\ \\mathbb{E}[\\exp\\{\\|\\nabla G(u)-G(u;\\xi_i)\\|_*^2/\\sigma_G^2\\}]\\le\\exp\\{1\\},\\ \\text{and}\\ \\mathbb{E}[\\exp\\{\\|H(u)-H(u;\\zeta_i)\\|_*^2/\\sigma_H^2\\}]\\le\\exp\\{1\\}.",
+      "ref": "Assumption 11",
+      "parameters": [
+        "G",
+        "H",
+        "u",
+        "\\xi_i",
+        "\\zeta_i",
+        "\\sigma_G",
+        "\\sigma_H"
+      ]
+    }
+  ],
+  "upstream_alignment": [
+    {
+      "name": "SAMP_OracleStreamBoundary",
+      "kind": "upstream Lean probability-model boundary",
+      "source_lean": "Algorithms/Unverified/StochasticAcceleratedMirrorProx.lean:1228-1237",
+      "status": "explicit probability-model boundary consumed by the interleaved SAMP bridge",
+      "role": "Supplies the measurable, iid, cross-stream-independent sample streams needed to instantiate the paper's informal independently distributed oracle samples without changing the verbatim paper Assumption 10.",
+      "clauses": [
+        "For every i, the coordinate map xiStream(sample,i) is measurable.",
+        "For every i, the coordinate map zetaStream(sample,i) is measurable.",
+        "The xi coordinate stream is iid: iIndepFun (xiStream sample) mu.",
+        "The zeta coordinate stream is iid: iIndepFun (zetaStream sample) mu.",
+        "The full xi and zeta streams are independent: IndepFun (fun omega => (sample omega).xi) (fun omega => (sample omega).zeta) mu.",
+        "Every xi coordinate has the fixed marginal law xiLaw: Measure.map (xiStream sample i) mu = xiLaw.",
+        "Every zeta coordinate has the fixed marginal law zetaLaw: Measure.map (zetaStream sample i) mu = zetaLaw."
+      ],
+      "produces": "measurable_iid_cross_independent_oracle_streams"
+    },
+    {
+      "name": "SAMP_InterleavedOracleHistoryBoundary",
+      "kind": "explicit Phase-alpha alignment hypothesis",
+      "source_lean": "Algorithms/Unverified/StochasticAcceleratedMirrorProx.lean:1242-1279; interleavedOracleBlock, interleavedOracleBlock_spec, SAMP_InterleavedOracleHistoryCertificate.outputs (abstract Prop fields only)",
+      "status": "extra formalization hypothesis: the downstream proof consumes the listed block-history, Borel/adaptedness, and pre-call measurability facts as hypotheses; the cited Lean range records abstract Prop fields and does not prove them from Algorithm 4.4 or Assumption 10",
+      "depends_on": [
+        "SAMP_OracleStreamBoundary",
+        "SAMP_initialization_membership",
+        "SAMP_search_point_update",
+        "SAMP_first_prox_update",
+        "SAMP_second_prox_update",
+        "Lemma_4_15_AuxiliaryPerturbationBound"
+      ],
+      "role": "The paper's interleaved three-call proof requires a block-history, pre-call measurability, and deterministic-Borel iterate-map interface. Conditional oracle laws are separated into SAMP_InterleavedConditionalOracleLawBoundary rather than treated as source-derived theorem statements.",
+      "clauses": [
+        "Hypothesis: chi_i := (zeta_{2i-1}, xi_i, zeta_{2i}) and chi_[i-1] := (chi_1,...,chi_{i-1}) form the iid block input required by Lemma 4.1.",
+        "Hypothesis: define the pre-call histories F_i^{H,o} := sigma(chi_[i-1]), F_i^G := sigma(chi_[i-1], zeta_{2i-1}), and F_i^{H,e} := sigma(chi_[i-1], zeta_{2i-1}, xi_i), matching the call order (r_i,zeta_{2i-1}), (w_i,xi_i), (w_{i+1},zeta_{2i}).",
+        "Hypothesis: induction through initialization, deterministic convex-combination updates, measurable prox selections, and the auxiliary recursion makes r_i, w_i, and w_i^v deterministic Borel functions of chi_[i-1], hence r_i-w_i^v is F_i^G-measurable.",
+        "Hypothesis: the first prox update makes w_{i+1} a Borel function of (chi_[i-1], zeta_{2i-1}, xi_i), while w_i^v remains a function of chi_[i-1], hence w_{i+1}-w_i^v is F_i^{H,e}-measurable."
+      ],
+      "proof": [
+        {
+          "step": 1,
+          "description": "Consume the explicit SAMP_InterleavedOracleHistoryBoundary certificate field that groups the actual oracle coordinates into chi_i=(zeta_{2i-1},xi_i,zeta_{2i}) and chi_[i-1], and asserts the iid block input required by Lemma 4.1. The prerequisite stream facts come from SAMP_OracleStreamBoundary; the iid block-history clause is not derived from the source-only Assumption 10 anchor.",
+          "ref": "Extra Phase-alpha alignment hypothesis; generic iid input required by Lemma 4.1",
+          "source_pdf_lines": [
+            6209,
+            6211
+          ],
+          "uses": [
+            "SAMP_OracleStreamBoundary"
+          ],
+          "produces": "SAMP_interleaved_iid_block_history"
+        },
+        {
+          "step": 2,
+          "description": "Record the three pre-call histories required by the within-iteration order: F_i^{H,o}=sigma(chi_[i-1]), F_i^G=sigma(chi_[i-1],zeta_{2i-1}), and F_i^{H,e}=sigma(chi_[i-1],zeta_{2i-1},xi_i).",
+          "ref": "Derived filtration construction from Algorithm 4.4, (4.5.11)-(4.5.13)",
+          "source_pdf_lines": [],
+          "uses": [
+            "previous_step:1",
+            "SAMP_first_prox_update",
+            "SAMP_second_prox_update"
+          ],
+          "produces": "SAMP_interleaved_pre_call_histories"
+        },
+        {
+          "step": 3,
+          "description": "Use the formalization hypothesis for induction through initialization, deterministic convex-combination updates, measurable prox selections, and the auxiliary recursion to make r_i, w_i, and w_i^v deterministic Borel functions of chi_[i-1], with r_i-w_i^v measurable before the G call.",
+          "ref": "Derived deterministic-Borel/adaptedness route from Algorithm 4.4 and (4.5.34)",
+          "source_pdf_lines": [],
+          "uses": [
+            "SAMP_initialization_membership",
+            "SAMP_search_point_update",
+            "SAMP_aggregate_update",
+            "SAMP_first_prox_update",
+            "SAMP_second_prox_update",
+            "Lemma_4_15_AuxiliaryPerturbationBound",
+            "previous_step:2"
+          ],
+          "produces": "SAMP_interleaved_adapted_query_maps"
+        },
+        {
+          "step": 4,
+          "description": "Use the formalization hypothesis for even-H adaptedness: w_{i+1} is a Borel function of the revealed odd-H and G coordinates and w_i^v is a prior-history function, yielding measurability of w_{i+1}-w_i^v before the even-H call.",
+          "ref": "Derived even-H pre-call adaptedness route from (4.5.12)-(4.5.13) and (4.5.34)",
+          "source_pdf_lines": [],
+          "uses": [
+            "SAMP_first_prox_update",
+            "SAMP_second_prox_update",
+            "Lemma_4_15_AuxiliaryPerturbationBound",
+            "previous_step:2",
+            "previous_step:3"
+          ],
+          "produces": "SAMP_even_H_pairing_query_measurability"
+        }
+      ],
+      "produces": "SAMP_interleaved_iid_block_history; SAMP_interleaved_pre_call_histories; SAMP_interleaved_adapted_query_maps; SAMP_even_H_pairing_query_measurability"
+    },
+    {
+      "name": "SAMP_InterleavedConditionalOracleLawBoundary",
+      "kind": "explicit Phase-alpha alignment hypothesis",
+      "source_lean": "Algorithms/Unverified/StochasticAcceleratedMirrorProx.lean:1283-1301; SAMP_InterleavedConditionalOracleLawCertificate.outputs (abstract Prop fields only)",
+      "status": "extra formalization hypothesis: the downstream expectation and martingale arguments consume these conditional adaptive-query laws as hypotheses; the cited Lean range records abstract Prop fields and does not prove them from Assumption 10",
+      "depends_on": [
+        "SAMP_OracleStreamBoundary",
+        "SAMP_InterleavedOracleHistoryBoundary",
+        "SFO_variance_bound",
+        "Oracle_independence",
+        "G_unbiased_convex_L_smooth",
+        "H_unbiased_monotone_Lipschitz",
+        "Oracle_noise_definitions"
+      ],
+      "role": "Separates the non-source conditional-law transport from the source Assumption 10 statement: the paper prints fixed-query second-moment bounds and then uses zero pairings before (4.5.47), while the formal proof needs conditional versions at adaptive SAMP queries.",
+      "clauses": [
+        "Hypothesis: conditioned on the pre-G-call history F_i^G, the G residual Delta G^i has conditional mean zero and conditional second moment bounded by sigma_G^2 at the adaptive query w_i.",
+        "Hypothesis: conditioned on the pre-odd-H-call history F_i^{H,o}, the odd-H residual Delta H^{2i-1} has conditional mean zero and conditional second moment bounded by sigma_H^2 at the adaptive query r_i.",
+        "Hypothesis: conditioned on the pre-even-H-call history F_i^{H,e}, the even-H residual Delta H^{2i} has conditional mean zero and conditional second moment bounded by sigma_H^2 at the adaptive query w_{i+1}.",
+        "Hypothesis: the conditional mean-zero facts and pre-call measurability of r_i-w_i^v and w_{i+1}-w_i^v yield the zero inner-product pairings used before (4.5.47)."
+      ],
+      "produces": "SAMP_interleaved_conditional_mean_zero; SAMP_interleaved_second_moment_bounds; SAMP_interleaved_zero_pairings_before_4547"
+    },
+    {
+      "name": "SAMP_InterleavedLightTailBoundary",
+      "kind": "explicit Phase-alpha alignment hypothesis",
+      "source_lean": "Algorithms/Unverified/StochasticAcceleratedMirrorProx.lean:1305-1324; SAMP_InterleavedLightTailCertificate.outputs (abstract Prop fields only)",
+      "status": "extra formalization hypothesis: the downstream tail proof consumes the listed conditional exponential-square outputs as hypotheses; the cited Lean range records abstract Prop fields and does not prove them from Assumption 11",
+      "depends_on": [
+        "SAMP_OracleStreamBoundary",
+        "SAMP_InterleavedOracleHistoryBoundary",
+        "SAMP_InterleavedConditionalOracleLawBoundary",
+        "Light_tail_oracle_noise"
+      ],
+      "role": "The high-probability proof additionally requires conditional exponential-square bounds for the three interleaved residual calls. This entry marks the adaptive-query transport of the fixed-query Assumption-11 laws as an extra formalization hypothesis consumed by Lemma 4.1 and the weighted-square argument.",
+      "clauses": [
+        "Hypothesis: conditioned on F_i^G, the G residual at the F_i^G-measurable query w_i satisfies the exponential-square bound inherited from Assumption 11 and the fixed xi marginal law.",
+        "Hypothesis: conditioned on F_i^{H,o}, the odd-H residual at r_i satisfies the exponential-square bound inherited from Assumption 11 and the fixed zeta marginal law.",
+        "Hypothesis: conditioned on F_i^{H,e}, the even-H residual at w_{i+1} satisfies the exponential-square bound inherited from Assumption 11 and the fresh zeta_{2i} marginal law.",
+        "Hypothesis: the corresponding conditional light-tail facts after multiplying by r_i-w_i^v and w_{i+1}-w_i^v supply the Lemma-4.1 inner-product applications.",
+        "The weighted square-noise applications consume the same conditional transport; no residual-independence claim is needed for the convexity-of-exponential step."
+      ],
+      "proof": [
+        {
+          "step": 1,
+          "description": "Consume the explicit SAMP_InterleavedLightTailBoundary certificate field for the G call: conditioned on F_i^G, the adaptive residual Delta G^i satisfies the required exponential-square control. This is not derived here from Assumption 11 alone; the stream freshness and adaptive-query history are supplied by SAMP_OracleStreamBoundary and SAMP_InterleavedOracleHistoryBoundary.",
+          "ref": "Extra Phase-alpha alignment hypothesis; conditional G light-tail certificate",
+          "source_pdf_lines": [
+            10461,
+            10467
+          ],
+          "uses": [
+            "Light_tail_oracle_noise",
+            "SAMP_OracleStreamBoundary",
+            "SAMP_InterleavedOracleHistoryBoundary"
+          ],
+          "produces": "SAMP_G_conditional_light_tail"
+        },
+        {
+          "step": 2,
+          "description": "Consume the explicit SAMP_InterleavedLightTailBoundary certificate field for the odd-H call: conditioned on F_i^{H,o}, the adaptive residual Delta H^{2i-1} satisfies the required exponential-square control. This conditional fact is recorded as boundary structure, not as a theorem derived from the fixed-query Assumption 11 statement alone.",
+          "ref": "Extra Phase-alpha alignment hypothesis; conditional odd-H light-tail certificate",
+          "source_pdf_lines": [
+            10461,
+            10467
+          ],
+          "uses": [
+            "Light_tail_oracle_noise",
+            "SAMP_OracleStreamBoundary",
+            "SAMP_InterleavedOracleHistoryBoundary"
+          ],
+          "produces": "SAMP_H_odd_conditional_light_tail"
+        },
+        {
+          "step": 3,
+          "description": "Consume the explicit SAMP_InterleavedLightTailBoundary certificate field for the even-H call: conditioned on F_i^{H,e}, the adaptive residual Delta H^{2i} satisfies the required exponential-square control. This step relies on the pre-even-H history and fresh even-H coordinate as boundary hypotheses.",
+          "ref": "Extra Phase-alpha alignment hypothesis; conditional even-H light-tail certificate",
+          "source_pdf_lines": [
+            10461,
+            10467
+          ],
+          "uses": [
+            "Light_tail_oracle_noise",
+            "SAMP_OracleStreamBoundary",
+            "SAMP_InterleavedOracleHistoryBoundary"
+          ],
+          "produces": "SAMP_H_even_conditional_light_tail"
+        },
+        {
+          "step": 4,
+          "description": "For the G inner-product martingale term, use the paper's martingale-difference observation together with Assumption 11 and the displayed exponential-square calculation for alpha_i Gamma_i^{-1}<Delta G^i,r_i-w_i^v>. This supplies only the G inner-product light-tail interface used in the subsequent Lemma 4.1 application.",
+          "ref": "Proof of Theorem 4.10 before (4.5.48), G inner-product exponential-square check",
+          "source_pdf_lines": [
+            10819,
+            10830
+          ],
+          "uses": [
+            "previous_step:1",
+            "SAMP_InterleavedOracleHistoryBoundary",
+            "Lemma_4_1_MartingaleLargeDeviation",
+            "Light_tail_oracle_noise"
+          ],
+          "produces": "SAMP_G_inner_product_conditional_light_tail"
+        },
+        {
+          "step": 5,
+          "description": "Record the paper's 'similar argument' for the even-H inner-product term leading to (4.5.49). The step consumes the even-H conditional light-tail and pre-even-H measurability boundary, and produces only the even-H inner-product light-tail interface.",
+          "ref": "Proof of Theorem 4.10, similar argument for (4.5.49)",
+          "source_pdf_lines": [
+            10841,
+            10848
+          ],
+          "uses": [
+            "previous_step:3",
+            "SAMP_InterleavedOracleHistoryBoundary",
+            "Lemma_4_1_MartingaleLargeDeviation",
+            "Light_tail_oracle_noise"
+          ],
+          "produces": "SAMP_H_even_inner_product_conditional_light_tail"
+        },
+        {
+          "step": 6,
+          "description": "For the weighted G square-noise term, use Assumption 11 and convexity of exponential functions with S_i=alpha_i gamma_i/Gamma_i and S=sum_i S_i, then Markov's inequality and the source rewrite to (4.5.50). This step produces only the G weighted-square light-tail interface.",
+          "ref": "Proof of Theorem 4.10, weighted G square-noise argument ending at (4.5.50)",
+          "source_pdf_lines": [
+            10850,
+            10873
+          ],
+          "uses": [
+            "previous_step:1",
+            "Light_tail_oracle_noise"
+          ],
+          "produces": "SAMP_G_weighted_square_conditional_light_tail"
+        },
+        {
+          "step": 7,
+          "description": "Record the paper's separate 'Using similar arguments' step for the odd-index H weighted square-noise tail (4.5.51). This step consumes the odd-H conditional light-tail interface and the preceding weighted-square argument pattern.",
+          "ref": "(4.5.51)",
+          "source_pdf_lines": [
+            10875,
+            10878
+          ],
+          "math": "\\operatorname{Prob}\\left\\{\\sum_{i=1}^t\\frac{3\\alpha_i\\gamma_i}{2\\Gamma_i}\\|\\Delta H^{2i-1}\\|_*^2>(1+\\lambda)\\frac{3\\sigma_H^2}{2}\\sum_{i=1}^t\\frac{\\alpha_i\\gamma_i}{\\Gamma_i}\\right\\}\\le\\exp\\{-\\lambda\\}.",
+          "uses": [
+            "previous_step:2",
+            "previous_step:6",
+            "Light_tail_oracle_noise"
+          ],
+          "produces": "SAMP_H_odd_weighted_square_conditional_light_tail"
+        },
+        {
+          "step": 8,
+          "description": "Record the paper's separate 'Using similar arguments' step for the even-index H weighted square-noise tail (4.5.52). This step consumes the even-H conditional light-tail interface and the preceding weighted-square argument pattern.",
+          "ref": "(4.5.52)",
+          "source_pdf_lines": [
+            10879,
+            10881
+          ],
+          "math": "\\operatorname{Prob}\\left\\{\\sum_{i=1}^t\\frac{5\\alpha_i\\gamma_i}{2\\Gamma_i}\\|\\Delta H^{2i}\\|_*^2>(1+\\lambda)\\frac{5\\sigma_H^2}{2}\\sum_{i=1}^t\\frac{\\alpha_i\\gamma_i}{\\Gamma_i}\\right\\}\\le\\exp\\{-\\lambda\\}.",
+          "uses": [
+            "previous_step:3",
+            "previous_step:6",
+            "Light_tail_oracle_noise"
+          ],
+          "produces": "SAMP_H_even_weighted_square_conditional_light_tail"
+        }
+      ],
+      "produces": "SAMP_G_conditional_light_tail; SAMP_H_odd_conditional_light_tail; SAMP_H_even_conditional_light_tail; SAMP_G_inner_product_conditional_light_tail; SAMP_H_even_inner_product_conditional_light_tail; SAMP_G_weighted_square_conditional_light_tail; SAMP_H_odd_weighted_square_conditional_light_tail; SAMP_H_even_weighted_square_conditional_light_tail"
+    }
+  ],
+  "algorithm_spec": {
+    "ref": "Algorithm 4.4",
+    "initialization": {
+      "math": "\\text{Choose }r_1\\in Z.\\ \\text{Set }w_1=r_1,\\ \\bar w_1=r_1.",
+      "ref": "Algorithm 4.4"
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "accelerated_search_point",
+        "math": "w_t=(1-\\alpha_t)\\bar w_t+\\alpha_t r_t,",
+        "ref": "(4.5.11)"
+      },
+      {
+        "step": 2,
+        "name": "first_mirror_prox_point",
+        "math": "w_{t+1}=\\arg\\min_{u\\in Z}\\gamma_t[\\langle H(r_t;\\zeta_{2t-1})+G(w_t;\\xi_t),u-r_t\\rangle+J(u)]+V(r_t,u),",
+        "ref": "(4.5.12)"
+      },
+      {
+        "step": 3,
+        "name": "second_mirror_prox_point",
+        "math": "r_{t+1}=\\arg\\min_{u\\in Z}\\gamma_t[\\langle H(w_{t+1};\\zeta_{2t})+G(w_t;\\xi_t),u-r_t\\rangle+J(u)]+V(r_t,u),",
+        "ref": "(4.5.13)"
+      },
+      {
+        "step": 4,
+        "name": "aggregate_update",
+        "math": "\\bar w_{t+1}=(1-\\alpha_t)\\bar w_t+\\alpha_t w_{t+1}.",
+        "ref": "(4.5.14)"
+      }
+    ],
+    "output": {
+      "math": "w_N^{ag}",
+      "ref": "Algorithm 4.4",
+      "type": "aggregate iterate"
+    },
+    "parameters": [
+      {
+        "name": "iteration_range",
+        "math": "t=1,2,\\ldots,N-1",
+        "ref": "Algorithm 4.4"
+      },
+      {
+        "name": "Gamma_t",
+        "math": "\\Gamma_t=\\begin{cases}1, & \\text{when }t=1,\\\\ (1-\\alpha_t)\\Gamma_{t-1}, & \\text{when }t>1.\\end{cases}",
+        "ref": "(4.5.17)"
+      },
+      {
+        "name": "noise_terms",
+        "math": "\\Delta H^{2t-1}:=H(r_t;\\zeta_{2t-1})-H(r_t),\\quad \\Delta H^{2t}:=H(w_{t+1};\\zeta_{2t})-H(w_{t+1}),\\quad \\Delta G^t:=G(w_t;\\xi_t)-\\nabla G(w_t).",
+        "ref": "(4.5.29)"
+      }
+    ]
+  },
+  "cited_theorems": [
+    {
+      "name_in_source": "Theorem 4.10",
+      "ref": "Theorem 4.10 / (4.5.38)-(4.5.40)",
+      "role": "Internal theorem invoked explicitly in the proof of Corollary 4.5 after verifying the parameter hypotheses in (4.5.37)."
+    }
+  ],
+  "main_theorem": {
+    "ref": "Theorem 4.10",
+    "statement_math": "\\text{Suppose that }\\sup_{z_1,z_2\\in Z}V(z_1,z_2)\\le D_Z^2.\\ \\text{Also assume that the parameters }\\{\\alpha_t\\}\\text{ and }\\{\\gamma_t\\}\\text{ in Algorithm 4.4 satisfy }\\alpha_1=1,\\ q-L\\alpha_t\\gamma_t-3M^2\\gamma_t^2\\ge0\\text{ for some }q\\in(0,1),\\text{ and }\\frac{\\alpha_t}{\\Gamma_t\\gamma_t}\\le\\frac{\\alpha_{t+1}}{\\Gamma_{t+1}\\gamma_{t+1}},\\ \\forall t\\ge1,\\text{ where }\\Gamma_t\\text{ is defined in (4.5.17). Then, (a) Under Assumption 10, for all }t\\ge1,\\ \\mathbb{E}[g(\\bar w_{t+1})]\\le Q_0(t):=\\frac{2\\alpha_t}{\\gamma_t}D_Z^2+\\left(4\\sigma_H^2+\\left(1+\\frac{1}{2(1-q)}\\right)\\sigma_G^2\\right)\\Gamma_t\\sum_{i=1}^t\\frac{\\alpha_i\\gamma_i}{\\Gamma_i}.\\ \\text{(b) Under Assumption 11, for all }\\lambda>0\\text{ and }t\\ge1,\\ \\operatorname{Prob}\\{g(\\bar w_{t+1})>Q_0(t)+\\lambda Q_1(t)\\}\\le2\\exp\\{-\\lambda^2/3\\}+3\\exp\\{-\\lambda\\},\\text{ where }Q_1(t):=\\Gamma_t(\\sigma_G+\\sigma_H)D_Z\\sqrt{2\\sum_{i=1}^t(\\alpha_i/\\Gamma_i)^2}+\\left(4\\sigma_H^2+\\left(1+\\frac{1}{2(1-q)}\\right)\\sigma_G^2\\right)\\Gamma_t\\sum_{i=1}^t\\frac{\\alpha_i\\gamma_i}{\\Gamma_i}.",
+    "rate": "With beta = O(sigma/D_Z), the number of iterations to find an epsilon-solution \\bar w of (4.5.1) satisfying E[g(\\bar w)] <= epsilon is O(L/epsilon + M/epsilon + sigma^2/epsilon^2), as stated in (4.5.56).",
+    "measure": "Expected and high-probability bounds on the SVI gap function g(\\bar w_{t+1}).",
+    "proof": [
+      {
+        "step": 0,
+        "description": "Establish membership of the algorithm-generated sequences before the first B_t telescope: Algorithm 4.4 chooses r_1 in Z, both prox updates minimize over u in Z, and the aggregate/search updates preserve the feasible carrier. Thus r_i and w_{i+1} lie in Z for all indices used in the proof.",
+        "ref": "Algorithm 4.4",
+        "source_pdf_lines": [
+          10408,
+          10415
+        ],
+        "uses": [
+          "SAMP_initialization_membership",
+          "SAMP_first_prox_update",
+          "SAMP_second_prox_update",
+          "SAMP_search_point_update",
+          "SAMP_aggregate_update",
+          "SAMP_convex_combination_alpha_range"
+        ],
+        "produces": "algorithm_sequence_membership: r_i\\in Z, w_i\\in Z, w_{i+1}\\in Z, and \\bar w_i\\in Z for all indices used in the theorem proof"
+      },
+      {
+        "step": 0.5,
+        "description": "Establish membership of the auxiliary sequence separately from the algorithm sequence: the auxiliary recursion in Lemma 4.15 defines w_1^v in Z and each w_{i+1}^v as an argmin over u in Z. Hence every auxiliary point w_i^v used below lies in Z.",
+        "ref": "(4.5.34)",
+        "source_pdf_lines": [
+          10673,
+          10676
+        ],
+        "uses": [
+          "Lemma_4_15_AuxiliaryPerturbationBound",
+          "previous_step:0"
+        ],
+        "produces": "auxiliary_sequence_membership: w_i^v\\in Z for every index used in the auxiliary telescope and martingale terms"
+      },
+      {
+        "step": 0.75,
+        "description": "Record exactly the source oracle-call statement used for the sampling model: at the i-th calls, the G and H oracle outputs satisfy the displayed second-moment bounds, and the source says that xi_i and zeta_i are independently distributed random samples. This source statement is only a per-call/same-index sampling statement; it does not itself assert iid streams across calls, measurability with respect to an algorithm history, or independence from the full past filtration.",
+        "ref": "Assumption 10",
+        "source_pdf_lines": [
+          10323,
+          10329
+        ],
+        "uses": [
+          "SFO_variance_bound",
+          "Oracle_independence"
+        ],
+        "produces": "source_per_call_sampling_data_only: the Assumption-10 variance bounds and the same-index statement that xi_i and zeta_i are independently distributed random samples; no cross-call iid, history-measurability, or full-past independence is claimed here"
+      },
+      {
+        "step": 0.755,
+        "description": "Consume the proof-consumable SAMP_OracleStreamBoundary extra hypothesis to expose the sample-stream hypotheses needed to realize the source's independently distributed samples: measurable coordinate streams, iid coordinate streams with fixed marginal laws, and cross-stream independence. This is a Lean/formalization boundary, not a consequence of the source-only Assumption 10 anchor.",
+        "ref": "Extra Phase-alpha boundary; Lean OracleSampleBoundary declaration",
+        "source_pdf_lines": [],
+        "uses": [
+          "SAMP_OracleStreamBoundary"
+        ],
+        "produces": "declared_measurable_iid_cross_independent_oracle_stream_boundary"
+      },
+      {
+        "step": 0.76,
+        "description": "Record the source call order and the algorithmic inputs of the three oracle calls in iteration i: SFOH is called at r_i with \\zeta_{2i-1}, SFOG at w_i with \\xi_i, and SFOH at w_{i+1} with \\zeta_{2i}.",
+        "ref": "Algorithm 4.4, (4.5.11)-(4.5.13)",
+        "source_pdf_lines": [
+          10408,
+          10415
+        ],
+        "uses": [
+          "SAMP_first_prox_update",
+          "SAMP_second_prox_update",
+          "SAMP_search_point_update",
+          "SAMP_aggregate_update",
+          "previous_step:0"
+        ],
+        "produces": "source_oracle_call_order: iteration i uses the actual call sequence (r_i,\\zeta_{2i-1}), (w_i,\\xi_i), and (w_{i+1},\\zeta_{2i})"
+      },
+      {
+        "step": 0.77,
+        "description": "Record the source definitions of the stochastic residuals used throughout the proof.",
+        "ref": "(4.5.29)",
+        "source_pdf_lines": [
+          10591,
+          10598
+        ],
+        "uses": [
+          "Oracle_noise_definitions",
+          "previous_step:0.76"
+        ],
+        "produces": "source_noise_residual_definitions: \\Delta H^{2i-1}=H(r_i;\\zeta_{2i-1})-H(r_i), \\Delta H^{2i}=H(w_{i+1};\\zeta_{2i})-H(w_{i+1}), and \\Delta G^i=G(w_i;\\xi_i)-\\nabla G(w_i)"
+      },
+      {
+        "step": 0.78,
+        "description": "Record the source auxiliary recursion: w_1^v is chosen in Z and each subsequent w_{i+1}^v is an argmin over u in Z, so the auxiliary points are generated before the corresponding residual pairings are used.",
+        "ref": "(4.5.34)",
+        "source_pdf_lines": [
+          10673,
+          10676
+        ],
+        "uses": [
+          "Lemma_4_15_AuxiliaryPerturbationBound",
+          "previous_step:0.5"
+        ],
+        "produces": "source_auxiliary_recursion: the auxiliary sequence w_i^v is defined by the source argmin recursion over Z"
+      },
+      {
+        "step": 0.79,
+        "description": "Consume the proof-consumable interleaved history boundary: chi_i=(zeta_{2i-1},xi_i,zeta_{2i}) and chi_[i-1]=(chi_1,...,chi_{i-1}) are the formal block-history inputs needed for Lemma 4.1. The iid block-history clause is an explicit certificate output supported by SAMP_OracleStreamBoundary, not a fact derived from the source-only Assumption 10 anchor.",
+        "ref": "Extra Phase-alpha boundary; Algorithm 4.4, (4.5.11)-(4.5.13); (4.5.34); Lemma 4.1",
+        "source_pdf_lines": [],
+        "uses": [
+          "SAMP_OracleStreamBoundary",
+          "SAMP_InterleavedOracleHistoryBoundary",
+          "SAMP_search_point_update",
+          "SAMP_first_prox_update",
+          "SAMP_second_prox_update",
+          "Lemma_4_15_AuxiliaryPerturbationBound",
+          "previous_step:0.75",
+          "previous_step:0.76",
+          "previous_step:0.78",
+          "previous_step:0.755"
+        ],
+        "produces": "SAMP_interleaved_iid_block_history: chi_i=(zeta_{2i-1},xi_i,zeta_{2i}) and its prior-block history"
+      },
+      {
+        "step": 0.795,
+        "description": "Consume the pre-call history component of the interleaved history boundary: the odd H call sees only prior blocks, the G call additionally sees zeta_{2i-1}, and the even H call additionally sees xi_i.",
+        "ref": "Derived filtration construction from Algorithm 4.4, (4.5.11)-(4.5.13)",
+        "source_pdf_lines": [],
+        "uses": [
+          "SAMP_InterleavedOracleHistoryBoundary",
+          "previous_step:0.76",
+          "previous_step:0.79"
+        ],
+        "produces": "SAMP_interleaved_pre_call_histories: F_i^{H,o}=sigma(chi_[i-1]), F_i^G=sigma(chi_[i-1],zeta_{2i-1}), and F_i^{H,e}=sigma(chi_[i-1],zeta_{2i-1},xi_i)"
+      },
+      {
+        "step": 0.797,
+        "description": "Consume the adaptive-query regularity component of the interleaved history boundary: r_i, w_i, and w_i^v are Borel functions of chi_[i-1], r_i-w_i^v is measurable before the G call, and w_{i+1}-w_i^v is measurable before the even-H call.",
+        "ref": "Derived deterministic-Borel/adaptedness bridge from Algorithm 4.4, (4.5.11)-(4.5.14), and (4.5.34)",
+        "source_pdf_lines": [],
+        "uses": [
+          "SAMP_InterleavedOracleHistoryBoundary",
+          "SAMP_initialization_membership",
+          "SAMP_search_point_update",
+          "SAMP_first_prox_update",
+          "SAMP_second_prox_update",
+          "Lemma_4_15_AuxiliaryPerturbationBound",
+          "previous_step:0.795"
+        ],
+        "produces": "SAMP_interleaved_adapted_query_maps: deterministic-Borel iterate and auxiliary maps and the two pre-call measurability facts"
+      },
+      {
+        "step": 0.799,
+        "description": "Consume the proof-consumable conditional-law boundary: the three adaptive residual calls satisfy the required conditional mean-zero, second-moment, and zero-pairing facts at the pre-call histories. The boundary is explicit extra formalization structure beyond the fixed-query Assumption 10 text.",
+        "ref": "Extra Phase-alpha boundary; Assumption 10 and (4.5.29) conditional-law interface",
+        "source_pdf_lines": [],
+        "uses": [
+          "G_unbiased_convex_L_smooth",
+          "H_unbiased_monotone_Lipschitz",
+          "SAMP_InterleavedConditionalOracleLawBoundary",
+          "SFO_variance_bound",
+          "Oracle_independence",
+          "previous_step:0.79",
+          "previous_step:0.795",
+          "previous_step:0.797",
+          "previous_step:0.77"
+        ],
+        "produces": "SAMP_interleaved_conditional_moment_laws: conditional mean-zero and second-moment facts at the three pre-call histories"
+      },
+      {
+        "step": 0.7995,
+        "description": "Record the paper's additional assertion that Delta G^i, Delta H^{2i-1}, and Delta H^{2i} are independent, but do not treat it as established. Since w_{i+1} depends on zeta_{2i-1} and xi_i, Delta H^{2i} is evaluated at an adaptive query; fresh-coordinate independence alone does not imply mutual independence of the residual random variables. A query-independent oracle-kernel hypothesis or a separate proof is required.",
+        "ref": "Derived residual-independence bridge for the three-call order in Algorithm 4.4",
+        "source_pdf_lines": [],
+        "uses": [
+          "Oracle_independence",
+          "SAMP_SourceResidualIndependenceHypothesis",
+          "previous_step:0.76",
+          "previous_step:0.79",
+          "previous_step:0.795",
+          "previous_step:0.797",
+          "previous_step:0.799"
+        ],
+        "produces": "SAMP_source_residual_mutual_independence"
+      },
+      {
+        "step": 0.8,
+        "description": "Record the generic hypotheses that Lemma 4.1 requires before it can be applied: an iid input sequence, deterministic-Borel dependence on the current input and prior history, conditional mean zero, and conditional exponential-square control. The SAMP-specific iid, adaptedness, and conditional-mean components are supplied by the history and conditional-law hypotheses; the light-tail component is recorded separately below.",
+        "ref": "Lemma 4.1 source statement",
+        "source_pdf_lines": [
+          6209,
+          6211
+        ],
+        "uses": [
+          "previous_step:0.79",
+          "previous_step:0.797",
+          "previous_step:0.799",
+          "previous_step:0.7995"
+        ],
+        "produces": "Lemma_4_1_required_conditional_interface: iid-history, deterministic-Borel, conditional-mean, and conditional-light-tail premises required by the source lemma"
+      },
+      {
+        "step": 0.81,
+        "description": "Record the source definitions of the three residuals that are later paired with adapted vectors and inserted into the expectation and tail arguments.",
+        "ref": "(4.5.29)",
+        "source_pdf_lines": [
+          10591,
+          10598
+        ],
+        "uses": [
+          "Oracle_noise_definitions",
+          "previous_step:0.77"
+        ],
+        "produces": "residuals_for_conditional_interface: the G, odd-H, and even-H residuals to which the source conditional hypotheses must be applied"
+      },
+      {
+        "step": 0.82,
+        "description": "Record the source auxiliary recursion used to construct the comparison sequence in the stochastic-term proof. Its source definition is separate from the generic Lemma 4.1 hypotheses.",
+        "ref": "(4.5.34)",
+        "source_pdf_lines": [
+          10673,
+          10676
+        ],
+        "uses": [
+          "Lemma_4_15_AuxiliaryPerturbationBound",
+          "previous_step:0.78"
+        ],
+        "produces": "auxiliary_recursion_for_conditional_interface: the source-defined sequence w_i^v used in the residual pairings"
+      },
+      {
+        "step": 0.83,
+        "description": "Record the SAMP-specific Lemma 4.1 instantiation required for the three interleaved residual streams. It combines the iid block history, pre-call filtrations, adaptive query maps, and conditional oracle laws into the residual interface consumed by the tail proof.",
+        "ref": "Derived conditional instantiation from Lemma 4.1 and the SAMP interleaved bridge",
+        "source_pdf_lines": [],
+        "uses": [
+          "previous_step:0.8",
+          "previous_step:0.81",
+          "previous_step:0.82",
+          "previous_step:0.79",
+          "previous_step:0.795",
+          "previous_step:0.797",
+          "previous_step:0.799"
+        ],
+        "produces": "SAMP_interleaved_conditional_residual_API: separate conditional mean, second-moment, history-function, and pre-call measurability facts"
+      },
+      {
+        "step": 0.85,
+        "description": "Record the source light-tail inequalities in Assumption 11 for the G and H oracle residuals.",
+        "ref": "Assumption 11",
+        "source_pdf_lines": [
+          10461,
+          10467
+        ],
+        "uses": [
+          "Light_tail_oracle_noise"
+        ],
+        "produces": "source_light_tail_assumption: the per-call unconditional exponential-square bounds in Assumption 11 for G and H oracle samples"
+      },
+      {
+        "step": 0.86,
+        "description": "Consume the proof-consumable light-tail boundary: the fixed-query Assumption-11 exponential-square bounds are available conditionally for the G, odd-H, and even-H residuals at their adaptive pre-call histories. This is recorded as extra formalization structure, not as a source theorem derived from Assumption 11 alone.",
+        "ref": "Extra Phase-alpha boundary; Assumption 11 conditional light-tail interface",
+        "source_pdf_lines": [],
+        "uses": [
+          "Light_tail_oracle_noise",
+          "SAMP_InterleavedLightTailBoundary",
+          "previous_step:0.8",
+          "previous_step:0.79",
+          "previous_step:0.799",
+          "previous_step:0.85",
+          "previous_step:0.795",
+          "previous_step:0.797",
+          "previous_step:0.7995"
+        ],
+        "produces": "SAMP_interleaved_conditional_light_tail: conditional exponential-square premises for the G, odd-H, and even-H residuals"
+      },
+      {
+        "step": 0.865,
+        "description": "Record the source G exponential-square calculation before (4.5.48), using conditional light-tail control for the adaptive query r_i-w_i^v.",
+        "ref": "Proof of Theorem 4.10 before (4.5.48), using Lemma 4.1's conditional premise",
+        "source_pdf_lines": [
+          10819,
+          10830
+        ],
+        "uses": [
+          "Light_tail_oracle_noise",
+          "Oracle_noise_definitions",
+          "previous_step:0.86",
+          "previous_step:0.8",
+          "BregmanStrongConvexityLowerBound",
+          "Bounded_Bregman_diameter",
+          "previous_step:0",
+          "previous_step:0.5"
+        ],
+        "produces": "SAMP_G_ConditionalLightTailCalculation"
+      },
+      {
+        "step": 0.87,
+        "description": "Record the paper's 'similar argument' for the even-H residual before (4.5.49), using conditional light-tail control for the adaptive query w_{i+1}-w_i^v.",
+        "ref": "Proof of Theorem 4.10 before (4.5.49)",
+        "source_pdf_lines": [
+          10841,
+          10848
+        ],
+        "uses": [
+          "Light_tail_oracle_noise",
+          "Oracle_noise_definitions",
+          "previous_step:0.86",
+          "previous_step:0.8",
+          "BregmanStrongConvexityLowerBound",
+          "Bounded_Bregman_diameter",
+          "previous_step:0",
+          "previous_step:0.5"
+        ],
+        "produces": "SAMP_H_ConditionalLightTailCalculation"
+      },
+      {
+        "step": 1,
+        "description": "Telescope the weighted Bregman sum B_t(u,r_[t]) from its definition, then use boundedness of Z and monotonicity of alpha_i/(Gamma_i gamma_i) from the parameter condition.",
+        "ref": "(4.5.41)",
+        "source_pdf_lines": [
+          10737,
+          10752
+        ],
+        "math": "B_t(u,r_{[t]})=\\frac{\\alpha_1}{\\Gamma_1\\gamma_1}V(r_1,u)-\\sum_{i=1}^{t-1}\\left(\\frac{\\alpha_i}{\\Gamma_i\\gamma_i}-\\frac{\\alpha_{i+1}}{\\Gamma_{i+1}\\gamma_{i+1}}\\right)V(r_{i+1},u)-\\frac{\\alpha_t}{\\Gamma_t\\gamma_t}V(r_{t+1},u)\\le\\frac{\\alpha_1}{\\Gamma_1\\gamma_1}D_Z^2-\\sum_{i=1}^{t-1}\\left(\\frac{\\alpha_i}{\\Gamma_i\\gamma_i}-\\frac{\\alpha_{i+1}}{\\Gamma_{i+1}\\gamma_{i+1}}\\right)D_Z^2=\\frac{\\alpha_t}{\\Gamma_t\\gamma_t}D_Z^2,\\ \\forall u\\in Z,",
+        "uses": [
+          "Bounded_Bregman_diameter",
+          "SAMP_parameter_conditions",
+          "Lemma_4_14_StochasticGapRecursion",
+          "previous_step:0"
+        ],
+        "produces": "Bt_r_diameter_bound"
+      },
+      {
+        "step": 2,
+        "description": "Apply the nonnegative coefficient condition q-L alpha_i gamma_i-3M^2 gamma_i^2 >= 0 and the B_t(r_[t]) bound to Lemma 4.14.",
+        "ref": "(4.5.42)",
+        "source_pdf_lines": [
+          10753,
+          10757
+        ],
+        "math": "\\frac{1}{\\Gamma_t}Q(\\bar w_{t+1},u)\\le\\frac{\\alpha_t}{\\Gamma_t\\gamma_t}D_Z^2+\\sum_{i=1}^t\\Lambda_i(u),\\ \\forall u\\in Z.",
+        "uses": [
+          "SAMP_parameter_conditions",
+          "Lemma_4_14_StochasticGapRecursion",
+          "previous_step:1"
+        ],
+        "produces": "Q_bound_with_Lambda"
+      },
+      {
+        "step": 3,
+        "description": "Introduce the auxiliary sequence tilde w_i by Lemma 4.15 with Delta_i = Delta H_{2i}+Delta G_i and theta_i = alpha_i/Gamma_i.",
+        "ref": "(4.5.43)",
+        "source_pdf_lines": [
+          10759,
+          10763
+        ],
+        "math": "-\\sum_{i=1}^t\\frac{\\alpha_i}{\\Gamma_i}\\langle\\Delta H^{2i}+\\Delta G^i,w_i^v-u\\rangle\\le B_t(u,w_{[t]}^v)+\\sum_{i=1}^t\\frac{\\alpha_i\\gamma_i}{2\\Gamma_i}\\|\\Delta H^{2i}+\\Delta G^i\\|_*^2,\\ \\forall u\\in Z.",
+        "uses": [
+          "Oracle_noise_definitions",
+          "Gamma_definition",
+          "SAMP_parameter_conditions",
+          "Lemma_4_14_StochasticGapRecursion",
+          "Lemma_4_15_AuxiliaryPerturbationBound",
+          "previous_step:0.5"
+        ],
+        "produces": "auxiliary_noise_bound"
+      },
+      {
+        "step": 4,
+        "description": "Apply the same telescoping estimate (4.5.41) to the auxiliary sequence tilde w_[t]; since all auxiliary points lie in Z, (4.5.36) and (4.5.37) give the same diameter bound for B_t(u,tilde w_[t]).",
+        "ref": "(4.5.41) applied to (4.5.43)",
+        "source_pdf_lines": [
+          10789,
+          10792
+        ],
+        "uses": [
+          "Bounded_Bregman_diameter",
+          "SAMP_parameter_conditions",
+          "Lemma_4_14_StochasticGapRecursion",
+          "previous_step:3",
+          "previous_step:0",
+          "previous_step:0.5"
+        ],
+        "produces": "Bt_auxiliary_diameter_bound: B_t(u,\\tilde w_{[t]})\\le\\frac{\\alpha_t}{\\Gamma_t\\gamma_t}D_Z^2"
+      },
+      {
+        "step": 5,
+        "description": "Expand the sum of Lambda_i(u) using its definition, split w_{i+1}-u through the auxiliary point, and apply Young's inequality to isolate U_t.",
+        "ref": "(4.5.44)",
+        "source_pdf_lines": [
+          10765,
+          10775
+        ],
+        "math": "\\sum_{i=1}^t\\Lambda_i(u)=-\\sum_{i=1}^t\\frac{\\alpha_i}{\\Gamma_i}\\langle\\Delta H^{2i}+\\Delta G^i,w_i^v-u\\rangle+\\sum_{i=1}^t\\frac{3\\alpha_i\\gamma_i}{2\\Gamma_i}(\\|\\Delta H^{2i}\\|_*^2+\\|\\Delta H^{2i-1}\\|_*^2)+\\sum_{i=1}^t\\frac{\\alpha_i}{\\Gamma_i}\\left[-\\frac{1-q}{2\\gamma_i}\\|r_i-w_{i+1}\\|^2-\\langle\\Delta G^i,w_{i+1}-r_i\\rangle\\right]-\\sum_{i=1}^t\\frac{\\alpha_i}{\\Gamma_i}\\langle\\Delta G^i,r_i-w_i^v\\rangle-\\sum_{i=1}^t\\frac{\\alpha_i}{\\Gamma_i}\\langle\\Delta H^{2i},w_{i+1}-w_i^v\\rangle\\le B_t(u,w_{[t]}^v)+U_t,",
+        "uses": [
+          "Lemma_4_14_StochasticGapRecursion",
+          "ScalarInequality_3_1_6",
+          "previous_step:3"
+        ],
+        "produces": "Lambda_sum_bounded_by_Bt_plus_Ut"
+      },
+      {
+        "step": 6,
+        "description": "Define the residual U_t that remains after the Young-inequality decomposition.",
+        "ref": "(4.5.45)",
+        "source_pdf_lines": [
+          10777,
+          10787
+        ],
+        "math": "U_t:=\\sum_{i=1}^t\\frac{\\alpha_i\\gamma_i}{2\\Gamma_i}\\|\\Delta H^{2i}+\\Delta G^i\\|_*^2+\\sum_{i=1}^t\\frac{\\alpha_i\\gamma_i}{2(1-q)\\Gamma_i}\\|\\Delta G^i\\|_*^2+\\sum_{i=1}^t\\frac{3\\alpha_i\\gamma_i}{2\\Gamma_i}(\\|\\Delta H^{2i}\\|_*^2+\\|\\Delta H^{2i-1}\\|_*^2)-\\sum_{i=1}^t\\frac{\\alpha_i}{\\Gamma_i}\\langle\\Delta G^i,r_i-w_i^v\\rangle-\\sum_{i=1}^t\\frac{\\alpha_i}{\\Gamma_i}\\langle\\Delta H^{2i},w_{i+1}-w_i^v\\rangle.",
+        "uses": [
+          "previous_step:5"
+        ],
+        "produces": "Ut_definition"
+      },
+      {
+        "step": 7,
+        "description": "Apply the r-sequence B_t bound and the auxiliary B_t bound to (4.5.42) and (4.5.44), yielding the displayed Q-bound with residual U_t.",
+        "ref": "display before (4.5.46)",
+        "source_pdf_lines": [
+          10789,
+          10792
+        ],
+        "math": "\\frac{1}{\\Gamma_t}Q(\\bar w_{t+1},u)\\le\\frac{2\\alpha_t}{\\gamma_t\\Gamma_t}D_Z^2+U_t,\\ \\forall u\\in Z,",
+        "uses": [
+          "previous_step:1",
+          "previous_step:2",
+          "previous_step:4",
+          "previous_step:5",
+          "previous_step:6"
+        ],
+        "produces": "Q_bound_by_Ut"
+      },
+      {
+        "step": 8,
+        "description": "Take the supremum over u in Z and use the gap-function definition to rewrite the preceding Q-bound as (4.5.46).",
+        "ref": "(4.5.46)",
+        "source_pdf_lines": [
+          10795,
+          10798
+        ],
+        "math": "g(\\bar w_{t+1})\\le\\frac{2\\alpha_t}{\\gamma_t}D_Z^2+\\Gamma_t U_t.",
+        "uses": [
+          "Gap_function_definition",
+          "previous_step:7"
+        ],
+        "produces": "gap_bound_by_Ut"
+      },
+      {
+        "step": 9.1,
+        "description": "The source proof integrates first over the fresh xi_i coordinate, using F_i^G-measurability of r_i-w_i^v and the hypothesized conditional G residual law to obtain the G zero pairing and second-moment input.",
+        "ref": "Proof of Theorem 4.10 before (4.5.47)",
+        "source_pdf_lines": [
+          10800,
+          10805
+        ],
+        "math": "\\mathbb{E}[\\langle\\Delta G^i,r_i-w_i^v\\rangle]=0,\\quad \\mathbb{E}[\\|\\Delta G^i\\|_*^2]\\le\\sigma_G^2,",
+        "uses": [
+          "G_unbiased_convex_L_smooth",
+          "SFO_variance_bound",
+          "Oracle_noise_definitions",
+          "SAMP_first_prox_update",
+          "Lemma_4_15_AuxiliaryPerturbationBound",
+          "previous_step:0",
+          "previous_step:0.5",
+          "SAMP_InterleavedConditionalOracleLawBoundary",
+          "previous_step:0.797",
+          "previous_step:0.799"
+        ],
+        "produces": "SAMP_G_zero_mean_and_second_moment: the source G pairing and second-moment facts"
+      },
+      {
+        "step": 9.2,
+        "description": "The source proof integrates the odd-H square term over the fresh zeta_{2i-1} coordinate using the odd-H pre-call history and hypothesized conditional residual law at r_i.",
+        "ref": "Proof of Theorem 4.10 before (4.5.47)",
+        "source_pdf_lines": [
+          10800,
+          10805
+        ],
+        "math": "\\mathbb{E}[\\|\\Delta H^{2i-1}\\|_*^2]\\le\\sigma_H^2,",
+        "uses": [
+          "H_unbiased_monotone_Lipschitz",
+          "SFO_variance_bound",
+          "Oracle_noise_definitions",
+          "previous_step:0.75",
+          "previous_step:0.77",
+          "SAMP_InterleavedConditionalOracleLawBoundary",
+          "previous_step:0.795",
+          "previous_step:0.799"
+        ],
+        "produces": "SAMP_H_odd_second_moment: the source odd-H second-moment fact"
+      },
+      {
+        "step": 9.3,
+        "description": "The source proof integrates first over the fresh zeta_{2i} coordinate, using F_i^{H,e}-measurability of w_{i+1}-w_i^v and the hypothesized conditional even-H residual law to obtain the even-H zero pairing and second-moment input.",
+        "ref": "Proof of Theorem 4.10 before (4.5.47)",
+        "source_pdf_lines": [
+          10800,
+          10805
+        ],
+        "math": "\\mathbb{E}[\\langle\\Delta H^{2i},w_{i+1}-w_i^v\\rangle]=0,\\quad \\mathbb{E}[\\|\\Delta H^{2i}\\|_*^2]\\le\\sigma_H^2.",
+        "uses": [
+          "H_unbiased_monotone_Lipschitz",
+          "SFO_variance_bound",
+          "Oracle_noise_definitions",
+          "SAMP_first_prox_update",
+          "SAMP_second_prox_update",
+          "Lemma_4_15_AuxiliaryPerturbationBound",
+          "previous_step:0",
+          "previous_step:0.5",
+          "SAMP_InterleavedConditionalOracleLawBoundary",
+          "previous_step:0.797",
+          "previous_step:0.799"
+        ],
+        "produces": "SAMP_H_even_zero_mean_and_second_moment: the source even-H pairing and second-moment facts"
+      },
+      {
+        "step": 9.5,
+        "description": "Record the source's additional assertion that Delta G^i, Delta H^{2i-1}, and Delta H^{2i} are mutually independent. The dependency is supplied by the explicit residual-independence hypothesis, which is kept separate from the fresh-coordinate conditional-law facts because w_{i+1} is adaptive.",
+        "ref": "Proof of Theorem 4.10 before (4.5.47)",
+        "source_pdf_lines": [
+          10800,
+          10805
+        ],
+        "uses": [
+          "Oracle_noise_definitions",
+          "SAMP_SourceResidualIndependenceHypothesis",
+          "SFO_variance_bound",
+          "Oracle_independence",
+          "previous_step:0.76",
+          "previous_step:0.77",
+          "previous_step:0.75",
+          "previous_step:0.79",
+          "previous_step:0.797",
+          "previous_step:0.755"
+        ],
+        "produces": "SAMP_source_residual_mutual_independence"
+      },
+      {
+        "step": 10,
+        "description": "The source takes expectation in U_t using the three zero-pairing/second-moment facts and its mutual-independence assertion, then substitutes the variance bounds to obtain the displayed (4.5.47) transition.",
+        "ref": "(4.5.47)",
+        "source_pdf_lines": [
+          10805,
+          10816
+        ],
+        "math": "\\mathbb{E}[U_t]\\le\\mathbb{E}\\left[\\sum_{i=1}^t\\frac{\\alpha_i\\gamma_i}{\\Gamma_i}(\\|\\Delta H^{2i}\\|_*^2+\\|\\Delta G^i\\|_*^2)+\\sum_{i=1}^t\\frac{\\alpha_i\\gamma_i}{2(1-q)\\Gamma_i}\\|\\Delta G^i\\|_*^2+\\sum_{i=1}^t\\frac{3\\alpha_i\\gamma_i}{2\\Gamma_i}(\\|\\Delta H^{2i}\\|_*^2+\\|\\Delta H^{2i-1}\\|_*^2)\\right]=\\sum_{i=1}^t\\frac{\\alpha_i\\gamma_i}{\\Gamma_i}\\left(4\\sigma_H^2+\\left(1+\\frac{1}{2(1-q)}\\right)\\sigma_G^2\\right).",
+        "uses": [
+          "previous_step:6",
+          "previous_step:9.1",
+          "previous_step:9.2",
+          "previous_step:9.3",
+          "SAMP_InterleavedConditionalOracleLawBoundary",
+          "previous_step:9.5"
+        ],
+        "produces": "expected_Ut_bound_4547_source_trace"
+      },
+      {
+        "step": 11,
+        "description": "The source takes expectation on both sides of (4.5.46) and uses (4.5.47) to obtain (4.5.38).",
+        "ref": "proof transition immediately before (4.5.38)",
+        "source_pdf_lines": [
+          10818,
+          10818
+        ],
+        "uses": [
+          "previous_step:8",
+          "previous_step:10"
+        ],
+        "produces": "Theorem_4_10_part_a_source_conclusion: the expected-gap conclusion (4.5.38)"
+      },
+      {
+        "step": 13,
+        "description": "Derive the norm-diameter bound needed in the high-probability exponential-moment checks: from (4.5.26) and (4.5.36), any two points in Z have squared norm distance at most 2D_Z^2, in particular r_i and w_i^v, and w_{i+1} and w_i^v.",
+        "ref": "(4.5.26), (4.5.36), used before (4.5.48)",
+        "source_pdf_lines": [
+          10522,
+          10707
+        ],
+        "uses": [
+          "BregmanStrongConvexityLowerBound",
+          "Bounded_Bregman_diameter",
+          "previous_step:0",
+          "previous_step:0.5"
+        ],
+        "produces": "norm_diameter_bound_for_martingale_terms: derived from (4.5.26) and (4.5.36), \\|r_i-w_i^v\\|^2\\le2D_Z^2 and \\|w_{i+1}-w_i^v\\|^2\\le2D_Z^2"
+      },
+      {
+        "step": 14,
+        "description": "Instantiate the extra G-specific Lemma 4.1 hypothesis: the G inner-product increment is a deterministic-Borel function of the interleaved iid block history, r_i-w_i^v is measurable before the G call, and the G residual has conditional mean zero with deterministic scale sigma_G alpha_i Gamma_i^{-1}D_Z.",
+        "ref": "Derived G-specific Lemma 4.1 prerequisite used before (4.5.48)",
+        "source_pdf_lines": [],
+        "uses": [
+          "G_unbiased_convex_L_smooth",
+          "SAMP_InterleavedOracleHistoryBoundary",
+          "SAMP_InterleavedConditionalOracleLawBoundary",
+          "SAMP_G_Lemma41InstantiationHypothesis",
+          "SFO_variance_bound",
+          "Oracle_noise_definitions",
+          "SAMP_first_prox_update",
+          "Lemma_4_15_AuxiliaryPerturbationBound",
+          "previous_step:0",
+          "previous_step:0.5",
+          "previous_step:13",
+          "previous_step:0.79",
+          "previous_step:0.799",
+          "previous_step:0.83",
+          "previous_step:0.86"
+        ],
+        "produces": "SAMP_G_inner_product_Lemma41_premises: iid block history, deterministic-Borel increment, pre-G measurability of r_i-w_i^v, conditional mean zero, and deterministic scale sigma_G alpha_i Gamma_i^{-1}D_Z"
+      },
+      {
+        "step": 15,
+        "description": "Record the source exponential-square calculation for the normalized G inner-product increment using Assumption 11, the norm-diameter bound, and the conditional-light-tail bridge.",
+        "ref": "display before (4.5.48)",
+        "source_pdf_lines": [
+          10821,
+          10830
+        ],
+        "math": "\\mathbb{E}\\exp\\left\\{\\frac{(\\alpha_i\\Gamma_i^{-1}\\langle\\Delta G^i,r_i-w_i^v\\rangle)^2}{2(\\sigma_G\\alpha_i\\Gamma_i^{-1}D_Z)^2}\\right\\}\\le\\mathbb{E}\\exp\\left\\{\\frac{\\|\\Delta G^i\\|_*^2\\|r_i-w_i^v\\|^2}{2\\sigma_G^2D_Z^2}\\right\\}\\le\\mathbb{E}\\exp\\{\\|\\Delta G^i\\|_*^2/\\sigma_G^2\\}\\le\\exp\\{1\\},",
+        "uses": [
+          "Light_tail_oracle_noise",
+          "SAMP_InterleavedLightTailBoundary",
+          "SAMP_G_Lemma41InstantiationHypothesis",
+          "Oracle_noise_definitions",
+          "previous_step:13",
+          "previous_step:14",
+          "previous_step:0.865",
+          "previous_step:0.79"
+        ],
+        "produces": "SAMP_G_inner_product_conditional_exponential_moment"
+      },
+      {
+        "step": 16,
+        "description": "The source applies Lemma 4.1 to the G inner-product sequence with deterministic scales sigma_i=sigma_G alpha_i Gamma_i^{-1}D_Z.",
+        "ref": "(4.5.48)",
+        "source_pdf_lines": [
+          10833,
+          10839
+        ],
+        "math": "\\operatorname{Prob}\\left\\{-\\sum_{i=1}^t\\frac{\\alpha_i}{\\Gamma_i}\\langle\\Delta G^i,r_i-w_i^v\\rangle>\\lambda\\sigma_GD_Z\\sqrt{2\\sum_{i=1}^t\\left(\\frac{\\alpha_i}{\\Gamma_i}\\right)^2}\\right\\}\\le\\exp\\{-\\lambda^2/3\\}.",
+        "uses": [
+          "Lemma_4_1_MartingaleLargeDeviation",
+          "SAMP_G_Lemma41InstantiationHypothesis",
+          "previous_step:14",
+          "previous_step:15"
+        ],
+        "produces": "G_inner_product_tail_4548_source_conclusion"
+      },
+      {
+        "step": 17,
+        "description": "Instantiate the extra even-H-specific Lemma 4.1 hypothesis hidden under the paper's 'similar argument': the even-H inner-product increment is a deterministic-Borel function of the interleaved iid block history, w_{i+1}-w_i^v is measurable before the even-H call, and the even-H residual has conditional mean zero with deterministic scale sigma_H alpha_i Gamma_i^{-1}D_Z.",
+        "ref": "Derived even-H-specific Lemma 4.1 prerequisite used before (4.5.49)",
+        "source_pdf_lines": [],
+        "uses": [
+          "H_unbiased_monotone_Lipschitz",
+          "SAMP_InterleavedOracleHistoryBoundary",
+          "SAMP_InterleavedConditionalOracleLawBoundary",
+          "SAMP_EvenH_Lemma41InstantiationHypothesis",
+          "SFO_variance_bound",
+          "Oracle_noise_definitions",
+          "SAMP_first_prox_update",
+          "SAMP_second_prox_update",
+          "Lemma_4_15_AuxiliaryPerturbationBound",
+          "previous_step:0",
+          "previous_step:0.5",
+          "previous_step:13",
+          "previous_step:14",
+          "previous_step:0.79",
+          "previous_step:0.797",
+          "previous_step:0.799",
+          "previous_step:0.83",
+          "previous_step:0.86",
+          "previous_step:0.87"
+        ],
+        "produces": "SAMP_evenH_inner_product_Lemma41_premises: iid block history, deterministic-Borel increment, pre-even-H measurability of w_{i+1}-w_i^v, conditional mean zero, and deterministic scale sigma_H alpha_i Gamma_i^{-1}D_Z"
+      },
+      {
+        "step": 18,
+        "description": "Record the source even-H exponential-square calculation and its norm-diameter step before (4.5.49), using the conditional-light-tail bridge.",
+        "ref": "Proof of Theorem 4.10 before (4.5.49); generic requirements are recorded separately in Lemma 4.1",
+        "source_pdf_lines": [
+          10841,
+          10848
+        ],
+        "uses": [
+          "Light_tail_oracle_noise",
+          "SAMP_InterleavedLightTailBoundary",
+          "SAMP_EvenH_Lemma41InstantiationHypothesis",
+          "Oracle_noise_definitions",
+          "previous_step:13",
+          "previous_step:14",
+          "previous_step:17",
+          "previous_step:0.79",
+          "previous_step:0.797",
+          "previous_step:0.799",
+          "previous_step:0.86",
+          "previous_step:0.87"
+        ],
+        "produces": "SAMP_H_inner_product_conditional_exponential_moment"
+      },
+      {
+        "step": 19,
+        "description": "The source applies Lemma 4.1 to the even-H inner-product sequence with deterministic scales sigma_i=sigma_H alpha_i Gamma_i^{-1}D_Z.",
+        "ref": "(4.5.49)",
+        "source_pdf_lines": [
+          10841,
+          10848
+        ],
+        "math": "\\operatorname{Prob}\\left\\{-\\sum_{i=1}^t\\frac{\\alpha_i}{\\Gamma_i}\\langle\\Delta H^{2i},w_{i+1}-w_i^v\\rangle>\\lambda\\sigma_HD_Z\\sqrt{2\\sum_{i=1}^t\\left(\\frac{\\alpha_i}{\\Gamma_i}\\right)^2}\\right\\}\\le\\exp\\{-\\lambda^2/3\\}.",
+        "uses": [
+          "Lemma_4_1_MartingaleLargeDeviation",
+          "SAMP_EvenH_Lemma41InstantiationHypothesis",
+          "previous_step:17",
+          "previous_step:18"
+        ],
+        "produces": "H_inner_product_tail_4549_source_conclusion"
+      },
+      {
+        "step": 20,
+        "description": "Introduce the weights used in the square-noise tail argument and define their total weight before applying convexity of exponential functions.",
+        "ref": "paragraph before display preceding (4.5.50)",
+        "source_pdf_lines": [
+          10850,
+          10851
+        ],
+        "math": "S_i=\\frac{\\alpha_i\\gamma_i}{\\Gamma_i}\\quad\\text{and}\\quad S=\\sum_{i=1}^tS_i.",
+        "uses": [
+          "Gamma_definition"
+        ],
+        "produces": "weighted_noise_weights: S_i:=\\alpha_i\\gamma_i/\\Gamma_i and S:=\\sum_{i=1}^tS_i"
+      },
+      {
+        "step": 21,
+        "description": "Record the source convexity-of-exponential calculation for the weighted G-noise square average using the hypothesized per-call exponential-moment input.",
+        "ref": "display before (4.5.50)",
+        "source_pdf_lines": [
+          10850,
+          10854
+        ],
+        "math": "\\mathbb{E}\\exp\\left\\{\\frac{1}{S}\\sum_{i=1}^tS_i\\|\\Delta G^i\\|_*^2/\\sigma_G^2\\right\\}\\le\\mathbb{E}\\frac{1}{S}\\sum_{i=1}^tS_i\\exp\\{\\|\\Delta G^i\\|_*^2/\\sigma_G^2\\}\\le\\exp\\{1\\}.",
+        "uses": [
+          "Light_tail_oracle_noise",
+          "SAMP_InterleavedLightTailBoundary",
+          "Oracle_noise_definitions",
+          "previous_step:20",
+          "previous_step:0.86",
+          "previous_step:0.865"
+        ],
+        "produces": "weighted_G_square_exponential_moment_4550"
+      },
+      {
+        "step": 22,
+        "description": "Rewrite the weighted G square-sum event as the corresponding exponential event with threshold exp{1+lambda}; this algebraic equivalence is separate from the moment bound.",
+        "ref": "Markov chain before (4.5.50), event rewrite",
+        "source_pdf_lines": [
+          10855,
+          10860
+        ],
+        "math": "\\operatorname{Prob}\\left\\{\\sum_{i=1}^tS_i\\|\\Delta G^i\\|_*^2>(1+\\lambda)\\sigma_G^2S\\right\\}=\\operatorname{Prob}\\left\\{\\exp\\left(\\frac{1}{S}\\sum_{i=1}^tS_i\\|\\Delta G^i\\|_*^2/\\sigma_G^2\\right)>\\exp\\{1+\\lambda\\}\\right\\}.",
+        "uses": [
+          "previous_step:20",
+          "previous_step:21"
+        ],
+        "produces": "G_square_event_exponential_rewrite: the event equivalence used before (4.5.50)"
+      },
+      {
+        "step": 23,
+        "description": "Apply Markov's inequality to the nonnegative exponential random variable and use the weighted exponential-moment bound.",
+        "ref": "Markov chain before (4.5.50), inequality step",
+        "source_pdf_lines": [
+          10860,
+          10863
+        ],
+        "math": "\\operatorname{Prob}\\left\\{\\exp\\left(\\frac{1}{S}\\sum_{i=1}^tS_i\\|\\Delta G^i\\|_*^2/\\sigma_G^2\\right)>\\exp\\{1+\\lambda\\}\\right\\}\\le\\mathbb{E}\\exp\\left\\{\\frac{1}{S}\\sum_{i=1}^tS_i\\|\\Delta G^i\\|_*^2/\\sigma_G^2\\right\\}/\\exp\\{1+\\lambda\\}\\le\\exp\\{-\\lambda\\}.",
+        "uses": [
+          "previous_step:20",
+          "previous_step:21",
+          "previous_step:22"
+        ],
+        "produces": "G_square_markov_tail"
+      },
+      {
+        "step": 24,
+        "description": "Rewrite the source G square-noise tail using S_i=alpha_i gamma_i/Gamma_i and the coefficient 1+1/(2(1-q)).",
+        "ref": "(4.5.50)",
+        "source_pdf_lines": [
+          10865,
+          10873
+        ],
+        "math": "\\operatorname{Prob}\\left\\{\\left(1+\\frac{1}{2(1-q)}\\right)\\sum_{i=1}^t\\frac{\\alpha_i\\gamma_i}{\\Gamma_i}\\|\\Delta G^i\\|_*^2>(1+\\lambda)\\sigma_G^2\\left(1+\\frac{1}{2(1-q)}\\right)\\sum_{i=1}^t\\frac{\\alpha_i\\gamma_i}{\\Gamma_i}\\right\\}\\le\\exp\\{-\\lambda\\}.",
+        "uses": [
+          "previous_step:20",
+          "previous_step:23"
+        ],
+        "produces": "G_square_tail_4550_source_conclusion"
+      },
+      {
+        "step": 24.1,
+        "description": "Record the paper's suppressed 'Using similar arguments' step for the odd- and even-index H residual streams using the same conditional-light-tail bridge.",
+        "ref": "sentence before (4.5.51)-(4.5.52)",
+        "source_pdf_lines": [
+          10875,
+          10881
+        ],
+        "uses": [
+          "Light_tail_oracle_noise",
+          "SAMP_InterleavedLightTailBoundary",
+          "Oracle_noise_definitions",
+          "previous_step:20",
+          "previous_step:0.79",
+          "previous_step:0.86",
+          "previous_step:0.87"
+        ],
+        "produces": "H_weighted_square_exponential_moments"
+      },
+      {
+        "step": 24.2,
+        "description": "Apply Markov's inequality separately to the odd- and even-index H weighted exponential events to obtain the exp{-lambda} bounds underlying (4.5.51) and (4.5.52).",
+        "ref": "sentence before (4.5.51)-(4.5.52)",
+        "source_pdf_lines": [
+          10875,
+          10881
+        ],
+        "uses": [
+          "previous_step:20",
+          "previous_step:24.1"
+        ],
+        "produces": "H_weighted_square_markov_tails"
+      },
+      {
+        "step": 25,
+        "description": "Record the source odd-index H square-noise tail (4.5.51), using the hypothesized adaptive-query light-tail transport.",
+        "ref": "(4.5.51)",
+        "source_pdf_lines": [
+          10875,
+          10878
+        ],
+        "math": "\\operatorname{Prob}\\left\\{\\sum_{i=1}^t\\frac{3\\alpha_i\\gamma_i}{2\\Gamma_i}\\|\\Delta H^{2i-1}\\|_*^2>(1+\\lambda)\\frac{3\\sigma_H^2}{2}\\sum_{i=1}^t\\frac{\\alpha_i\\gamma_i}{\\Gamma_i}\\right\\}\\le\\exp\\{-\\lambda\\}.",
+        "uses": [
+          "Light_tail_oracle_noise",
+          "SAMP_InterleavedLightTailBoundary",
+          "Oracle_noise_definitions",
+          "previous_step:0.75",
+          "previous_step:20",
+          "previous_step:24.1",
+          "previous_step:24.2",
+          "previous_step:0.86",
+          "previous_step:0.87"
+        ],
+        "produces": "H_odd_square_tail_4551_source_conclusion"
+      },
+      {
+        "step": 26,
+        "description": "Record the source even-index H square-noise tail (4.5.52), including the coefficient appearing after bounding ||Delta H^{2i}+Delta G^i||_*^2, using the hypothesized adaptive-query light-tail transport.",
+        "ref": "(4.5.52)",
+        "source_pdf_lines": [
+          10879,
+          10881
+        ],
+        "math": "\\operatorname{Prob}\\left\\{\\sum_{i=1}^t\\frac{5\\alpha_i\\gamma_i}{2\\Gamma_i}\\|\\Delta H^{2i}\\|_*^2>(1+\\lambda)\\frac{5\\sigma_H^2}{2}\\sum_{i=1}^t\\frac{\\alpha_i\\gamma_i}{\\Gamma_i}\\right\\}\\le\\exp\\{-\\lambda\\}.",
+        "uses": [
+          "Light_tail_oracle_noise",
+          "SAMP_InterleavedLightTailBoundary",
+          "Oracle_noise_definitions",
+          "previous_step:0.75",
+          "previous_step:20",
+          "previous_step:24.1",
+          "previous_step:24.2",
+          "previous_step:0.86",
+          "previous_step:0.87"
+        ],
+        "produces": "H_even_square_tail_4552_source_conclusion"
+      },
+      {
+        "step": 27,
+        "description": "Apply the printed square decomposition to the first square term in U_t. The source prints the G residual with index 2i-1; for the U_t definition in (4.5.45), the corresponding derived substitution uses the G residual Delta G_i.",
+        "ref": "sentence after (4.5.52)",
+        "source_pdf_lines": [
+          10883,
+          10884
+        ],
+        "math": "\\|\\Delta H^{2i}+\\Delta G^{2i-1}\\|_*^2\\le2\\|\\Delta H^{2i}\\|_*^2+2\\|\\Delta G^{2i-1}\\|_*^2.",
+        "uses": [
+          "previous_step:6"
+        ],
+        "produces": "Ut_square_decomposition_bound: the printed source bound uses Delta G_{2i-1}; derived from the U_t definition and the norm-square inequality, the corresponding U_t bound uses (1+1/(2(1-q)))\\sum_i(\\alpha_i\\gamma_i/\\Gamma_i)\\|\\Delta G_i\\|_*^2, (3/2)\\sum_i(\\alpha_i\\gamma_i/\\Gamma_i)\\|\\Delta H_{2i-1}\\|_*^2, and (5/2)\\sum_i(\\alpha_i\\gamma_i/\\Gamma_i)\\|\\Delta H_{2i}\\|_*^2."
+      },
+      {
+        "step": 28,
+        "description": "Define the five good events furnished by the source tail bounds: the G inner-product event from (4.5.48), the even-H inner-product event from (4.5.49), the weighted G-square event from (4.5.50), the odd-H square event from (4.5.51), and the even-H square event from (4.5.52).",
+        "ref": "(4.5.48)-(4.5.52) combined after (4.5.52)",
+        "source_pdf_lines": [
+          10883,
+          10884
+        ],
+        "uses": [
+          "previous_step:16",
+          "previous_step:19",
+          "previous_step:24",
+          "previous_step:25",
+          "previous_step:26",
+          "previous_step:27"
+        ],
+        "produces": "five_good_events_for_high_probability_bound: E_G_mart, E_H_mart, E_G_square, E_H_odd_square, and E_H_even_square with failure probabilities exp{-lambda^2/3}, exp{-lambda^2/3}, exp{-lambda}, exp{-lambda}, exp{-lambda}"
+      },
+      {
+        "step": 29,
+        "description": "On E_G_mart intersect E_H_mart, substitute the two martingale bounds into the two negative inner-product terms in U_t. This contributes the lambda-weighted inner-product part of Q_1(t).",
+        "ref": "(4.5.48)-(4.5.49) substituted into (4.5.45)",
+        "source_pdf_lines": [
+          10883,
+          10884
+        ],
+        "uses": [
+          "previous_step:6",
+          "previous_step:16",
+          "previous_step:19",
+          "previous_step:28"
+        ],
+        "produces": "martingale_part_of_Ut_good_event_bound: the two inner-product terms are bounded by lambda (sigma_G+sigma_H) D_Z sqrt(2 sum_i (alpha_i/Gamma_i)^2)"
+      },
+      {
+        "step": 30,
+        "description": "On E_G_square intersect E_H_odd_square intersect E_H_even_square, substitute the three weighted square-noise bounds into the decomposed U_t estimate. The coefficients combine to (1+lambda)[4 sigma_H^2+(1+1/(2(1-q)))sigma_G^2] sum_i alpha_i gamma_i/Gamma_i.",
+        "ref": "(4.5.50)-(4.5.52) substituted into (4.5.45)",
+        "source_pdf_lines": [
+          10883,
+          10884
+        ],
+        "uses": [
+          "previous_step:24",
+          "previous_step:25",
+          "previous_step:26",
+          "previous_step:27",
+          "previous_step:28"
+        ],
+        "produces": "square_part_of_Ut_good_event_bound: square terms are bounded by (1+lambda)(4 sigma_H^2+(1+1/(2(1-q)))sigma_G^2) sum_i alpha_i gamma_i/Gamma_i"
+      },
+      {
+        "step": 31,
+        "description": "Combine the martingale and square-noise substitutions in U_t and multiply by Gamma_t as required in (4.5.46). This separates Gamma_t U_t into a constant part and a lambda part matching the two addends in Q_1(t).",
+        "ref": "(4.5.45), (4.5.48)-(4.5.52)",
+        "source_pdf_lines": [
+          10883,
+          10884
+        ],
+        "uses": [
+          "previous_step:29",
+          "previous_step:30"
+        ],
+        "produces": "Gamma_Ut_good_event_bound: Gamma_t U_t <= lambda Gamma_t (sigma_G+sigma_H)D_Z sqrt(2 sum_i (alpha_i/Gamma_i)^2) + (1+lambda) Gamma_t (4 sigma_H^2+(1+1/(2(1-q)))sigma_G^2) sum_i alpha_i gamma_i/Gamma_i"
+      },
+      {
+        "step": 32,
+        "description": "Insert the Gamma_t U_t good-event bound into (4.5.46). The deterministic term 2 alpha_t gamma_t^{-1}D_Z^2 plus the non-lambda square coefficient is Q_0(t), and the lambda-weighted martingale coefficient plus the lambda-weighted square coefficient is Q_1(t).",
+        "ref": "(4.5.46), (4.5.40), conclusion after (4.5.52)",
+        "source_pdf_lines": [
+          10795,
+          10798,
+          10883,
+          10884
+        ],
+        "uses": [
+          "previous_step:8",
+          "previous_step:31"
+        ],
+        "produces": "gap_good_event_bound: on the intersection of the five good events, g(\\bar w_{t+1})\\le Q_0(t)+\\lambda Q_1(t)"
+      },
+      {
+        "step": 33,
+        "description": "Take the union bound over the complements of the five good events. The two martingale complements contribute 2 exp{-lambda^2/3}; the three square-noise complements contribute 3 exp{-lambda}, yielding the source conclusion (4.5.39).",
+        "ref": "proof conclusion immediately after (4.5.52)",
+        "source_pdf_lines": [
+          10883,
+          10884
+        ],
+        "uses": [
+          "previous_step:16",
+          "previous_step:19",
+          "previous_step:24",
+          "previous_step:25",
+          "previous_step:26",
+          "previous_step:32"
+        ],
+        "produces": "Theorem_4_10_part_b_source_conclusion: Prob{g(\\bar w_{t+1})>Q_0(t)+lambda Q_1(t)} <= 2 exp{-lambda^2/3}+3 exp{-lambda}"
+      }
+    ]
+  },
+  "key_lemmas": [
+    {
+      "name": "OracleSampleBoundary",
+      "ref": "Assumption 10",
+      "statement_math": "\\text{At the }i\\text{-th call of SFOG and SFOH with input }z\\in Z,\\text{ the oracles SFOG and SFOH output stochastic information }G(z;\\xi_i)\\text{ and }H(z;\\zeta_i)\\text{ respectively, such that }\\mathbb{E}\\|G(u;\\xi_i)-\\nabla G(u)\\|_*^2\\le\\sigma_G^2\\ \\text{and}\\ \\mathbb{E}\\|H(u;\\zeta_i)-H(u)\\|_*^2\\le\\sigma_H^2,\\text{ for some }\\sigma_G,\\sigma_H\\ge0,\\text{ where }\\xi_i\\text{ and }\\zeta_i\\text{ are independently distributed random samples.}",
+      "role": "Source-facing Assumption 10 anchor for the stochastic oracle sample outputs and their independently distributed random samples. The Lean probability-model predicate with measurability, iid stream, marginal-law, and cross-stream-independence clauses is recorded separately in SAMP_OracleStreamBoundary, not in this source-quoted statement.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "The paper states Assumption 10 as the oracle-output, second-moment, and independently-distributed-samples condition. Any stronger stream-level measurability or iid formalization is recorded separately in SAMP_OracleStreamBoundary rather than treated as a consequence of this paper lemma.",
+          "ref": "Assumption 10",
+          "source_pdf_lines": [
+            10323,
+            10329
+          ],
+          "uses": [
+            "SFO_variance_bound",
+            "Oracle_independence"
+          ],
+          "produces": "source_Assumption_10_oracle_sample_anchor"
+        }
+      ]
+    },
+    {
+      "name": "SAMP_OracleStreamBoundary",
+      "ref": "Assumption 10",
+      "statement_math": "\\text{At the }i\\text{-th call of SFOG and SFOH with input }z\\in Z,\\text{ the oracles SFOG and SFOH output stochastic information }G(z;\\xi_i)\\text{ and }H(z;\\zeta_i)\\text{ respectively, such that }\\mathbb{E}\\|G(u;\\xi_i)-\\nabla G(u)\\|_*^2\\le\\sigma_G^2\\ \\text{and}\\ \\mathbb{E}\\|H(u;\\zeta_i)-H(u)\\|_*^2\\le\\sigma_H^2,\\text{ for some }\\sigma_G,\\sigma_H\\ge0,\\text{ where }\\xi_i\\text{ and }\\zeta_i\\text{ are independently distributed random samples.}",
+      "role": "Proof-consumable stream contract needed to instantiate Lemma 4.1's iid input sequence for the interleaved SAMP block history. This is the promoted Lean OracleSampleBoundary contract and is not the source-facing Assumption 10 statement.",
+      "source_lean": "Algorithms/Unverified/StochasticAcceleratedMirrorProx.lean:1228-1237; OracleSampleBoundary fields",
+      "status": "extra formalization hypothesis: the downstream proof consumes measurable coordinate maps, iid xi and zeta streams, fixed marginal laws, and independence of the full xi/zeta streams as hypotheses",
+      "clauses": [
+        "Hypothesis: for every i, the coordinate map xiStream(sample,i) is measurable.",
+        "Hypothesis: for every i, the coordinate map zetaStream(sample,i) is measurable.",
+        "Hypothesis: the xi coordinate stream is iid with fixed marginal law xiLaw.",
+        "Hypothesis: the zeta coordinate stream is iid with fixed marginal law zetaLaw.",
+        "Hypothesis: the full xi and zeta streams are independent."
+      ],
+      "proof": [
+        {
+          "step": 1,
+          "description": "Expose the Lean OracleSampleBoundary fields as explicit extra formalization hypotheses. This step deliberately does not derive stream iid, marginal-law, or cross-stream independence from the source-only Assumption 10 text.",
+          "ref": "Extra Phase-alpha alignment hypothesis; Lean OracleSampleBoundary declaration",
+          "source_pdf_lines": [],
+          "uses": [],
+          "produces": "SAMP_oracle_stream_boundary_hypothesis: measurable coordinate streams, iid xi and zeta streams with fixed marginal laws, and independent full xi/zeta streams"
+        }
+      ],
+      "produces": "SAMP_oracle_stream_boundary_hypothesis"
+    },
+    {
+      "name": "SAMP_InterleavedOracleHistoryBoundary",
+      "ref": "Algorithm 4.4; (4.5.11)-(4.5.14)",
+      "statement_math": "\\text{Choose }r_1\\in Z.\\ \\text{Set }w_1=r_1,\\ \\bar w_1=r_1.\\ \\text{For }t=1,2,\\ldots,N-1,\\ \\text{calculate }w_t=(1-\\alpha_t)\\bar w_t+\\alpha_t r_t,\\quad w_{t+1}=\\arg\\min_{u\\in Z}\\gamma_t[\\langle H(r_t;\\zeta_{2t-1})+G(w_t;\\xi_t),u-r_t\\rangle+J(u)]+V(r_t,u),\\quad r_{t+1}=\\arg\\min_{u\\in Z}\\gamma_t[\\langle H(w_{t+1};\\zeta_{2t})+G(w_t;\\xi_t),u-r_t\\rangle+J(u)]+V(r_t,u),\\quad \\bar w_{t+1}=(1-\\alpha_t)\\bar w_t+\\alpha_t w_{t+1}.\\ \\text{Output }w_N^{ag}.",
+      "role": "The paper's interleaved three-call proof requires a block-history, pre-call measurability, and deterministic-Borel iterate-map interface. Conditional oracle laws are separated into SAMP_InterleavedConditionalOracleLawBoundary rather than treated as source-derived theorem statements. This is a proof-consumable extra-hypothesis boundary, not a theorem proved in the paper from the verbatim assumptions.",
+      "source_lean": "Algorithms/Unverified/StochasticAcceleratedMirrorProx.lean:1242-1279; interleavedOracleBlock, interleavedOracleBlock_spec, SAMP_InterleavedOracleHistoryCertificate.outputs (abstract Prop fields only)",
+      "status": "extra formalization hypothesis: the downstream proof consumes the listed block-history, Borel/adaptedness, and pre-call measurability facts as hypotheses; the cited Lean range records abstract Prop fields and does not prove them from Algorithm 4.4 or Assumption 10",
+      "depends_on": [
+        "SAMP_OracleStreamBoundary",
+        "SAMP_initialization_membership",
+        "SAMP_search_point_update",
+        "SAMP_first_prox_update",
+        "SAMP_second_prox_update",
+        "Lemma_4_15_AuxiliaryPerturbationBound"
+      ],
+      "clauses": [
+        "Hypothesis: chi_i := (zeta_{2i-1}, xi_i, zeta_{2i}) and chi_[i-1] := (chi_1,...,chi_{i-1}) form the iid block input required by Lemma 4.1.",
+        "Hypothesis: define the pre-call histories F_i^{H,o} := sigma(chi_[i-1]), F_i^G := sigma(chi_[i-1], zeta_{2i-1}), and F_i^{H,e} := sigma(chi_[i-1], zeta_{2i-1}, xi_i), matching the call order (r_i,zeta_{2i-1}), (w_i,xi_i), (w_{i+1},zeta_{2i}).",
+        "Hypothesis: induction through initialization, deterministic convex-combination updates, measurable prox selections, and the auxiliary recursion makes r_i, w_i, and w_i^v deterministic Borel functions of chi_[i-1], hence r_i-w_i^v is F_i^G-measurable.",
+        "Hypothesis: the first prox update makes w_{i+1} a Borel function of (chi_[i-1], zeta_{2i-1}, xi_i), while w_i^v remains a function of chi_[i-1], hence w_{i+1}-w_i^v is F_i^{H,e}-measurable."
+      ],
+      "proof": [
+        {
+          "step": 1,
+          "description": "Consume the explicit SAMP_InterleavedOracleHistoryBoundary certificate field that groups the actual oracle coordinates into chi_i=(zeta_{2i-1},xi_i,zeta_{2i}) and chi_[i-1], and asserts the iid block input required by Lemma 4.1. The prerequisite stream facts come from SAMP_OracleStreamBoundary; the iid block-history clause is not derived from the source-only Assumption 10 anchor.",
+          "ref": "Extra Phase-alpha alignment hypothesis; generic iid input required by Lemma 4.1",
+          "source_pdf_lines": [
+            6209,
+            6211
+          ],
+          "uses": [
+            "SAMP_OracleStreamBoundary"
+          ],
+          "produces": "SAMP_interleaved_iid_block_history"
+        },
+        {
+          "step": 2,
+          "description": "Record the three pre-call histories required by the within-iteration order: F_i^{H,o}=sigma(chi_[i-1]), F_i^G=sigma(chi_[i-1],zeta_{2i-1}), and F_i^{H,e}=sigma(chi_[i-1],zeta_{2i-1},xi_i).",
+          "ref": "Derived filtration construction from Algorithm 4.4, (4.5.11)-(4.5.13)",
+          "source_pdf_lines": [],
+          "uses": [
+            "previous_step:1",
+            "SAMP_first_prox_update",
+            "SAMP_second_prox_update"
+          ],
+          "produces": "SAMP_interleaved_pre_call_histories"
+        },
+        {
+          "step": 3,
+          "description": "Use the formalization hypothesis for induction through initialization, deterministic convex-combination updates, measurable prox selections, and the auxiliary recursion to make r_i, w_i, and w_i^v deterministic Borel functions of chi_[i-1], with r_i-w_i^v measurable before the G call.",
+          "ref": "Derived deterministic-Borel/adaptedness route from Algorithm 4.4 and (4.5.34)",
+          "source_pdf_lines": [],
+          "uses": [
+            "SAMP_initialization_membership",
+            "SAMP_search_point_update",
+            "SAMP_aggregate_update",
+            "SAMP_first_prox_update",
+            "SAMP_second_prox_update",
+            "Lemma_4_15_AuxiliaryPerturbationBound",
+            "previous_step:2"
+          ],
+          "produces": "SAMP_interleaved_adapted_query_maps"
+        },
+        {
+          "step": 4,
+          "description": "Use the formalization hypothesis for even-H adaptedness: w_{i+1} is a Borel function of the revealed odd-H and G coordinates and w_i^v is a prior-history function, yielding measurability of w_{i+1}-w_i^v before the even-H call.",
+          "ref": "Derived even-H pre-call adaptedness route from (4.5.12)-(4.5.13) and (4.5.34)",
+          "source_pdf_lines": [],
+          "uses": [
+            "SAMP_first_prox_update",
+            "SAMP_second_prox_update",
+            "Lemma_4_15_AuxiliaryPerturbationBound",
+            "previous_step:2",
+            "previous_step:3"
+          ],
+          "produces": "SAMP_even_H_pairing_query_measurability"
+        }
+      ],
+      "produces": "SAMP_interleaved_iid_block_history; SAMP_interleaved_pre_call_histories; SAMP_interleaved_adapted_query_maps; SAMP_even_H_pairing_query_measurability"
+    },
+    {
+      "name": "SAMP_InterleavedConditionalOracleLawBoundary",
+      "ref": "(4.5.29)",
+      "statement_math": "\\Delta H^{2t-1}:=H(r_t;\\zeta_{2t-1})-H(r_t),\\quad \\Delta H^{2t}:=H(w_{t+1};\\zeta_{2t})-H(w_{t+1}),\\quad \\Delta G^t:=G(w_t;\\xi_t)-\\nabla G(w_t).",
+      "role": "Separates the non-source conditional-law transport from the source Assumption 10 statement: the paper prints fixed-query second-moment bounds and then uses zero pairings before (4.5.47), while the formal proof needs conditional versions at adaptive SAMP queries. This is a proof-consumable extra-hypothesis boundary, not a theorem proved in the paper from the verbatim assumptions.",
+      "source_lean": "Algorithms/Unverified/StochasticAcceleratedMirrorProx.lean:1283-1301; SAMP_InterleavedConditionalOracleLawCertificate.outputs (abstract Prop fields only)",
+      "status": "extra formalization hypothesis: the downstream expectation and martingale arguments consume these conditional adaptive-query laws as hypotheses; the cited Lean range records abstract Prop fields and does not prove them from Assumption 10",
+      "depends_on": [
+        "SAMP_OracleStreamBoundary",
+        "SAMP_InterleavedOracleHistoryBoundary",
+        "SFO_variance_bound",
+        "Oracle_independence",
+        "G_unbiased_convex_L_smooth",
+        "H_unbiased_monotone_Lipschitz",
+        "Oracle_noise_definitions"
+      ],
+      "clauses": [
+        "Hypothesis: conditioned on the pre-G-call history F_i^G, the G residual Delta G^i has conditional mean zero and conditional second moment bounded by sigma_G^2 at the adaptive query w_i.",
+        "Hypothesis: conditioned on the pre-odd-H-call history F_i^{H,o}, the odd-H residual Delta H^{2i-1} has conditional mean zero and conditional second moment bounded by sigma_H^2 at the adaptive query r_i.",
+        "Hypothesis: conditioned on the pre-even-H-call history F_i^{H,e}, the even-H residual Delta H^{2i} has conditional mean zero and conditional second moment bounded by sigma_H^2 at the adaptive query w_{i+1}.",
+        "Hypothesis: the conditional mean-zero facts and pre-call measurability of r_i-w_i^v and w_{i+1}-w_i^v yield the zero inner-product pairings used before (4.5.47)."
+      ],
+      "proof": [
+        {
+          "step": 1,
+          "description": "extra formalization hypothesis: the downstream expectation and martingale arguments consume these conditional adaptive-query laws as hypotheses; the cited Lean range records abstract Prop fields and does not prove them from Assumption 10",
+          "ref": "Extra Phase-alpha alignment hypothesis; Assumption 10; (4.5.29)",
+          "source_pdf_lines": [],
+          "uses": [
+            "SAMP_OracleStreamBoundary",
+            "SAMP_InterleavedOracleHistoryBoundary",
+            "SFO_variance_bound",
+            "Oracle_independence",
+            "G_unbiased_convex_L_smooth",
+            "H_unbiased_monotone_Lipschitz",
+            "Oracle_noise_definitions"
+          ],
+          "produces": "SAMP_interleaved_conditional_mean_zero; SAMP_interleaved_second_moment_bounds; SAMP_interleaved_zero_pairings_before_4547"
+        }
+      ],
+      "produces": "SAMP_interleaved_conditional_mean_zero; SAMP_interleaved_second_moment_bounds; SAMP_interleaved_zero_pairings_before_4547"
+    },
+    {
+      "name": "SAMP_InterleavedLightTailBoundary",
+      "ref": "Assumption 11",
+      "statement_math": "\\text{For any }i\\text{-th call on oracles }SFOH\\text{ and }SFOH\\text{ with any input }u\\in Z,\\ \\mathbb{E}[\\exp\\{\\|\\nabla G(u)-G(u;\\xi_i)\\|_*^2/\\sigma_G^2\\}]\\le\\exp\\{1\\},\\ \\text{and}\\ \\mathbb{E}[\\exp\\{\\|H(u)-H(u;\\zeta_i)\\|_*^2/\\sigma_H^2\\}]\\le\\exp\\{1\\}.",
+      "role": "The high-probability proof additionally requires conditional exponential-square bounds for the three interleaved residual calls. This entry marks the adaptive-query transport of the fixed-query Assumption-11 laws as an extra formalization hypothesis consumed by Lemma 4.1 and the weighted-square argument. This is a proof-consumable extra-hypothesis boundary, not a theorem proved in the paper from the verbatim assumptions.",
+      "source_lean": "Algorithms/Unverified/StochasticAcceleratedMirrorProx.lean:1305-1324; SAMP_InterleavedLightTailCertificate.outputs (abstract Prop fields only)",
+      "status": "extra formalization hypothesis: the downstream tail proof consumes the listed conditional exponential-square outputs as hypotheses; the cited Lean range records abstract Prop fields and does not prove them from Assumption 11",
+      "depends_on": [
+        "SAMP_OracleStreamBoundary",
+        "SAMP_InterleavedOracleHistoryBoundary",
+        "SAMP_InterleavedConditionalOracleLawBoundary",
+        "Light_tail_oracle_noise"
+      ],
+      "clauses": [
+        "Hypothesis: conditioned on F_i^G, the G residual at the F_i^G-measurable query w_i satisfies the exponential-square bound inherited from Assumption 11 and the fixed xi marginal law.",
+        "Hypothesis: conditioned on F_i^{H,o}, the odd-H residual at r_i satisfies the exponential-square bound inherited from Assumption 11 and the fixed zeta marginal law.",
+        "Hypothesis: conditioned on F_i^{H,e}, the even-H residual at w_{i+1} satisfies the exponential-square bound inherited from Assumption 11 and the fresh zeta_{2i} marginal law.",
+        "Hypothesis: the corresponding conditional light-tail facts after multiplying by r_i-w_i^v and w_{i+1}-w_i^v supply the Lemma-4.1 inner-product applications.",
+        "The weighted square-noise applications consume the same conditional transport; no residual-independence claim is needed for the convexity-of-exponential step."
+      ],
+      "proof": [
+        {
+          "step": 1,
+          "description": "Consume the explicit SAMP_InterleavedLightTailBoundary certificate field for the G call: conditioned on F_i^G, the adaptive residual Delta G^i satisfies the required exponential-square control. This is not derived here from Assumption 11 alone; the stream freshness and adaptive-query history are supplied by SAMP_OracleStreamBoundary and SAMP_InterleavedOracleHistoryBoundary.",
+          "ref": "Extra Phase-alpha alignment hypothesis; conditional G light-tail certificate",
+          "source_pdf_lines": [
+            10461,
+            10467
+          ],
+          "uses": [
+            "Light_tail_oracle_noise",
+            "SAMP_OracleStreamBoundary",
+            "SAMP_InterleavedOracleHistoryBoundary"
+          ],
+          "produces": "SAMP_G_conditional_light_tail"
+        },
+        {
+          "step": 2,
+          "description": "Consume the explicit SAMP_InterleavedLightTailBoundary certificate field for the odd-H call: conditioned on F_i^{H,o}, the adaptive residual Delta H^{2i-1} satisfies the required exponential-square control. This conditional fact is recorded as boundary structure, not as a theorem derived from the fixed-query Assumption 11 statement alone.",
+          "ref": "Extra Phase-alpha alignment hypothesis; conditional odd-H light-tail certificate",
+          "source_pdf_lines": [
+            10461,
+            10467
+          ],
+          "uses": [
+            "Light_tail_oracle_noise",
+            "SAMP_OracleStreamBoundary",
+            "SAMP_InterleavedOracleHistoryBoundary"
+          ],
+          "produces": "SAMP_H_odd_conditional_light_tail"
+        },
+        {
+          "step": 3,
+          "description": "Consume the explicit SAMP_InterleavedLightTailBoundary certificate field for the even-H call: conditioned on F_i^{H,e}, the adaptive residual Delta H^{2i} satisfies the required exponential-square control. This step relies on the pre-even-H history and fresh even-H coordinate as boundary hypotheses.",
+          "ref": "Extra Phase-alpha alignment hypothesis; conditional even-H light-tail certificate",
+          "source_pdf_lines": [
+            10461,
+            10467
+          ],
+          "uses": [
+            "Light_tail_oracle_noise",
+            "SAMP_OracleStreamBoundary",
+            "SAMP_InterleavedOracleHistoryBoundary"
+          ],
+          "produces": "SAMP_H_even_conditional_light_tail"
+        },
+        {
+          "step": 4,
+          "description": "For the G inner-product martingale term, use the paper's martingale-difference observation together with Assumption 11 and the displayed exponential-square calculation for alpha_i Gamma_i^{-1}<Delta G^i,r_i-w_i^v>. This supplies only the G inner-product light-tail interface used in the subsequent Lemma 4.1 application.",
+          "ref": "Proof of Theorem 4.10 before (4.5.48), G inner-product exponential-square check",
+          "source_pdf_lines": [
+            10819,
+            10830
+          ],
+          "uses": [
+            "previous_step:1",
+            "SAMP_InterleavedOracleHistoryBoundary",
+            "Lemma_4_1_MartingaleLargeDeviation",
+            "Light_tail_oracle_noise"
+          ],
+          "produces": "SAMP_G_inner_product_conditional_light_tail"
+        },
+        {
+          "step": 5,
+          "description": "Record the paper's 'similar argument' for the even-H inner-product term leading to (4.5.49). The step consumes the even-H conditional light-tail and pre-even-H measurability boundary, and produces only the even-H inner-product light-tail interface.",
+          "ref": "Proof of Theorem 4.10, similar argument for (4.5.49)",
+          "source_pdf_lines": [
+            10841,
+            10848
+          ],
+          "uses": [
+            "previous_step:3",
+            "SAMP_InterleavedOracleHistoryBoundary",
+            "Lemma_4_1_MartingaleLargeDeviation",
+            "Light_tail_oracle_noise"
+          ],
+          "produces": "SAMP_H_even_inner_product_conditional_light_tail"
+        },
+        {
+          "step": 6,
+          "description": "For the weighted G square-noise term, use Assumption 11 and convexity of exponential functions with S_i=alpha_i gamma_i/Gamma_i and S=sum_i S_i, then Markov's inequality and the source rewrite to (4.5.50). This step produces only the G weighted-square light-tail interface.",
+          "ref": "Proof of Theorem 4.10, weighted G square-noise argument ending at (4.5.50)",
+          "source_pdf_lines": [
+            10850,
+            10873
+          ],
+          "uses": [
+            "previous_step:1",
+            "Light_tail_oracle_noise"
+          ],
+          "produces": "SAMP_G_weighted_square_conditional_light_tail"
+        },
+        {
+          "step": 7,
+          "description": "Record the paper's separate 'Using similar arguments' step for the odd-index H weighted square-noise tail (4.5.51). This step consumes the odd-H conditional light-tail interface and the preceding weighted-square argument pattern.",
+          "ref": "(4.5.51)",
+          "source_pdf_lines": [
+            10875,
+            10878
+          ],
+          "math": "\\operatorname{Prob}\\left\\{\\sum_{i=1}^t\\frac{3\\alpha_i\\gamma_i}{2\\Gamma_i}\\|\\Delta H^{2i-1}\\|_*^2>(1+\\lambda)\\frac{3\\sigma_H^2}{2}\\sum_{i=1}^t\\frac{\\alpha_i\\gamma_i}{\\Gamma_i}\\right\\}\\le\\exp\\{-\\lambda\\}.",
+          "uses": [
+            "previous_step:2",
+            "previous_step:6",
+            "Light_tail_oracle_noise"
+          ],
+          "produces": "SAMP_H_odd_weighted_square_conditional_light_tail"
+        },
+        {
+          "step": 8,
+          "description": "Record the paper's separate 'Using similar arguments' step for the even-index H weighted square-noise tail (4.5.52). This step consumes the even-H conditional light-tail interface and the preceding weighted-square argument pattern.",
+          "ref": "(4.5.52)",
+          "source_pdf_lines": [
+            10879,
+            10881
+          ],
+          "math": "\\operatorname{Prob}\\left\\{\\sum_{i=1}^t\\frac{5\\alpha_i\\gamma_i}{2\\Gamma_i}\\|\\Delta H^{2i}\\|_*^2>(1+\\lambda)\\frac{5\\sigma_H^2}{2}\\sum_{i=1}^t\\frac{\\alpha_i\\gamma_i}{\\Gamma_i}\\right\\}\\le\\exp\\{-\\lambda\\}.",
+          "uses": [
+            "previous_step:3",
+            "previous_step:6",
+            "Light_tail_oracle_noise"
+          ],
+          "produces": "SAMP_H_even_weighted_square_conditional_light_tail"
+        }
+      ],
+      "produces": "SAMP_G_conditional_light_tail; SAMP_H_odd_conditional_light_tail; SAMP_H_even_conditional_light_tail; SAMP_G_inner_product_conditional_light_tail; SAMP_H_even_inner_product_conditional_light_tail; SAMP_G_weighted_square_conditional_light_tail; SAMP_H_odd_weighted_square_conditional_light_tail; SAMP_H_even_weighted_square_conditional_light_tail"
+    },
+    {
+      "name": "SAMP_InterleavedOracleHistoryHypothesis",
+      "ref": "Algorithm 4.4, (4.5.11)-(4.5.14); Lemma 4.1",
+      "statement_math": "w_t=(1-\\alpha_t)\\bar w_t+\\alpha_t r_t,\\quad w_{t+1}=\\arg\\min_{u\\in Z}\\gamma_t[\\langle H(r_t;\\zeta_{2t-1})+G(w_t;\\xi_t),u-r_t\\rangle+J(u)]+V(r_t,u),\\quad r_{t+1}=\\arg\\min_{u\\in Z}\\gamma_t[\\langle H(w_{t+1};\\zeta_{2t})+G(w_t;\\xi_t),u-r_t\\rangle+J(u)]+V(r_t,u),\\quad \\bar w_{t+1}=(1-\\alpha_t)\\bar w_t+\\alpha_t w_{t+1}.",
+      "role": "Source-facing anchor for Algorithm 4.4's three stochastic oracle calls and Lemma 4.1's generic iid/Borel martingale-difference input. The chi-block and filtration interface is recorded in SAMP_InterleavedOracleHistoryBoundary as a proof-consumable extra formalization boundary, not as a statement printed by the paper.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Algorithm 4.4 prints the within-iteration stochastic call order: the odd H sample zeta_{2t-1} appears in the first prox update, the G sample xi_t appears in both prox updates through G(w_t;xi_t), and the even H sample zeta_{2t} appears in the second prox update.",
+          "ref": "Algorithm 4.4, (4.5.11)-(4.5.13)",
+          "source_pdf_lines": [
+            10408,
+            10415
+          ],
+          "uses": [
+            "SAMP_first_prox_update",
+            "SAMP_second_prox_update"
+          ],
+          "produces": "source_SAMP_three_call_order_anchor"
+        },
+        {
+          "step": 2,
+          "description": "Lemma 4.1 separately supplies the source's generic martingale-difference template: an iid sequence xi[t], deterministic Borel functions zeta_t(xi[t]), conditional mean zero, and conditional exponential-square control. The interleaved chi_i and filtration bookkeeping needed to map Algorithm 4.4 to this template is recorded in SAMP_InterleavedOracleHistoryBoundary as an extra formalization boundary.",
+          "ref": "Lemma 4.1",
+          "source_pdf_lines": [
+            6209,
+            6214
+          ],
+          "uses": [
+            "previous_step:1",
+            "Lemma_4_1_MartingaleLargeDeviation"
+          ],
+          "produces": "source_Lemma_4_1_iid_Borel_template_anchor"
+        },
+        {
+          "step": 3,
+          "description": "This source-anchor entry intentionally does not assert the derived chi_i, chi_[i-1], F_i^G, F_i^{H,o}, or F_i^{H,e} formulas as paper mathematics; those non-source formalization hypotheses are consumed through SAMP_InterleavedOracleHistoryBoundary.",
+          "ref": "Algorithm 4.4 and Lemma 4.1 source-anchor boundary",
+          "source_pdf_lines": [],
+          "uses": [
+            "previous_step:1",
+            "previous_step:2"
+          ],
+          "produces": "SAMP_interleaved_history_formalization_boundary_only"
+        }
+      ]
+    },
+    {
+      "name": "SAMP_InterleavedConditionalOracleLawHypothesis",
+      "ref": "Assumption 10; (4.5.29)",
+      "statement_math": "\\text{At the }i\\text{-th call of SFOG and SFOH with input }z\\in Z,\\text{ the oracles SFOG and SFOH output stochastic information }G(z;\\xi_i)\\text{ and }H(z;\\zeta_i)\\text{ respectively, such that }\\mathbb{E}\\|G(u;\\xi_i)-\\nabla G(u)\\|_*^2\\le\\sigma_G^2\\ \\text{and}\\ \\mathbb{E}\\|H(u;\\zeta_i)-H(u)\\|_*^2\\le\\sigma_H^2,\\text{ for some }\\sigma_G,\\sigma_H\\ge0,\\text{ where }\\xi_i\\text{ and }\\zeta_i\\text{ are independently distributed random samples.}",
+      "role": "Source-facing anchor for (4.5.29)'s residual definitions and Assumption 10's fixed-query second-moment bounds and independently-distributed-samples clause. Conditional adaptive-query transport is recorded in SAMP_InterleavedConditionalOracleLawBoundary as a proof-consumable extra hypothesis, not as a paper theorem or as a product of this source-anchor key lemma.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "The source defines the three oracle residuals Delta H^{2t-1}, Delta H^{2t}, and Delta G^t in (4.5.29).",
+          "ref": "(4.5.29)",
+          "source_pdf_lines": [
+            10592,
+            10598
+          ],
+          "uses": [
+            "Oracle_noise_definitions"
+          ],
+          "produces": "source_oracle_residual_definitions"
+        },
+        {
+          "step": 2,
+          "description": "Assumption 10 prints the fixed-query second-moment bounds for the G and H oracle outputs and the independent-samples clause.",
+          "ref": "Assumption 10",
+          "source_pdf_lines": [
+            10323,
+            10329
+          ],
+          "uses": [
+            "SFO_variance_bound",
+            "Oracle_independence",
+            "previous_step:1"
+          ],
+          "produces": "source_fixed_query_second_moment_bounds_and_independent_sample_clause"
+        }
+      ]
+    },
+    {
+      "name": "SAMP_InterleavedLightTailHypothesis",
+      "ref": "Assumption 11",
+      "statement_math": "\\mathbb{E}[\\exp\\{\\|\\nabla G(u)-G(u;\\xi_i)\\|_*^2/\\sigma_G^2\\}]\\le\\exp\\{1\\},\\quad \\mathbb{E}[\\exp\\{\\|H(u)-H(u;\\zeta_i)\\|_*^2/\\sigma_H^2\\}]\\le\\exp\\{1\\}.",
+      "role": "Source-facing Assumption 11 anchor for the fixed-query exponential-square bounds on the G and H oracle residuals. Conditional transport through F_i^G, F_i^{H,o}, and F_i^{H,e} is recorded in SAMP_InterleavedLightTailBoundary as a proof-consumable extra hypothesis, not as a product of this source-anchor key lemma.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "The paper states Assumption 11 as fixed-query exponential-square bounds for the G and H stochastic oracle samples. This source-facing entry does not assert conditional filtration facts or adaptive-query transport.",
+          "ref": "Assumption 11",
+          "source_pdf_lines": [
+            10461,
+            10467
+          ],
+          "uses": [
+            "Light_tail_oracle_noise"
+          ],
+          "produces": "source_fixed_query_light_tail_bounds"
+        }
+      ]
+    },
+    {
+      "name": "SAMP_G_Lemma41InstantiationHypothesis",
+      "ref": "Proof of Theorem 4.10 before (4.5.48); Lemma 4.1",
+      "statement_math": "\\operatorname{Prob}\\left\\{-\\sum_{i=1}^t\\frac{\\alpha_i}{\\Gamma_i}\\langle\\Delta G^i,r_i-w_i^v\\rangle>\\lambda\\sigma_GD_Z\\sqrt{2\\sum_{i=1}^t\\left(\\frac{\\alpha_i}{\\Gamma_i}\\right)^2}\\right\\}\\le\\exp\\{-\\lambda^2/3\\}.",
+      "role": "Extra theorem-hypothesis packaging of the G-specific Lemma 4.1 prerequisites: iid interleaved block history, deterministic-Borel dependence of the G increment, pre-G measurability of r_i-w_i^v, conditional mean zero, and conditional exponential-square control.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "The paper states that the sequence {<Delta G_i,r_i-w_i^v>} is a martingale difference and then invokes Lemma 4.1. This JSON records the exact formal prerequisites as an extra theorem hypothesis because the cited Lean declarations only expose abstract Prop fields.",
+          "ref": "Proof of Theorem 4.10 before (4.5.48)",
+          "source_pdf_lines": [
+            10819,
+            10821
+          ],
+          "uses": [
+            "SAMP_InterleavedOracleHistoryBoundary",
+            "SAMP_InterleavedConditionalOracleLawBoundary",
+            "Oracle_noise_definitions"
+          ],
+          "produces": "G_Lemma41_prerequisites: iid block history, deterministic-Borel G increment, F_i^G-measurable pairing vector r_i-w_i^v, conditional mean zero, and deterministic scale sigma_G alpha_i Gamma_i^{-1} D_Z"
+        },
+        {
+          "step": 2,
+          "description": "Together with the displayed exponential-square check before (4.5.48), the formal prerequisites are exactly the inputs needed for Lemma 4.1 on the G inner-product sequence.",
+          "ref": "display before (4.5.48)",
+          "source_pdf_lines": [
+            10821,
+            10839
+          ],
+          "uses": [
+            "previous_step:1",
+            "SAMP_InterleavedLightTailBoundary",
+            "Lemma_4_1_MartingaleLargeDeviation"
+          ],
+          "produces": "G_Lemma41_instantiation_to_4548"
+        }
+      ]
+    },
+    {
+      "name": "SAMP_EvenH_Lemma41InstantiationHypothesis",
+      "ref": "Proof of Theorem 4.10 before (4.5.49); Lemma 4.1",
+      "statement_math": "\\operatorname{Prob}\\left\\{-\\sum_{i=1}^t\\frac{\\alpha_i}{\\Gamma_i}\\langle\\Delta H^{2i},w_{i+1}-w_i^v\\rangle>\\lambda\\sigma_HD_Z\\sqrt{2\\sum_{i=1}^t\\left(\\frac{\\alpha_i}{\\Gamma_i}\\right)^2}\\right\\}\\le\\exp\\{-\\lambda^2/3\\}.",
+      "role": "Extra theorem-hypothesis packaging of the even-H-specific Lemma 4.1 prerequisites hidden under the paper's phrase 'By using a similar argument'.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "The similar-argument step for (4.5.49) requires the iid interleaved block history, deterministic-Borel dependence of the even-H increment, pre-even-H measurability of w_{i+1}-w_i^v, conditional mean zero, and deterministic scale sigma_H alpha_i Gamma_i^{-1} D_Z. This is recorded as an extra theorem hypothesis because those facts are not proved by the cited Lean hypothesis projections.",
+          "ref": "Proof of Theorem 4.10 before (4.5.49)",
+          "source_pdf_lines": [
+            10841,
+            10848
+          ],
+          "uses": [
+            "SAMP_InterleavedOracleHistoryBoundary",
+            "SAMP_InterleavedConditionalOracleLawBoundary",
+            "Oracle_noise_definitions"
+          ],
+          "produces": "EvenH_Lemma41_prerequisites: iid block history, deterministic-Borel even-H increment, F_i^{H,e}-measurable pairing vector w_{i+1}-w_i^v, conditional mean zero, and deterministic scale sigma_H alpha_i Gamma_i^{-1} D_Z"
+        },
+        {
+          "step": 2,
+          "description": "The conditional exponential-square part of the similar argument comes from the adaptive light-tail hypothesis and the norm-diameter bound, giving the remaining Lemma 4.1 premise for (4.5.49).",
+          "ref": "Proof of Theorem 4.10 before (4.5.49)",
+          "source_pdf_lines": [
+            10841,
+            10848
+          ],
+          "uses": [
+            "previous_step:1",
+            "SAMP_InterleavedLightTailBoundary",
+            "Lemma_4_1_MartingaleLargeDeviation"
+          ],
+          "produces": "EvenH_Lemma41_instantiation_to_4549"
+        }
+      ]
+    },
+    {
+      "name": "SAMP_SourceResidualIndependenceHypothesis",
+      "ref": "Proof of Theorem 4.10 before (4.5.47)",
+      "statement_math": "\\Delta G^i,\\ \\Delta H^{2i-1},\\ \\Delta H^{2i}\\text{ are independent}.",
+      "role": "Records the paper's explicit residual-factorization assertion used when the source expands the square term in U_t; in formalization it is an explicit sufficient hypothesis because adaptive query dependence is not implied by coordinate-stream independence alone.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Expose the source assertion that the three residuals are independent. This entry treats it as an explicit source-level hypothesis, separate from the valid fresh-coordinate conditional-law transport.",
+          "ref": "Proof of Theorem 4.10 before (4.5.47)",
+          "source_pdf_lines": [
+            10800,
+            10805
+          ],
+          "uses": [
+            "Oracle_noise_definitions",
+            "Oracle_independence",
+            "SAMP_InterleavedOracleHistoryBoundary"
+          ],
+          "produces": "SAMP_source_residual_mutual_independence"
+        }
+      ]
+    },
+    {
+      "name": "Lemma_3_5_ProxMappingCharacterization",
+      "ref": "Lemma 3.5",
+      "statement_math": "\\text{Let the convex function }p:X\\to\\mathbb{R},\\text{ the points }\\tilde x,\\tilde y\\in X,\\text{ and the scalars }\\mu_1,\\mu_2\\ge0\\text{ be given. Let }\\nu:X\\to\\mathbb{R}\\text{ be a differentiable convex function and }V(x,z)\\text{ be defined in (3.2.2). If }\\hat u\\in\\operatorname{Argmin}\\{p(u)+\\mu_1V(\\tilde x,u)+\\mu_2V(\\tilde y,u):u\\in X\\},\\text{ then for any }u\\in X,\\ p(\\hat u)+\\mu_1V(\\tilde x,\\hat u)+\\mu_2V(\\tilde y,\\hat u)\\le p(u)+\\mu_1V(\\tilde x,u)+\\mu_2V(\\tilde y,u)-(\\mu_1+\\mu_2)V(\\hat u,u).",
+      "role": "External-to-section prox optimality characterization used to derive Lemmas 4.12 and 4.15.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Use the definition of the minimizer and the convexity of p to choose the subgradient witness explicitly printed in the proof: for some p'(hat u) in partial p(hat u).",
+          "ref": "Proof of Lemma 3.5, subgradient witness",
+          "source_pdf_lines": [
+            3555,
+            3557
+          ],
+          "uses": [],
+          "produces": "p_subgradient_at_hat_u"
+        },
+        {
+          "step": 2,
+          "description": "With the subgradient witness and differentiability/convexity of V(tilde x, .) and V(tilde y, .), write the first-order condition at hat u.",
+          "ref": "Proof of Lemma 3.5, first displayed condition",
+          "source_pdf_lines": [
+            3555,
+            3558
+          ],
+          "math": "\\langle p'(\\hat u)+\\mu_1\\nabla V(\\tilde x,\\hat u)+\\mu_2\\nabla V(\\tilde y,\\hat u),u-\\hat u\\rangle\\ge0,\\ \\forall u\\in X,",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "Lemma_3_5_first_order_condition"
+        },
+        {
+          "step": 3,
+          "description": "Unfold the Bregman definition (3.2.2) to get the three-point identity used for each center point.",
+          "ref": "Proof of Lemma 3.5, Bregman identity",
+          "source_pdf_lines": [
+            3558,
+            3562
+          ],
+          "math": "V(\\tilde x,u)=V(\\tilde x,\\hat u)+\\langle\\nabla V(\\tilde x,\\hat u),u-\\hat u\\rangle+V(\\hat u,u),\\ \\forall u\\in X.",
+          "uses": [],
+          "produces": "Lemma_3_5_Bregman_three_point_identity"
+        },
+        {
+          "step": 4,
+          "description": "Substitute the Bregman identity for the two V terms and apply convexity of p with the chosen subgradient witness to replace p(u) by the affine subgradient lower bound at hat u.",
+          "ref": "Proof of Lemma 3.5, displayed expansion and first inequality",
+          "source_pdf_lines": [
+            3563,
+            3570
+          ],
+          "math": "p(u)+\\mu_1V(\\tilde x,u)+\\mu_2V(\\tilde y,u)=p(u)+\\mu_1[V(\\tilde x,\\hat u)+\\langle\\nabla V(\\tilde x,\\hat u),u-\\hat u\\rangle+V(\\hat u,u)]+\\mu_2[V(\\tilde y,\\hat u)+\\langle\\nabla V(\\tilde y,\\hat u),u-\\hat u\\rangle+V(\\hat u,u)]\\ge p(\\hat u)+\\mu_1V(\\tilde x,\\hat u)+\\mu_2V(\\tilde y,\\hat u)+\\langle p'(\\hat u)+\\mu_1\\nabla V(\\tilde x,\\hat u)+\\mu_2\\nabla V(\\tilde y,\\hat u),u-\\hat u\\rangle+(\\mu_1+\\mu_2)V(\\hat u,u)",
+          "uses": [
+            "previous_step:1",
+            "previous_step:2",
+            "previous_step:3"
+          ],
+          "produces": "Lemma_3_5_expanded_lower_bound"
+        },
+        {
+          "step": 5,
+          "description": "Use the first-order condition to drop the nonnegative inner-product term, then rearrange to the stated prox-mapping inequality.",
+          "ref": "Proof of Lemma 3.5, final displayed inequality",
+          "source_pdf_lines": [
+            3570,
+            3572
+          ],
+          "math": "p(u)+\\mu_1V(\\tilde x,u)+\\mu_2V(\\tilde y,u)\\ge[p(\\hat u)+\\mu_1V(\\tilde x,\\hat u)+\\mu_2V(\\tilde y,\\hat u)]+(\\mu_1+\\mu_2)V(\\hat u,u).",
+          "uses": [
+            "previous_step:2",
+            "previous_step:4"
+          ],
+          "produces": "Lemma_3_5_ProxMappingCharacterization"
+        }
+      ]
+    },
+    {
+      "name": "Lemma_4_1_MartingaleLargeDeviation",
+      "ref": "Lemma 4.1",
+      "statement_math": "\\text{Let }\\xi_{[t]}\\equiv\\{\\xi_1,\\xi_2,\\ldots,\\xi_t\\}\\text{ be a sequence of iid random variables, and }\\zeta_t=\\zeta_t(\\xi_{[t]})\\text{ be deterministic Borel functions of }\\xi_{[t]}\\text{ such that }\\mathbb{E}_{|\\xi_{[t-1]}}[\\zeta_t]=0\\text{ a.s. and }\\mathbb{E}_{|\\xi_{[t-1]}}[\\exp\\{\\zeta_t^2/\\sigma_t^2\\}]\\le\\exp\\{1\\}\\text{ a.s., where }\\sigma_t>0\\text{ are deterministic. Then }\\forall\\lambda\\ge0:\\operatorname{Prob}\\left\\{\\sum_{t=1}^N\\zeta_t>\\lambda\\sqrt{\\sum_{t=1}^N\\sigma_t^2}\\right\\}\\le\\exp\\{-\\lambda^2/3\\}.",
+      "role": "Large-deviation bound applied to the G and H martingale inner-product sums in Theorem 4.10(b).",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Introduce the shorthand conditional expectation E_|t-1 and normalize the martingale difference by zeta_bar_t=zeta_t/sigma_t; the assumptions give zero conditional mean and unit-scale exponential square moment.",
+          "ref": "Proof of Lemma 4.1, normalization",
+          "source_pdf_lines": [
+            6219,
+            6222
+          ],
+          "math": "\\bar\\zeta_t=\\zeta_t/\\sigma_t,\\quad \\mathbb{E}_{|t-1}[\\bar\\zeta_t]=0,\\quad \\mathbb{E}_{|t-1}[\\exp\\{\\bar\\zeta_t^2\\}]\\le\\exp\\{1\\}\\ \\text{a.s.}",
+          "uses": [],
+          "produces": "normalized_martingale_difference"
+        },
+        {
+          "step": 2,
+          "description": "Use exp{x} <= x+exp{9x^2/16} together with the normalized conditional moment relations to obtain the small-lambda conditional mgf bound.",
+          "ref": "(4.1.16)",
+          "source_pdf_lines": [
+            6220,
+            6226
+          ],
+          "math": "\\forall\\lambda\\in[0,4/3]:\\ \\mathbb{E}_{|t-1}\\exp\\{\\lambda\\bar\\zeta_t\\}\\le\\mathbb{E}_{|t-1}\\exp\\{(9\\lambda^2/16)\\bar\\zeta_t^2\\}\\le\\exp\\{9\\lambda^2/16\\}.",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "small_lambda_conditional_mgf_bound"
+        },
+        {
+          "step": 3,
+          "description": "Use the inequality lambda x <= 3 lambda^2/8 + 2 x^2/3 to get the complementary conditional mgf bound.",
+          "ref": "Proof of Lemma 4.1, display after (4.1.16)",
+          "source_pdf_lines": [
+            6227,
+            6230
+          ],
+          "math": "\\mathbb{E}_{|t-1}\\exp\\{\\lambda\\bar\\zeta_t\\}\\le\\exp\\{3\\lambda^2/8\\}\\mathbb{E}_{|t-1}\\exp\\{2\\bar\\zeta_t^2/3\\}\\le\\exp\\{2/3+3\\lambda^2/8\\}.",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "large_lambda_conditional_mgf_bound"
+        },
+        {
+          "step": 4,
+          "description": "Combine the small-lambda and complementary bounds to obtain a single conditional mgf estimate for all nonnegative lambda.",
+          "ref": "Proof of Lemma 4.1, combined mgf bound",
+          "source_pdf_lines": [
+            6231,
+            6234
+          ],
+          "math": "\\forall\\lambda\\ge0:\\ \\mathbb{E}_{|t-1}\\exp\\{\\lambda\\bar\\zeta_t\\}\\le\\exp\\{3\\lambda^2/4\\},",
+          "uses": [
+            "previous_step:2",
+            "previous_step:3"
+          ],
+          "produces": "all_lambda_normalized_conditional_mgf_bound"
+        },
+        {
+          "step": 5,
+          "description": "Rescale from zeta_bar_t to zeta_t to express the conditional mgf in terms of sigma_t.",
+          "ref": "Proof of Lemma 4.1, rescaled mgf bound",
+          "source_pdf_lines": [
+            6235,
+            6238
+          ],
+          "math": "\\forall\\nu\\ge0:\\ \\mathbb{E}_{|t-1}[\\exp\\{\\nu\\zeta_t\\}]\\le\\exp\\{3\\nu^2\\sigma_t^2/4\\}.",
+          "uses": [
+            "previous_step:4"
+          ],
+          "produces": "conditional_mgf_bound_for_zeta_t"
+        },
+        {
+          "step": 6,
+          "description": "Because each zeta_tau is a deterministic function of the history, factor the partial-sum exponential by conditioning on xi_[t-1], then apply the rescaled conditional mgf bound from the preceding step to obtain the recursive mgf estimate.",
+          "ref": "Proof of Lemma 4.1, mgf recurrence",
+          "source_pdf_lines": [
+            6239,
+            6244
+          ],
+          "math": "\\forall\\nu\\ge0:\\ \\mathbb{E}\\left[\\exp\\left\\{\\nu\\sum_{\\tau=1}^t\\zeta_\\tau\\right\\}\\right]=\\mathbb{E}\\left[\\exp\\left\\{\\nu\\sum_{\\tau=1}^{t-1}\\zeta_\\tau\\right\\}\\mathbb{E}_{|t-1}\\left[\\exp\\{\\nu\\zeta_t\\}\\right]\\right]\\le\\exp\\{3\\nu^2\\sigma_t^2/4\\}\\mathbb{E}\\left[\\exp\\left\\{\\nu\\sum_{\\tau=1}^{t-1}\\zeta_\\tau\\right\\}\\right].",
+          "uses": [
+            "previous_step:5"
+          ],
+          "produces": "partial_sum_mgf_recurrence"
+        },
+        {
+          "step": 7,
+          "description": "Iterate the recurrence over t=1,...,N to obtain the mgf bound for the full martingale sum.",
+          "ref": "Proof of Lemma 4.1, iterated mgf bound",
+          "source_pdf_lines": [
+            6245,
+            6250
+          ],
+          "math": "\\forall\\nu\\ge0:\\ \\mathbb{E}\\exp\\{\\nu\\sum_{t=1}^N\\zeta_t\\}\\le\\exp\\{3\\nu^2\\sum_{t=1}^N\\sigma_t^2/4\\}.",
+          "uses": [
+            "previous_step:6"
+          ],
+          "produces": "full_sum_mgf_bound"
+        },
+        {
+          "step": 8,
+          "description": "Apply Chebyshev's exponential inequality and optimize over nonnegative nu before evaluating the infimum.",
+          "ref": "Proof of Lemma 4.1, Chebyshev infimum",
+          "source_pdf_lines": [
+            6251,
+            6264
+          ],
+          "math": "\\operatorname{Prob}\\left\\{\\sum_{t=1}^N\\zeta_t>\\lambda\\sqrt{\\sum_{t=1}^N\\sigma_t^2}\\right\\}\\le\\inf_{\\nu\\ge0}\\exp\\left\\{3\\nu^2\\sum_{t=1}^N\\sigma_t^2/4\\right\\}\\exp\\left\\{-\\lambda\\nu\\sqrt{\\sum_{t=1}^N\\sigma_t^2}\\right\\}=\\exp\\{-\\lambda^2/3\\}.",
+          "uses": [
+            "previous_step:7"
+          ],
+          "produces": "Lemma_4_1_MartingaleLargeDeviation"
+        }
+      ]
+    },
+    {
+      "name": "ScalarInequality_3_1_6",
+      "ref": "(3.1.6)",
+      "statement_math": "bt-\\frac{at^2}{2}\\le\\frac{b^2}{2a},\\ \\forall a>0,\\ b\\in\\mathbb{R},\\ t\\in\\mathbb{R}.",
+      "role": "Provides the scalar complete-square/Young inequality invoked in Lemmas 4.12 and 4.15.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "The paper records this as a simple inequality used often in first-order convergence analysis.",
+          "ref": "(3.1.6)",
+          "source_pdf_lines": [
+            2970,
+            2974
+          ],
+          "math": "bt-\\frac{at^2}{2}\\le\\frac{b^2}{2a},\\ \\forall a>0,\\ b\\in\\mathbb{R},\\ t\\in\\mathbb{R}.",
+          "uses": [],
+          "produces": "ScalarInequality_3_1_6"
+        }
+      ]
+    },
+    {
+      "name": "BregmanStrongConvexityLowerBound",
+      "ref": "(4.5.26)",
+      "statement_math": "\\frac{1}{2}\\|z-u\\|^2\\le V(u,z),\\ \\forall u,z\\in Z.",
+      "role": "Converts norm squares into Bregman distances in Lemmas 4.12 and 4.15.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Section 3.2 records the general prox-function lower bound as a consequence of the distance-generating function's strong convexity.",
+          "ref": "(3.2.3)",
+          "source_pdf_lines": [
+            3323,
+            3342
+          ],
+          "math": "V(x,z)\\ge\\frac{\\sigma_\\nu}{2}\\|x-z\\|^2.",
+          "uses": [
+            "Distance_generating_function_strong_convexity",
+            "Prox_function_strong_convexity_lower_bound"
+          ],
+          "produces": "general_Bregman_lower_bound_with_modulus_sigma_nu"
+        },
+        {
+          "step": 2,
+          "description": "Specialize the general Bregman lower bound to the SAMP prox-function associated with omega on Z and use the paper's modulus-one normalization.",
+          "ref": "(4.5.26)",
+          "source_pdf_lines": [
+            10522,
+            10527
+          ],
+          "math": "\\frac{1}{2}\\|z-u\\|^2\\le V(u,z),\\ \\forall u,z\\in Z.",
+          "uses": [
+            "omega_distance_generating_function_on_Z",
+            "Bregman_prox_definition",
+            "Distance_generating_function_modulus_one_normalization",
+            "previous_step:1"
+          ],
+          "produces": "Bregman lower bound by squared norm"
+        }
+      ]
+    },
+    {
+      "name": "Lemma_4_12_ProxTwoPointInequalities",
+      "ref": "Lemma 4.12",
+      "statement_math": "\\text{Given }r,w,y\\in Z\\text{ and }\\eta,\\vartheta\\in\\mathbb{R}^n\\text{ that satisfy }w=\\arg\\min_{u\\in Z}\\langle\\eta,u-r\\rangle+V(r,u)+J(u),\\ y=\\arg\\min_{u\\in Z}\\langle\\vartheta,u-r\\rangle+V(r,u)+J(u),\\text{ and }\\|\\vartheta-\\eta\\|_*^2\\le L^2\\|w-r\\|^2+M^2.\\text{ Then, for all }u\\in Z,\\ \\langle\\vartheta,w-u\\rangle+J(w)-J(u)\\le V(r,u)-V(y,u)-\\left(\\frac{1}{2}-\\frac{L^2}{2}\\right)\\|r-w\\|^2+\\frac{M^2}{2},\\text{ and }V(y,w)\\le L^2V(r,w)+\\frac{M^2}{2}.",
+      "role": "Supplies the prox inequalities used inside the SAMP one-step recursion.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Apply Lemma 3.5 to the two prox minimizers.",
+          "ref": "(4.5.23)-(4.5.24)",
+          "source_pdf_lines": [
+            10504,
+            10508
+          ],
+          "math": "\\langle\\eta,w-u\\rangle+J(w)-J(u)\\le V(r,u)-V(r,w)-V(w,u),\\quad \\langle\\vartheta,y-u\\rangle+J(y)-J(u)\\le V(r,u)-V(r,y)-V(y,u).",
+          "uses": [
+            "Lemma_3_5_ProxMappingCharacterization"
+          ],
+          "produces": "two prox optimality inequalities"
+        },
+        {
+          "step": 2,
+          "description": "Specialize the first prox inequality at u=y.",
+          "ref": "(4.5.25)",
+          "source_pdf_lines": [
+            10510,
+            10512
+          ],
+          "math": "\\langle\\eta,w-y\\rangle+J(w)-J(y)\\le V(r,y)-V(r,w)-V(w,y).",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "first prox inequality at y"
+        },
+        {
+          "step": 3,
+          "description": "Add the second prox inequality and the specialized first prox inequality.",
+          "ref": "display after (4.5.25)",
+          "source_pdf_lines": [
+            10514,
+            10517
+          ],
+          "math": "\\langle\\vartheta,y-u\\rangle+\\langle\\eta,w-y\\rangle+J(w)-J(u)\\le V(r,u)-V(y,u)-V(r,w)-V(w,y),",
+          "uses": [
+            "previous_step:1",
+            "previous_step:2"
+          ],
+          "produces": "added prox inequality"
+        },
+        {
+          "step": 4,
+          "description": "Rewrite the added inequality so that the left side contains <vartheta,w-u>.",
+          "ref": "display before (4.5.27)",
+          "source_pdf_lines": [
+            10518,
+            10520
+          ],
+          "math": "\\langle\\vartheta,w-u\\rangle+J(w)-J(u)\\le\\langle\\vartheta-\\eta,w-y\\rangle+V(r,u)-V(y,u)-V(r,w)-V(w,y).",
+          "uses": [
+            "previous_step:3"
+          ],
+          "produces": "rewritten prox inequality"
+        },
+        {
+          "step": 5,
+          "description": "Apply Cauchy-Schwarz, the scalar inequality (3.1.6), and the Bregman lower bound to control the error inner product.",
+          "ref": "(4.5.27)",
+          "source_pdf_lines": [
+            10522,
+            10533
+          ],
+          "math": "\\langle\\vartheta,w-u\\rangle+J(w)-J(u)\\le\\|\\vartheta-\\eta\\|_*\\|w-y\\|+V(r,u)-V(y,u)-V(r,w)-\\frac{1}{2}\\|w-y\\|^2\\le\\frac{1}{2}\\|\\vartheta-\\eta\\|_*^2+\\frac{1}{2}\\|w-y\\|^2+V(r,u)-V(y,u)-V(r,w)-\\frac{1}{2}\\|w-y\\|^2=\\frac{1}{2}\\|\\vartheta-\\eta\\|_*^2+V(r,u)-V(y,u)-V(r,w).",
+          "uses": [
+            "ScalarInequality_3_1_6",
+            "BregmanStrongConvexityLowerBound",
+            "previous_step:4"
+          ],
+          "produces": "prox inequality with norm error"
+        },
+        {
+          "step": 6,
+          "description": "Record the local hypothesis (4.5.20) from Lemma 4.12; the proof substitutes this bound in both conclusions.",
+          "ref": "(4.5.20)",
+          "source_pdf_lines": [
+            10488,
+            10491
+          ],
+          "math": "\\|\\vartheta-\\eta\\|_*^2\\le L^2\\|w-r\\|^2+M^2.",
+          "uses": [],
+          "produces": "Lemma_4_12_local_hypothesis_4520"
+        },
+        {
+          "step": 7,
+          "description": "Substitute the hypothesis ||vartheta-eta||_*^2 <= L^2||w-r||^2+M^2 and use the Bregman lower bound on V(r,w) to obtain (4.5.21).",
+          "ref": "(4.5.21)",
+          "source_pdf_lines": [
+            10494,
+            10498
+          ],
+          "math": "\\langle\\vartheta,w-u\\rangle+J(w)-J(u)\\le V(r,u)-V(y,u)-\\left(\\frac{1}{2}-\\frac{L^2}{2}\\right)\\|r-w\\|^2+\\frac{M^2}{2}.",
+          "uses": [
+            "BregmanStrongConvexityLowerBound",
+            "previous_step:5",
+            "previous_step:6"
+          ],
+          "produces": "Lemma_4_12_first_inequality"
+        },
+        {
+          "step": 7.1,
+          "description": "The proof then states that the first conclusion (4.5.21) follows immediately from the preceding relation, the local hypothesis (4.5.20), and the Bregman lower bound.",
+          "ref": "proof transition after (4.5.27)",
+          "source_pdf_lines": [
+            10535,
+            10536
+          ],
+          "uses": [
+            "previous_step:7"
+          ],
+          "produces": "Lemma_4_12_first_inequality_proof_transition"
+        },
+        {
+          "step": 8,
+          "description": "Set u=w in (4.5.24) and u=y in (4.5.27).",
+          "ref": "display before final chain in Lemma 4.12",
+          "source_pdf_lines": [
+            10537,
+            10542
+          ],
+          "math": "\\langle\\vartheta,y-w\\rangle+J(y)-J(w)\\le V(r,w)-V(r,y)-V(y,w),\\quad \\langle\\vartheta,w-y\\rangle+J(w)-J(y)\\le\\frac{1}{2}\\|\\vartheta-\\eta\\|_*^2+V(r,y)-V(r,w).",
+          "uses": [
+            "previous_step:1",
+            "previous_step:5"
+          ],
+          "produces": "two inequalities for V(y,w)"
+        },
+        {
+          "step": 9,
+          "description": "Add the two inequalities and substitute (4.5.20) plus the Bregman lower bound to obtain the second conclusion.",
+          "ref": "final display before (4.5.22)",
+          "source_pdf_lines": [
+            10543,
+            10547
+          ],
+          "math": "0\\le\\frac{1}{2}\\|\\vartheta-\\eta\\|_*^2-V(y,w)\\le\\frac{L^2}{2}\\|r-w\\|^2+\\frac{M^2}{2}-V(y,w)\\le L^2V(r,w)+\\frac{M^2}{2}-V(y,w),",
+          "uses": [
+            "BregmanStrongConvexityLowerBound",
+            "previous_step:6",
+            "previous_step:8"
+          ],
+          "produces": "Lemma_4_12_second_inequality"
+        }
+      ]
+    },
+    {
+      "name": "Lemma_4_13_QRecursion",
+      "ref": "Lemma 4.13",
+      "statement_math": "\\text{For any sequences }\\{r_t\\}_{t\\ge1}\\text{ and }\\{w_t\\}_{t\\ge1}\\subset Z,\\text{ if the sequences }\\{\\bar w_t\\}\\text{ and }\\{w_t\\}\\text{ are generated by (4.5.11) and (4.5.14), then for all }u\\in Z,\\ Q(\\bar w_{t+1},u)-(1-\\alpha_t)Q(\\bar w_t,u)\\le\\alpha_t\\langle\\nabla G(w_t)+H(w_{t+1}),w_{t+1}-u\\rangle+\\frac{L\\alpha_t^2}{2}\\|w_{t+1}-r_t\\|^2+\\alpha_tJ(w_{t+1})-\\alpha_tJ(u).",
+      "role": "Gives the deterministic Q-recursion that Lemma 4.14 perturbs by stochastic oracle errors.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Record the observation obtained from (4.5.11) and (4.5.14) before the smoothness estimate.",
+          "ref": "Proof of Lemma 4.13, observation before first display",
+          "source_pdf_lines": [
+            10560,
+            10560
+          ],
+          "math": "\\bar w_{t+1}-w_t=\\alpha_t(w_{t+1}-r_t).",
+          "uses": [
+            "SAMP_search_point_update",
+            "SAMP_aggregate_update"
+          ],
+          "produces": "Lemma_4_13_update_identity"
+        },
+        {
+          "step": 2,
+          "description": "Apply the smoothness upper bound for G at w_t using the identity from the preceding observation for the later quadratic term.",
+          "ref": "first line of first display in proof of Lemma 4.13",
+          "source_pdf_lines": [
+            10561,
+            10563
+          ],
+          "math": "G(\\bar w_{t+1})\\le G(w_t)+\\langle\\nabla G(w_t),\\bar w_{t+1}-w_t\\rangle+\\frac{L}{2}\\|\\bar w_{t+1}-w_t\\|^2",
+          "uses": [
+            "G_unbiased_convex_L_smooth",
+            "previous_step:1"
+          ],
+          "produces": "smoothness_bound_for_G_at_bar_w"
+        },
+        {
+          "step": 3,
+          "description": "Expand \\bar w_{t+1}-w_t through (4.5.11) and (4.5.14), then insert and subtract the printed u-terms to obtain the equality in the displayed chain.",
+          "ref": "middle equality in first display in proof of Lemma 4.13",
+          "source_pdf_lines": [
+            10564,
+            10567
+          ],
+          "math": "G(w_t)+\\langle\\nabla G(w_t),\\bar w_{t+1}-w_t\\rangle+\\frac{L}{2}\\|\\bar w_{t+1}-w_t\\|^2=(1-\\alpha_t)[G(w_t)+\\langle\\nabla G(w_t),\\bar w_t-w_t\\rangle]+\\alpha_t[G(w_t)+\\langle\\nabla G(w_t),u-w_t\\rangle]+\\alpha_t\\langle\\nabla G(w_t),w_{t+1}-u\\rangle+\\frac{L\\alpha_t^2}{2}\\|w_{t+1}-r_t\\|^2",
+          "uses": [
+            "SAMP_search_point_update",
+            "SAMP_aggregate_update",
+            "previous_step:1",
+            "previous_step:2"
+          ],
+          "produces": "expanded_G_smoothness_chain"
+        },
+        {
+          "step": 4,
+          "description": "Apply convexity of G to the two bracketed first-order expressions in the equality: the bracket at \\bar w_t is bounded by G(\\bar w_t), and the bracket at u is bounded by G(u).",
+          "ref": "final inequality in first display in proof of Lemma 4.13",
+          "source_pdf_lines": [
+            10571,
+            10572
+          ],
+          "math": "G(\\bar w_{t+1})\\le(1-\\alpha_t)G(\\bar w_t)+\\alpha_tG(u)+\\alpha_t\\langle\\nabla G(w_t),w_{t+1}-u\\rangle+\\frac{L\\alpha_t^2}{2}\\|w_{t+1}-r_t\\|^2.",
+          "uses": [
+            "G_unbiased_convex_L_smooth",
+            "previous_step:3"
+          ],
+          "produces": "G_part_recursion"
+        },
+        {
+          "step": 5,
+          "description": "Expand Q(\\bar w_{t+1},u)-(1-alpha_t)Q(\\bar w_t,u) using the definition of Q.",
+          "ref": "second display in proof of Lemma 4.13",
+          "source_pdf_lines": [
+            10576,
+            10581
+          ],
+          "math": "Q(\\bar w_{t+1},u)-(1-\\alpha_t)Q(\\bar w_t,u)=G(\\bar w_{t+1})-(1-\\alpha_t)G(\\bar w_t)-\\alpha_tG(u)+\\langle H(u),\\bar w_{t+1}-u\\rangle-(1-\\alpha_t)\\langle H(u),\\bar w_t-u\\rangle+J(\\bar w_{t+1})-(1-\\alpha_t)J(\\bar w_t)-\\alpha_tJ(u)",
+          "uses": [
+            "Q_definition"
+          ],
+          "produces": "expanded_Q_difference"
+        },
+        {
+          "step": 6,
+          "description": "Use the aggregate update and convexity of J to replace the H/J part by alpha_t terms at w_{t+1}.",
+          "ref": "first inequality after Q expansion",
+          "source_pdf_lines": [
+            10582,
+            10583
+          ],
+          "math": "Q(\\bar w_{t+1},u)-(1-\\alpha_t)Q(\\bar w_t,u)\\le G(\\bar w_{t+1})-(1-\\alpha_t)G(\\bar w_t)-\\alpha_tG(u)+\\alpha_t\\langle H(u),w_{t+1}-u\\rangle+\\alpha_tJ(w_{t+1})-\\alpha_tJ(u)",
+          "uses": [
+            "J_subgradient_convex_simple",
+            "SAMP_aggregate_update",
+            "previous_step:5"
+          ],
+          "produces": "Q_difference_after_convex_J"
+        },
+        {
+          "step": 7,
+          "description": "Substitute the G recursion and use monotonicity of H to replace H(u) by H(w_{t+1}) in the needed direction.",
+          "ref": "(4.5.28)",
+          "source_pdf_lines": [
+            10584,
+            10588
+          ],
+          "math": "Q(\\bar w_{t+1},u)-(1-\\alpha_t)Q(\\bar w_t,u)\\le\\alpha_t\\langle\\nabla G(w_t),w_{t+1}-u\\rangle+\\frac{L\\alpha_t^2}{2}\\|w_{t+1}-r_t\\|^2+\\alpha_t\\langle H(w_{t+1}),w_{t+1}-u\\rangle+\\alpha_tJ(w_{t+1})-\\alpha_tJ(u).",
+          "uses": [
+            "H_unbiased_monotone_Lipschitz",
+            "previous_step:4",
+            "previous_step:6"
+          ],
+          "produces": "Lemma_4_13_Q_recursion"
+        }
+      ]
+    },
+    {
+      "name": "Lemma_4_14_StochasticGapRecursion",
+      "ref": "Lemma 4.14",
+      "statement_math": "\\text{Suppose that the parameters }\\{\\alpha_t\\}\\text{ in Algorithm 4.4 satisfy }\\alpha_1=1\\text{ and }0\\le\\alpha_t<1\\text{ for all }t>1.\\text{ Then the iterates }\\{r_t\\},\\{w_t\\}\\text{ and }\\{\\bar w_t\\}\\text{ satisfy }\\frac{1}{\\Gamma_t}Q(\\bar w_{t+1},u)\\le B_t(u,r_{[t]})-\\sum_{i=1}^t\\frac{\\alpha_i}{2\\Gamma_i\\gamma_i}(q-L\\alpha_i\\gamma_i-3M^2\\gamma_i^2)\\|r_i-w_{i+1}\\|^2+\\sum_{i=1}^t\\Lambda_i(u),\\ \\forall u\\in Z,\\text{ where }\\Gamma_t\\text{ is defined in (4.5.17), }B_t(u,r_{[t]}):=\\sum_{i=1}^t\\frac{\\alpha_i}{\\Gamma_i\\gamma_i}(V(r_i,u)-V(r_{i+1},u)),\\text{ and }\\Lambda_i(u):=\\frac{3\\alpha_i\\gamma_i}{2\\Gamma_i}(\\|\\Delta H^{2i}\\|_*^2+\\|\\Delta H^{2i-1}\\|_*^2)-\\frac{\\alpha_i(1-q)}{2\\Gamma_i\\gamma_i}\\|r_i-w_{i+1}\\|^2-\\frac{\\alpha_i}{\\Gamma_i}\\langle\\Delta H^{2i}+\\Delta G^i,w_{i+1}-u\\rangle.",
+      "role": "Main one-step-to-telescope recursion used at the start of Theorem 4.10.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Use the residual definitions and Lipschitz continuity of H to bound the stochastic H difference.",
+          "ref": "(4.5.33)",
+          "source_pdf_lines": [
+            10623,
+            10631
+          ],
+          "math": "\\|H(w_{t+1};\\zeta_{2t})-H(r_t;\\zeta_{2t-1})\\|_*^2\\le(\\|H(w_{t+1})-H(r_t)\\|_*+\\|\\Delta H^{2t}\\|_*+\\|\\Delta H^{2t-1}\\|_*)^2\\le3(\\|H(w_{t+1})-H(r_t)\\|_*^2+\\|\\Delta H^{2t}\\|_*^2+\\|\\Delta H^{2t-1}\\|_*^2)\\le3(M^2\\|w_{t+1}-r_t\\|^2+\\|\\Delta H^{2t}\\|_*^2+\\|\\Delta H^{2t-1}\\|_*^2).",
+          "uses": [
+            "Oracle_noise_definitions",
+            "H_unbiased_monotone_Lipschitz"
+          ],
+          "produces": "stochastic_H_difference_bound"
+        },
+        {
+          "step": 2,
+          "description": "Record the exact substitution map printed for applying Lemma 4.12 to the two prox steps (4.5.12) and (4.5.13): r = r_t, w = w_{t+1}, y = r_{t+1}, eta = gamma_t H(r_t; zeta_{2t-1}) + gamma_t G(w_t; xi_t), vartheta = gamma_t H(w_{t+1}; zeta_{2t}) + gamma_t G(w_t; xi_t), J = gamma_t J, L^2 = 3M^2 gamma_t^2, and M^2 = 3 gamma_t^2(||Delta H_{2t}||_*^2 + ||Delta H_{2t-1}||_*^2).",
+          "ref": "Proof of Lemma 4.14, substitution into Lemma 4.12",
+          "source_pdf_lines": [
+            10633,
+            10635
+          ],
+          "uses": [
+            "SAMP_first_prox_update",
+            "SAMP_second_prox_update",
+            "Oracle_noise_definitions",
+            "Lemma_4_12_ProxTwoPointInequalities"
+          ],
+          "produces": "Lemma_4_14_Lemma_4_12_substitution_map"
+        },
+        {
+          "step": 3,
+          "description": "Use (4.5.33) to verify Lemma 4.12's local hypothesis under the substitution map, namely the squared dual-norm difference between vartheta and eta is bounded by 3M^2 gamma_t^2 ||w_{t+1}-r_t||^2 plus the displayed stochastic-noise remainder.",
+          "ref": "(4.5.33) used in Lemma 4.14",
+          "source_pdf_lines": [
+            10623,
+            10635
+          ],
+          "uses": [
+            "Lemma_4_12_ProxTwoPointInequalities",
+            "previous_step:1",
+            "previous_step:2"
+          ],
+          "produces": "Lemma_4_14_verified_Lemma_4_12_hypothesis"
+        },
+        {
+          "step": 4,
+          "description": "Apply Lemma 4.12 with the verified substitutions to obtain the printed stochastic prox inequality for every u in Z.",
+          "ref": "display after (4.5.33)",
+          "source_pdf_lines": [
+            10637,
+            10644
+          ],
+          "math": "\\gamma_t\\langle H(w_{t+1};\\zeta_{2t})+G(w_t;\\xi_t),w_{t+1}-u\\rangle+\\gamma_tJ(w_{t+1})-\\gamma_tJ(u)\\le V(r_t,u)-V(r_{t+1},u)-\\left(\\frac{1}{2}-\\frac{3M^2\\gamma_t^2}{2}\\right)\\|r_t-w_{t+1}\\|^2+\\frac{3\\gamma_t^2}{2}(\\|\\Delta H^{2t}\\|_*^2+\\|\\Delta H^{2t-1}\\|_*^2).",
+          "uses": [
+            "Lemma_4_12_ProxTwoPointInequalities",
+            "previous_step:2",
+            "previous_step:3"
+          ],
+          "produces": "stochastic_prox_inequality"
+        },
+        {
+          "step": 5,
+          "description": "Insert the stochastic residual decompositions and the prox inequality into Lemma 4.13.",
+          "ref": "display after prox inequality in Lemma 4.14",
+          "source_pdf_lines": [
+            10645,
+            10655
+          ],
+          "math": "Q(\\bar w_{t+1},u)-(1-\\alpha_t)Q(\\bar w_t,u)\\le\\frac{\\alpha_t}{\\gamma_t}(V(r_t,u)-V(r_{t+1},u))-\\frac{\\alpha_t}{2\\gamma_t}(1-L\\alpha_t\\gamma_t-3M^2\\gamma_t^2)\\|r_t-w_{t+1}\\|^2+\\frac{3\\alpha_t\\gamma_t}{2}(\\|\\Delta H^{2t}\\|_*^2+\\|\\Delta H^{2t-1}\\|_*^2)-\\alpha_t\\langle\\Delta H^{2t}+\\Delta G^t,w_{t+1}-u\\rangle.",
+          "uses": [
+            "Oracle_noise_definitions",
+            "Lemma_4_13_QRecursion",
+            "previous_step:4"
+          ],
+          "produces": "single_step_stochastic_Q_recursion"
+        },
+        {
+          "step": 6,
+          "description": "Divide by Gamma_t and use the definition of Lambda_t(u), replacing 1 by q plus the residual -(1-q) part embedded in Lambda_t.",
+          "ref": "weighted one-step display",
+          "source_pdf_lines": [
+            10657,
+            10665
+          ],
+          "math": "\\frac{1}{\\Gamma_t}Q(\\bar w_{t+1},u)-\\frac{1-\\alpha_t}{\\Gamma_t}Q(\\bar w_t,u)\\le\\frac{\\alpha_t}{\\Gamma_t\\gamma_t}(V(r_t,u)-V(r_{t+1},u))-\\frac{\\alpha_t}{2\\Gamma_t\\gamma_t}(q-L\\alpha_t\\gamma_t-3M^2\\gamma_t^2)\\|r_t-w_{t+1}\\|^2+\\Lambda_t(u).",
+          "uses": [
+            "Gamma_definition",
+            "previous_step:5"
+          ],
+          "produces": "weighted_single_step_recursion"
+        },
+        {
+          "step": 7,
+          "description": "Record the local parameter hypothesis used by Lemma 4.14: alpha_1=1 and 0<=alpha_t<1 for all t>1.",
+          "ref": "Lemma 4.14 hypothesis",
+          "source_pdf_lines": [
+            10602,
+            10603
+          ],
+          "math": "\\alpha_1=1\\text{ and }0\\le\\alpha_t<1\\text{ for all }t>1.",
+          "uses": [],
+          "produces": "Lemma_4_14_local_alpha_hypothesis"
+        },
+        {
+          "step": 8,
+          "description": "Use alpha_1=1 and (1-alpha_t)/Gamma_t=1/Gamma_{t-1} for t>1 to recursively telescope the weighted recurrence and identify B_t.",
+          "ref": "(4.5.30)-(4.5.32)",
+          "source_pdf_lines": [
+            10606,
+            10621
+          ],
+          "math": "\\frac{1}{\\Gamma_t}Q(\\bar w_{t+1},u)\\le B_t(u,r_{[t]})-\\sum_{i=1}^t\\frac{\\alpha_i}{2\\Gamma_i\\gamma_i}(q-L\\alpha_i\\gamma_i-3M^2\\gamma_i^2)\\|r_i-w_{i+1}\\|^2+\\sum_{i=1}^t\\Lambda_i(u),\\ \\forall u\\in Z.",
+          "uses": [
+            "Gamma_definition",
+            "previous_step:6",
+            "previous_step:7"
+          ],
+          "produces": "Lemma_4_14_cumulative_formula_4530"
+        },
+        {
+          "step": 8.1,
+          "description": "The proof states that recursively applying the weighted one-step relation concludes the cumulative result (4.5.30), with B_t and Lambda_i defined by (4.5.31)-(4.5.32).",
+          "ref": "proof transition after the displayed definitions",
+          "source_pdf_lines": [
+            10668,
+            10670
+          ],
+          "uses": [
+            "previous_step:8"
+          ],
+          "produces": "Lemma_4_14_stochastic_gap_recursion"
+        }
+      ]
+    },
+    {
+      "name": "Lemma_4_15_AuxiliaryPerturbationBound",
+      "ref": "Lemma 4.15",
+      "statement_math": "\\text{Let }\\theta_t,\\gamma_t>0,\\ t=1,2,\\ldots,\\text{ be given. For any }w_1\\in Z\\text{ and any sequence }\\{\\Delta_t\\}\\subset\\mathbb{R}^n,\\text{ if we define }w_1^v=w_1\\text{ and }w_{i+1}^v=\\arg\\min_{u\\in Z}-\\gamma_i\\langle\\Delta_i,u\\rangle+V(w_i^v,u),\\ \\forall i>1,\\text{ then }\\sum_{i=1}^t\\theta_i\\langle-\\Delta_i,w_i^v-u\\rangle\\le\\sum_{i=1}^t\\frac{\\theta_i}{\\gamma_i}(V(w_i^v,u)-V(w_{i+1}^v,u))+\\sum_{i=1}^t\\frac{\\theta_i\\gamma_i}{2}\\|\\Delta_i\\|_*^2,\\ \\forall u\\in Z.",
+      "role": "Controls the stochastic linear perturbation term in Theorem 4.10 by an auxiliary Bregman telescope and squared-noise term.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Apply Lemma 3.5 to the auxiliary prox definition (4.5.34).",
+          "ref": "first display in proof of Lemma 4.15",
+          "source_pdf_lines": [
+            10682,
+            10685
+          ],
+          "math": "-\\gamma_i\\langle\\Delta_i,w_{i+1}^v-u\\rangle\\le V(w_i^v,u)-V(w_i^v,w_{i+1}^v)-V(w_{i+1}^v,u),\\ \\forall u\\in Z.",
+          "uses": [
+            "Lemma_3_5_ProxMappingCharacterization"
+          ],
+          "produces": "auxiliary_prox_optimality"
+        },
+        {
+          "step": 2,
+          "description": "Use Cauchy-Schwarz, the scalar inequality (3.1.6), and the Bregman lower bound to control the step from \\tilde w_i to \\tilde w_{i+1}.",
+          "ref": "second display in proof of Lemma 4.15",
+          "source_pdf_lines": [
+            10687,
+            10692
+          ],
+          "math": "-\\gamma_i\\langle\\Delta_i,w_i^v-w_{i+1}^v\\rangle\\le\\gamma_i\\|\\Delta_i\\|_*\\|w_i^v-w_{i+1}^v\\|\\le\\frac{\\gamma_i^2}{2}\\|\\Delta_i\\|_*^2+\\frac{1}{2}\\|w_i^v-w_{i+1}^v\\|^2\\le\\frac{\\gamma_i^2}{2}\\|\\Delta_i\\|_*^2+V(w_i^v,w_{i+1}^v).",
+          "uses": [
+            "ScalarInequality_3_1_6",
+            "BregmanStrongConvexityLowerBound"
+          ],
+          "produces": "auxiliary_step_error_bound"
+        },
+        {
+          "step": 3,
+          "description": "Add the two inequalities and multiply by theta_i/gamma_i.",
+          "ref": "display before summation in Lemma 4.15",
+          "source_pdf_lines": [
+            10693,
+            10697
+          ],
+          "math": "-\\theta_i\\langle\\Delta_i,w_i^v-u\\rangle\\le\\frac{\\theta_i\\gamma_i}{2}\\|\\Delta_i\\|_*^2+\\frac{\\theta_i}{\\gamma_i}(V(w_i^v,u)-V(w_{i+1}^v,u)).",
+          "uses": [
+            "previous_step:1",
+            "previous_step:2"
+          ],
+          "produces": "single_i_auxiliary_bound"
+        },
+        {
+          "step": 4,
+          "description": "Sum the single-index inequality from i=1 to t.",
+          "ref": "(4.5.35)",
+          "source_pdf_lines": [
+            10678,
+            10681
+          ],
+          "math": "\\sum_{i=1}^t\\theta_i\\langle-\\Delta_i,w_i^v-u\\rangle\\le\\sum_{i=1}^t\\frac{\\theta_i}{\\gamma_i}(V(w_i^v,u)-V(w_{i+1}^v,u))+\\sum_{i=1}^t\\frac{\\theta_i\\gamma_i}{2}\\|\\Delta_i\\|_*^2,\\ \\forall u\\in Z.",
+          "uses": [
+            "previous_step:3"
+          ],
+          "produces": "Lemma_4_15_cumulative_formula_4535"
+        },
+        {
+          "step": 4.1,
+          "description": "The proof then says that summing the preceding inequalities from i=1 to t concludes (4.5.35).",
+          "ref": "proof transition after the single-index inequality",
+          "source_pdf_lines": [
+            10698,
+            10698
+          ],
+          "uses": [
+            "previous_step:4"
+          ],
+          "produces": "Lemma_4_15_auxiliary_perturbation_bound"
+        }
+      ]
+    },
+    {
+      "name": "Corollary_4_5_ParameterChoiceRate",
+      "ref": "Corollary 4.5",
+      "statement_math": "\\text{Suppose that (4.5.36) holds. If the stepsizes }\\{\\alpha_t\\}\\text{ and }\\{\\gamma_t\\}\\text{ in Algorithm 4.4 are set to: }\\alpha_t=\\frac{2}{t+1}\\text{ and }\\gamma_t=\\frac{t}{4L+3Mt+\\beta(t+1)\\sqrt{t}},\\text{ where }\\beta>0\\text{ is a parameter. Then under Assumption 10, }\\mathbb{E}[g(\\bar w_{t+1})]\\le\\frac{16LD_Z^2}{t(t+1)}+\\frac{12MD_Z^2}{t+1}+\\frac{\\sigma D_Z}{\\sqrt{t-1}}\\left(\\frac{4\\beta D_Z}{\\sigma}+\\frac{16\\sigma}{3\\beta D_Z}\\right)=:C_0(t).\\text{ where }\\sigma\\text{ and }D_Z\\text{ are defined in (4.5.7) and (4.5.36), respectively. Furthermore, under Assumption 11, }\\operatorname{Prob}\\{g(\\bar w_{t+1})>C_0(t)+\\lambda C_1(t)\\}\\le2\\exp\\{-\\lambda^2/3\\}+3\\exp\\{-\\lambda\\},\\ \\forall\\lambda>0,\\text{ where }C_1(t):=\\frac{\\sigma D_Z}{\\sqrt{t-1}}\\left(\\frac{4\\sqrt{3}}{3}+\\frac{16\\sigma}{3\\beta D_Z}\\right).",
+      "role": "Records the paper's explicit parameter schedule and resulting expected/high-probability rates following Theorem 4.10.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Record the corollary parameter schedule (4.5.53), including the immediate alpha_1 = 1 consequence needed for Theorem 4.10.",
+          "ref": "(4.5.53)",
+          "source_pdf_lines": [
+            10888,
+            10894
+          ],
+          "math": "\\alpha_t=\\frac{2}{t+1}\\quad\\text{and}\\quad\\gamma_t=\\frac{t}{4L+3Mt+\\beta(t+1)\\sqrt{t}},",
+          "uses": [
+            "Bounded_Bregman_diameter"
+          ],
+          "produces": "Corollary_4_5_schedule_4_5_53: \\alpha_t=2/(t+1), \\gamma_t=t/(4L+3Mt+\\beta(t+1)\\sqrt{t}), and derived \\alpha_1=1."
+        },
+        {
+          "step": 2,
+          "description": "Use (4.5.17) with alpha_t = 2/(t+1) to compute Gamma_t, then check the monotonicity relation in (4.5.37) directly from the schedule.",
+          "ref": "Proof of Corollary 4.5, first display after (4.5.55)",
+          "source_pdf_lines": [
+            10915,
+            10920
+          ],
+          "math": "\\Gamma_t=\\frac{2}{t(t+1)}\\text{ and }\\frac{\\alpha_t}{\\Gamma_t\\gamma_t}\\le\\frac{\\alpha_{t+1}}{\\Gamma_{t+1}\\gamma_{t+1}}.",
+          "uses": [
+            "Gamma_definition",
+            "previous_step:1"
+          ],
+          "produces": "Corollary_4_5_Gamma_and_monotonicity: \\Gamma_t=2/(t(t+1)) and \\alpha_t/(\\Gamma_t\\gamma_t)\\le\\alpha_{t+1}/(\\Gamma_{t+1}\\gamma_{t+1})."
+        },
+        {
+          "step": 3,
+          "description": "Use the chosen gamma_t to obtain gamma_t <= t/(4L) and gamma_t^2 <= 1/(9M^2), then substitute these bounds and alpha_t = 2/(t+1) into the nonnegative coefficient condition with q = 5/6.",
+          "ref": "Proof of Corollary 4.5, parameter-condition display",
+          "source_pdf_lines": [
+            10922,
+            10929
+          ],
+          "math": "\\frac{5}{6}-L\\alpha_t\\gamma_t-3M^2\\gamma_t^2\\ge\\frac{5}{6}-\\frac{t}{4}\\cdot\\frac{2}{t+1}-\\frac{1}{3}\\ge0.",
+          "uses": [
+            "Bounded_Bregman_diameter",
+            "previous_step:1"
+          ],
+          "produces": "Corollary_4_5_parameter_condition_with_q_5_over_6: q-L\\alpha_t\\gamma_t-3M^2\\gamma_t^2\\ge0 holds for q=5/6."
+        },
+        {
+          "step": 4,
+          "description": "Invoke Theorem 4.10 after the corollary has established (4.5.36), alpha_1 = 1, the monotonicity relation, and the q = 5/6 coefficient condition; the remaining printed obligations are Q0(t) <= C0(t) and Q1(t) <= C1(t).",
+          "ref": "Proof of Corollary 4.5, sentence after parameter-condition display",
+          "source_pdf_lines": [
+            10929,
+            10931
+          ],
+          "uses": [
+            "Bounded_Bregman_diameter",
+            "Theorem 4.10",
+            "previous_step:1",
+            "previous_step:2",
+            "previous_step:3"
+          ],
+          "produces": "Corollary_4_5_Theorem_4_10_reduction: it suffices to show Q_0(t)\\le C_0(t) and Q_1(t)\\le C_1(t)."
+        },
+        {
+          "step": 5,
+          "description": "Record the printed observations preceding the summation estimate: alpha_t/Gamma_t = t and gamma_t <= 1/(beta sqrt(t)).",
+          "ref": "Proof of Corollary 4.5, sentence before summation display",
+          "source_pdf_lines": [
+            10931,
+            10933
+          ],
+          "math": "\\alpha_t/\\Gamma_t=t\\text{ and }\\gamma_t\\le1/(\\beta\\sqrt{t}),",
+          "uses": [
+            "previous_step:1",
+            "previous_step:2"
+          ],
+          "produces": "Corollary_4_5_alpha_over_Gamma_and_gamma_bound: \\alpha_i/\\Gamma_i=i and \\gamma_i\\le1/(\\beta\\sqrt{i}) for summation indices i."
+        },
+        {
+          "step": 6,
+          "description": "Apply alpha_i/Gamma_i = i and gamma_i <= 1/(beta sqrt(i)) termwise to bound the weighted alpha-gamma sum by the square-root sum.",
+          "ref": "Proof of Corollary 4.5, summation display",
+          "source_pdf_lines": [
+            10933,
+            10934
+          ],
+          "math": "\\sum_{i=1}^t\\frac{\\alpha_i\\gamma_i}{\\Gamma_i}\\le\\frac{1}{\\beta}\\sum_{i=1}^t\\sqrt{i}",
+          "uses": [
+            "previous_step:5"
+          ],
+          "produces": "Corollary_4_5_weighted_sum_to_sqrt_sum: \\sum_{i=1}^t\\alpha_i\\gamma_i/\\Gamma_i\\le\\beta^{-1}\\sum_{i=1}^t\\sqrt{i}."
+        },
+        {
+          "step": 7,
+          "description": "Use the printed integral comparison for the increasing square-root sum.",
+          "ref": "Proof of Corollary 4.5, summation display",
+          "source_pdf_lines": [
+            10934,
+            10937
+          ],
+          "math": "\\frac{1}{\\beta}\\sum_{i=1}^t\\sqrt{i}\\le\\frac{1}{\\beta}\\int_0^{t+1}\\sqrt{u}\\,du",
+          "uses": [
+            "previous_step:6"
+          ],
+          "produces": "Corollary_4_5_sqrt_sum_integral_bound: \\beta^{-1}\\sum_{i=1}^t\\sqrt{i}\\le\\beta^{-1}\\int_0^{t+1}\\sqrt{u}\\,du as printed."
+        },
+        {
+          "step": 8,
+          "description": "Evaluate the printed integral and combine it with the preceding comparisons to get the final alpha-gamma summation bound.",
+          "ref": "Proof of Corollary 4.5, summation display",
+          "source_pdf_lines": [
+            10935,
+            10937
+          ],
+          "math": "\\frac{1}{\\beta}\\int_0^{t+1}\\sqrt{u}\\,du=\\frac{1}{\\beta}\\cdot\\frac{2(t+1)^{3/2}}{3}=\\frac{2(t+1)^{3/2}}{3\\beta}.",
+          "uses": [
+            "previous_step:6",
+            "previous_step:7"
+          ],
+          "produces": "Corollary_4_5_alpha_gamma_sum_bound: \\sum_{i=1}^t\\frac{\\alpha_i\\gamma_i}{\\Gamma_i}\\le\\frac{2(t+1)^{3/2}}{3\\beta}."
+        },
+        {
+          "step": 9,
+          "description": "Record the two elementary comparisons explicitly used in the corollary endpoint algebra before the Q0 and Q1 displays.",
+          "ref": "Proof of Corollary 4.5, sentence before the Q0(t) display",
+          "source_pdf_lines": [
+            10940,
+            10941
+          ],
+          "math": "\\frac{\\sqrt{t+1}}{t}\\le\\frac{1}{\\sqrt{t-1}}\\quad\\text{and}\\quad\\sum_{i=1}^t i^2\\le\\frac{t(t+1)^2}{3}.",
+          "uses": [],
+          "produces": "Corollary_4_5_endpoint_comparisons: \\sqrt{t+1}/t\\le1/\\sqrt{t-1} and \\sum_{i=1}^t i^2\\le t(t+1)^2/3."
+        },
+        {
+          "step": 10,
+          "description": "Substitute the schedule (4.5.53), Gamma_t = 2/(t(t+1)), q = 5/6 in Q0(t) from Theorem 4.10, and sigma as defined in the paper to get the printed equality for Q0(t), using the preceding weighted-sum and endpoint-comparison facts.",
+          "ref": "Proof of Corollary 4.5, Q0(t) display",
+          "source_pdf_lines": [
+            10939,
+            10943
+          ],
+          "math": "Q_0(t)=\\frac{4D_Z^2}{t(t+1)}\\left(4L+3Mt+\\beta(t+1)\\sqrt{t}\\right)+\\frac{8\\sigma^2}{t(t+1)}\\sum_{i=1}^t\\frac{\\alpha_i\\gamma_i}{\\Gamma_i}",
+          "uses": [
+            "Bounded_Bregman_diameter",
+            "Sigma_definition",
+            "Theorem 4.10",
+            "previous_step:1",
+            "previous_step:2",
+            "previous_step:3",
+            "previous_step:4",
+            "previous_step:8",
+            "previous_step:9"
+          ],
+          "produces": "Corollary_4_5_Q0_displayed_equality"
+        },
+        {
+          "step": 11,
+          "description": "Apply the alpha-gamma summation bound to the Q0(t) equality and expand the deterministic terms to obtain the printed intermediate inequality.",
+          "ref": "Proof of Corollary 4.5, Q0(t) display",
+          "source_pdf_lines": [
+            10943,
+            10948
+          ],
+          "math": "Q_0(t)\\le\\frac{16LD_Z^2}{t(t+1)}+\\frac{12MD_Z^2}{t+1}+\\frac{4\\beta D_Z^2}{\\sqrt{t}}+\\frac{16\\sigma^2\\sqrt{t+1}}{3\\beta t}",
+          "uses": [
+            "previous_step:8",
+            "previous_step:9",
+            "previous_step:10"
+          ],
+          "produces": "Corollary_4_5_Q0_intermediate_bound"
+        },
+        {
+          "step": 12,
+          "description": "Use the printed elementary comparison sqrt(t+1)/t <= 1/sqrt(t-1) and the definition of C0(t) in (4.5.54) to complete the Q0(t) comparison.",
+          "ref": "Proof of Corollary 4.5, Q0(t) display",
+          "source_pdf_lines": [
+            10948,
+            10950
+          ],
+          "math": "Q_0(t)\\le C_0(t),",
+          "uses": [
+            "previous_step:9",
+            "previous_step:11"
+          ],
+          "produces": "Corollary_4_5_Q0_bound"
+        },
+        {
+          "step": 13,
+          "description": "Substitute the schedule and Gamma_t into Q1(t) from Theorem 4.10, rewriting (alpha_i/Gamma_i)^2 as i^2 and the square-noise coefficient as 8 sigma^2.",
+          "ref": "Proof of Corollary 4.5, Q1(t) display",
+          "source_pdf_lines": [
+            10952,
+            10957
+          ],
+          "math": "Q_1(t)=\\frac{2(\\sigma_G+\\sigma_H)}{t(t+1)}D_Z\\sqrt{2\\sum_{i=1}^ti^2}+\\frac{8\\sigma^2}{t(t+1)}\\sum_{i=1}^t\\frac{\\alpha_i\\gamma_i}{\\Gamma_i}",
+          "uses": [
+            "Sigma_definition",
+            "Theorem 4.10",
+            "previous_step:1",
+            "previous_step:2",
+            "previous_step:3",
+            "previous_step:4",
+            "previous_step:5"
+          ],
+          "produces": "Corollary_4_5_Q1_displayed_equality"
+        },
+        {
+          "step": 14,
+          "description": "Use the printed square-sum bound sum_{i=1}^t i^2 <= t(t+1)^2/3 and the alpha-gamma summation bound to obtain the intermediate Q1(t) inequality.",
+          "ref": "Proof of Corollary 4.5, Q1(t) display",
+          "source_pdf_lines": [
+            10957,
+            10962
+          ],
+          "math": "Q_1(t)\\le\\frac{2\\sqrt{2}(\\sigma_G+\\sigma_H)D_Z}{\\sqrt{3t}}+\\frac{16\\sigma^2\\sqrt{t+1}}{3\\beta t}",
+          "uses": [
+            "previous_step:8",
+            "previous_step:9",
+            "previous_step:13"
+          ],
+          "produces": "Corollary_4_5_Q1_intermediate_bound"
+        },
+        {
+          "step": 15,
+          "description": "Derive the comparison \\sigma_G+\\sigma_H\\le\\sqrt{2}\\sigma from the paper's definition \\sigma=\\sqrt{\\sigma_G^2+\\sigma_H^2}; this is the derived noise aggregation used in the Q1 endpoint.",
+          "ref": "Derived from (4.5.7), used in the Q1 endpoint comparison",
+          "source_pdf_lines": [
+            10962,
+            10964
+          ],
+          "uses": [
+            "Sigma_definition"
+          ],
+          "produces": "Corollary_4_5_sigma_sum_bound: \\sigma_G+\\sigma_H\\le\\sqrt{2}\\sigma."
+        },
+        {
+          "step": 16,
+          "description": "Apply the printed t-dependent comparison and the definition of sigma to compare the intermediate Q1(t) bound with C1(t).",
+          "ref": "Proof of Corollary 4.5, Q1(t) display",
+          "source_pdf_lines": [
+            10962,
+            10964
+          ],
+          "math": "Q_1(t)\\le C_1(t).",
+          "uses": [
+            "previous_step:9",
+            "previous_step:14",
+            "previous_step:15"
+          ],
+          "produces": "Corollary_4_5_Q1_bound"
+        }
+      ]
+    }
+  ]
+}

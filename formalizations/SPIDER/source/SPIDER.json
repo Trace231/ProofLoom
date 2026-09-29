@@ -1,0 +1,2193 @@
+{
+  "algorithm": "Spider_SFO",
+  "full_name": "Spider-SFO: Stochastic Path-Integrated Differential Estimator for Stochastic First-Order Optimization",
+  "source_reference": "Fang, Li, Lin, Zhang, Spider: Near-Optimal Non-Convex Optimization via Stochastic Path Integrated Differential Estimator, arXiv:1807.01695v2 (Theorem 1)",
+  "setup": {
+    "problem": {
+      "math": "\\minimize_{x\\in\\mathbb{R}^d}\\ f(x) \\equiv \\mathbb{E}[F(x;\\zeta)]",
+      "ref": "Eq. (1.1), p. 2",
+      "description": "Online stochastic non-convex optimization; the paper then studies the finite-sum notation in (1.2) for both finite-sum and on-line cases."
+    },
+    "variable_space": {
+      "math": "\\minimize_{x\\in\\mathbb{R}^d}\\ f(x)=\\frac{1}{n}\\sum_{i=1}^n f_i(x)",
+      "ref": "Eq. (1.2), p. 2"
+    }
+  },
+  "assumptions": [
+    {
+      "name": "Finite_Initial_Gap",
+      "math": "\\Delta := f(x_0)-f^*<\\infty\\text{ where }f^*=\\inf_{x\\in\\mathbb{R}^d} f(x)\\text{ is the global infimum value of }f(x)",
+      "ref": "Assumption 1(i), p. 9",
+      "parameters": [
+        "\\Delta",
+        "f^*",
+        "x_0"
+      ]
+    },
+    {
+      "name": "Averaged_Lipschitz_Gradient",
+      "math": "\\mathbb{E}\\|\\nabla f_i(x)-\\nabla f_i(y)\\|^2\\le L^2\\|x-y\\|^2",
+      "ref": "Assumption 1(ii), p. 9",
+      "parameters": [
+        "L",
+        "f_i",
+        "x",
+        "y"
+      ]
+    },
+    {
+      "name": "Online_Gradient_Variance",
+      "math": "\\mathbb{E}\\|\\nabla f_i(x)-\\nabla f(x)\\|^2\\le \\sigma^2",
+      "ref": "Assumption 1(iii), p. 9",
+      "parameters": [
+        "\\sigma",
+        "f_i",
+        "f",
+        "x"
+      ]
+    },
+    {
+      "name": "Spider_Core_Differential_Unbiasedness",
+      "math": "\\mathbb{E}\\left[\\xi_k(\\hat{x}_{0:k})\\mid \\hat{x}_{0:k}\\right]=Q(\\hat{x}^k)-Q(\\hat{x}^{k-1})",
+      "ref": "Section 2, displayed formula before Eq. (2.1), p. 7",
+      "parameters": [
+        "\\xi_k",
+        "Q",
+        "\\hat{x}_{0:k}"
+      ]
+    },
+    {
+      "name": "Spider_Path_Integrated_Estimator",
+      "math": "\\widetilde{Q}(\\hat{x}_{0:K}) := \\widetilde{Q}(\\hat{x}^0)+\\sum_{k=1}^K \\xi_k(\\hat{x}_{0:k})",
+      "ref": "Eq. (2.1), p. 7",
+      "parameters": [
+        "\\widetilde{Q}",
+        "Q",
+        "\\xi_k"
+      ]
+    },
+    {
+      "name": "Spider_Difference_Unbiasedness",
+      "math": "\\mathbb{E}\\left[B_i(x^k)-B_i(x^{k-1})\\mid x_{0:k}\\right]=V^k-V^{k-1}",
+      "ref": "Eq. (2.6), p. 8",
+      "parameters": [
+        "B_i",
+        "V^k",
+        "x_{0:k}"
+      ]
+    },
+    {
+      "name": "Spider_Abstract_With_Replacement_Sampling",
+      "math": "\\text{At each step }k\\text{ let }S_*\\text{ be a subset that samples }S_*\\text{ elements in }[n]\\text{ with replacement, and let }B_{S_*}=\\frac{1}{S_*}\\sum_{i\\in S_*}B_i",
+      "ref": "Text before Eq. (2.7), p. 8",
+      "parameters": [
+        "S_*",
+        "[n]",
+        "B_{S_*}",
+        "B_i"
+      ]
+    },
+    {
+      "name": "Spider_Second_Moment_Lipschitz",
+      "math": "\\mathbb{E}\\|B_i(x)-B_i(y)\\|^2\\le L_B^2\\|x-y\\|^2",
+      "ref": "Eq. (2.7), p. 8",
+      "parameters": [
+        "B_i",
+        "L_B",
+        "x",
+        "y"
+      ]
+    },
+    {
+      "name": "Abstract_Step_Bound",
+      "math": "\\|x^k-x^{k-1}\\|\\le \\epsilon_1\\text{ for all }k=1,\\ldots,K",
+      "ref": "Text after Eq. (2.7), p. 8",
+      "parameters": [
+        "\\epsilon_1",
+        "x^k"
+      ]
+    },
+    {
+      "name": "Spider_Recursive_Estimator",
+      "math": "V^k=B_{S_*}(x^k)-B_{S_*}(x^{k-1})+V^{k-1}",
+      "ref": "Displayed formula after Eq. (2.7), p. 8",
+      "parameters": [
+        "V^k",
+        "B_{S_*}",
+        "x^k"
+      ]
+    },
+    {
+      "name": "SpiderSFO_Full_Refresh_Update",
+      "math": "2:\\ \\text{if }\\operatorname{mod}(k,q)=0\\text{ then}\\quad 3:\\ \\text{Draw }S_1\\text{ samples (or compute the full gradient for the finite-sum case), let }v^k=\\nabla f_{S_1}(x^k)",
+      "ref": "Algorithm 1, Lines 2-3, p. 10",
+      "parameters": [
+        "k",
+        "v^k",
+        "S_1",
+        "q"
+      ]
+    },
+    {
+      "name": "SpiderSFO_Periodic_Full_Refresh",
+      "math": "2:\\ \\text{if }\\operatorname{mod}(k,q)=0\\text{ then}\\quad 3:\\ \\text{Draw }S_1\\text{ samples (or compute the full gradient for the finite-sum case), let }v^k=\\nabla f_{S_1}(x^k)",
+      "ref": "Algorithm 1, Lines 2-3, p. 10",
+      "parameters": [
+        "k",
+        "q",
+        "S_1",
+        "v^k"
+      ]
+    },
+    {
+      "name": "SpiderSFO_Full_Refresh_Sampling",
+      "math": "2:\\ \\text{if }\\operatorname{mod}(k,q)=0\\text{ then}\\quad 3:\\ \\text{Draw }S_1\\text{ samples (or compute the full gradient for the finite-sum case), let }v^k=\\nabla f_{S_1}(x^k)",
+      "ref": "Algorithm 1, Lines 2-3, p. 10",
+      "parameters": [
+        "k",
+        "S_1",
+        "v^k",
+        "q"
+      ]
+    },
+    {
+      "name": "SpiderSFO_Recursive_Update",
+      "math": "5:\\ \\text{Draw }S_2\\text{ samples, and let }v^k=\\nabla f_{S_2}(x^k)-\\nabla f_{S_2}(x^{k-1})+v^{k-1}",
+      "ref": "Algorithm 1, Line 5, p. 10",
+      "parameters": [
+        "v^k",
+        "S_2",
+        "q"
+      ]
+    },
+    {
+      "name": "SpiderSFO_OptionII_Update",
+      "math": "x^{k+1}=x^k-\\eta^k v^k\\quad\\text{where}\\quad \\eta^k=\\min\\left(\\frac{\\epsilon}{Ln_0\\|v^k\\|},\\frac{1}{2Ln_0}\\right)",
+      "ref": "Algorithm 1, Line 14, p. 10",
+      "parameters": [
+        "x^{k+1}",
+        "\\eta^k",
+        "v^k"
+      ]
+    },
+    {
+      "name": "SpiderSFO_OptionII_Output",
+      "math": "\\widetilde{x}\\text{ chosen uniformly at random from }\\{x^k\\}_{k=0}^{K-1}",
+      "ref": "Algorithm 1, Line 17, p. 10",
+      "parameters": [
+        "\\widetilde{x}",
+        "K"
+      ]
+    },
+    {
+      "name": "Online_SFO_Difference_Unbiasedness",
+      "math": "\\mathbb{E}\\left[\\nabla f_i(x^k)-\\nabla f_i(x^{k-1})\\mid x_{0:k}\\right]=\\nabla f(x^k)-\\nabla f(x^{k-1})",
+      "ref": "Eq. (3.5), p. 11",
+      "parameters": [
+        "f_i",
+        "f",
+        "x_{0:k}"
+      ]
+    },
+    {
+      "name": "Online_Parameter_Schedule",
+      "math": "S_1=\\frac{2\\sigma^2}{\\epsilon^2},\\quad S_2=\\frac{2\\sigma}{\\epsilon n_0},\\quad \\eta=\\frac{\\epsilon}{Ln_0},\\quad \\eta^k=\\min\\left(\\frac{\\epsilon}{Ln_0\\|v^k\\|},\\frac{1}{2Ln_0}\\right),\\quad q=\\frac{\\sigma n_0}{\\epsilon}",
+      "ref": "Eq. (3.4), p. 11",
+      "parameters": [
+        "S_1",
+        "S_2",
+        "\\eta",
+        "\\eta^k",
+        "q",
+        "n_0"
+      ]
+    },
+    {
+      "name": "Free_Parameter_Range",
+      "math": "n_0\\in[1,2\\sigma/\\epsilon]",
+      "ref": "Text after Eq. (3.4), p. 11",
+      "parameters": [
+        "n_0",
+        "\\sigma",
+        "\\epsilon"
+      ]
+    },
+    {
+      "name": "Theorem1_Iteration_Budget",
+      "math": "K=\\left\\lfloor(4L\\Delta n_0)\\epsilon^{-2}\\right\\rfloor+1",
+      "ref": "Theorem 1, p. 11",
+      "parameters": [
+        "K",
+        "L",
+        "\\Delta",
+        "n_0",
+        "\\epsilon"
+      ]
+    }
+  ],
+  "algorithm_spec": {
+    "initialization": {
+      "math": "\\text{Algorithm 1 Spider-SFO: Input }x_0,q,S_1,S_2,n_0,\\epsilon,\\text{ and }\\widetilde{\\epsilon}\\text{ (For finding first-order stationary point)}",
+      "ref": "Algorithm 1 header, p. 10"
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "for_loop",
+        "math": "1:\\ \\text{for }k=0\\text{ to }K\\text{ do}",
+        "ref": "Algorithm 1, Line 1, p. 10"
+      },
+      {
+        "step": 2,
+        "name": "refresh_condition",
+        "math": "2:\\ \\text{if }\\operatorname{mod}(k,q)=0\\text{ then}",
+        "ref": "Algorithm 1, Line 2, p. 10"
+      },
+      {
+        "step": 3,
+        "name": "epoch_refresh",
+        "math": "3:\\ \\text{Draw }S_1\\text{ samples (or compute the full gradient for the finite-sum case), let }v^k=\\nabla f_{S_1}(x^k)",
+        "ref": "Algorithm 1, Line 3, p. 10"
+      },
+      {
+        "step": 4,
+        "name": "else_branch",
+        "math": "4:\\ \\text{else}",
+        "ref": "Algorithm 1, Line 4, p. 10"
+      },
+      {
+        "step": 5,
+        "name": "spider_recursive_update",
+        "math": "5:\\ \\text{Draw }S_2\\text{ samples, and let }v^k=\\nabla f_{S_2}(x^k)-\\nabla f_{S_2}(x^{k-1})+v^{k-1}",
+        "ref": "Algorithm 1, Line 5, p. 10"
+      },
+      {
+        "step": 6,
+        "name": "end_refresh_if",
+        "math": "6:\\ \\text{end if}",
+        "ref": "Algorithm 1, Line 6, p. 10"
+      },
+      {
+        "step": 7,
+        "name": "option_I_label",
+        "math": "7:\\ \\text{OPTION I for convergence rates in high probability}",
+        "ref": "Algorithm 1, Line 7, p. 10"
+      },
+      {
+        "step": 8,
+        "name": "option_I_threshold",
+        "math": "8:\\ \\text{if }\\|v^k\\|\\le 2\\widetilde{\\epsilon}\\text{ then}",
+        "ref": "Algorithm 1, Line 8, p. 10"
+      },
+      {
+        "step": 9,
+        "name": "option_I_return_current",
+        "math": "9:\\ \\text{return }x^k",
+        "ref": "Algorithm 1, Line 9, p. 10"
+      },
+      {
+        "step": 10,
+        "name": "option_I_else",
+        "math": "10:\\ \\text{else}",
+        "ref": "Algorithm 1, Line 10, p. 10"
+      },
+      {
+        "step": 11,
+        "name": "option_I_normalized_update",
+        "math": "11:\\ x^{k+1}=x^k-\\eta\\cdot(v^k/\\|v^k\\|)\\text{ where }\\eta=\\frac{\\epsilon}{Ln_0}",
+        "ref": "Algorithm 1, Line 11, p. 10"
+      },
+      {
+        "step": 12,
+        "name": "option_I_end_if",
+        "math": "12:\\ \\text{end if}",
+        "ref": "Algorithm 1, Line 12, p. 10"
+      },
+      {
+        "step": 13,
+        "name": "option_II_label",
+        "math": "13:\\ \\text{OPTION II for convergence rates in expectation}",
+        "ref": "Algorithm 1, Line 13, p. 10"
+      },
+      {
+        "step": 14,
+        "name": "option_II_expectation_update",
+        "math": "14:\\ x^{k+1}=x^k-\\eta^k v^k\\quad\\text{where}\\quad \\eta^k=\\min\\left(\\frac{\\epsilon}{Ln_0\\|v^k\\|},\\frac{1}{2Ln_0}\\right)",
+        "ref": "Algorithm 1, Line 14, p. 10"
+      },
+      {
+        "step": 15,
+        "name": "end_for",
+        "math": "15:\\ \\text{end for}",
+        "ref": "Algorithm 1, Line 15, p. 10"
+      },
+      {
+        "step": 16,
+        "name": "option_I_return_final",
+        "math": "16:\\ \\text{OPTION I: Return }x^K\\text{ however, this line is not reached with high probability}",
+        "ref": "Algorithm 1, Line 16, p. 10"
+      },
+      {
+        "step": 17,
+        "name": "option_II_return_random_iterate",
+        "math": "17:\\ \\text{OPTION II: Return }\\widetilde{x}\\text{ chosen uniformly at random from }\\{x^k\\}_{k=0}^{K-1}",
+        "ref": "Algorithm 1, Line 17, p. 10"
+      }
+    ],
+    "output": {
+      "math": "17:\\ \\text{OPTION II: Return }\\widetilde{x}\\text{ chosen uniformly at random from }\\{x^k\\}_{k=0}^{K-1}",
+      "ref": "Algorithm 1, Line 17, p. 10",
+      "type": "random iterate"
+    },
+    "parameters": [
+      {
+        "name": "online_schedule",
+        "math": "S_1=\\frac{2\\sigma^2}{\\epsilon^2},\\quad S_2=\\frac{2\\sigma}{\\epsilon n_0},\\quad \\eta=\\frac{\\epsilon}{Ln_0},\\quad \\eta^k=\\min\\left(\\frac{\\epsilon}{Ln_0\\|v^k\\|},\\frac{1}{2Ln_0}\\right),\\quad q=\\frac{\\sigma n_0}{\\epsilon}",
+        "ref": "Eq. (3.4), p. 11"
+      },
+      {
+        "name": "theorem1_budget",
+        "math": "K=\\left\\lfloor(4L\\Delta n_0)\\epsilon^{-2}\\right\\rfloor+1",
+        "ref": "Theorem 1, p. 11"
+      },
+      {
+        "name": "free_parameter",
+        "math": "n_0\\in[1,2\\sigma/\\epsilon]",
+        "ref": "Text after Eq. (3.4), p. 11"
+      }
+    ]
+  },
+  "cited_theorems": [
+    {
+      "name_in_source": "Exercise 4.4.9",
+      "name_in_lean": "spider_cited_square_integrable_martingale_product_identity",
+      "source_reference": "Durrett, Probability: Theory and Examples, 5th ed., Exercise 4.4.9; SPIDER cites Durrett (2010) for the same square-integrable martingale property",
+      "source_url": "https://dokumen.pub/probability-theory-and-examples-5nbsped-1108473687-9781108473682.html",
+      "source_reader_url": "https://r.jina.ai/http://r.jina.ai/http://https://dokumen.pub/probability-theory-and-examples-5nbsped-1108473687-9781108473682.html",
+      "local_source_artifact": "paper/external_sources/durrett_5_jina/source.txt",
+      "local_source_sha256": "95ecf3db6f03ac1b8b2365374e71f118f5e39c2fc1918551fda38c6f3ec0a36e",
+      "statement_math": "\\text{Let }X_n\\text{ and }Y_n\\text{ be martingales with }\\mathbb{E}X_n^2<\\infty\\text{ and }\\mathbb{E}Y_n^2<\\infty.\\quad \\mathbb{E}X_nY_n-\\mathbb{E}X_0Y_0=\\sum_{m=1}^n \\mathbb{E}(X_m-X_{m-1})(Y_m-Y_{m-1}).",
+      "statement_quote": "Let Xn and Yn be martingales with EX2n < ∞ and EY2n < ∞. EXn Yn − EX0 Y0 = sum_{m=1}^n E(Xm − Xm−1)(Ym − Ym−1).",
+      "ref": "Durrett, Probability: Theory and Examples, 5th ed., Exercise 4.4.9, local reader artifact lines 5681-5691; SPIDER cites Durrett (2010) in Appendix A.1, p. 25",
+      "source_pdf_lines": [
+        5681,
+        5691
+      ],
+      "main_paper_citation_context": [
+        {
+          "quote": "Proposition 1(i) can be easily concluded using the property of square-integrable martingales.",
+          "source_pdf_lines": [
+            357,
+            359
+          ],
+          "role": "Identifies the martingale property needed for the variance identity in Proposition 1(i)."
+        },
+        {
+          "quote": "is a martingale, and hence (2.2) follows from the property of L2 martingales (Durrett, 2010).",
+          "source_pdf_lines": [
+            1371,
+            1371
+          ],
+          "role": "Appendix proof invocation used after expanding the SPIDER estimation error."
+        }
+      ],
+      "proof_in_source": "cited",
+      "role_for_main": "Applied coordinate-wise with X=Y to the scalar coordinates of the expanded SPIDER error martingale, then summed over coordinates, this supplies the L2 martingale variance identity Eq. (2.2) under the paper's square-integrability source boundary."
+    }
+  ],
+  "main_theorem": {
+    "statement_math": "\\text{For the on-line case, set the parameters }S_1,S_2,\\eta,\\text{ and }q\\text{ as in (3.4), and }K=\\left\\lfloor(4L\\Delta n_0)\\epsilon^{-2}\\right\\rfloor+1.\\text{ Then under the Assumption 1, for Algorithm 1 with OPTION I, after }K\\text{ iteration, we have }\\mathbb{E}[\\|\\nabla f(\\widetilde{x})\\|]\\le 5\\epsilon.\\text{ The gradient cost is bounded by }16L\\Delta\\sigma\\cdot\\epsilon^{-3}+2\\sigma^2\\epsilon^{-2}+4\\sigma n_0^{-1}\\epsilon^{-1}\\text{ for any choice of }n_0\\in[1,2\\sigma/\\epsilon].\\text{ Treating }\\Delta,L\\text{ and }\\sigma\\text{ as positive constants, the stochastic gradient complexity is }O(\\epsilon^{-3}).",
+    "rate": "The online stochastic gradient complexity is O(epsilon^{-3}) when Delta, L, and sigma are treated as positive constants.",
+    "measure": "Expected first-order stationarity, \\mathbb{E}[\\|\\nabla f(\\widetilde{x})\\|]\\le 5\\epsilon.",
+    "proof": [
+      {
+        "step": 1,
+        "description": "Take full expectation in Lemma 4 for a fixed k, converting the conditional descent inequality into an unconditional descent inequality.",
+        "ref": "Proof of Theorem 1 before Eq. (B.13), p. 28",
+        "source_pdf_lines": [
+          1535,
+          1536
+        ],
+        "uses": [
+          "Lemma4_OneStep_Descent"
+        ],
+        "produces": "full_expectation_descent_inequality_for_fixed_k"
+      },
+      {
+        "step": 2,
+        "description": "Sum the full-expectation descent inequalities over k=0,...,K-1 before telescoping the f(x^k) terms.",
+        "ref": "Proof of Theorem 1 before Eq. (B.13), p. 28",
+        "source_pdf_lines": [
+          1535,
+          1536
+        ],
+        "uses": [
+          "previous_step:1"
+        ],
+        "produces": "summed_full_expectation_descent_pre_telescope"
+      },
+      {
+        "step": 3,
+        "description": "Telescope the summed descent inequality from k=0 to K-1 and rearrange to the first printed inequality in (B.13).",
+        "ref": "Eq. (B.13), first inequality, p. 28",
+        "source_pdf_lines": [
+          1535,
+          1540
+        ],
+        "math": "\\frac{\\epsilon}{4Ln_0}\\sum_{k=0}^{K-1}\\mathbb{E}\\|v^k\\|\\le f(x_0)-\\mathbb{E}f(x^K)+\\frac{3K\\epsilon^2}{4Ln_0}",
+        "uses": [
+          "previous_step:2"
+        ],
+        "produces": "telescoped_descent_bound_B13"
+      },
+      {
+        "step": 4,
+        "description": "Use \\mathbb{E}f(x^K)\\ge f^* and \\Delta=f(x_0)-f^* to obtain the second inequality in (B.13).",
+        "ref": "Eq. (B.13), second inequality, p. 28",
+        "source_pdf_lines": [
+          1538,
+          1540
+        ],
+        "math": "\\le \\Delta+\\frac{3K\\epsilon^2}{4Ln_0}",
+        "uses": [
+          "previous_step:3",
+          "Finite_Initial_Gap"
+        ],
+        "produces": "telescoped_estimator_norm_bound_B13"
+      },
+      {
+        "step": 5,
+        "description": "Divide both sides of (B.13) by (epsilon/(4Ln0))K to get the first inequality in (B.14).",
+        "ref": "Eq. (B.14), first inequality, p. 28",
+        "source_pdf_lines": [
+          1544,
+          1553
+        ],
+        "math": "\\frac{1}{K}\\sum_{k=0}^{K-1}\\mathbb{E}\\|v^k\\|\\le \\Delta\\cdot\\frac{4Ln_0}{\\epsilon}\\frac{1}{K}+3\\epsilon",
+        "uses": [
+          "previous_step:4"
+        ],
+        "produces": "average_estimator_norm_pre_budget_B14"
+      },
+      {
+        "step": 6,
+        "description": "Use the printed budget K=floor(4L Delta n0 epsilon^{-2})+1 >= 4L Delta n0 epsilon^{-2} to get the final inequality in (B.14).",
+        "ref": "Eq. (B.14), second inequality, p. 28",
+        "source_pdf_lines": [
+          1544,
+          1554
+        ],
+        "math": "\\le 4\\epsilon",
+        "uses": [
+          "previous_step:5",
+          "Theorem1_Iteration_Budget"
+        ],
+        "produces": "average_estimator_norm_bound_B14"
+      },
+      {
+        "step": 7,
+        "description": "Use the proof's stated choice of \\widetilde{x}; this is Algorithm 1 line 17 (OPTION II) even though the theorem head prints OPTION I.",
+        "ref": "Eq. (B.15), equality, p. 28",
+        "source_pdf_lines": [
+          1556,
+          1559
+        ],
+        "math": "\\mathbb{E}\\|\\nabla f(\\widetilde{x})\\|=\\frac{1}{K}\\sum_{k=0}^{K-1}\\mathbb{E}\\|\\nabla f(x^k)\\|",
+        "uses": [
+          "SpiderSFO_OptionII_Output"
+        ],
+        "produces": "uniform_random_iterate_gradient_average_B15"
+      },
+      {
+        "step": 8,
+        "description": "Apply Lemma 5, cited in the display as (B.10), to the average over iterates.",
+        "ref": "Eq. (B.15), inequality using (B.10), p. 28",
+        "source_pdf_lines": [
+          1557,
+          1560
+        ],
+        "math": "\\le \\frac{1}{K}\\sum_{k=0}^{K-1}\\mathbb{E}\\|v^k\\|+\\epsilon",
+        "uses": [
+          "previous_step:7",
+          "Lemma5_Gradient_Estimator_Conversion"
+        ],
+        "produces": "gradient_average_bounded_by_estimator_average_B15"
+      },
+      {
+        "step": 9,
+        "description": "Use (B.14), cited in the display, to conclude the expected gradient norm bound.",
+        "ref": "Eq. (B.15), final inequality using (B.14), p. 28",
+        "source_pdf_lines": [
+          1557,
+          1561
+        ],
+        "math": "\\le 5\\epsilon",
+        "uses": [
+          "previous_step:8",
+          "previous_step:6"
+        ],
+        "produces": "theorem1_expected_stationarity_bound"
+      },
+      {
+        "step": 10,
+        "description": "Count oracle calls using Algorithm 1 lines 2-3: the mod(k,q)=0 branch performs one S1 refresh per q iterations, while line 5 performs S2 recursive-gradient accesses on the remaining iterations; with S1=qS2 this yields the first printed cost bound.",
+        "ref": "Eq. (B.16), first line, p. 28",
+        "source_pdf_lines": [
+          1563,
+          1573
+        ],
+        "math": "\\left\\lceil K\\cdot\\frac{1}{q}\\right\\rceil S_1+KS_2\\le 2K\\cdot S_2+S_1",
+        "uses": [
+          "Online_Parameter_Schedule",
+          "SpiderSFO_Periodic_Full_Refresh",
+          "SpiderSFO_Recursive_Update"
+        ],
+        "produces": "raw_gradient_cost_bound"
+      },
+      {
+        "step": 11,
+        "description": "Substitute K=floor(4L Delta n0 epsilon^{-2})+1 and S2=2 sigma/(epsilon n0), keeping the extra 2S2 term printed in (B.16).",
+        "ref": "Eq. (B.16), middle line, p. 28",
+        "source_pdf_lines": [
+          1574,
+          1578
+        ],
+        "math": "\\le 2\\left(\\frac{4Ln_0\\Delta}{\\epsilon^2}\\right)\\frac{2\\sigma}{\\epsilon n_0}+\\frac{2\\sigma^2}{\\epsilon^2}+2S_2",
+        "uses": [
+          "previous_step:10",
+          "Online_Parameter_Schedule",
+          "Theorem1_Iteration_Budget"
+        ],
+        "produces": "substituted_gradient_cost_bound"
+      },
+      {
+        "step": 12,
+        "description": "Algebraically simplify the substituted cost bound using S2=2 sigma/(epsilon n0).",
+        "ref": "Eq. (B.16), final line, p. 28",
+        "source_pdf_lines": [
+          1579,
+          1581
+        ],
+        "math": "=\\frac{16L\\sigma\\Delta}{\\epsilon^3}+\\frac{2\\sigma^2}{\\epsilon^2}+\\frac{4\\sigma}{n_0\\epsilon}",
+        "uses": [
+          "previous_step:11",
+          "Online_Parameter_Schedule"
+        ],
+        "produces": "theorem1_gradient_cost_bound"
+      },
+      {
+        "step": 13,
+        "description": "State the theorem's gradient-cost conclusion in the notation used in the theorem.",
+        "ref": "Text after Eq. (B.16), p. 28",
+        "source_pdf_lines": [
+          1583,
+          1584
+        ],
+        "math": "16L\\Delta\\sigma\\epsilon^{-3}+2\\sigma^2\\epsilon^{-2}+4\\sigma n_0^{-1}\\epsilon^{-1}",
+        "uses": [
+          "previous_step:12"
+        ],
+        "produces": "theorem1_complexity_claim"
+      }
+    ],
+    "ref": "Theorem 1, Eq. (3.6), p. 11",
+    "source_pdf_lines": [
+      547,
+      559
+    ]
+  },
+  "key_lemmas": [
+    {
+      "name": "Proposition1_MartingaleVariance",
+      "ref": "Proposition 1(i), Eq. (2.2), p. 7",
+      "statement_math": "\\mathbb{E}\\|\\widetilde{Q}(\\hat{x}_{0:K})-Q(\\hat{x}^K)\\|^2=\\mathbb{E}\\|\\widetilde{Q}(\\hat{x}^0)-Q(\\hat{x}^0)\\|^2+\\sum_{k=1}^K \\mathbb{E}\\|\\xi_k(\\hat{x}_{0:k})-(Q(\\hat{x}^k)-Q(\\hat{x}^{k-1}))\\|^2",
+      "role": "This supplies the martingale second-moment identity used to prove the abstract SPIDER estimator error lemma.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Expand the SPIDER estimation error using the definition of Q tilde in (2.1).",
+          "ref": "Proof of Proposition 1, p. 25",
+          "source_pdf_lines": [
+            1364,
+            1369
+          ],
+          "math": "\\widetilde{Q}(\\hat{x}_{0:K})-Q(\\hat{x}^K)=\\widetilde{Q}(\\hat{x}^0)-Q(\\hat{x}^0)+\\sum_{k=1}^K\\xi_k(\\hat{x}_{0:k})-(Q(\\hat{x}^k)-Q(\\hat{x}^{k-1}))",
+          "uses": [
+            "Spider_Path_Integrated_Estimator"
+          ],
+          "produces": "expanded_spider_error"
+        },
+        {
+          "step": 2,
+          "description": "Use the conditional unbiasedness assumption for xi_k to identify the expanded error process displayed above as the martingale that the paper says it is.",
+          "ref": "Proof of Proposition 1, p. 25",
+          "source_pdf_lines": [
+            1364,
+            1371
+          ],
+          "uses": [
+            "previous_step:1",
+            "Spider_Core_Differential_Unbiasedness"
+          ],
+          "produces": "expanded_error_process_is_martingale_as_stated_in_source"
+        },
+        {
+          "step": 3,
+          "description": "Record, without deriving it from martingaleness, the paper's source boundary for the integrability prerequisite: Proposition 1(i) is said to use square-integrable martingales, and the appendix says that (2.2) follows from L2 martingales after the displayed expansion. The PDF does not separately prove finite second moments for the expanded SPIDER error process.",
+          "ref": "Text after Proposition 1, p. 7; Proof of Proposition 1, p. 25",
+          "source_pdf_lines": [
+            357,
+            359
+          ],
+          "uses": [
+            "Exercise 4.4.9"
+          ],
+          "produces": "undisclosed_L2_prerequisite_for_expanded_error_recorded_from_source_context"
+        },
+        {
+          "step": 4,
+          "description": "Reduce the Euclidean squared-norm target to scalar coordinate identities: write the expanded vector martingale M_K=M_0+sum_k D_k with D_k=xi_k(xhat_{0:k})-(Q(xhat^k)-Q(xhat^{k-1})), and for each coordinate j consider the scalar martingale M^j and increment D_k^j. Under the source-recorded L2 boundary, each coordinate has the finite-second-moment prerequisite required by Durrett.",
+          "ref": "Eq. (2.2), p. 7; Proof of Proposition 1, p. 25",
+          "source_pdf_lines": [
+            326,
+            334
+          ],
+          "uses": [
+            "previous_step:1",
+            "previous_step:2",
+            "previous_step:3"
+          ],
+          "produces": "coordinate_scalar_L2_martingales_and_norm_square_reduction_for_2_2"
+        },
+        {
+          "step": 5,
+          "description": "Apply Durrett's scalar square-integrable martingale product identity coordinate-wise with X=Y=M^j, giving the scalar increment variance identity for each coordinate of the expanded error process.",
+          "ref": "Proof of Proposition 1, p. 25; Durrett Exercise 4.4.9",
+          "source_pdf_lines": [
+            1371,
+            1371
+          ],
+          "uses": [
+            "previous_step:4",
+            "Exercise 4.4.9"
+          ],
+          "produces": "coordinatewise_durrett_variance_identity_for_expanded_error"
+        },
+        {
+          "step": 6,
+          "description": "Sum the coordinate-wise scalar identities and use the Euclidean norm-square decomposition to recover the vector martingale variance identity printed as Proposition 1(i).",
+          "ref": "Eq. (2.2), p. 7; Proof of Proposition 1, p. 25",
+          "source_pdf_lines": [
+            326,
+            334
+          ],
+          "math": "\\mathbb{E}\\|\\widetilde{Q}(\\hat{x}_{0:K})-Q(\\hat{x}^K)\\|^2=\\mathbb{E}\\|\\widetilde{Q}(\\hat{x}^0)-Q(\\hat{x}^0)\\|^2+\\sum_{k=1}^K \\mathbb{E}\\|\\xi_k(\\hat{x}_{0:k})-(Q(\\hat{x}^k)-Q(\\hat{x}^{k-1}))\\|^2",
+          "uses": [
+            "previous_step:1",
+            "previous_step:5"
+          ],
+          "produces": "martingale_variance_identity_2_2"
+        }
+      ]
+    },
+    {
+      "name": "Lemma1_Abstract_Spider_Error",
+      "ref": "Lemma 1, Eq. (2.8), p. 8",
+      "statement_math": "\\text{We have under the condition (2.7) that for all }k=1,\\ldots,K,\\quad \\mathbb{E}\\|V^k-B(x^k)\\|^2\\le \\frac{kL_B^2\\epsilon_1^2}{S_*}+\\mathbb{E}\\|V^0-B(x^0)\\|^2",
+      "role": "This is the abstract second-moment tracking bound specialized in Lemma 2 to v^k and B_i=grad f_i.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Instantiate Proposition 1 with Q=B, \\widetilde{Q}=V, and xi_k=B_{S_*}(x^k)-B_{S_*}(x^{k-1}); Eq. (2.6) supplies conditional unbiasedness and the with-replacement S_* sampling supplies the mini-batch differential estimator, while the recursion for V gives the displayed one-step decomposition (A.2).",
+          "ref": "Eq. (A.2), p. 25",
+          "source_pdf_lines": [
+            1373,
+            1377
+          ],
+          "math": "\\mathbb{E}_k\\|V^k-B(x^k)\\|^2=\\mathbb{E}_k\\|B_{S_*}(x^k)-B(x^k)-B_{S_*}(x^{k-1})+B(x^{k-1})\\|^2+\\|V^{k-1}-B(x^{k-1})\\|^2",
+          "uses": [
+            "Proposition1_MartingaleVariance",
+            "Spider_Difference_Unbiasedness",
+            "Spider_Abstract_With_Replacement_Sampling",
+            "Spider_Recursive_Estimator"
+          ],
+          "produces": "proposition1_instantiated_with_Q_B_Qtilde_V_and_one_step_error_decomposition_A2"
+        },
+        {
+          "step": 2,
+          "description": "Use conditional unbiasedness (2.6) and sampling with replacement to rewrite the mini-batch variance with the factor 1/S_*; this is the equality marked (a).",
+          "ref": "Eq. (A.3), equality (a), p. 26",
+          "source_pdf_lines": [
+            1382,
+            1387
+          ],
+          "math": "\\mathbb{E}_k\\|B_{S_*}(x^k)-B(x^k)-B_{S_*}(x^{k-1})+B(x^{k-1})\\|^2=\\frac{1}{S_*}\\mathbb{E}_k\\|B_i(x^k)-B(x^k)-B_i(x^{k-1})+B(x^{k-1})\\|^2",
+          "uses": [
+            "Spider_Difference_Unbiasedness",
+            "Spider_Abstract_With_Replacement_Sampling"
+          ],
+          "produces": "minibatch_variance_rescaling_A3a"
+        },
+        {
+          "step": 3,
+          "description": "Use the same Eq. (2.6) centering to drop the mean term and upper-bound by the uncentered increment; this is the inequality marked (b).",
+          "ref": "Eq. (A.3), inequality (b), p. 26",
+          "source_pdf_lines": [
+            1388,
+            1390
+          ],
+          "math": "\\le \\frac{1}{S_*}\\mathbb{E}_k\\|B_i(x^k)-B_i(x^{k-1})\\|^2",
+          "uses": [
+            "previous_step:2",
+            "Spider_Difference_Unbiasedness"
+          ],
+          "produces": "uncentered_increment_bound_A3b"
+        },
+        {
+          "step": 4,
+          "description": "Apply the second-moment Lipschitz condition (2.7) and the abstract step bound ||x^k-x^{k-1}|| <= epsilon_1.",
+          "ref": "Eq. (A.3), final inequality, p. 26",
+          "source_pdf_lines": [
+            1391,
+            1393
+          ],
+          "math": "\\le \\frac{1}{S_*}L_B^2\\mathbb{E}_k\\|x^k-x^{k-1}\\|^2\\le \\frac{L_B^2\\epsilon_1^2}{S_*}",
+          "uses": [
+            "previous_step:3",
+            "Spider_Second_Moment_Lipschitz",
+            "Abstract_Step_Bound"
+          ],
+          "produces": "one_step_noise_bound_A3"
+        },
+        {
+          "step": 5,
+          "description": "Combine the one-step decomposition (A.2) with the one-step noise bound (A.3).",
+          "ref": "Eq. (A.4), p. 26",
+          "source_pdf_lines": [
+            1397,
+            1401
+          ],
+          "math": "\\mathbb{E}_k\\|V^k-B(x^k)\\|^2\\le \\frac{L_B^2\\epsilon_1^2}{S_*}+\\|V^{k-1}-B(x^{k-1})\\|^2",
+          "uses": [
+            "previous_step:1",
+            "previous_step:4"
+          ],
+          "produces": "recursive_error_bound_A4"
+        },
+        {
+          "step": 6,
+          "description": "Telescope (A.4) for k'=k-1,...,0 and use the iterated law of expectation.",
+          "ref": "Eq. (A.5), p. 26",
+          "source_pdf_lines": [
+            1403,
+            1408
+          ],
+          "math": "\\mathbb{E}\\|V^k-B(x^k)\\|^2\\le \\frac{kL_B^2\\epsilon_1^2}{S_*}+\\mathbb{E}\\|V^0-B(x^0)\\|^2",
+          "uses": [
+            "previous_step:5"
+          ],
+          "produces": "abstract_spider_error_bound_A5"
+        }
+      ]
+    },
+    {
+      "name": "Lemma2_SpiderSFO_Estimator_Error",
+      "ref": "Lemma 2, p. 11",
+      "statement_math": "\\text{Set the parameters }S_1,S_2,\\eta,\\text{ and }q\\text{ as in (3.4), and }k_0=\\lfloor k/q\\rfloor\\cdot q.\\text{ Then under the Assumption 1, we have }\\mathbb{E}\\left[\\|v^k-\\nabla f(x^k)\\|^2\\mid x_{0:k_0}\\right]\\le \\epsilon^2.\\text{ Here we compute the conditional expectation over the randomness of }x_{(k_0+1):k}.",
+      "role": "This proves that the SPIDER gradient estimator maintains O(epsilon^2) mean-square error throughout an epoch.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "At the epoch refresh k=k0=floor(k/q)q, Algorithm 1 lines 2-3 give mod(k0,q)=0 and v^{k0}=grad f_{S1}(x^{k0}); then use the online variance bound and S1=2 sigma^2/epsilon^2.",
+          "ref": "Eq. (B.1), p. 26",
+          "source_pdf_lines": [
+            1415,
+            1420
+          ],
+          "math": "\\mathbb{E}_{k_0}\\|v^{k_0}-\\nabla f(x^{k_0})\\|^2=\\mathbb{E}_{k_0}\\|\\nabla f_{S_1}(x^{k_0})-\\nabla f(x^{k_0})\\|^2\\le \\frac{\\sigma^2}{S_1}=\\frac{\\epsilon^2}{2}",
+          "uses": [
+            "SpiderSFO_Periodic_Full_Refresh",
+            "SpiderSFO_Full_Refresh_Update",
+            "Online_Gradient_Variance",
+            "Online_Parameter_Schedule"
+          ],
+          "produces": "epoch_refresh_error_B1"
+        },
+        {
+          "step": 2,
+          "description": "From Line 14 of Algorithm 1, compute the step length and bound it by epsilon/(L n0).",
+          "ref": "Eq. (B.2), p. 26",
+          "source_pdf_lines": [
+            1422,
+            1427
+          ],
+          "math": "\\|x^{k+1}-x^k\\|=\\min\\left(\\frac{\\epsilon}{Ln_0\\|v^k\\|},\\frac{1}{2Ln_0}\\right)\\|v^k\\|\\le \\frac{\\epsilon}{Ln_0}",
+          "uses": [
+            "SpiderSFO_OptionII_Update"
+          ],
+          "produces": "optionII_step_bound_B2"
+        },
+        {
+          "step": 3,
+          "description": "Specialize Lemma 1 with V^k=v^k, B_i=grad f_i, epsilon_1=epsilon/(Ln0), S_*=S2=2 sigma/(epsilon n0), and K=k-k0<=q=sigma n0/epsilon; Algorithm 1 Line 5 supplies the S2 mini-batch sampling, the Section 2 setup supplies the with-replacement sampling prerequisite for Lemma 1, (3.5) supplies the required differential unbiasedness, and Assumption 1(ii) supplies L_B=L.",
+          "ref": "Eq. (B.3), p. 26",
+          "source_pdf_lines": [
+            1429,
+            1433
+          ],
+          "math": "\\mathbb{E}_{k_0}\\|v^k-\\nabla f(x^k)\\|^2\\le \\frac{\\sigma n_0}{\\epsilon}\\cdot L^2\\frac{\\epsilon^2}{L^2n_0^2}\\cdot\\frac{\\epsilon n_0}{2\\sigma}+\\mathbb{E}_{k_0}\\|v^{k_0}-\\nabla f(x^{k_0})\\|^2=\\epsilon^2",
+          "uses": [
+            "Lemma1_Abstract_Spider_Error",
+            "previous_step:1",
+            "previous_step:2",
+            "Online_Parameter_Schedule",
+            "SpiderSFO_Periodic_Full_Refresh",
+            "SpiderSFO_Recursive_Update",
+            "Online_SFO_Difference_Unbiasedness",
+            "Spider_Abstract_With_Replacement_Sampling",
+            "Averaged_Lipschitz_Gradient"
+          ],
+          "produces": "spider_sfo_epoch_error_bound_B3"
+        }
+      ]
+    },
+    {
+      "name": "Lemma4_OneStep_Descent",
+      "ref": "Lemma 4, Eq. (B.4), p. 27",
+      "statement_math": "\\text{Under the Assumption 1, setting }k_0=\\lfloor k/q\\rfloor\\cdot q,\\text{ we have }\\mathbb{E}_{k_0}\\left[f(x^{k+1})-f(x^k)\\right]\\le -\\frac{\\epsilon}{4Ln_0}\\mathbb{E}_{k_0}\\|v^k\\|+\\frac{3\\epsilon^2}{4n_0L}.",
+      "role": "This is the per-iteration descent inequality telescoped in Theorem 1.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Derive L-Lipschitz continuity of grad f from the averaged component-gradient Lipschitz assumption using Jensen/expectation inequalities.",
+          "ref": "Eq. (B.5), p. 27",
+          "source_pdf_lines": [
+            1449,
+            1452
+          ],
+          "math": "\\|\\nabla f(x)-\\nabla f(y)\\|^2=\\|\\mathbb{E}_i(\\nabla f_i(x)-\\nabla f_i(y))\\|^2\\le \\mathbb{E}_i\\|\\nabla f_i(x)-\\nabla f_i(y)\\|^2\\le L^2\\|x-y\\|^2",
+          "uses": [
+            "Averaged_Lipschitz_Gradient"
+          ],
+          "produces": "f_has_L_lipschitz_gradient_B5"
+        },
+        {
+          "step": 2,
+          "description": "Apply the smoothness descent inequality for an L-Lipschitz gradient to x^k and x^{k+1}.",
+          "ref": "Eq. (B.6), first line, p. 27",
+          "source_pdf_lines": [
+            1453,
+            1456
+          ],
+          "math": "f(x^{k+1})\\le f(x^k)+\\langle\\nabla f(x^k),x^{k+1}-x^k\\rangle+\\frac{L}{2}\\|x^{k+1}-x^k\\|^2",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "smoothness_descent_B6_first_line"
+        },
+        {
+          "step": 3,
+          "description": "Substitute the Option II update x^{k+1}=x^k-\\eta^k v^k into the smoothness descent inequality.",
+          "ref": "Eq. (B.6), second line, p. 27",
+          "source_pdf_lines": [
+            1457,
+            1459
+          ],
+          "math": "=f(x^k)-\\eta^k\\langle\\nabla f(x^k),v^k\\rangle+\\frac{L(\\eta^k)^2}{2}\\|v^k\\|^2",
+          "uses": [
+            "previous_step:2",
+            "SpiderSFO_OptionII_Update"
+          ],
+          "produces": "optionII_substituted_descent_B6"
+        },
+        {
+          "step": 4,
+          "description": "Rewrite the inner product term by expanding around v^k and isolating the estimator error \\nabla f(x^k)-v^k.",
+          "ref": "Eq. (B.6), third line, p. 27",
+          "source_pdf_lines": [
+            1460,
+            1464
+          ],
+          "math": "=f(x^k)-\\eta^k\\left(1-\\frac{\\eta^kL}{2}\\right)\\|v^k\\|^2-\\eta^k\\langle\\nabla f(x^k)-v^k,v^k\\rangle",
+          "uses": [
+            "previous_step:3"
+          ],
+          "produces": "estimator_error_expansion_B6"
+        },
+        {
+          "step": 5,
+          "description": "Apply the Cauchy-Schwarz/Young inequality at the marked inequality (a).",
+          "ref": "Eq. (B.6), inequality (a), p. 27",
+          "source_pdf_lines": [
+            1465,
+            1471
+          ],
+          "math": "\\le f(x^k)-\\eta^k\\left(\\frac{1}{2}-\\frac{\\eta^kL}{2}\\right)\\|v^k\\|^2+\\frac{\\eta^k}{2}\\|v^k-\\nabla f(x^k)\\|^2",
+          "uses": [
+            "previous_step:4"
+          ],
+          "produces": "smooth_descent_with_estimator_error_B6"
+        },
+        {
+          "step": 6,
+          "description": "Use eta^k=min(epsilon/(Ln0||v^k||),1/(2Ln0)) and n0>=1 to obtain eta^k<=1/(2Ln0)<=1/(2L).",
+          "ref": "Text before Eq. (B.7), p. 27",
+          "source_pdf_lines": [
+            1472,
+            1480
+          ],
+          "math": "\\eta^k=\\min\\left(\\frac{\\epsilon}{Ln_0\\|v^k\\|},\\frac{1}{2Ln_0}\\right)\\le \\frac{1}{2Ln_0}\\le \\frac{1}{2L}",
+          "uses": [
+            "Online_Parameter_Schedule",
+            "Free_Parameter_Range"
+          ],
+          "produces": "eta_upper_bound_for_descent"
+        },
+        {
+          "step": 7,
+          "description": "Use the upper bound on eta^k to get the first inequality in the descent-coefficient chain.",
+          "ref": "Eq. (B.7), first inequality, p. 27",
+          "source_pdf_lines": [
+            1480,
+            1488
+          ],
+          "math": "\\eta^k\\left(\\frac{1}{2}-\\frac{\\eta^kL}{2}\\right)\\|v^k\\|^2\\ge \\frac{1}{4}\\eta^k\\|v^k\\|^2",
+          "uses": [
+            "previous_step:6"
+          ],
+          "produces": "descent_coefficient_quarter_eta_bound_B7"
+        },
+        {
+          "step": 8,
+          "description": "Substitute the printed Option II definition of eta^k into the quarter-eta term.",
+          "ref": "Eq. (B.7), equality, p. 27",
+          "source_pdf_lines": [
+            1483,
+            1488
+          ],
+          "math": "\\frac{1}{4}\\eta^k\\|v^k\\|^2=\\frac{\\epsilon^2}{8n_0L}\\min\\left(\\frac{2\\|v^k\\|}{\\epsilon},\\frac{\\|v^k\\|^2}{\\epsilon^2}\\right)",
+          "uses": [
+            "previous_step:7",
+            "Online_Parameter_Schedule"
+          ],
+          "produces": "descent_coefficient_min_form_B7"
+        },
+        {
+          "step": 9,
+          "description": "Record the scalar inequality printed after (B.7), with the paper's definition of V; no normalization by 1/2 is printed in this source line.",
+          "ref": "Explanation after Eq. (B.7), p. 27",
+          "source_pdf_lines": [
+            1490,
+            1492
+          ],
+          "math": "V(x)=\\min(|x|,x^2)\\ge |x|-2\\text{ for all }x",
+          "uses": [],
+          "produces": "scalar_min_inequality_for_B7"
+        },
+        {
+          "step": 10,
+          "description": "Apply the scalar inequality to the min form, yielding the final lower bound in (B.7).",
+          "ref": "Eq. (B.7), final inequality, p. 27",
+          "source_pdf_lines": [
+            1483,
+            1492
+          ],
+          "math": "\\eta^k\\left(\\frac{1}{2}-\\frac{\\eta^kL}{2}\\right)\\|v^k\\|^2\\ge \\frac{1}{4}\\eta^k\\|v^k\\|^2=\\frac{\\epsilon^2}{8n_0L}\\min\\left(\\frac{2\\|v^k\\|}{\\epsilon},\\frac{\\|v^k\\|^2}{\\epsilon^2}\\right)\\ge \\frac{\\epsilon\\|v^k\\|-2\\epsilon^2}{4n_0L}",
+          "uses": [
+            "previous_step:8",
+            "previous_step:9"
+          ],
+          "produces": "descent_coefficient_lower_bound_B7"
+        },
+        {
+          "step": 11,
+          "description": "Combine (B.6) and (B.7) to get the first printed inequality in (B.8), retaining the eta^k estimator-error term.",
+          "ref": "Eq. (B.8), first inequality, p. 27",
+          "source_pdf_lines": [
+            1494,
+            1496
+          ],
+          "math": "f(x^{k+1})\\le f(x^k)-\\frac{\\epsilon\\|v^k\\|}{4Ln_0}+\\frac{\\epsilon^2}{2n_0L}+\\frac{\\eta^k}{2}\\|v^k-\\nabla f(x^k)\\|^2",
+          "uses": [
+            "previous_step:5",
+            "previous_step:10"
+          ],
+          "produces": "descent_before_eta_bound_B8"
+        },
+        {
+          "step": 12,
+          "description": "Use eta^k<=1/(2Ln0) to obtain the second printed inequality in (B.8).",
+          "ref": "Eq. (B.8), second inequality, p. 27",
+          "source_pdf_lines": [
+            1497,
+            1501
+          ],
+          "math": "\\le f(x^k)-\\frac{\\epsilon\\|v^k\\|}{4Ln_0}+\\frac{\\epsilon^2}{2n_0L}+\\frac{1}{4Ln_0}\\|v^k-\\nabla f(x^k)\\|^2",
+          "uses": [
+            "previous_step:11",
+            "previous_step:6"
+          ],
+          "produces": "descent_with_fixed_error_weight_B8"
+        },
+        {
+          "step": 13,
+          "description": "Take conditional expectation of (B.8) and use Lemma 2 to bound the estimator-error term by epsilon^2.",
+          "ref": "Eq. (B.9), p. 27",
+          "source_pdf_lines": [
+            1503,
+            1507
+          ],
+          "math": "\\mathbb{E}_{k_0}f(x^{k+1})-\\mathbb{E}_{k_0}f(x^k)\\le -\\frac{\\epsilon}{4Ln_0}\\mathbb{E}_{k_0}\\|v^k\\|+\\frac{3\\epsilon^2}{4Ln_0}",
+          "uses": [
+            "previous_step:12",
+            "Lemma2_SpiderSFO_Estimator_Error"
+          ],
+          "produces": "one_step_expected_descent_B9"
+        }
+      ]
+    },
+    {
+      "name": "Lemma5_Gradient_Estimator_Conversion",
+      "ref": "Lemma 5, Eq. (B.10), p. 27",
+      "statement_math": "\\text{Under Assumption 1, for all }k\\ge 0,\\text{ we have}\\quad \\mathbb{E}\\|\\nabla f(x^k)\\|\\le \\mathbb{E}\\|v^k\\|+\\epsilon",
+      "role": "This converts the averaged estimator norm controlled by Theorem 1's telescope into the averaged true gradient norm.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Take total expectation in Lemma 2.",
+          "ref": "Eq. (B.11), p. 27",
+          "source_pdf_lines": [
+            1518,
+            1520
+          ],
+          "math": "\\mathbb{E}\\|v^k-\\nabla f(x^k)\\|^2\\le \\epsilon^2",
+          "uses": [
+            "Lemma2_SpiderSFO_Estimator_Error"
+          ],
+          "produces": "unconditional_estimator_mse_B11"
+        },
+        {
+          "step": 2,
+          "description": "Apply Jensen's inequality to convert the second-moment bound to a first-moment bound.",
+          "ref": "Display after Eq. (B.11), p. 27",
+          "source_pdf_lines": [
+            1522,
+            1525
+          ],
+          "math": "\\left(\\mathbb{E}\\|v^k-\\nabla f(x^k)\\|\\right)^2\\le \\mathbb{E}\\|v^k-\\nabla f(x^k)\\|^2\\le \\epsilon^2",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "estimator_l1_error_at_most_epsilon"
+        },
+        {
+          "step": 3,
+          "description": "Use the triangle inequality in the printed form to relate the true gradient norm to the estimator norm and estimator error.",
+          "ref": "Eq. (B.12), p. 27",
+          "source_pdf_lines": [
+            1526,
+            1529
+          ],
+          "math": "\\mathbb{E}\\|\\nabla f(x^k)\\|=\\mathbb{E}\\|v^k-(v^k-\\nabla f(x^k))\\|\\le \\mathbb{E}\\|v^k\\|+\\mathbb{E}\\|v^k-\\nabla f(x^k)\\|\\le \\mathbb{E}\\|v^k\\|+\\epsilon",
+          "uses": [
+            "previous_step:2"
+          ],
+          "produces": "gradient_estimator_conversion_B12"
+        }
+      ]
+    }
+  ],
+  "extension": {
+    "base_id": "1e3cfd2e40bca86961e4362ef836d1dd8933b45be6c775238cc9507cf7a857cd",
+    "request": "Add the paper-facing finite-sum SPIDER Theorem 2 incrementally, preserving the existing Theorem 1 and prior proofs, with explicit source alignment and Lean verification.",
+    "reuse": [
+      {
+        "base_json_pointer": "/key_lemmas/2",
+        "base_symbols": [
+          "_private.Algorithms.Unverified.SPIDER.0.Algorithms.Unverified.SPIDER.optionII_estimator_error_secondMoment_le_epsilon_sq_rounded"
+        ],
+        "target_json_pointer": "/extension/additions/key_lemmas/0",
+        "method": "adapt",
+        "reason": "The inherited declaration is not directly instantiable: it requires Theorem1Schedule, theorem1RealizedScheduleAdmissible, and equalities S1=theorem1RefreshBatchCount, S2=theorem1RecursiveBatchCount, and q=theorem1EpochCount. The finite-sum route instead supplies the full-refresh boundary (B.17), S1=[n], S2=n^{1/2}/n_0, and q=n_0n^{1/2}; Theorem2_FiniteSum_Estimator_Error_Adapter is the named adapter that preserves the common SPIDER recurrence while replacing those online rounded-count and variance-bound prerequisites."
+      },
+      {
+        "base_json_pointer": "/key_lemmas/3",
+        "base_symbols": [
+          "_private.Algorithms.Unverified.SPIDER.0.Algorithms.Unverified.SPIDER.optionII_one_step_descent_B8_pathwise"
+        ],
+        "target_json_pointer": "/extension/additions/main_theorem/proof/4",
+        "method": "adapt",
+        "reason": "The inherited B.8 declaration is not schedule-agnostic at the Lean type level: it requires Theorem1Schedule P.L P.sigma epsilon n0 and derives n0>=1 through that online predicate. The finite-sum proof supplies only epsilon>0, L>0, 1<=n0, and the finite-sum Option II update; Theorem2_FiniteSum_OneStep_Descent_Adapter exposes the same B.8 inequality under exactly those finite-sum obligations and reuses the inherited pathwise algebra without importing the online sigma schedule."
+      },
+      {
+        "base_json_pointer": "/key_lemmas/4",
+        "base_symbols": [
+          "_private.Algorithms.Unverified.SPIDER.0.Algorithms.Unverified.SPIDER.uniform_average_gradient_bound_of_estimator_average",
+          "Algorithms.Unverified.SPIDER.selectedOutputGradientNormExpectation_le_of_uniform_average_le"
+        ],
+        "target_json_pointer": "/extension/additions/main_theorem/proof/11",
+        "method": "reuse",
+        "reason": "The B.15 estimator-to-gradient conversion is main-theorem proof array index 11, where the finite-sum proof applies the inherited uniform-average bound without changing its mathematical content."
+      },
+      {
+        "base_json_pointer": "/assumptions/1",
+        "base_symbols": [
+          "Algorithms.Unverified.SPIDER.OnlineProblem.averaged_lipschitz_gradient_bound"
+        ],
+        "target_json_pointer": "/extension/additions/key_lemmas/0/proof/4",
+        "method": "reuse",
+        "reason": "The finite-sum B.18 application is key-lemma proof array index 4 and uses the same Assumption 1(ii) averaged component-gradient Lipschitz bound with L_B=L, with no strengthening of smoothness."
+      }
+    ],
+    "additions": {
+      "algorithm": "Spider_SFO_FiniteSum_Theorem2",
+      "full_name": "Spider-SFO finite-sum specialization for first-order stationary points",
+      "source_reference": "Fang, Li, Lin, Zhang, Spider: Near-Optimal Non-Convex Optimization via Stochastic Path Integrated Differential Estimator, arXiv:1807.01695v2 (Theorem 2)",
+      "assumptions": [
+        {
+          "name": "Finite_Sum_Refresh_Is_Full_Gradient",
+          "math": "S_1=[n]",
+          "ref": "Theorem 2, p. 12",
+          "parameters": [
+            "S_1",
+            "n"
+          ]
+        },
+        {
+          "name": "Finite_Sum_Free_Parameter_Range",
+          "math": "n_0\\in[1,n^{1/2}]",
+          "ref": "Text after Eq. (3.7), p. 12; Theorem 2, p. 12",
+          "parameters": [
+            "n_0",
+            "n"
+          ]
+        },
+        {
+          "name": "Finite_Sum_Full_Refresh_Identity_B17",
+          "math": "\\mathbb{E}_{k_0}\\|v^{k_0}-\\nabla f(x^{k_0})\\|^2=\\mathbb{E}_{k_0}\\|\\nabla f(x^{k_0})-\\nabla f(x^{k_0})\\|^2=0",
+          "ref": "Eq. (B.17), Proof of Theorem 2, p. 29",
+          "parameters": [
+            "k_0",
+            "v^{k_0}",
+            "x^{k_0}"
+          ]
+        },
+        {
+          "name": "Finite_Sum_Recursive_Difference_Unbiasedness",
+          "math": "\\mathbb{E}\\left[B_i(x^k)-B_i(x^{k-1})\\mid x_{0:k}\\right]=V^k-V^{k-1}",
+          "ref": "Eq. (2.6), p. 8; finite-sum specialization of Algorithm 1, Line 5",
+          "parameters": [
+            "B_i",
+            "V^k",
+            "x_{0:k}"
+          ]
+        },
+        {
+          "name": "Finite_Sum_Recursive_Sample_Average",
+          "math": "B_{S_*}=\\frac{1}{S_*}\\sum_{i\\in S_*}B_i",
+          "ref": "Text before Eq. (2.7), p. 8; finite-sum specialization with S_*=S_2",
+          "parameters": [
+            "S_*",
+            "B_{S_*}",
+            "B_i"
+          ]
+        },
+        {
+          "name": "Finite_Sum_Epsilon_Positive",
+          "math": "\\epsilon>0",
+          "ref": "Theorem 2 parameter domain, p. 12; finite-sum Lean adapter scalar obligation",
+          "parameters": [
+            "\\epsilon"
+          ],
+          "formalization_only": true,
+          "source_status": "Lean adapter obligation; not an additional paper assumption"
+        },
+        {
+          "name": "Finite_Sum_Lipschitz_Constant_Positive",
+          "math": "L>0",
+          "ref": "Theorem 2 parameter domain, p. 12; finite-sum Lean adapter scalar obligation",
+          "parameters": [
+            "L"
+          ],
+          "formalization_only": true,
+          "source_status": "Lean adapter obligation; not an additional paper assumption"
+        },
+        {
+          "name": "Finite_Sum_N0_Lower_Bound",
+          "math": "1\\le n_0",
+          "ref": "Text after Eq. (3.7), p. 12; finite-sum Lean adapter scalar obligation",
+          "parameters": [
+            "n_0"
+          ],
+          "formalization_only": true,
+          "source_status": "Named lower-bound interface extracted from the paper's range n_0\\in[1,n^{1/2}]"
+        },
+        {
+          "name": "Finite_Sum_Recursive_Sampling_Law",
+          "math": "B_{S_*}=\\frac{1}{S_*}\\sum_{i\\in S_*}B_i",
+          "ref": "Text before Eq. (2.7), p. 8; finite-sum specialization with S_*=S_2",
+          "description": "At each step k let S_* be a subset that samples S_* elements in [n] with replacement; the stochastic estimator B_{S_*} is the displayed sample average.",
+          "parameters": [
+            "S_*",
+            "[n]",
+            "B_{S_*}",
+            "B_i"
+          ]
+        },
+        {
+          "name": "Finite_Sum_Conditional_Difference_Unbiasedness",
+          "math": "\\mathbb{E}\\left[B_i(x^k)-B_i(x^{k-1})\\mid x_{0:k}\\right]=V^k-V^{k-1}",
+          "ref": "Eq. (2.6), p. 8; finite-sum specialization of Algorithm 1, Line 5",
+          "parameters": [
+            "B_i",
+            "V^k",
+            "x_{0:k}"
+          ]
+        },
+        {
+          "name": "Finite_Sum_Process_Measurability",
+          "math": "\\text{The finite-sum iterate, estimator, sample coordinates, and residual kernels are measurable for the conditional expectations used by Lemma 1.}",
+          "ref": "Finite-sum Lean adapter obligation induced by the conditional-expectation route; no separate displayed formula in the PDF",
+          "parameters": [
+            "x^k",
+            "v^k",
+            "S_2"
+          ],
+          "formalization_only": true,
+          "source_status": "Lean interface obligation; the paper uses the corresponding expectations but does not isolate a measurability lemma"
+        },
+        {
+          "name": "Finite_Sum_Refresh_Recursive_Independence",
+          "math": "\\text{The refresh and recursive sample coordinates are independent under the product sampling law used by the estimator recurrence.}",
+          "ref": "With-replacement sampling text before Eq. (2.7), p. 8; finite-sum Lean adapter obligation",
+          "parameters": [
+            "S_1",
+            "S_2",
+            "k_0",
+            "k"
+          ],
+          "formalization_only": true,
+          "source_status": "Lean interface obligation induced by the product sample law; not an additional paper assumption"
+        }
+      ],
+      "algorithm_spec": {
+        "initialization": {
+          "math": "\\text{Algorithm 1 Spider-SFO: Input }x_0,q,S_1,S_2,n_0,\\epsilon,\\text{ and }\\widetilde{\\epsilon}\\text{ (For finding first-order stationary point)}",
+          "ref": "Algorithm 1 header, p. 10"
+        },
+        "steps": [
+          {
+            "step": 1,
+            "name": "finite_sum_schedule",
+            "math": "S_2=\\frac{n^{1/2}}{n_0},\\quad \\eta=\\frac{\\epsilon}{Ln_0},\\quad \\eta^k=\\min\\left(\\frac{\\epsilon}{Ln_0\\|v^k\\|},\\frac{1}{2Ln_0}\\right),\\quad q=n_0n^{1/2}",
+            "ref": "Eq. (3.7), p. 12"
+          },
+          {
+            "step": 2,
+            "name": "finite_sum_full_refresh",
+            "math": "\\text{In this case, one computes the full gradient }v^k=\\nabla f_{S_1}(x^k)\\text{ in Line 3 of Algorithm 1}",
+            "ref": "Text before Theorem 2, p. 12; Theorem 2, p. 12"
+          },
+          {
+            "step": 3,
+            "name": "finite_sum_recursive_update",
+            "math": "v^k=\\nabla f_{S_2}(x^k)-\\nabla f_{S_2}(x^{k-1})+v^{k-1}",
+            "ref": "Algorithm 1, Line 5, p. 10"
+          },
+          {
+            "step": 4,
+            "name": "finite_sum_option_II_update",
+            "math": "x^{k+1}=x^k-\\eta^k v^k\\quad\\text{where}\\quad \\eta^k=\\min\\left(\\frac{\\epsilon}{Ln_0\\|v^k\\|},\\frac{1}{2Ln_0}\\right)",
+            "ref": "Algorithm 1, Line 14, p. 10; Eq. (3.7), p. 12"
+          },
+          {
+            "step": 5,
+            "name": "finite_sum_random_output",
+            "math": "\\widetilde{x}\\text{ chosen uniformly at random from }\\{x^k\\}_{k=0}^{K-1}",
+            "ref": "Algorithm 1, Line 17, p. 10"
+          }
+        ],
+        "output": {
+          "math": "\\widetilde{x}\\text{ chosen uniformly at random from }\\{x^k\\}_{k=0}^{K-1}",
+          "ref": "Algorithm 1, Line 17, p. 10",
+          "type": "random iterate"
+        },
+        "parameters": [
+          {
+            "name": "Finite_Sum_Parameter_Schedule",
+            "math": "S_2=\\frac{n^{1/2}}{n_0},\\quad \\eta=\\frac{\\epsilon}{Ln_0},\\quad \\eta^k=\\min\\left(\\frac{\\epsilon}{Ln_0\\|v^k\\|},\\frac{1}{2Ln_0}\\right),\\quad q=n_0n^{1/2}",
+            "ref": "Eq. (3.7), p. 12"
+          },
+          {
+            "name": "Finite_Sum_Full_Refresh_Parameter",
+            "math": "S_1=[n]",
+            "ref": "Theorem 2, p. 12"
+          },
+          {
+            "name": "Finite_Sum_Iteration_Budget",
+            "math": "K=\\left\\lfloor(4L\\Delta n_0)\\epsilon^{-2}\\right\\rfloor+1",
+            "ref": "Theorem 2, p. 12"
+          }
+        ]
+      },
+      "main_theorem": {
+        "statement_math": "\\text{In the finite-sum case, set the parameters }S_2,\\eta,\\text{ and }q\\text{ as in (3.7), }K=\\left\\lfloor(4L\\Delta n_0)\\epsilon^{-2}\\right\\rfloor+1\\text{ and let }S_1=[n],\\text{ i.e. we obtain the full gradient in Line 3. The gradient cost is bounded by }n+8(L\\Delta)n^{1/2}\\epsilon^{-2}+2n_0^{-1}n^{1/2}\\text{ for any choice of }n_0\\in[1,n^{1/2}].\\text{ Treating }\\Delta,L\\text{ and }\\sigma\\text{ as positive constants, the stochastic gradient complexity is }O(n+n^{1/2}\\epsilon^{-2}).",
+        "rate": "The finite-sum stochastic gradient complexity is O(n+n^{1/2} epsilon^{-2}) when Delta, L, and sigma are treated as positive constants.",
+        "measure": "Total stochastic-gradient computation cost, bounded by n+8(L Delta)n^{1/2}epsilon^{-2}+2n_0^{-1}n^{1/2}.",
+        "ref": "Theorem 2, p. 12",
+        "source_pdf_lines": [
+          592,
+          601
+        ],
+        "proof": [
+          {
+            "step": 1,
+            "description": "At the epoch refresh k=k_0, the finite-sum full-gradient branch gives v^{k_0}=\\nabla f(x^{k_0}); subtracting the same full gradient from itself yields the zero initial estimator error printed in (B.17).",
+            "ref": "Eq. (B.17), Proof of Theorem 2, p. 29",
+            "source_pdf_lines": [
+              1586,
+              1588
+            ],
+            "math": "\\mathbb{E}_{k_0}\\|v^{k_0}-\\nabla f(x^{k_0})\\|^2=\\mathbb{E}_{k_0}\\|\\nabla f(x^{k_0})-\\nabla f(x^{k_0})\\|^2=0",
+            "uses": [
+              "Finite_Sum_Refresh_Is_Full_Gradient",
+              "Finite_Sum_Full_Refresh_Parameter"
+            ],
+            "produces": "finite_sum_zero_refresh_error_B17"
+          },
+          {
+            "step": 2,
+            "description": "From Line 14 of Algorithm 1, use the finite-sum Option II update and the finite-sum schedule to obtain the step bound required by the abstract SPIDER lemma: epsilon_1=epsilon/(Ln_0). This finite-sum specialization of the source's Eq. (B.2) prerequisite is established before applying Lemma 1.",
+            "ref": "Eq. (B.2), Proof of Lemma 2, p. 26; Algorithm 1, Line 14, p. 10",
+            "source_pdf_lines": [
+              1422,
+              1427
+            ],
+            "math": "\\|x^{k+1}-x^k\\|=\\min\\left(\\frac{\\epsilon}{Ln_0\\|v^k\\|},\\frac{1}{2Ln_0}\\right)\\|v^k\\|\\le\\frac{\\epsilon}{Ln_0}",
+            "uses": [
+              "SpiderSFO_OptionII_Update",
+              "Finite_Sum_Parameter_Schedule",
+              "Finite_Sum_Free_Parameter_Range",
+              "Finite_Sum_Epsilon_Positive",
+              "Finite_Sum_Lipschitz_Constant_Positive",
+              "Finite_Sum_N0_Lower_Bound"
+            ],
+            "produces": "finite_sum_step_bound_B2"
+          },
+          {
+            "step": 3,
+            "description": "Apply the inherited abstract SPIDER error lemma with epsilon_1=epsilon/(Ln_0), S_2=n^{1/2}/n_0, and k-k_0<=q=n_0n^{1/2}; use the finite_sum_step_bound_B2 produced by the preceding B.2 step, the abstract step-bound interface, the Option II update, Assumption 1(ii) for L_B=L, and the zero boundary from (B.17). The paper prints the B.18 chain with v^{k_0} on the left, an additional epsilon factor, and the B.1 marker. The displayed factors do not algebraically cancel to epsilon^2: their product is epsilon^3 before the zero boundary term is added. Preserve the source display and treat the final equality as a source inconsistency rather than a valid cancellation.",
+            "ref": "Eq. (B.18), Proof of Theorem 2, p. 29",
+            "source_pdf_lines": [
+              1590,
+              1595
+            ],
+            "math": "\\mathbb{E}_{k_0}\\|v^{k_0}-\\nabla f(x^{k_0})\\|^2\\le n_0n^{1/2}L^2\\cdot\\frac{\\epsilon^2}{L^2n_0^2}\\cdot\\frac{\\epsilon n_0}{n^{1/2}}+\\mathbb{E}_{k_0}\\|v^{k_0}-\\nabla f(x^{k_0})\\|^2\\ \\text{(B.1)}=\\epsilon^2",
+            "uses": [
+              "previous_step:1",
+              "previous_step:2",
+              "Theorem2_FiniteSum_Estimator_Error_Adapter",
+              "Lemma1_Abstract_Spider_Error",
+              "Theorem2_FiniteSum_Lemma2_Instantiation",
+              "Finite_Sum_Full_Refresh_Identity_B17",
+              "Finite_Sum_Recursive_Sampling_Law",
+              "Finite_Sum_Conditional_Difference_Unbiasedness",
+              "Finite_Sum_Recursive_Difference_Unbiasedness",
+              "Finite_Sum_Recursive_Sample_Average",
+              "Finite_Sum_Process_Measurability",
+              "Finite_Sum_Refresh_Recursive_Independence",
+              "Spider_Difference_Unbiasedness",
+              "Spider_Abstract_With_Replacement_Sampling",
+              "Spider_Recursive_Estimator",
+              "SpiderSFO_OptionII_Update",
+              "Averaged_Lipschitz_Gradient",
+              "Finite_Sum_Parameter_Schedule",
+              "Finite_Sum_Free_Parameter_Range",
+              "Finite_Sum_Epsilon_Positive",
+              "Finite_Sum_Lipschitz_Constant_Positive",
+              "Finite_Sum_N0_Lower_Bound"
+            ],
+            "produces": "finite_sum_source_display_B18_with_unresolved_epsilon_mismatch"
+          },
+          {
+            "step": 4,
+            "description": "The paper immediately says that Lemma 2 holds from (B.17)-(B.18). Because the printed B.18 factors yield epsilon^3 rather than epsilon^2, record this as the paper's asserted conclusion, not as a justified cancellation; a Lean proof must resolve or explicitly reject the source typo.",
+            "ref": "Proof of Theorem 2, p. 29",
+            "source_pdf_lines": [
+              1597,
+              1597
+            ],
+            "uses": [
+              "previous_step:3"
+            ],
+            "produces": "paper_asserted_Theorem2_FiniteSum_Lemma2_Instantiation"
+          },
+          {
+            "step": 5,
+            "description": "Take conditional expectation of the finite-sum B.8 adapter and use the finite-sum estimator-error conclusion asserted after (B.18) to replace the error term by epsilon^2, yielding the one-step expected descent inequality (B.9).",
+            "ref": "Eq. (B.9), p. 27; Proof of Theorem 2, p. 29",
+            "source_pdf_lines": [
+              1503,
+              1507
+            ],
+            "math": "\\mathbb{E}_{k_0}f(x^{k+1})-\\mathbb{E}_{k_0}f(x^k)\\le -\\frac{\\epsilon}{4Ln_0}\\mathbb{E}_{k_0}\\|v^k\\|+\\frac{3\\epsilon^2}{4Ln_0}",
+            "uses": [
+              "previous_step:4",
+              "Theorem2_FiniteSum_Lemma2_Instantiation",
+              "Theorem2_FiniteSum_OneStep_Descent_Adapter"
+            ],
+            "produces": "finite_sum_one_step_expected_descent_B9"
+          },
+          {
+            "step": 6,
+            "description": "Take full expectation in the conditional finite-sum descent inequality and sum the resulting inequalities over k=0,...,K-1 before telescoping the function values.",
+            "ref": "Proof of Theorem 1 before Eq. (B.13), p. 28; Proof of Theorem 2, p. 29",
+            "source_pdf_lines": [
+              1535,
+              1536
+            ],
+            "uses": [
+              "previous_step:5"
+            ],
+            "produces": "finite_sum_summed_unconditional_descent_pre_telescope"
+          },
+          {
+            "step": 7,
+            "description": "Telescope the summed finite-sum descent inequality from k=0 to K-1 and rearrange the function-value terms to obtain the first inequality in (B.13).",
+            "ref": "Eq. (B.13), first inequality, p. 28; Proof of Theorem 2, p. 29",
+            "source_pdf_lines": [
+              1535,
+              1540
+            ],
+            "math": "\\frac{\\epsilon}{4Ln_0}\\sum_{k=0}^{K-1}\\mathbb{E}\\|v^k\\|\\le f(x_0)-\\mathbb{E}f(x^K)+\\frac{3K\\epsilon^2}{4Ln_0}",
+            "uses": [
+              "previous_step:6"
+            ],
+            "produces": "finite_sum_telescoped_descent_bound_B13"
+          },
+          {
+            "step": 8,
+            "description": "Use the lower bound \\mathbb{E}f(x^K)\\ge f^* and the initial-gap definition Delta=f(x_0)-f^* to obtain the second inequality in (B.13).",
+            "ref": "Eq. (B.13), second inequality, p. 28; Proof of Theorem 2, p. 29",
+            "source_pdf_lines": [
+              1538,
+              1540
+            ],
+            "math": "\\le \\Delta+\\frac{3K\\epsilon^2}{4Ln_0}",
+            "uses": [
+              "previous_step:7",
+              "Finite_Initial_Gap"
+            ],
+            "produces": "finite_sum_estimator_norm_bound_B13"
+          },
+          {
+            "step": 9,
+            "description": "Divide both sides of (B.13) by (epsilon/(4Ln_0))K and rearrange to obtain the first inequality in (B.14).",
+            "ref": "Eq. (B.14), first inequality, p. 28; Proof of Theorem 2, p. 29",
+            "source_pdf_lines": [
+              1544,
+              1553
+            ],
+            "math": "\\frac{1}{K}\\sum_{k=0}^{K-1}\\mathbb{E}\\|v^k\\|\\le \\Delta\\cdot\\frac{4Ln_0}{\\epsilon}\\frac{1}{K}+3\\epsilon",
+            "uses": [
+              "previous_step:8"
+            ],
+            "produces": "finite_sum_average_estimator_norm_pre_budget_B14"
+          },
+          {
+            "step": 10,
+            "description": "Use the finite-sum iteration budget K=floor(4L Delta n_0 epsilon^{-2})+1 >= 4L Delta n_0 epsilon^{-2} to bound the first term in (B.14) and conclude the final average estimator-norm bound.",
+            "ref": "Eq. (B.14), second inequality, p. 28; Theorem 2, p. 12",
+            "source_pdf_lines": [
+              1544,
+              1554
+            ],
+            "math": "\\le 4\\epsilon",
+            "uses": [
+              "previous_step:9",
+              "Finite_Sum_Iteration_Budget"
+            ],
+            "produces": "finite_sum_average_estimator_norm_bound_B14"
+          },
+          {
+            "step": 11,
+            "description": "Use the uniform-random-output choice to identify the expected gradient norm at the returned iterate with the uniform average over k=0,...,K-1, as in the first line of (B.15).",
+            "ref": "Eq. (B.15), equality, p. 28; Proof of Theorem 2, p. 29",
+            "source_pdf_lines": [
+              1556,
+              1559
+            ],
+            "math": "\\mathbb{E}\\|\\nabla f(\\widetilde{x})\\|=\\frac{1}{K}\\sum_{k=0}^{K-1}\\mathbb{E}\\|\\nabla f(x^k)\\|",
+            "uses": [
+              "SpiderSFO_OptionII_Output"
+            ],
+            "produces": "finite_sum_uniform_output_gradient_average_B15"
+          },
+          {
+            "step": 12,
+            "description": "Apply the inherited estimator-to-gradient conversion (B.10) termwise in the uniform average to obtain the second line of (B.15).",
+            "ref": "Eq. (B.15), inequality using (B.10), p. 28; Proof of Theorem 2, p. 29",
+            "source_pdf_lines": [
+              1557,
+              1560
+            ],
+            "math": "\\le \\frac{1}{K}\\sum_{k=0}^{K-1}\\mathbb{E}\\|v^k\\|+\\epsilon",
+            "uses": [
+              "previous_step:11",
+              "Lemma5_Gradient_Estimator_Conversion"
+            ],
+            "produces": "finite_sum_gradient_average_bounded_by_estimator_average_B15"
+          },
+          {
+            "step": 13,
+            "description": "Use the finite-sum average estimator-norm bound (B.14) to conclude the expected output-gradient bound in the final line of (B.15).",
+            "ref": "Eq. (B.15), final inequality using (B.14), p. 28; Proof of Theorem 2, p. 29",
+            "source_pdf_lines": [
+              1557,
+              1561
+            ],
+            "math": "\\le 5\\epsilon",
+            "uses": [
+              "previous_step:12",
+              "previous_step:10"
+            ],
+            "produces": "finite_sum_expected_stationarity_bound_B15"
+          },
+          {
+            "step": 14,
+            "description": "Count full-refresh and recursive-gradient accesses over K iterations. Preserve the literal first B.19 display, including the source's S_1=qS_2 label and its right-hand side 2K+S_1.",
+            "ref": "Eq. (B.19), first inequality, Proof of Theorem 2, p. 29",
+            "source_pdf_lines": [
+              1598,
+              1602
+            ],
+            "math": "\\left\\lceil K\\cdot\\frac{1}{q}\\right\\rceil S_1+KS_2\\le 2K+S_1",
+            "uses": [
+              "Finite_Sum_Full_Refresh_Parameter",
+              "Finite_Sum_Parameter_Schedule",
+              "Finite_Sum_Iteration_Budget"
+            ],
+            "produces": "finite_sum_literal_B19_gradient_cost_bound"
+          },
+          {
+            "step": 15,
+            "description": "Record the source-corrected continuation required by the next B.19 display: the printed first inequality has 2K+S_1, while the subsequent line follows the dimensionally compatible route 2KS_2+S_1. Keep this bridge explicitly marked as source-corrected rather than claiming the literal first inequality implies it.",
+            "ref": "Eq. (B.19), transition from the first inequality to the middle inequality, Proof of Theorem 2, p. 29",
+            "source_pdf_lines": [
+              1598,
+              1606
+            ],
+            "uses": [
+              "previous_step:14",
+              "Finite_Sum_Parameter_Schedule",
+              "Finite_Sum_Full_Refresh_Parameter"
+            ],
+            "produces": "finite_sum_source_corrected_gradient_cost_route_2KS2_plus_S1"
+          },
+          {
+            "step": 16,
+            "description": "Following the paper's middle B.19 display, substitute K's finite-sum budget, S_2=n^{1/2}/n_0, and S_1=n along the source-corrected 2KS_2+S_1 route, retaining the displayed extra 2S_2 term.",
+            "ref": "Eq. (B.19), middle inequality, Proof of Theorem 2, p. 29",
+            "source_pdf_lines": [
+              1603,
+              1606
+            ],
+            "math": "\\le 2\\left(\\frac{4Ln_0\\Delta}{\\epsilon^2}\\right)\\frac{n^{1/2}}{n_0}+n+2S_2",
+            "uses": [
+              "previous_step:15",
+              "Finite_Sum_Iteration_Budget",
+              "Finite_Sum_Parameter_Schedule",
+              "Finite_Sum_Full_Refresh_Parameter"
+            ],
+            "produces": "finite_sum_substituted_gradient_cost_bound"
+          },
+          {
+            "step": 17,
+            "description": "Algebraically simplify the substituted expression, cancel n_0, and replace S_2 by n^{1/2}/n_0 to obtain the equality in (B.19).",
+            "ref": "Eq. (B.19), equality, Proof of Theorem 2, p. 29",
+            "source_pdf_lines": [
+              1607,
+              1609
+            ],
+            "math": "=\\frac{8(L\\Delta)n^{1/2}}{\\epsilon^2}+n+\\frac{2n^{1/2}}{n_0}",
+            "uses": [
+              "previous_step:16",
+              "Finite_Sum_Parameter_Schedule"
+            ],
+            "produces": "finite_sum_gradient_cost_bound_B19"
+          },
+          {
+            "step": 18,
+            "description": "Reorder the terms to match the theorem statement and record the paper's concluded finite-sum gradient cost, with n_0^{-1} only on the final 2n_0^{-1}n^{1/2} term.",
+            "ref": "Text after Eq. (B.19), Proof of Theorem 2, p. 29",
+            "source_pdf_lines": [
+              1611,
+              1613
+            ],
+            "math": "n+8(L\\Delta)n^{1/2}\\epsilon^{-2}+2n_0^{-1}n^{1/2}",
+            "uses": [
+              "previous_step:17",
+              "Finite_Sum_Free_Parameter_Range"
+            ],
+            "produces": "theorem2_finite_sum_gradient_cost_claim"
+          }
+        ]
+      },
+      "key_lemmas": [
+        {
+          "name": "Theorem2_FiniteSum_Lemma2_Instantiation",
+          "ref": "Eq. (B.18), Proof of Theorem 2, p. 29",
+          "statement_math": "\\mathbb{E}_{k_0}\\|v^{k_0}-\\nabla f(x^{k_0})\\|^2\\le n_0n^{1/2}L^2\\cdot\\frac{\\epsilon^2}{L^2n_0^2}\\cdot\\frac{\\epsilon n_0}{n^{1/2}}+\\mathbb{E}_{k_0}\\|v^{k_0}-\\nabla f(x^{k_0})\\|^2\\ \\text{(B.1)}=\\epsilon^2",
+          "role": "This is the finite-sum specialization of the inherited SPIDER estimator-error lemma; it replaces the online refresh variance term by exact full-gradient refresh and feeds the reused descent/output proof.",
+          "proof": [
+            {
+              "step": 1,
+              "description": "At k_0, the finite-sum branch computes the full gradient, so the estimator and true gradient coincide and the initial conditional mean-square error is zero.",
+              "ref": "Eq. (B.17), Proof of Theorem 2, p. 29",
+              "source_pdf_lines": [
+                1586,
+                1588
+              ],
+              "math": "\\mathbb{E}_{k_0}\\|v^{k_0}-\\nabla f(x^{k_0})\\|^2=\\mathbb{E}_{k_0}\\|\\nabla f(x^{k_0})-\\nabla f(x^{k_0})\\|^2=0",
+              "uses": [
+                "Finite_Sum_Refresh_Is_Full_Gradient",
+                "Finite_Sum_Full_Refresh_Parameter"
+              ],
+              "produces": "finite_sum_zero_refresh_error"
+            },
+            {
+              "step": 2,
+              "description": "From Line 14 of Algorithm 1, use the finite-sum Option II update and the finite-sum schedule to obtain the step bound required by the abstract SPIDER lemma: epsilon_1=epsilon/(Ln_0). This is the finite-sum specialization of the source's Eq. (B.2) prerequisite and is established before applying Lemma 1.",
+              "ref": "Eq. (B.2), Proof of Lemma 2, p. 26; Algorithm 1, Line 14, p. 10",
+              "source_pdf_lines": [
+                1422,
+                1427
+              ],
+              "math": "\\|x^{k+1}-x^k\\|=\\min\\left(\\frac{\\epsilon}{Ln_0\\|v^k\\|},\\frac{1}{2Ln_0}\\right)\\|v^k\\|\\le\\frac{\\epsilon}{Ln_0}",
+              "uses": [
+                "SpiderSFO_OptionII_Update",
+                "Finite_Sum_Parameter_Schedule",
+                "Finite_Sum_Free_Parameter_Range",
+                "Finite_Sum_Epsilon_Positive",
+                "Finite_Sum_Lipschitz_Constant_Positive",
+                "Finite_Sum_N0_Lower_Bound"
+              ],
+              "produces": "finite_sum_step_bound_B2"
+            },
+            {
+              "step": 3,
+              "description": "Instantiate the abstract recurrence parameters for the finite-sum proof: epsilon_1=epsilon/(Ln_0), S_2=n^{1/2}/n_0, and K=k-k_0<=q=n_0n^{1/2}.",
+              "ref": "Proof of Theorem 2, p. 29; Eq. (3.7), p. 12",
+              "source_pdf_lines": [
+                1590,
+                1591
+              ],
+              "math": "\\epsilon_1=\\frac{\\epsilon}{Ln_0},\\quad S_2=\\frac{n^{1/2}}{n_0},\\quad K=k-k_0\\le q=n_0n^{1/2}",
+              "uses": [
+                "previous_step:2",
+                "Finite_Sum_Parameter_Schedule",
+                "Finite_Sum_Free_Parameter_Range",
+                "Finite_Sum_Epsilon_Positive",
+                "Finite_Sum_Lipschitz_Constant_Positive",
+                "Finite_Sum_N0_Lower_Bound"
+              ],
+              "produces": "finite_sum_recurrence_parameters"
+            },
+            {
+              "step": 4,
+              "description": "Map the finite-sum process to the inherited Lemma 1 interface: the recursive branch is the S_2 sample-average estimator, its component-gradient difference is conditionally centered, and the finite-sum construction must provide the process measurability and refresh/recursive independence boundaries used by the conditional second-moment recurrence.",
+              "ref": "Section 2, Eq. (2.6) and text before Eq. (2.7), pp. 8-9; Algorithm 1, Line 5, p. 10",
+              "source_pdf_lines": [
+                360,
+                373
+              ],
+              "uses": [
+                "Finite_Sum_Recursive_Sampling_Law",
+                "Finite_Sum_Conditional_Difference_Unbiasedness",
+                "Finite_Sum_Process_Measurability",
+                "Finite_Sum_Refresh_Recursive_Independence",
+                "Finite_Sum_Recursive_Difference_Unbiasedness",
+                "Finite_Sum_Recursive_Sample_Average",
+                "Spider_Difference_Unbiasedness",
+                "Spider_Abstract_With_Replacement_Sampling",
+                "Spider_Recursive_Estimator"
+              ],
+              "produces": "finite_sum_recurrence_interface"
+            },
+            {
+              "step": 5,
+              "description": "Apply Lemma 1 through the finite-sum interface, use the finite_sum_step_bound_B2 from (B.2), Assumption 1(ii) for L_B=L, and substitute the zero boundary from (B.17). The source display has v^{k_0} on its left, includes an extra epsilon factor and an inline (B.1) marker, and therefore simplifies to epsilon^3 before the zero term rather than epsilon^2; preserve that inconsistency for the downstream formalization.",
+              "ref": "Eq. (B.18), Proof of Theorem 2, p. 29",
+              "source_pdf_lines": [
+                1590,
+                1595
+              ],
+              "math": "\\mathbb{E}_{k_0}\\|v^{k_0}-\\nabla f(x^{k_0})\\|^2\\le n_0n^{1/2}L^2\\cdot\\frac{\\epsilon^2}{L^2n_0^2}\\cdot\\frac{\\epsilon n_0}{n^{1/2}}+\\mathbb{E}_{k_0}\\|v^{k_0}-\\nabla f(x^{k_0})\\|^2\\ \\text{(B.1)}=\\epsilon^2",
+              "uses": [
+                "previous_step:1",
+                "previous_step:2",
+                "previous_step:3",
+                "previous_step:4",
+                "Theorem2_FiniteSum_Estimator_Error_Adapter",
+                "Lemma1_Abstract_Spider_Error",
+                "Finite_Sum_Full_Refresh_Identity_B17",
+                "Finite_Sum_Recursive_Sampling_Law",
+                "Finite_Sum_Conditional_Difference_Unbiasedness",
+                "Finite_Sum_Process_Measurability",
+                "Finite_Sum_Refresh_Recursive_Independence",
+                "Spider_Difference_Unbiasedness",
+                "Spider_Abstract_With_Replacement_Sampling",
+                "Spider_Recursive_Estimator",
+                "Averaged_Lipschitz_Gradient",
+                "Finite_Sum_Parameter_Schedule",
+                "Finite_Sum_Free_Parameter_Range",
+                "Finite_Sum_Epsilon_Positive",
+                "Finite_Sum_Lipschitz_Constant_Positive",
+                "Finite_Sum_N0_Lower_Bound"
+              ],
+              "produces": "finite_sum_error_terms_substituted_with_source_epsilon_mismatch"
+            },
+            {
+              "step": 6,
+              "description": "The source says 'So Lemma 2 holds' after B.18. Since the displayed factors do not support the printed epsilon^2 equality, preserve this as a source assertion requiring a correction or separate formal justification rather than a proven cancellation.",
+              "ref": "Proof of Theorem 2, p. 29",
+              "source_pdf_lines": [
+                1597,
+                1597
+              ],
+              "uses": [
+                "previous_step:5"
+              ],
+              "produces": "paper_asserted_finite_sum_estimator_error_B18"
+            }
+          ]
+        },
+        {
+          "name": "Theorem2_FiniteSum_Estimator_Error_Adapter",
+          "ref": "Eq. (B.17)-(B.18), Proof of Theorem 2, p. 29; finite-sum Lean adapter contract",
+          "statement_math": "\\mathbb{E}_{k_0}\\|v^{k_0}-\\nabla f(x^{k_0})\\|^2\\le n_0n^{1/2}L^2\\cdot\\frac{\\epsilon^2}{L^2n_0^2}\\cdot\\frac{\\epsilon n_0}{n^{1/2}}+\\mathbb{E}_{k_0}\\|v^{k_0}-\\nabla f(x^{k_0})\\|^2\\ \\text{(B.1)}=\\epsilon^2",
+          "role": "This adapter carries the inherited SPIDER recurrence into the finite-sum process while replacing the online rounded batch-count, online schedule, and refresh-variance prerequisites by the exact full-refresh boundary and the finite-sum schedule.",
+          "formalization_adapter": {
+            "lean_name": "Algorithms.Unverified.SPIDER.theorem2_finite_sum_estimator_error_adapter",
+            "minimal_scalar_hypotheses": [
+              "Finite_Sum_Epsilon_Positive",
+              "Finite_Sum_Lipschitz_Constant_Positive",
+              "Finite_Sum_N0_Lower_Bound"
+            ],
+            "lean_hypothesis_bindings": {
+              "Finite_Sum_Epsilon_Positive": "hepsilon : 0 < epsilon",
+              "Finite_Sum_Lipschitz_Constant_Positive": "hL : 0 < L",
+              "Finite_Sum_N0_Lower_Bound": "hn0 : 1 <= n0"
+            },
+            "finite_sum_interface_obligations": [
+              {
+                "name": "Finite_Sum_Full_Refresh_Identity_B17",
+                "source_ref": "Eq. (B.17), Proof of Theorem 2, p. 29",
+                "description": "The epoch refresh is the exact full gradient, so the estimator error at k_0 is zero.",
+                "maps_to": [
+                  "Finite_Sum_Refresh_Is_Full_Gradient",
+                  "Finite_Sum_Full_Refresh_Parameter"
+                ]
+              },
+              {
+                "name": "Finite_Sum_Recursive_Sampling_Law",
+                "source_ref": "Section 2, text before Eq. (2.7), p. 8; Algorithm 1, Line 5, p. 10",
+                "description": "The recursive branch uses an S_2-element with-replacement sample average of component-gradient differences.",
+                "maps_to": [
+                  "Finite_Sum_Recursive_Sample_Average",
+                  "Spider_Abstract_With_Replacement_Sampling",
+                  "Spider_Recursive_Estimator"
+                ]
+              },
+              {
+                "name": "Finite_Sum_Conditional_Difference_Unbiasedness",
+                "source_ref": "Eq. (2.6), p. 8; finite-sum instantiation of the recursive branch",
+                "description": "Conditioned on the iterate history, each sampled component-gradient difference is centered at the full-gradient difference.",
+                "maps_to": [
+                  "Finite_Sum_Recursive_Difference_Unbiasedness",
+                  "Spider_Difference_Unbiasedness"
+                ]
+              },
+              {
+                "name": "Finite_Sum_Process_Measurability",
+                "source_ref": "Lean adapter obligation induced by the finite-sum process; the PDF uses the corresponding expectation expressions but does not isolate a separate measurability lemma",
+                "description": "The finite-sum iterate, estimator, sample coordinates, and residual kernels are measurable enough for the conditional expectations and integrals used by Lemma 1.",
+                "maps_to": [
+                  "Spider_Recursive_Estimator"
+                ]
+              },
+              {
+                "name": "Finite_Sum_Refresh_Recursive_Independence",
+                "source_ref": "Section 2, with-replacement sampling text before Eq. (2.7), p. 8; finite-sum product sample law required by the estimator recurrence",
+                "description": "Refresh and recursive sample coordinates have the finite-sum product-law independence needed for the minibatch variance and centered-cross-term steps.",
+                "maps_to": [
+                  "Spider_Abstract_With_Replacement_Sampling",
+                  "Finite_Sum_Recursive_Sampling_Law"
+                ]
+              }
+            ],
+            "excluded_inherited_hypotheses": [
+              "Theorem1Schedule P.L P.sigma epsilon n0",
+              "theorem1RealizedScheduleAdmissible P.L P.sigma epsilon n0",
+              "S_1=theorem1RefreshBatchCount P.sigma epsilon",
+              "S_2=theorem1RecursiveBatchCount P.sigma epsilon n0",
+              "q=theorem1EpochCount P.sigma epsilon n0"
+            ],
+            "base_declaration": "_private.Algorithms.Unverified.SPIDER.0.Algorithms.Unverified.SPIDER.optionII_estimator_error_secondMoment_le_epsilon_sq_rounded"
+          },
+          "proof": [
+            {
+              "step": 1,
+              "description": "Use the finite-sum full-refresh interface to replace the online refresh variance boundary by the exact zero error at k_0.",
+              "ref": "Eq. (B.17), Proof of Theorem 2, p. 29",
+              "source_pdf_lines": [
+                1586,
+                1588
+              ],
+              "math": "\\mathbb{E}_{k_0}\\|v^{k_0}-\\nabla f(x^{k_0})\\|^2=\\mathbb{E}_{k_0}\\|\\nabla f(x^{k_0})-\\nabla f(x^{k_0})\\|^2=0",
+              "uses": [
+                "Finite_Sum_Refresh_Is_Full_Gradient",
+                "Finite_Sum_Full_Refresh_Parameter"
+              ],
+              "produces": "adapter_zero_refresh_boundary_B17"
+            },
+            {
+              "step": 2,
+              "description": "From Line 14 of Algorithm 1, expand the finite-sum Option II update and bound the realized step length by epsilon/(Ln_0). This is the finite-sum instance of the source's B.2 prerequisite for Lemma 1.",
+              "ref": "Eq. (B.2), Proof of Lemma 2, p. 26; Algorithm 1, Line 14, p. 10",
+              "source_pdf_lines": [
+                1422,
+                1427
+              ],
+              "math": "\\|x^{k+1}-x^k\\|=\\min\\left(\\frac{\\epsilon}{Ln_0\\|v^k\\|},\\frac{1}{2Ln_0}\\right)\\|v^k\\|\\le\\frac{\\epsilon}{Ln_0}",
+              "uses": [
+                "SpiderSFO_OptionII_Update",
+                "Finite_Sum_Parameter_Schedule",
+                "Finite_Sum_Free_Parameter_Range",
+                "Finite_Sum_Epsilon_Positive",
+                "Finite_Sum_Lipschitz_Constant_Positive",
+                "Finite_Sum_N0_Lower_Bound"
+              ],
+              "produces": "finite_sum_step_bound_B2"
+            },
+            {
+              "step": 3,
+              "description": "Instantiate the abstract recurrence parameters for the finite-sum proof: epsilon_1=epsilon/(Ln_0), S_2=n^{1/2}/n_0, and K=k-k_0<=q=n_0n^{1/2}.",
+              "ref": "Proof of Theorem 2, p. 29; Eq. (3.7), p. 12",
+              "source_pdf_lines": [
+                1590,
+                1591
+              ],
+              "math": "\\epsilon_1=\\frac{\\epsilon}{Ln_0},\\quad S_2=\\frac{n^{1/2}}{n_0},\\quad K=k-k_0\\le q=n_0n^{1/2}",
+              "uses": [
+                "previous_step:2",
+                "Finite_Sum_Parameter_Schedule",
+                "Finite_Sum_Free_Parameter_Range",
+                "Finite_Sum_Epsilon_Positive",
+                "Finite_Sum_Lipschitz_Constant_Positive",
+                "Finite_Sum_N0_Lower_Bound"
+              ],
+              "produces": "adapter_finite_sum_recurrence_parameters"
+            },
+            {
+              "step": 4,
+              "description": "Map the finite-sum process to the inherited Lemma 1 interface before applying the recurrence: the Line 5 update is the recursive estimator, the S_2 draws use the with-replacement sample-average law, the conditional component-gradient difference is centered by Eq. (2.6), and the finite-sum process supplies the measurability and refresh/recursive independence boundaries required for the conditional second-moment calculation.",
+              "ref": "Section 2, Eq. (2.6) and text before Eq. (2.7), pp. 8-9; Algorithm 1, Line 5, p. 10; proof of Lemma 1, pp. 25-26",
+              "source_pdf_lines": [
+                360,
+                373
+              ],
+              "uses": [
+                "Finite_Sum_Recursive_Sampling_Law",
+                "Finite_Sum_Conditional_Difference_Unbiasedness",
+                "Finite_Sum_Process_Measurability",
+                "Finite_Sum_Refresh_Recursive_Independence",
+                "Finite_Sum_Recursive_Difference_Unbiasedness",
+                "Finite_Sum_Recursive_Sample_Average",
+                "Spider_Difference_Unbiasedness",
+                "Spider_Abstract_With_Replacement_Sampling",
+                "Spider_Recursive_Estimator"
+              ],
+              "produces": "finite_sum_lemma1_interface_obligations_discharged"
+            },
+            {
+              "step": 5,
+              "description": "Apply the inherited abstract SPIDER recurrence through the finite-sum interface, using the B.2 step bound, the finite-sum parameter instantiation, Assumption 1(ii) for the recursive difference second moment with L_B=L, and the B.17 zero boundary. Preserve the paper's extra epsilon factor, v^{k_0} left-hand side, and inline B.1 marker.",
+              "ref": "Eq. (B.18), Proof of Theorem 2, p. 29",
+              "source_pdf_lines": [
+                1590,
+                1595
+              ],
+              "math": "\\mathbb{E}_{k_0}\\|v^{k_0}-\\nabla f(x^{k_0})\\|^2\\le n_0n^{1/2}L^2\\cdot\\frac{\\epsilon^2}{L^2n_0^2}\\cdot\\frac{\\epsilon n_0}{n^{1/2}}+\\mathbb{E}_{k_0}\\|v^{k_0}-\\nabla f(x^{k_0})\\|^2\\ \\text{(B.1)}=\\epsilon^2",
+              "uses": [
+                "previous_step:1",
+                "previous_step:2",
+                "previous_step:3",
+                "previous_step:4",
+                "Lemma1_Abstract_Spider_Error",
+                "Finite_Sum_Full_Refresh_Identity_B17",
+                "Finite_Sum_Recursive_Sampling_Law",
+                "Finite_Sum_Conditional_Difference_Unbiasedness",
+                "Finite_Sum_Process_Measurability",
+                "Finite_Sum_Refresh_Recursive_Independence",
+                "Spider_Difference_Unbiasedness",
+                "Spider_Abstract_With_Replacement_Sampling",
+                "Spider_Recursive_Estimator",
+                "Averaged_Lipschitz_Gradient",
+                "Finite_Sum_Epsilon_Positive",
+                "Finite_Sum_Lipschitz_Constant_Positive",
+                "Finite_Sum_N0_Lower_Bound"
+              ],
+              "produces": "adapter_B18_finite_sum_error_chain"
+            },
+            {
+              "step": 6,
+              "description": "Expose the finite-sum estimator-error conclusion to the downstream proof as a source assertion, while retaining the unresolved epsilon-power mismatch for Lean rather than hiding it in an online schedule hypothesis.",
+              "ref": "Proof of Theorem 2, p. 29",
+              "source_pdf_lines": [
+                1597,
+                1597
+              ],
+              "uses": [
+                "previous_step:5"
+              ],
+              "produces": "adapter_finite_sum_estimator_error_output"
+            }
+          ]
+        },
+        {
+          "name": "Theorem2_FiniteSum_OneStep_Descent_Adapter",
+          "ref": "Eq. (B.5)-(B.8), Proof of Lemma 4, pp. 27-28; finite-sum Lean adapter contract",
+          "statement_math": "f(x^{k+1})\\le f(x^k)-\\frac{\\epsilon\\|v^k\\|}{4Ln_0}+\\frac{\\epsilon^2}{2n_0L}+\\frac{1}{4Ln_0}\\|v^k-\\nabla f(x^k)\\|^2",
+          "role": "This schedule-independent adapter supplies the pathwise B.8 inequality to the finite-sum theorem without requiring the online Theorem1Schedule predicate or sigma-dependent batch-count equalities.",
+          "formalization_adapter": {
+            "lean_name": "Algorithms.Unverified.SPIDER.theorem2_finite_sum_one_step_descent_adapter",
+            "minimal_scalar_hypotheses": [
+              "Finite_Sum_Epsilon_Positive",
+              "Finite_Sum_Lipschitz_Constant_Positive",
+              "Finite_Sum_N0_Lower_Bound"
+            ],
+            "lean_hypothesis_bindings": {
+              "Finite_Sum_Epsilon_Positive": "hepsilon : 0 < epsilon",
+              "Finite_Sum_Lipschitz_Constant_Positive": "hL : 0 < L",
+              "Finite_Sum_N0_Lower_Bound": "hn0 : 1 <= n0"
+            },
+            "algorithm_interface": "x^{k+1}=x^k-\\eta^k v^k with \\eta^k=\\min(\\epsilon/(Ln_0\\|v^k\\|),(2Ln_0)^{-1})",
+            "excluded_inherited_hypotheses": [
+              "Theorem1Schedule L sigma epsilon n0",
+              "Theorem1Schedule.n0_upper",
+              "theorem1RealizedScheduleAdmissible L sigma epsilon n0"
+            ],
+            "base_declaration": "_private.Algorithms.Unverified.SPIDER.0.Algorithms.Unverified.SPIDER.optionII_one_step_descent_B8_pathwise"
+          },
+          "proof": [
+            {
+              "step": 1,
+              "description": "Derive L-Lipschitz continuity of the full gradient from the averaged component-gradient Lipschitz assumption.",
+              "ref": "Eq. (B.5), Proof of Lemma 4, p. 27",
+              "source_pdf_lines": [
+                1449,
+                1452
+              ],
+              "math": "\\|\\nabla f(x)-\\nabla f(y)\\|^2=\\|\\mathbb{E}_i(\\nabla f_i(x)-\\nabla f_i(y))\\|^2\\le \\mathbb{E}_i\\|\\nabla f_i(x)-\\nabla f_i(y)\\|^2\\le L^2\\|x-y\\|^2",
+              "uses": [
+                "Averaged_Lipschitz_Gradient"
+              ],
+              "produces": "finite_sum_full_gradient_lipschitz_B5"
+            },
+            {
+              "step": 2,
+              "description": "Apply the smoothness upper model to x^k and x^{k+1}.",
+              "ref": "Eq. (B.6), first line, p. 27",
+              "source_pdf_lines": [
+                1453,
+                1456
+              ],
+              "math": "f(x^{k+1})\\le f(x^k)+\\langle\\nabla f(x^k),x^{k+1}-x^k\\rangle+\\frac{L}{2}\\|x^{k+1}-x^k\\|^2",
+              "uses": [
+                "previous_step:1"
+              ],
+              "produces": "finite_sum_smoothness_descent_B6_first_line"
+            },
+            {
+              "step": 3,
+              "description": "Substitute the Option II update into the smoothness inequality.",
+              "ref": "Eq. (B.6), second line, p. 27",
+              "source_pdf_lines": [
+                1457,
+                1459
+              ],
+              "math": "=f(x^k)-\\eta^k\\langle\\nabla f(x^k),v^k\\rangle+\\frac{L(\\eta^k)^2}{2}\\|v^k\\|^2",
+              "uses": [
+                "previous_step:2",
+                "SpiderSFO_OptionII_Update"
+              ],
+              "produces": "finite_sum_optionII_substituted_descent_B6"
+            },
+            {
+              "step": 4,
+              "description": "Expand around v^k and isolate the estimator error.",
+              "ref": "Eq. (B.6), third line, p. 27",
+              "source_pdf_lines": [
+                1460,
+                1464
+              ],
+              "math": "=f(x^k)-\\eta^k\\left(1-\\frac{\\eta^kL}{2}\\right)\\|v^k\\|^2-\\eta^k\\langle\\nabla f(x^k)-v^k,v^k\\rangle",
+              "uses": [
+                "previous_step:3"
+              ],
+              "produces": "finite_sum_estimator_error_expansion_B6"
+            },
+            {
+              "step": 5,
+              "description": "Apply the marked Cauchy-Schwarz/Young inequality.",
+              "ref": "Eq. (B.6), inequality (a), p. 27",
+              "source_pdf_lines": [
+                1465,
+                1471
+              ],
+              "math": "\\le f(x^k)-\\eta^k\\left(\\frac{1}{2}-\\frac{\\eta^kL}{2}\\right)\\|v^k\\|^2+\\frac{\\eta^k}{2}\\|v^k-\\nabla f(x^k)\\|^2",
+              "uses": [
+                "previous_step:4"
+              ],
+              "produces": "finite_sum_smooth_descent_with_error_B6"
+            },
+            {
+              "step": 6,
+              "description": "Use the finite-sum Option II stepsize and 1<=n_0 to obtain the stepsize upper bound needed by the descent algebra.",
+              "ref": "Text before Eq. (B.7), p. 27; Eq. (3.7), p. 12",
+              "source_pdf_lines": [
+                1472,
+                1480
+              ],
+              "math": "\\eta^k=\\min\\left(\\frac{\\epsilon}{Ln_0\\|v^k\\|},\\frac{1}{2Ln_0}\\right)\\le\\frac{1}{2Ln_0}\\le\\frac{1}{2L}",
+              "uses": [
+                "SpiderSFO_OptionII_Update",
+                "Finite_Sum_Parameter_Schedule",
+                "Finite_Sum_Free_Parameter_Range",
+                "Finite_Sum_Epsilon_Positive",
+                "Finite_Sum_Lipschitz_Constant_Positive",
+                "Finite_Sum_N0_Lower_Bound"
+              ],
+              "produces": "finite_sum_eta_upper_bound"
+            },
+            {
+              "step": 7,
+              "description": "Use the stepsize upper bound to obtain the first inequality in the descent-coefficient chain.",
+              "ref": "Eq. (B.7), first inequality, p. 27",
+              "source_pdf_lines": [
+                1480,
+                1488
+              ],
+              "math": "\\eta^k\\left(\\frac{1}{2}-\\frac{\\eta^kL}{2}\\right)\\|v^k\\|^2\\ge\\frac{1}{4}\\eta^k\\|v^k\\|^2",
+              "uses": [
+                "previous_step:6"
+              ],
+              "produces": "finite_sum_descent_coefficient_quarter_eta"
+            },
+            {
+              "step": 8,
+              "description": "Substitute the printed Option II definition of eta^k into the quarter-eta term.",
+              "ref": "Eq. (B.7), equality, p. 27",
+              "source_pdf_lines": [
+                1483,
+                1488
+              ],
+              "math": "\\frac{1}{4}\\eta^k\\|v^k\\|^2=\\frac{\\epsilon^2}{8n_0L}\\min\\left(\\frac{2\\|v^k\\|}{\\epsilon},\\frac{\\|v^k\\|^2}{\\epsilon^2}\\right)",
+              "uses": [
+                "previous_step:7",
+                "Finite_Sum_Parameter_Schedule",
+                "Finite_Sum_Epsilon_Positive",
+                "Finite_Sum_Lipschitz_Constant_Positive",
+                "Finite_Sum_N0_Lower_Bound"
+              ],
+              "produces": "finite_sum_descent_coefficient_min_form"
+            },
+            {
+              "step": 9,
+              "description": "Record the scalar min inequality used by the paper.",
+              "ref": "Explanation after Eq. (B.7), p. 27",
+              "source_pdf_lines": [
+                1490,
+                1492
+              ],
+              "math": "V(x)=\\min(|x|,x^2)\\ge|x|-2\\text{ for all }x",
+              "uses": [],
+              "produces": "finite_sum_scalar_min_inequality"
+            },
+            {
+              "step": 10,
+              "description": "Apply the scalar inequality to obtain the final lower bound in (B.7).",
+              "ref": "Eq. (B.7), final inequality, p. 27",
+              "source_pdf_lines": [
+                1483,
+                1492
+              ],
+              "math": "\\eta^k\\left(\\frac{1}{2}-\\frac{\\eta^kL}{2}\\right)\\|v^k\\|^2\\ge\\frac{1}{4}\\eta^k\\|v^k\\|^2=\\frac{\\epsilon^2}{8n_0L}\\min\\left(\\frac{2\\|v^k\\|}{\\epsilon},\\frac{\\|v^k\\|^2}{\\epsilon^2}\\right)\\ge\\frac{\\epsilon\\|v^k\\|-2\\epsilon^2}{4n_0L}",
+              "uses": [
+                "previous_step:8",
+                "previous_step:9",
+                "Finite_Sum_Epsilon_Positive",
+                "Finite_Sum_Lipschitz_Constant_Positive",
+                "Finite_Sum_N0_Lower_Bound"
+              ],
+              "produces": "finite_sum_descent_coefficient_lower_bound"
+            },
+            {
+              "step": 11,
+              "description": "Combine the smoothness inequality and the descent-coefficient lower bound, retaining the eta^k estimator-error term.",
+              "ref": "Eq. (B.8), first inequality, p. 27",
+              "source_pdf_lines": [
+                1494,
+                1496
+              ],
+              "math": "f(x^{k+1})\\le f(x^k)-\\frac{\\epsilon\\|v^k\\|}{4Ln_0}+\\frac{\\epsilon^2}{2n_0L}+\\frac{\\eta^k}{2}\\|v^k-\\nabla f(x^k)\\|^2",
+              "uses": [
+                "previous_step:5",
+                "previous_step:10"
+              ],
+              "produces": "finite_sum_descent_before_eta_bound"
+            },
+            {
+              "step": 12,
+              "description": "Use the finite-sum stepsize upper bound to replace the eta^k error weight by 1/(4Ln_0).",
+              "ref": "Eq. (B.8), second inequality, p. 27",
+              "source_pdf_lines": [
+                1497,
+                1501
+              ],
+              "math": "\\le f(x^k)-\\frac{\\epsilon\\|v^k\\|}{4Ln_0}+\\frac{\\epsilon^2}{2n_0L}+\\frac{1}{4Ln_0}\\|v^k-\\nabla f(x^k)\\|^2",
+              "uses": [
+                "previous_step:11",
+                "previous_step:6",
+                "Finite_Sum_Epsilon_Positive",
+                "Finite_Sum_Lipschitz_Constant_Positive",
+                "Finite_Sum_N0_Lower_Bound"
+              ],
+              "produces": "finite_sum_one_step_descent_B8_adapter"
+            }
+          ]
+        }
+      ]
+    },
+    "new_obligations": [
+      "Define the finite-sum schedule adapter in Algorithms.Unverified.SPIDER with exact source-facing values S_1=[n], S_2=n^{1/2}/n_0, eta=epsilon/(L n_0), and q=n_0 n^{1/2}, while keeping the existing Option II state/process definitions and declarations.",
+      "Add theorem2_finite_sum_estimator_error_adapter as a finite-sum process/sample-law adapter around the inherited estimator recurrence; replace Theorem1Schedule, theorem1RealizedScheduleAdmissible, and all online rounded batch-count equalities by the B.17 full-refresh boundary, S_1=[n], S_2=n^{1/2}/n_0, q=n_0 n^{1/2}, and named finite-sum recursive-sampling, conditional-centering, process-measurability, and independence obligations. Preserve the exact source B.18 display, including its extra epsilon factor and v^{k_0} left-hand side; the printed equality is algebraically inconsistent and must be resolved or rejected in Lean rather than assumed.",
+      "Add theorem2_finite_sum_one_step_descent_adapter around the inherited B.8 pathwise algebra with minimal scalar hypotheses epsilon>0, L>0, and 1<=n_0 plus the finite-sum Option II update; do not pass the online Theorem1Schedule or sigma-dependent upper-bound condition into the finite-sum route.",
+      "Reuse the inherited telescope and uniform-output conversion only after the two finite-sum adapters discharge their changed interfaces; keep B.19 as a new finite-sum ceiling/substitution obligation and add only the adapters needed for the remaining measure/index domains.",
+      "Formalize the finite-sum call-count ceiling and the B.19 substitutions, including positivity and denominator obligations for the paper's displayed quotients; preserve the literal first B.19 bound 2K+S_1 while documenting the intended 2KS_2+S_1 continuation, then expose the theorem's exact n + 8(L Delta)n^{1/2}epsilon^{-2} + 2n_0^{-1}n^{1/2} bound.",
+      "Establish the fully qualified extension proof root Algorithms.Unverified.SPIDER.theorem2_finite_sum_gradient_cost_bound in the same Lean module and make its dependency graph reach the inherited estimator/descent/output declarations."
+    ],
+    "proof_roots": [
+      "Algorithms.Unverified.SPIDER.theorem2_finite_sum_gradient_cost_bound"
+    ],
+    "extension_audit": {
+      "baseline_reviewed": true,
+      "delta_faithful": true,
+      "reuse_justified": true,
+      "no_duplicate_model": true,
+      "no_assumption_leakage": true,
+      "evidence": "The immutable baseline JSON, Lean snapshot, and declaration index were reviewed. The estimator declaration `_private.Algorithms.Unverified.SPIDER.0.Algorithms.Unverified.SPIDER.optionII_estimator_error_secondMoment_le_epsilon_sq_rounded` requires Theorem1Schedule, theorem1RealizedScheduleAdmissible, and online rounded S1/S2/q equalities, so the finite-sum proof routes through `Theorem2_FiniteSum_Estimator_Error_Adapter`, whose contract names the B.17 full-refresh identity, S1=[n], S2=n^{1/2}/n_0, q=n_0n^{1/2}, the exact B.2 step bound, and separately resolvable top-level records `Finite_Sum_Recursive_Sampling_Law`, `Finite_Sum_Conditional_Difference_Unbiasedness`, `Finite_Sum_Process_Measurability`, and `Finite_Sum_Refresh_Recursive_Independence`. The finite-sum additions also expose `Finite_Sum_Epsilon_Positive`, `Finite_Sum_Lipschitz_Constant_Positive`, and `Finite_Sum_N0_Lower_Bound`, with Lean binder mappings, and the adapter proof consumes them at the denominator and stepsize steps. The corrected reuse pointer `/extension/additions/key_lemmas/0/proof/4` resolves to the B.18 application object that explicitly consumes `Averaged_Lipschitz_Gradient`. The main finite-sum theorem proof now records the source-ordered B.9 conditional-expectation step, the full-expectation/summation and B.13 telescope, the `Finite_Initial_Gap` bound, B.14 normalization and budget substitution, and all three B.15 output-conversion transitions before the B.19 cost analysis. The inherited B.8 declaration `_private.Algorithms.Unverified.SPIDER.0.Algorithms.Unverified.SPIDER.optionII_one_step_descent_B8_pathwise` requires Theorem1Schedule and derives n0>=1 from it, so the finite-sum route uses `Theorem2_FiniteSum_OneStep_Descent_Adapter` with only the named finite-sum scalar obligations. B.15 still reuses `_private.Algorithms.Unverified.SPIDER.0.Algorithms.Unverified.SPIDER.uniform_average_gradient_bound_of_estimator_average` and `Algorithms.Unverified.SPIDER.selectedOutputGradientNormExpectation_le_of_uniform_average_le` because that conversion has no changed schedule type. No inherited theorem, assumption, or algorithm formula is changed; Phase 0 must implement the two named adapters and the new finite-sum theorem root."
+    }
+  }
+}

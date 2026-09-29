@@ -1,0 +1,872 @@
+{
+  "algorithm": "StochasticMirrorDescentSaddlePoint",
+  "full_name": "Stochastic mirror descent for stochastic convex-concave saddle point problems",
+  "source_reference": "Lan, First-order and Stochastic Optimization Methods for Machine Learning, Springer 2020, Section 4.3.1, Lemma 4.6, equations (4.3.8)-(4.3.17), and Proposition 4.10",
+    "setup": {
+      "problem": {
+        "math": "\\min_{x\\in X}\\max_{y\\in Y}\\left\\{\\phi(x,y):=\\mathbb{E}[\\Phi(x,y,\\xi)]\\right\\}.",
+        "ref": "(4.3.1)",
+        "description": "Stochastic convex-concave minimax problem with finite-valued expectation."
+      },
+      "variable_space": {
+        "ref": "Section 4.3, lines 8263-8265 and Section 4.3.1, lines 8335-8336",
+        "description": "Source prose states that X ⊂ Rn and Y ⊂ Rm are nonempty bounded closed convex sets; later it says: We use notation z = (x, y) and equip Z := X × Y with the distance generating function."
+      }
+    },
+  "assumptions": [
+    {
+      "name": "Convex_concave_problem_data",
+      "ref": "Section 4.3, lines 8263-8265",
+      "description": "Here X ⊂ Rn and Y ⊂ Rm are nonempty bounded closed convex sets, ξ is a random vector whose probability distribution P is supported on set Ξ ⊂ Rd and Φ : X ×Y × Ξ → R.",
+      "parameters": [
+        "X",
+        "Y",
+        "\\xi",
+        "\\Xi",
+        "\\Phi"
+      ]
+    },
+    {
+      "name": "Finite_expectation_and_convexity_concavity",
+      "math": "\\mathbb{E}[\\Phi(x,y,\\xi)]=\\int_{\\Xi}\\Phi(x,y,\\xi)dP(\\xi)",
+      "ref": "Section 4.3, lines 8265-8273",
+      "description": "We assume that for every ξ ∈ Ξ, function Φ(x,y,ξ) is convex in x ∈ X and concave in y ∈ Y, and for all x ∈ X, y ∈ Y the expectation is well defined and finite valued. It follows that φ(x,y) is convex in x ∈ X and concave in y ∈ Y, finite valued.",
+      "parameters": [
+        "\\Phi",
+        "\\phi",
+        "P"
+      ]
+    },
+    {
+      "name": "Phi_lipschitz_continuity",
+      "ref": "Section 4.3, line 8273",
+      "description": "In addition, we assume that φ (·, ·) is Lipschitz continuous on X × Y.",
+      "parameters": [
+        "\\phi",
+        "X",
+        "Y"
+      ]
+    },
+    {
+      "name": "Stochastic_first_order_oracle_Assumption_7",
+      "math": "G(x,y,\\xi)=\\begin{bmatrix}G_x(x,y,\\xi)\\\\-G_y(x,y,\\xi)\\end{bmatrix},\\quad g(x,y)=\\begin{bmatrix}g_x(x,y)\\\\-g_y(x,y)\\end{bmatrix}:=\\begin{bmatrix}\\mathbb{E}[G_x(x,y,\\xi)]\\\\-\\mathbb{E}[G_y(x,y,\\xi)]\\end{bmatrix}",
+      "ref": "Assumption 7, lines 8284-8298",
+      "description": "There exists a stochastic first-order oracle which for every given x ∈ X, y ∈ Y and ξ ∈ Ξ returns value Φ(x,y,ξ) and a stochastic subgradient; g(x,y) is well defined, and gx(x,y) ∈ ∂x φ(x,y) and −gy(x,y) ∈ ∂y(−φ(x,y)).",
+      "parameters": [
+        "G",
+        "G_x",
+        "G_y",
+        "g",
+        "g_x",
+        "g_y"
+      ]
+    },
+    {
+      "name": "Oracle_second_moment_bound",
+      "math": "\\mathbb{E}\\left[\\|G_x(u,v,\\xi)\\|_{*,X}^2\\right]\\le M_X^2\\text{ and }\\mathbb{E}\\left[\\|G_y(u,v,\\xi)\\|_{*,Y}^2\\right]\\le M_Y^2,\\quad \\forall (u,v)\\in X\\times Y.",
+      "ref": "(4.3.2), lines 8306-8312",
+      "parameters": [
+        "M_X",
+        "M_Y",
+        "G_x",
+        "G_y"
+      ]
+    },
+    {
+      "name": "Distance_generating_functions_modulus_one",
+      "ref": "Section 4.3.1, lines 8318-8320",
+      "description": "We equip X and Y with distance generating functions νX : X → R modulus 1 with respect to · X, and νY : Y → R modulus 1 with respect to · Y. Let DX ≡ DX,νX and DY ≡ DY,νY be the respective constants (see Sect. 3.2).",
+      "parameters": [
+        "\\nu_X",
+        "\\nu_Y",
+        "D_X",
+        "D_Y"
+      ]
+    },
+    {
+      "name": "Product_norm_and_dual_norm",
+      "math": "\\|(x,y)\\|:=\\sqrt{\\frac{1}{2D_X^2}\\|x\\|_X^2+\\frac{1}{2D_Y^2}\\|y\\|_Y^2},\\quad \\|(\\zeta,\\eta)\\|_* = \\sqrt{2D_X^2\\|\\zeta\\|_{*,X}^2+2D_Y^2\\|\\eta\\|_{*,Y}^2}.",
+      "ref": "(4.3.3)-(4.3.4), lines 8321-8328",
+      "parameters": [
+        "D_X",
+        "D_Y",
+        "\\|\\cdot\\|",
+        "\\|\\cdot\\|_*"
+      ]
+    },
+    {
+      "name": "Product_norm_bound_M",
+      "math": "\\mathbb{E}\\left[\\|G(x,y,\\xi)\\|_*^2\\right]\\le 2D_X^2M_X^2+2D_Y^2M_Y^2=:M^2.",
+      "ref": "(4.3.5), lines 8330-8332",
+      "parameters": [
+        "M",
+        "D_X",
+        "D_Y",
+        "M_X",
+        "M_Y"
+      ]
+    },
+      {
+        "name": "Product_DGF_normalization",
+        "math": "\\nu(z):=\\frac{\\nu_X(x)}{2D_X^2}+\\frac{\\nu_Y(y)}{2D_Y^2}.",
+        "ref": "Section 4.3.1, lines 8335-8340",
+        "description": "The following prose states that ν is a distance generating function for Z modulus 1 with respect to the product norm, that Z^o = X^o × Y^o and D_Z ≡ D_{Z,ν} = 1, and that V(z,u) : Z^o × Z → R is the associated prox-function.",
+        "parameters": [
+          "\\nu",
+          "Z",
+        "D_Z",
+        "V"
+      ]
+    },
+    {
+      "name": "Mirror_descent_update_3_2_5",
+      "math": "x_{t+1}=\\arg\\min_{x\\in X}\\gamma_t\\langle g(x_t),x\\rangle+V(x_t,x),\\quad t=1,2,\\ldots.",
+      "ref": "(3.2.5), lines 3358-3363",
+      "description": "The deterministic mirror descent prox subproblem whose optimality condition is used in Lemma 3.4.",
+      "parameters": [
+        "x_{t+1}",
+        "\\gamma_t",
+        "g(x_t)",
+        "V"
+      ]
+    },
+    {
+      "name": "Stochastic_mirror_descent_initialization_z1",
+      "ref": "Section 4.3.1, lines 8349-8351",
+      "description": "where the initial point z1 ∈ Z is chosen to be the minimizer of ν(z) on Z.",
+      "parameters": [
+        "z_1",
+        "Z",
+        "\\nu"
+      ]
+    },
+    {
+      "name": "Stochastic_mirror_descent_update_4_3_6",
+      "math": "z_{t+1}:=\\arg\\min_{z\\in X}\\{\\gamma_t\\{\\langle G(z_t,\\xi_t),z\\rangle+V(z_t,z)\\}\\},",
+      "ref": "(4.3.6), lines 8349-8351",
+      "description": "The stochastic mirror descent recursion as printed in (4.3.6). The proof of Lemma 4.6 later applies (4.1.41) with \\zeta_t=\\gamma_tG(z_t,\\xi_t), so the prox-recursion form needed for that application is recorded as a derived proof-side interpretation rather than as the printed formula.",
+      "parameters": [
+        "z_{t+1}",
+        "\\gamma_t",
+        "G(z_t,\\xi_t)",
+        "V"
+      ]
+    },
+    {
+      "name": "Error_measure_definition",
+      "math": "\\varepsilon_\\phi(\\tilde z):=\\left[\\max_{y\\in Y}\\phi(\\tilde x,y)-\\phi_*\\right]+\\left[\\phi_*-\\min_{x\\in X}\\phi(x,\\tilde y)\\right]=\\max_{y\\in Y}\\phi(\\tilde x,y)-\\min_{x\\in X}\\phi(x,\\tilde y).",
+      "ref": "Section 4.3.1, lines 8357-8361",
+      "parameters": [
+        "\\varepsilon_\\phi",
+        "\\tilde z",
+        "\\phi_*"
+      ]
+    },
+    {
+      "name": "Weighted_average_output_definition",
+      "math": "\\tilde z_j=(\\tilde x_j,\\tilde y_j):=\\left(\\sum_{t=1}^j\\gamma_t\\right)^{-1}\\sum_{t=1}^j\\gamma_t z_t.",
+      "ref": "(4.3.7), lines 8351-8355",
+      "parameters": [
+        "\\tilde z_j",
+        "\\gamma_t",
+        "z_t"
+      ]
+    },
+    {
+      "name": "Constant_stepsize_policy",
+      "math": "\\gamma_t=\\frac{2}{M\\sqrt{5N}},\\quad t=1,\\ldots,N.",
+      "ref": "(4.3.15), lines 8467-8469",
+      "parameters": [
+        "\\gamma_t",
+        "M",
+        "N"
+      ]
+    },
+    {
+      "name": "Exponential_tail_oracle_bound",
+      "math": "\\mathbb{E}\\left[\\exp\\left\\{\\|G_x(u,v,\\xi)\\|_{*,X}^2/M_X^2\\right\\}\\right]\\le\\exp\\{1\\},\\quad \\mathbb{E}\\left[\\exp\\left\\{\\|G_y(x,y,\\xi)\\|_{*,Y}^2/M_Y^2\\right\\}\\right]\\le\\exp\\{1\\}.",
+      "ref": "(4.3.18), lines 8499-8504",
+      "description": "Suppose that conditions of the bound (4.3.16) are verified and, further, it holds for all (u,v) ∈ Z that the two displayed exponential moment inequalities in (4.3.18) hold.",
+      "parameters": [
+        "G_x",
+        "G_y",
+        "M_X",
+        "M_Y"
+      ]
+    }
+  ],
+  "algorithm_spec": {
+    "initialization": {
+      "ref": "Section 4.3.1, p. 150",
+      "description": "where the initial point z1 ∈ Z is chosen to be the minimizer of ν(z) on Z."
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "stochastic_mirror_descent_update",
+        "math": "z_{t+1}:=\\arg\\min_{z\\in X}\\{\\gamma_t\\{\\langle G(z_t,\\xi_t),z\\rangle+V(z_t,z)\\}\\},",
+        "ref": "(4.3.6)"
+      }
+    ],
+    "output": {
+      "math": "\\tilde z_j=(\\tilde x_j,\\tilde y_j):=\\left(\\sum_{t=1}^j\\gamma_t\\right)^{-1}\\sum_{t=1}^j\\gamma_t z_t.",
+      "ref": "(4.3.7)",
+      "type": "weighted average of iterates"
+    },
+    "parameters": [
+      {
+        "name": "gamma_t_constant",
+        "math": "\\gamma_t=\\frac{2}{M\\sqrt{5N}},\\quad t=1,\\ldots,N.",
+        "ref": "(4.3.15)"
+      },
+      {
+        "name": "gamma_t_decreasing",
+        "math": "\\gamma_t := 1/(M\\sqrt{t}),\\quad t = 1, 2, \\ldots,",
+        "ref": "Section 4.3.1, p. 152"
+      },
+      {
+        "name": "sliding_average",
+        "math": "\\tilde z_j=\\left(\\sum_{t=j-\\lfloor j/2\\rfloor}^{j}\\gamma_t\\right)^{-1}\\sum_{t=j-\\lfloor j/2\\rfloor}^{j}\\gamma_tz_t.",
+        "ref": "Section 4.3.1, p. 152"
+      }
+    ]
+    },
+    "main_theorem": {
+      "statement_math": "\\mathbb{E}[\\varepsilon_\\phi(\\tilde z_j)]\\le\\left(\\sum_{t=1}^j\\gamma_t\\right)^{-1}\\left[2+\\frac{5}{2}M^2\\sum_{t=1}^j\\gamma_t^2\\right].",
+      "ref": "Section 4.3.1, lines 8461-8465",
+      "rate": "O(\\bar D_{Z,\\nu} M / sqrt(j)) for the decreasing-stepsize sliding average, with \\bar D_{Z,\\nu} assumed finite as in the paper; O(M / sqrt(N)) for the fixed-horizon constant stepsize.",
+      "measure": "saddle-point primal-dual gap epsilon_phi(tilde z)",
+      "proof": [
+      {
+        "step": 1,
+        "description": "Define the saddle-point error for an approximate solution and rewrite it as the max-min gap.",
+        "ref": "Section 4.3.1, p. 150",
+        "source_pdf_lines": [
+          8357,
+          8361
+        ],
+        "math": "\\varepsilon_\\phi(\\tilde z):=\\left[\\max_{y\\in Y}\\phi(\\tilde x,y)-\\phi_*\\right]+\\left[\\phi_*-\\min_{x\\in X}\\phi(x,\\tilde y)\\right]=\\max_{y\\in Y}\\phi(\\tilde x,y)-\\min_{x\\in X}\\phi(x,\\tilde y).",
+        "uses": [
+          "Error_measure_definition"
+        ],
+        "produces": "gap_as_max_min"
+      },
+      {
+        "step": 2,
+        "description": "Use convexity of phi(.,y) and the x-subgradient gx(xt,yt) to upper bound the primal side.",
+        "ref": "Section 4.3.1, p. 150",
+        "source_pdf_lines": [
+          8363,
+          8365
+        ],
+        "math": "\\phi(x_t,y_t)-\\phi(x,y_t)\\le g_x(x_t,y_t)^T(x_t-x),\\quad \\forall x\\in X,",
+        "uses": [
+          "Finite_expectation_and_convexity_concavity",
+          "Stochastic_first_order_oracle_Assumption_7"
+        ],
+        "produces": "x_subgradient_gap_bound"
+      },
+      {
+        "step": 3,
+        "description": "Use concavity of phi(x,.) and the y-supergradient gy(xt,yt) to upper bound the dual side.",
+        "ref": "Section 4.3.1, p. 150",
+        "source_pdf_lines": [
+          8367,
+          8369
+        ],
+        "math": "\\phi(x_t,y)-\\phi(x_t,y_t)\\le g_y(x_t,y_t)^T(y-y_t),\\quad \\forall y\\in Y,",
+        "uses": [
+          "Finite_expectation_and_convexity_concavity",
+          "Stochastic_first_order_oracle_Assumption_7"
+        ],
+        "produces": "y_supergradient_gap_bound"
+      },
+      {
+        "step": 4,
+        "description": "Add the two one-sided bounds and identify the product-space stochastic-gradient vector g(zt).",
+        "ref": "Section 4.3.1, p. 150",
+        "source_pdf_lines": [
+          8371,
+          8373
+        ],
+        "math": "\\phi(x_t,y)-\\phi(x,y_t)\\le g_x(x_t,y_t)^T(x_t-x)+g_y(x_t,y_t)^T(y-y_t)=g(z_t)^T(z_t-z).",
+        "uses": [
+          "previous_step:2",
+          "previous_step:3",
+          "Stochastic_first_order_oracle_Assumption_7"
+        ],
+        "produces": "single_iterate_gap_bound"
+      },
+      {
+        "step": 5,
+        "description": "Apply the weighted-average definition of tilde z_j and convexity-concavity to move from the output gap to a weighted sum over iterates.",
+        "ref": "(4.3.8), first inequality",
+        "source_pdf_lines": [
+          8375,
+          8382
+        ],
+        "math": "\\varepsilon_\\phi(\\tilde z_j)=\\max_{y\\in Y}\\phi(\\tilde x_j,y)-\\min_{x\\in X}\\phi(x,\\tilde y_j)\\le\\left(\\sum_{t=1}^j\\gamma_t\\right)^{-1}\\left[\\max_{y\\in Y}\\sum_{t=1}^j\\gamma_t\\phi(x_t,y)-\\min_{x\\in X}\\sum_{t=1}^j\\gamma_t\\phi(x,y_t)\\right]",
+        "uses": [
+          "Weighted_average_output_definition",
+          "Finite_expectation_and_convexity_concavity",
+          "previous_step:1"
+        ],
+        "produces": "weighted_phi_gap_bound"
+      },
+      {
+        "step": 6,
+        "description": "Substitute the single-iterate product-space gap bound into the weighted max-min expression, giving the reduction to the maximized regret-like sum.",
+        "ref": "(4.3.8), second inequality",
+        "source_pdf_lines": [
+          8384,
+          8385
+        ],
+        "math": "\\varepsilon_\\phi(\\tilde z_j)\\le\\left(\\sum_{t=1}^j\\gamma_t\\right)^{-1}\\max_{z\\in Z}\\sum_{t=1}^j\\gamma_t g(z_t)^T(z_t-z).",
+        "uses": [
+          "previous_step:4",
+          "previous_step:5"
+        ],
+        "produces": "epsilon_reduced_to_regret_sum"
+      },
+      {
+        "step": 7,
+        "description": "Invoke Lemma 4.6 to bound the expectation of the maximized regret-like sum.",
+        "ref": "(4.3.9)",
+        "source_pdf_lines": [
+          8388,
+          8394
+        ],
+        "math": "\\mathbb{E}\\left[\\max_{z\\in Z}\\sum_{t=1}^j\\gamma_t g(z_t)^T(z_t-z)\\right]\\le 2+\\frac{5}{2}M^2\\sum_{t=1}^j\\gamma_t^2.",
+        "uses": [
+          "Lemma_4_6_gap_sum_bound"
+        ],
+        "produces": "expected_regret_sum_bound"
+      },
+      {
+        "step": 8,
+        "description": "Substitute (4.3.9) into (4.3.8) and take expectation to obtain the displayed expected error bound.",
+        "ref": "Section 4.3.1, p. 152",
+        "source_pdf_lines": [
+          8461,
+          8465
+        ],
+        "math": "\\mathbb{E}[\\varepsilon_\\phi(\\tilde z_j)]\\le\\left(\\sum_{t=1}^j\\gamma_t\\right)^{-1}\\left[2+\\frac{5}{2}M^2\\sum_{t=1}^j\\gamma_t^2\\right].",
+        "uses": [
+          "previous_step:6",
+          "previous_step:7"
+        ],
+        "produces": "expected_epsilon_bound_general_stepsizes"
+      },
+      {
+        "step": 9,
+        "description": "Specialize to the paper's fixed-horizon constant stepsize.",
+        "ref": "(4.3.15)",
+        "source_pdf_lines": [
+          8467,
+          8469
+        ],
+        "math": "\\gamma_t=\\frac{2}{M\\sqrt{5N}},\\quad t=1,\\ldots,N.",
+        "uses": [
+          "Constant_stepsize_policy"
+        ],
+        "produces": "constant_stepsize_substitution"
+      },
+    {
+      "step": 10,
+      "description": "Record the paper's printed fixed-horizon consequence after substituting the constant stepsize (4.3.15) into the general expected bound. The source prints this without an expectation, so the expectation-drop or notation change is intentionally left as a source-level unresolved passage rather than supplied as an added hypothesis.",
+      "ref": "Section 4.3.1, p. 152",
+      "source_pdf_lines": [
+        8470,
+        8472
+        ],
+        "math": "\\varepsilon_\\phi(\\tilde z_N)\\le 2M\\sqrt{\\frac{5}{N}},",
+      "uses": [
+        "previous_step:8",
+        "previous_step:9"
+      ],
+      "produces": "fixed_horizon_M_bound"
+    },
+    {
+      "step": 11,
+      "description": "Record (4.3.16) as the paper's printed componentwise fixed-horizon consequence. The display includes alpha_x and alpha_y, which are not defined in the cited local source window, so this step does not claim derivation from (4.3.5) alone.",
+      "ref": "(4.3.16)",
+      "source_pdf_lines": [
+        8472,
+        8475
+        ],
+      "math": "\\varepsilon_\\phi(\\tilde z_N)\\le 2\\sqrt{\\frac{10[\\alpha_yD_X^2M_X^2+\\alpha_xD_Y^2M_Y^2]}{\\alpha_x\\alpha_yN}}.",
+      "uses": [
+        "previous_step:10",
+        "Product_norm_bound_M"
+      ],
+      "produces": "fixed_horizon_component_bound"
+    },
+      {
+        "step": 12,
+        "description": "Record the paper's first saddle-specific adaptation from the minimization discussion in Section 3.2: pass from fixed-horizon constant stepsizes to the printed decreasing policy. The Section 3.2 exercise proof is not printed here, so it is not used as a formal proof dependency.",
+        "ref": "Section 4.3.1, p. 152",
+        "source_pdf_lines": [
+          8477,
+          8481
+        ],
+        "math": "\\gamma_t := 1/(M\\sqrt{t}),\\quad t = 1, 2, \\ldots,",
+        "uses": [
+          "previous_step:8",
+          "gamma_t_decreasing"
+        ],
+        "produces": "saddle_decreasing_stepsize_policy_selected"
+      },
+      {
+        "step": 13,
+        "description": "Record the paper's second saddle-specific adaptation: replace averaging over all iterates by the printed sliding average over the final half-window.",
+        "ref": "Section 4.3.1, p. 152",
+        "source_pdf_lines": [
+          8482,
+          8486
+        ],
+        "math": "\\tilde z_j=\\left(\\sum_{t=j-\\lfloor j/2\\rfloor}^{j}\\gamma_t\\right)^{-1}\\sum_{t=j-\\lfloor j/2\\rfloor}^{j}\\gamma_tz_t.",
+        "uses": [
+          "previous_step:12",
+          "sliding_average"
+        ],
+        "produces": "saddle_sliding_average_selected"
+      },
+      {
+        "step": 14,
+        "description": "Record (4.3.17) only as the source's printed saddle consequence of the decreasing-stepsize and sliding-averaging passage. The PDF says this is obtained as in the minimization case but does not print the Section 3.2 derivation in this window.",
+        "ref": "(4.3.17)",
+        "source_pdf_lines": [
+          8487,
+          8491
+        ],
+        "math": "\\varepsilon_\\phi(\\tilde z_j)\\le O(1)\\frac{\\bar D_{Z,\\nu}M}{\\sqrt{j}},",
+        "uses": [
+          "previous_step:12",
+          "previous_step:13",
+          "gamma_t_decreasing",
+          "sliding_average"
+        ],
+        "produces": "decreasing_stepsize_sliding_average_rate_printed_consequence"
+      },
+      {
+        "step": 15,
+        "description": "Define the diameter quantity that appears in the saddle efficiency estimate.",
+        "ref": "Section 4.3.1, p. 152",
+        "source_pdf_lines": [
+          8492,
+          8493
+        ],
+        "math": "\\bar D_{Z,\\nu}=\\left[2\\sup_{z\\in Z^o,w\\in Z}V(z,w)\\right]^{1/2}",
+        "uses": [
+          "Product_DGF_normalization"
+        ],
+        "produces": "bar_D_Z_nu_definition"
+      },
+      {
+        "step": 16,
+        "description": "Record the source's prose side condition following (4.3.17): the quantity \\bar D_{Z,\\nu} is assumed to be finite.",
+        "ref": "Section 4.3.1, p. 152",
+        "source_pdf_lines": [
+          8492,
+          8493
+        ],
+        "uses": [
+          "previous_step:15"
+        ],
+        "produces": "finite_bar_D_Z_nu_assumption"
+      }
+        ]
+    },
+    "key_lemmas": [
+    {
+      "name": "Prox_mapping_Lemma_3_4",
+      "ref": "Lemma 3.4",
+      "statement_math": "\\text{Let }x_{t+1}\\text{ be defined in }(3.2.5).\\ \\text{For any }y\\in X,\\ \\text{we have}\\quad \\gamma_t\\langle g(x_t),x_{t+1}-x\\rangle+V(x_t,x_{t+1})\\le V(x_t,x)-V(x_{t+1},x).",
+      "role": "Provides the one-step optimality inequality for mirror descent prox updates; Lemma 4.3 uses it as its first step.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Apply the optimality condition of the prox subproblem (3.2.5).",
+          "ref": "Lemma 3.4 proof, p. 61",
+          "source_pdf_lines": [
+            3368,
+            3372
+          ],
+          "math": "\\langle\\gamma_tg(x_t)+\\nabla V(x_t,x_{t+1}),x-x_t\\rangle\\ge 0,\\quad \\forall x\\in X,",
+          "uses": [
+            "Mirror_descent_update_3_2_5"
+          ],
+          "produces": "prox_subproblem_optimality_condition"
+        },
+        {
+          "step": 2,
+          "description": "Use the prox-function identity printed as (3.2.6).",
+          "ref": "(3.2.6)",
+          "source_pdf_lines": [
+            3373,
+            3376
+          ],
+          "math": "V(x_t,x)=V(x_t,x_{t+1})+\\langle\\nabla V(x_t,x_{t+1}),x-x_{t+1}\\rangle+V(x_{t+1},x),\\quad \\forall x\\in X.",
+          "uses": [
+            "Distance_generating_functions_modulus_one"
+          ],
+          "produces": "three_point_bregman_identity"
+        },
+        {
+          "step": 3,
+          "description": "Combine the optimality condition and the prox identity to conclude Lemma 3.4; the proof line is prose-only and refers back to the lemma statement display.",
+          "ref": "Lemma 3.4 proof, p. 62",
+          "source_pdf_lines": [
+            3378,
+            3378
+          ],
+          "uses": [
+            "previous_step:1",
+            "previous_step:2"
+          ],
+          "produces": "prox_mapping_lemma_3_4: gamma_t<g(x_t),x_{t+1}-x>+V(x_t,x_{t+1}) <= V(x_t,x)-V(x_{t+1},x)"
+        }
+      ]
+    },
+    {
+      "name": "Prox_sequence_Lemma_4_3",
+      "ref": "Lemma 4.3",
+      "statement_math": "\\text{Let }\\zeta_1,\\ldots,\\zeta_j\\text{ be a sequence of elements of }\\mathbb{R}^n.\\ \\text{Define }v_t,\\ t=1,2,\\ldots\\text{ in }X^o\\text{ as follows: }v_1\\in X^o\\text{ and }v_{t+1}=\\arg\\min_{x\\in X}\\{\\langle\\zeta_t,x\\rangle+V(v_t,x)\\}.\\ \\text{Then for any }x\\in X\\text{ the following inequalities hold}\\quad \\langle\\zeta_t,v_t-x\\rangle\\le V(v_t,x)-V(v_{t+1},x)+\\frac{1}{2}\\|\\zeta_t\\|_*^2,\\quad \\sum_{t=1}^j\\langle\\zeta_t,v_t-x\\rangle\\le V(v_1,x)+\\frac{1}{2}\\sum_{t=1}^j\\|\\zeta_t\\|_*^2.",
+      "role": "Supplies the prox recursion (4.1.41) and its summed form (4.1.42), both used in Lemma 4.6.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Apply Lemma 3.4 to the auxiliary prox sequence vt+1 = argmin{<zeta_t,x> + V(vt,x)}.",
+          "ref": "Lemma 4.3 proof, p. 124",
+          "source_pdf_lines": [
+            6689,
+            6692
+          ],
+          "math": "\\langle\\zeta_t,v_{t+1}-x\\rangle+V(v_t,v_{t+1})\\le V(v_t,x)-V(v_{t+1},x),",
+          "uses": [
+            "Prox_mapping_Lemma_3_4"
+          ],
+          "produces": "auxiliary_prox_three_point_bound"
+        },
+        {
+          "step": 2,
+          "description": "Use strong convexity of the prox function and Cauchy-Schwarz/Young to bound the movement term.",
+          "ref": "Lemma 4.3 proof, p. 124",
+          "source_pdf_lines": [
+            6693,
+            6696
+          ],
+          "math": "\\langle\\zeta_t,v_t-v_{t+1}\\rangle-V(v_t,v_{t+1})\\le\\langle\\zeta_t,v_t-v_{t+1}\\rangle-\\frac{1}{2}\\|v_{t+1}-v_t\\|^2\\le\\frac{1}{2}\\|\\zeta_t\\|_*^2,",
+          "uses": [
+            "Distance_generating_functions_modulus_one"
+          ],
+          "produces": "movement_term_bound"
+        },
+        {
+          "step": 3,
+          "description": "Add the auxiliary prox three-point bound and the movement term bound to obtain the one-step inequality.",
+          "ref": "(4.1.41)",
+          "source_pdf_lines": [
+            6681,
+            6685
+          ],
+          "math": "\\langle\\zeta_t,v_t-x\\rangle\\le V(v_t,x)-V(v_{t+1},x)+\\frac{1}{2}\\|\\zeta_t\\|_*^2.",
+          "uses": [
+            "previous_step:1",
+            "previous_step:2"
+          ],
+          "produces": "prox_sequence_one_step_4_1_41"
+        },
+        {
+          "step": 4,
+          "description": "Sum (4.1.41) from t=1 to j and drop the nonnegative terminal prox term.",
+          "ref": "(4.1.42)",
+          "source_pdf_lines": [
+            6686,
+            6687
+          ],
+          "math": "\\sum_{t=1}^j\\langle\\zeta_t,v_t-x\\rangle\\le V(v_1,x)+\\frac{1}{2}\\sum_{t=1}^j\\|\\zeta_t\\|_*^2.",
+          "uses": [
+            "previous_step:3",
+            "Distance_generating_functions_modulus_one"
+          ],
+          "produces": "prox_sequence_summed_4_1_42"
+        }
+      ]
+    },
+    {
+      "name": "Lemma_4_6_gap_sum_bound",
+            "ref": "Lemma 4.6",
+            "statement_math": "\\text{For any }j\\ge 1\\text{ the following inequality holds}\\quad \\mathbb{E}\\left[\\max_{z\\in Z}\\sum_{t=1}^j\\gamma_t g(z_t)^T(z_t-z)\\right]\\le 2+\\frac{5}{2}M^2\\sum_{t=1}^j\\gamma_t^2.",
+      "role": "This is the central estimate substituted into (4.3.8) to obtain the expected saddle-point gap bound.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Before the displayed inequality (4.3.10), the paper says it uses (4.1.41) with \\zeta_t=\\gamma_tG(z_t,\\xi_t). This requires the proof-side prox recursion z_{t+1}=argmin_z{<\\gamma_tG(z_t,\\xi_t),z>+V(z_t,z)}; this is a derived interpretation of the printed algorithm line (4.3.6), whose displayed formula is retained separately.",
+          "ref": "Lemma 4.6 proof, prerequisite for (4.3.10)",
+          "source_pdf_lines": [
+            8396,
+            8396
+          ],
+          "uses": [
+            "Prox_sequence_Lemma_4_3",
+            "Stochastic_mirror_descent_update_4_3_6",
+            "Stochastic_mirror_descent_initialization_z1"
+          ],
+          "produces": "derived_prox_recursion_for_4_1_41_application"
+        },
+        {
+          "step": 2,
+          "description": "Use (4.1.41) with zeta_t = gamma_t G(zt,xi_t) to get the stochastic one-step prox inequality.",
+          "ref": "(4.3.10)",
+          "source_pdf_lines": [
+            8396,
+            8400
+          ],
+          "math": "\\gamma_t(z_t-u)^TG(z_t,\\xi_t)\\le V(z_t,u)-V(z_{t+1},u)+\\frac{\\gamma_t^2}{2}\\|G(z_t,\\xi_t)\\|_*^2.",
+          "uses": [
+            "Prox_sequence_Lemma_4_3",
+            "previous_step:1"
+          ],
+          "produces": "stochastic_one_step_prox_bound"
+        },
+        {
+          "step": 3,
+          "description": "Introduce the oracle noise residual used throughout the proof.",
+          "ref": "Lemma 4.6 proof, residual definition",
+          "source_pdf_lines": [
+            8409,
+            8409
+          ],
+          "math": "\\Delta_t:=G(z_t,\\xi_t)-g(z_t).",
+          "uses": [
+            "Stochastic_first_order_oracle_Assumption_7"
+          ],
+          "produces": "delta_t_definition"
+        },
+        {
+          "step": 4,
+          "description": "Rewrite (4.3.10) in terms of g(z_t), moving the residual contribution to the right-hand side.",
+          "ref": "(4.3.11)",
+          "source_pdf_lines": [
+            8402,
+            8407
+          ],
+          "math": "\\gamma_t(z_t-u)^Tg(z_t)\\le V(z_t,u)-V(z_{t+1},u)+\\frac{\\gamma_t^2}{2}\\|G(z_t,\\xi_t)\\|_*^2-\\gamma_t(z_t-u)^T\\Delta_t,",
+          "uses": [
+            "previous_step:2",
+            "previous_step:3"
+          ],
+          "produces": "delta_rewritten_one_step_bound"
+        },
+        {
+          "step": 5,
+          "description": "Sum the one-step inequality from t=1 to j, telescoping the prox terms as printed.",
+          "ref": "Lemma 4.6 proof, p. 151",
+          "source_pdf_lines": [
+            8409,
+            8415
+          ],
+          "math": "\\sum_{t=1}^j\\gamma_t(z_t-u)^Tg(z_t)\\le V(z_1,u)-V(z_{t+1},u)+\\sum_{t=1}^j\\frac{\\gamma_t^2}{2}\\|G(z_t,\\xi_t)\\|_*^2-\\sum_{t=1}^j\\gamma_t(z_t-u)^T\\Delta_t.",
+          "uses": [
+            "previous_step:4"
+          ],
+          "produces": "summed_delta_one_step_bound"
+        },
+        {
+          "step": 6,
+          "description": "Introduce the auxiliary prox sequence used for the Delta_t residual: the paper applies Lemma 4.3 with v1=z1 and zeta_t=-gamma_t Delta_t.",
+          "ref": "Lemma 4.6 proof, auxiliary sequence definition",
+          "source_pdf_lines": [
+            8418,
+            8418
+          ],
+          "math": "v_1=z_1,\\quad \\zeta_t=-\\gamma_t\\Delta_t.",
+          "uses": [
+            "Prox_sequence_Lemma_4_3",
+            "previous_step:3",
+            "Stochastic_mirror_descent_initialization_z1"
+          ],
+          "produces": "auxiliary_v_sequence_def"
+        },
+        {
+          "step": 7,
+          "description": "Apply Lemma 4.3 to the auxiliary sequence from the preceding step to obtain (4.3.12).",
+          "ref": "(4.3.12)",
+          "source_pdf_lines": [
+            8418,
+            8420
+          ],
+          "math": "\\forall u\\in Z:\\quad \\sum_{t=1}^j\\gamma_t\\Delta_t^T(u-v_t)\\le V(z_1,u)+\\frac{1}{2}\\sum_{t=1}^j\\gamma_t^2\\|\\Delta_t\\|_*^2.",
+          "uses": [
+            "Prox_sequence_Lemma_4_3",
+            "previous_step:6"
+          ],
+          "produces": "auxiliary_delta_sequence_bound"
+        },
+        {
+          "step": 8,
+          "description": "Bound the second moment of Delta_t by the stochastic-oracle moment bound M.",
+          "ref": "Lemma 4.6 proof, p. 151",
+          "source_pdf_lines": [
+            8422,
+            8425
+                ],
+                "math": "\\mathbb{E}\\|\\Delta_t\\|_*^2\\le 4\\mathbb{E}\\|G(z_t,\\xi_t)\\|_*^2\\le 4(2D_X^2M_X^2+2D_Y^2M_Y^2)=4M^2,",
+                "uses": [
+                    "previous_step:3",
+                    "Stochastic_first_order_oracle_Assumption_7",
+                    "Product_norm_bound_M"
+                ],
+                "produces": "delta_second_moment_bound: conditional unbiasedness identifies g(z_t)=E[G(z_t,xi_t)|xi_[t-1]], and the product-space moment bound applies at the random iterate z_t"
+            },
+        {
+          "step": 9,
+          "description": "Take expectation of (4.3.12), use V(z1,.) bounded by 1 on Z, and substitute the Delta_t moment bound.",
+          "ref": "(4.3.13)",
+          "source_pdf_lines": [
+            8426,
+            8430
+          ],
+          "math": "\\mathbb{E}\\left[\\sup_{u\\in Z}\\sum_{t=1}^j\\gamma_t\\Delta_t^T(u-v_t)\\right]\\le 1+2M^2\\sum_{t=1}^j\\gamma_t^2.",
+          "uses": [
+            "previous_step:7",
+            "previous_step:8",
+            "Product_DGF_normalization"
+          ],
+          "produces": "expected_auxiliary_delta_sup_bound"
+        },
+        {
+          "step": 10,
+          "description": "Sum (4.3.11) from t=1 to j again, this time dropping the nonpositive terminal prox term V(z_{t+1},u).",
+          "ref": "(4.3.14)",
+          "source_pdf_lines": [
+            8432,
+            8435
+          ],
+          "math": "\\sum_{t=1}^j\\gamma_t(z_t-u)^Tg(z_t)\\le V(z_1,u)+\\sum_{t=1}^j\\frac{\\gamma_t^2}{2}\\|G(z_t,\\xi_t)\\|_*^2-\\sum_{t=1}^j\\gamma_t(z_t-u)^T\\Delta_t",
+          "uses": [
+            "previous_step:4",
+            "Distance_generating_functions_modulus_one"
+          ],
+          "produces": "summed_delta_bound_without_terminal_prox"
+        },
+        {
+          "step": 11,
+          "description": "Split the residual term around the auxiliary sequence v_t, producing the martingale-centered term and the auxiliary supremum term used later.",
+          "ref": "(4.3.14)",
+          "source_pdf_lines": [
+            8436,
+            8438
+          ],
+          "math": "\\sum_{t=1}^j\\gamma_t(z_t-u)^Tg(z_t)\\le V(z_1,u)+\\sum_{t=1}^j\\frac{\\gamma_t^2}{2}\\|G(z_t,\\xi_t)\\|_*^2-\\sum_{t=1}^j\\gamma_t(z_t-v_t)^T\\Delta_t+\\sum_{t=1}^j\\gamma_t(u-v_t)^T\\Delta_t.",
+          "uses": [
+            "previous_step:10",
+            "previous_step:6"
+          ],
+          "produces": "split_delta_bound_4_3_14"
+        },
+        {
+          "step": 12,
+          "description": "Because zt and vt are deterministic functions of xi_[t-1] and the conditional expectation of Delta_t vanishes, the martingale cross term has zero expectation.",
+          "ref": "Lemma 4.6 proof, p. 151",
+          "source_pdf_lines": [
+            8441,
+            8443
+          ],
+          "math": "\\mathbb{E}[(z_t-v_t)^T\\Delta_t]=0.",
+          "uses": [
+            "previous_step:3",
+            "previous_step:6",
+            "Stochastic_first_order_oracle_Assumption_7",
+            "Stochastic_mirror_descent_update_4_3_6",
+            "Stochastic_mirror_descent_initialization_z1"
+          ],
+          "produces": "zero_expected_cross_term"
+        },
+        {
+          "step": 13,
+          "description": "Take suprema over u in Z and expectations on both sides of (4.3.14), dropping the zero-expectation cross term. The residual term is printed without an expectation in this display; the expected residual supremum needed for the next line is recorded in produces as the derived object matched to (4.3.13).",
+          "ref": "Lemma 4.6 proof, p. 151",
+          "source_pdf_lines": [
+            8443,
+            8452
+          ],
+          "math": "\\mathbb{E}\\left[\\sup_{u\\in Z}\\sum_{t=1}^j\\gamma_t(z_t-u)^Tg(z_t)\\right]\\le\\sup_{u\\in Z}V(z_1,u)+\\sum_{t=1}^j\\frac{\\gamma_t^2}{2}\\mathbb{E}\\|G(z_t,\\xi_t)\\|_*^2+\\sup_{u\\in Z}\\sum_{t=1}^j\\gamma_t(u-v_t)^T\\Delta_t",
+          "uses": [
+            "previous_step:11",
+            "previous_step:12"
+          ],
+          "produces": "expected_sup_bound_with_printed_residual_term; derived_expected_residual_supremum_object"
+        },
+        {
+          "step": 14,
+          "description": "Use the expected residual-supremum bound printed as (4.3.13) for the derived residual object from the preceding display.",
+          "ref": "(4.3.13)",
+          "source_pdf_lines": [
+            8426,
+            8430
+          ],
+          "math": "\\mathbb{E}\\left[\\sup_{u\\in Z}\\sum_{t=1}^j\\gamma_t\\Delta_t^T(u-v_t)\\right]\\le 1+2M^2\\sum_{t=1}^j\\gamma_t^2.",
+          "uses": [
+            "previous_step:9",
+            "previous_step:13"
+          ],
+          "produces": "residual_supremum_bound_available_for_final_chain"
+        },
+        {
+          "step": 15,
+          "description": "Apply (4.3.13), use sup_u V(z1,u) <= 1, and use the M-bound on G to obtain the first printed inequality in the final chain.",
+          "ref": "Lemma 4.6 proof, p. 152",
+          "source_pdf_lines": [
+            8455,
+            8456
+          ],
+          "math": "[\\text{by }(4.3.13)]\\le 1+\\frac{M^2}{2}\\sum_{t=1}^j\\gamma_t^2+1+2M^2\\sum_{t=1}^j\\gamma_t^2",
+          "uses": [
+            "previous_step:9",
+            "previous_step:13",
+            "previous_step:14",
+            "Product_norm_bound_M",
+            "Product_DGF_normalization"
+          ],
+          "produces": "final_chain_before_arithmetic_simplification"
+        },
+        {
+          "step": 16,
+          "description": "Simplify the constants in the final displayed chain.",
+          "ref": "Lemma 4.6 proof, p. 152",
+          "source_pdf_lines": [
+            8457,
+            8458
+          ],
+          "math": "=2+\\frac{5}{2}M^2\\sum_{t=1}^j\\gamma_t^2.",
+          "uses": [
+            "previous_step:15"
+          ],
+          "produces": "final_gap_sum_arithmetic"
+        },
+        {
+          "step": 17,
+          "description": "The final arithmetic chain arrives at (4.3.9); line 8460 is prose-only and the displayed formula is the Lemma 4.6 statement.",
+          "ref": "(4.3.9)",
+          "source_pdf_lines": [
+            8460,
+            8460
+          ],
+          "uses": [
+            "previous_step:16"
+          ],
+          "produces": "lemma_4_6_conclusion: E[max_{z in Z} sum_{t=1}^j gamma_t g(z_t)^T(z_t-z)] <= 2+(5/2)M^2 sum_{t=1}^j gamma_t^2"
+        }
+      ]
+    },
+    {
+      "name": "Proposition_4_10_large_deviation_bound",
+      "ref": "Proposition 4.10",
+      "statement_math": "\\text{Suppose that conditions of the bound }(4.3.16)\\text{ are verified and, further, it holds for all }(u,v)\\in Z\\text{ that}\\quad \\mathbb{E}\\left[\\exp\\left\\{\\|G_x(u,v,\\xi)\\|_{*,X}^2/M_X^2\\right\\}\\right]\\le\\exp\\{1\\},\\quad \\mathbb{E}\\left[\\exp\\left\\{\\|G_y(x,y,\\xi)\\|_{*,Y}^2/M_Y^2\\right\\}\\right]\\le\\exp\\{1\\}.\\quad \\text{Then for the stepsizes }(4.3.15)\\text{ one has for any }\\lambda\\ge1\\text{ that }\\operatorname{Prob}\\left\\{\\varepsilon_\\phi(\\tilde z_N)>\\frac{(8+2\\lambda)\\sqrt{5}M}{\\sqrt{N}}\\right\\}\\le2\\exp\\{-\\lambda\\}.",
+      "role": "Records the paper's high-probability companion to the expected saddle-point gap bound.",
+      "proof": "cited"
+    }
+  ]
+}

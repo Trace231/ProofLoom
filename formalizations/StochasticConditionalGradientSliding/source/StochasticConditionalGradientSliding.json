@@ -1,0 +1,220 @@
+{
+  "algorithm": "StochasticConditionalGradientSliding",
+  "full_name": "Stochastic Conditional Gradient Sliding Method for Smooth Convex Optimization",
+  "source_reference": "Lan, First-order and Stochastic Optimization Methods for Machine Learning, Springer 2020 (Theorem 7.11)",
+  "setup": {
+    "problem": {
+      "math": "f^* := \\min_{x \\in X} f(x)",
+      "ref": "Eq. (7.1.1)",
+      "description": "Smooth convex optimization over a compact convex set"
+    },
+    "variable_space": {
+      "math": "X \\subseteq \\mathbb{R}^n \\text{ convex compact}; \\; f : X \\to \\mathbb{R} \\text{ closed convex}",
+      "ref": "Section 7.1"
+    }
+  },
+  "assumptions": [
+    {
+      "name": "L-smoothness",
+      "math": "f(y) \\le l_f(x, y) + \\frac{L}{2}\\|y - x\\|^2, \\quad \\forall x, y \\in X",
+      "ref": "Eq. (7.1.8)",
+      "parameters": ["L > 0"]
+    },
+    {
+      "name": "Unbiased stochastic first-order oracle",
+      "math": "\\mathbb{E}[G(z_k, \\xi_k)] = f'(z_k)",
+      "ref": "Eq. (7.2.43)"
+    },
+    {
+      "name": "Bounded variance",
+      "math": "\\mathbb{E}[\\|G(z_k, \\xi_k) - f'(z_k)\\|_*^2] \\le \\sigma^2",
+      "ref": "Eq. (7.2.44)",
+      "parameters": ["\\sigma^2 \\ge 0"]
+    },
+    {
+      "name": "Parameter condition (lower bound)",
+      "math": "\\gamma_1 = 1 \\text{ and } L\\gamma_k \\le \\beta_k, \\quad k \\ge 1",
+      "ref": "Eq. (7.2.10)"
+    },
+    {
+      "name": "Parameter monotonicity (nondecreasing ratio)",
+      "math": "\\frac{\\beta_k \\gamma_k}{\\Gamma_k} \\ge \\frac{\\beta_{k-1} \\gamma_{k-1}}{\\Gamma_{k-1}}, \\quad k \\ge 2",
+      "ref": "Eq. (7.2.11)"
+    }
+  ],
+  "algorithm_spec": {
+    "ref": "Algorithm 7.8",
+    "initialization": {
+      "math": "x_0 \\in X, \\; y_0 = x_0, \\; \\beta_k \\in \\mathbb{R}_{++}, \\; \\gamma_k \\in [0,1], \\; \\eta_k \\in \\mathbb{R}_+, \\; B_k \\ge 1",
+      "ref": "Algorithm 7.8"
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "Extrapolation",
+        "math": "z_k = (1 - \\gamma_k) y_{k-1} + \\gamma_k x_{k-1}",
+        "ref": "Eq. (7.2.1)"
+      },
+      {
+        "step": 2,
+        "name": "Batch stochastic gradient",
+        "math": "g_k := \\frac{1}{B_k} \\sum_{j=1}^{B_k} G(z_k, \\xi_{k,j})",
+        "ref": "Eq. (7.2.46)"
+      },
+      {
+        "step": 3,
+        "name": "Inexact CndG projection",
+        "math": "x_k = \\operatorname{CndG}(g_k, x_{k-1}, \\beta_k, \\eta_k)",
+        "ref": "Eq. (7.2.45)"
+      },
+      {
+        "step": 4,
+        "name": "Convex combination",
+        "math": "y_k = (1 - \\gamma_k) y_{k-1} + \\gamma_k x_k",
+        "ref": "Eq. (7.2.3)"
+      }
+    ],
+    "output": {
+      "math": "y_N",
+      "ref": "Algorithm 7.8",
+      "type": "weighted_average"
+    },
+    "parameters": [
+      {
+        "name": "\\Gamma_k",
+        "math": "\\Gamma_k := \\begin{cases} 1, & k = 1, \\\\ \\Gamma_{k-1}(1 - \\gamma_k), & k \\ge 2 \\end{cases}",
+        "ref": "Eq. (7.2.9)"
+      },
+      {
+        "name": "\\bar{D}_X",
+        "math": "\\bar{D}_X \\equiv \\bar{D}_{X,\\|\\cdot\\|} := \\max_{x, y \\in X} \\|x - y\\|",
+        "ref": "Eq. (7.1.18)"
+      },
+      {
+        "name": "\\operatorname{CndG}(g, u, \\beta, \\eta)",
+        "math": "\\text{CndG subroutine: set } u_1 = u, \\text{ compute } V_{g,u,\\beta}(u_t) := \\max_{x \\in X} \\langle g + \\beta(u_t - u), u_t - x \\rangle; \\text{ if } V_{g,u,\\beta}(u_t) \\le \\eta, \\text{ return } u^+ = u_t; \\text{ else } u_{t+1} = (1 - \\alpha_t) u_t + \\alpha_t v_t \\text{ with } \\alpha_t = \\min\\left\\{1, \\frac{\\langle \\beta(u - u_t) - g, v_t - u_t \\rangle}{\\beta \\|v_t - u_t\\|^2}\\right\\}",
+        "ref": "Eqs. (7.2.4)-(7.2.5)"
+      }
+    ]
+  },
+  "main_theorem": {
+    "ref": "Theorem 7.11(a)-(c)",
+    "statement_math": "\\mathbb{E}[f(y_k) - f(x^*)] \\le \\mathscr{C}_e := \\frac{\\beta_k \\gamma_k}{2} \\bar{D}_X^2 + \\Gamma_k \\sum_{i=1}^{k} \\left[ \\frac{\\eta_i \\gamma_i}{\\Gamma_i} + \\frac{\\gamma_i \\sigma^2}{2 \\Gamma_i B_i (\\beta_i - L\\gamma_i)} \\right], \\quad \\forall k \\ge 1",
+    "rate": "O(1/k^2) \\text{ in outer iterations; } O\\left(\\sqrt{L \\bar{D}_X^2 / \\varepsilon} + \\sigma^2 \\bar{D}_X^2 / \\varepsilon^2\\right) \\text{ SFO and } O(L \\bar{D}_X^2 / \\varepsilon) \\text{ LO complexity}",
+    "measure": "expected suboptimality",
+    "proof": [
+      {
+        "step": 1,
+        "description": "Start from the deterministic CGS descent relations (7.2.16)-(7.2.17) with exact gradient replaced by the noisy batch estimator g_k, writing g_k = f'(z_k) + delta_k",
+        "math": "f(y_k) \\le (1 - \\gamma_k) f(y_{k-1}) + \\gamma_k f(x) + \\frac{\\beta_k \\gamma_k}{2} [\\|x_{k-1} - x\\|^2 - \\|x_k - x\\|^2] + \\eta_k \\gamma_k + \\gamma_k \\langle \\delta_k, x - x_{k-1} \\rangle + \\frac{\\gamma_k \\|\\delta_k\\|_*^2}{2(\\beta_k - L\\gamma_k)}, \\; \\forall x \\in X",
+        "uses": ["One-step stochastic CGS recursion"]
+      },
+      {
+        "step": 2,
+        "description": "Subtract f(x) from both sides and apply Lemma 3.17 with w_k = gamma_k and W_k = Gamma_k to telescope the weighted recursion",
+        "math": "f(y_k) - f(x) \\le \\frac{\\beta_k \\gamma_k}{2} \\bar{D}_X^2 + \\Gamma_k \\sum_{i=1}^{k} \\frac{\\eta_i \\gamma_i}{\\Gamma_i} + \\Gamma_k \\sum_{i=1}^{k} \\frac{\\gamma_i}{\\Gamma_i} \\left[ \\sum_{j=1}^{B_i} B_i^{-1} \\langle \\delta_{i,j}, x - x_{i-1} \\rangle + \\frac{\\|\\delta_i\\|_*^2}{2(\\beta_i - L\\gamma_i)} \\right]",
+        "uses": ["Weighted recursion lemma (Lemma 3.17)"]
+      },
+      {
+        "step": 3,
+        "description": "Take expectation: the martingale terms vanish since E[<delta_{i,j}, x^* - x_{i-1}>] = 0 because delta_{i,j} are independent of x_{i-1}; apply the batch variance bound E[||delta_i||_*^2] <= sigma^2/B_i",
+        "math": "\\mathbb{E}[f(y_k) - f(x^*)] \\le \\frac{\\beta_k \\gamma_k}{2} \\bar{D}_X^2 + \\Gamma_k \\sum_{i=1}^{k} \\left[ \\frac{\\eta_i \\gamma_i}{\\Gamma_i} + \\frac{\\gamma_i \\sigma^2}{2 \\Gamma_i B_i (\\beta_i - L\\gamma_i)} \\right]",
+        "uses": ["Batch estimator unbiasedness and variance"]
+      },
+      {
+        "step": 4,
+        "description": "For part (c), the inner CndG procedure is deterministic (only the gradient input differs), so the inner-iteration bound from Theorem 7.9(c) applies directly",
+        "math": "T_k := \\left\\lceil \\frac{6 \\beta_k \\bar{D}_X^2}{\\eta_k} \\right\\rceil, \\quad \\forall k \\ge 1",
+        "uses": ["CndG inner-iteration bound (Theorem 7.9(c))"]
+      }
+    ]
+  },
+  "key_lemmas": [
+    {
+      "name": "Batch estimator unbiasedness and variance",
+      "ref": "Eq. (7.2.47)",
+      "statement_math": "\\mathbb{E}[g_k - f'(z_k)] = 0 \\quad \\text{and} \\quad \\mathbb{E}[\\|g_k - f'(z_k)\\|_*^2] \\le \\frac{\\sigma^2}{B_k}",
+      "role": "Bounds the variance of the mini-batch gradient estimator used in the stochastic CGS method",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Let S_{B_k} = sum_{j=1}^{B_k} (G(z_k, xi_{k,j}) - f'(z_k)) and expand E[||S_{B_k}||_*^2] recursively using independence of the fresh batch samples",
+          "math": "\\mathbb{E}[\\|S_{B_k}\\|_*^2] = \\mathbb{E}[\\|S_{B_k-1}\\|_*^2] + \\mathbb{E}[\\|G(z_k, \\xi_{k,B_k}) - f'(z_k)\\|_*^2] \\le B_k \\sigma^2",
+          "uses": []
+        },
+        {
+          "step": 2,
+          "description": "Since g_k - f'(z_k) = B_k^{-1} S_{B_k}, divide by B_k^2 to obtain the variance bound",
+          "math": "\\mathbb{E}[\\|g_k - f'(z_k)\\|_*^2] = B_k^{-2} \\mathbb{E}[\\|S_{B_k}\\|_*^2] \\le \\frac{\\sigma^2}{B_k}",
+          "uses": []
+        }
+      ]
+    },
+    {
+      "name": "One-step stochastic CGS recursion",
+      "ref": "Eq. (7.2.49)",
+      "statement_math": "f(y_k) \\le (1 - \\gamma_k) f(y_{k-1}) + \\gamma_k f(x) + \\frac{\\beta_k \\gamma_k}{2} \\left[ \\|x_{k-1} - x\\|^2 - \\|x_k - x\\|^2 \\right] + \\eta_k \\gamma_k + \\gamma_k \\langle \\delta_k, x - x_{k-1} \\rangle + \\frac{\\gamma_k \\|\\delta_k\\|_*^2}{2(\\beta_k - L\\gamma_k)}, \\quad \\forall x \\in X",
+      "role": "Provides the per-step descent relation for the stochastic CGS method by perturbing the deterministic CGS inequality with the estimator noise",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Start from the deterministic CGS relations (7.2.16) and (7.2.17) with f'(z_k) replaced by g_k = f'(z_k) + delta_k",
+          "math": "f(y_k) \\le (1 - \\gamma_k) f(y_{k-1}) + \\gamma_k l_f(z_k, x_k) + \\frac{\\beta_k \\gamma_k}{2} [\\|x_{k-1} - x\\|^2 - \\|x_k - x\\|^2] + \\eta_k \\gamma_k + \\gamma_k \\langle \\delta_k, x - x_k \\rangle",
+          "uses": []
+        },
+        {
+          "step": 2,
+          "description": "Apply the completion-of-squares bound to the noise cross-term: <delta_k, x - x_k> - (1/2)(beta_k - L gamma_k)||x_k - x_{k-1}||^2 <= <delta_k, x - x_{k-1}> + ||delta_k||_*^2 / (2(beta_k - L gamma_k))",
+          "math": "\\langle \\delta_k, x - x_k \\rangle - \\frac{1}{2}(\\beta_k - L\\gamma_k)\\|x_k - x_{k-1}\\|^2 \\le \\langle \\delta_k, x - x_{k-1} \\rangle + \\frac{\\|\\delta_k\\|_*^2}{2(\\beta_k - L\\gamma_k)}",
+          "uses": []
+        },
+        {
+          "step": 3,
+          "description": "Collect all terms to obtain the one-step recursion valid for every comparison point x in X",
+          "math": "f(y_k) \\le (1 - \\gamma_k) f(y_{k-1}) + \\gamma_k f(x) + \\frac{\\beta_k \\gamma_k}{2} [\\|x_{k-1} - x\\|^2 - \\|x_k - x\\|^2] + \\eta_k \\gamma_k + \\gamma_k \\langle \\delta_k, x - x_{k-1} \\rangle + \\frac{\\gamma_k \\|\\delta_k\\|_*^2}{2(\\beta_k - L\\gamma_k)}",
+          "uses": []
+        }
+      ]
+    },
+    {
+      "name": "Weighted recursion lemma (Lemma 3.17)",
+      "ref": "Lemma 3.17",
+      "statement_math": "\\text{Let } w_k \\in (0,1], \\; W_k := \\begin{cases} 1, & k = 1, \\\\ (1 - w_k) W_{k-1}, & k \\ge 2. \\end{cases} \\text{ If } \\delta_k \\le (1 - w_k) \\delta_{k-1} + B_k, \\; k = 1, 2, \\ldots, \\text{ then } \\delta_k \\le W_k (1 - w_1) \\delta_0 + W_k \\sum_{i=1}^{k} \\frac{B_i}{W_i}.",
+      "role": "Converts the one-step stochastic CGS recursion into a weighted telescoping sum with Gamma_k",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Divide the one-step recursion by W_k so the coefficient on delta_{k-1} becomes exactly 1/W_{k-1}",
+          "math": "\\frac{\\delta_k}{W_k} \\le \\frac{\\delta_{k-1}}{W_{k-1}} + \\frac{B_k}{W_k}",
+          "uses": []
+        },
+        {
+          "step": 2,
+          "description": "Sum the resulting inequalities over i = 1, ..., k to telescope the weighted left-hand side",
+          "math": "\\frac{\\delta_k}{W_k} \\le (1 - w_1) \\delta_0 + \\sum_{i=1}^{k} \\frac{B_i}{W_i}",
+          "uses": []
+        }
+      ]
+    },
+    {
+      "name": "CndG inner-iteration bound (Theorem 7.9(c))",
+      "ref": "Theorem 7.9(c)",
+      "statement_math": "T_k := \\left\\lceil \\frac{6 \\beta_k \\bar{D}_X^2}{\\eta_k} \\right\\rceil, \\quad \\forall k \\ge 1",
+      "role": "Bounds the number of inner linear-optimization oracle calls at each outer iteration of the CndG subroutine",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Define lambda_t := 2/t and Lambda_t := 1/(t(t-1)) for the CndG inner iterations, and bound the Wolfe gap phi(u_{t+1}) - phi^* via the recursion (7.2.24)-(7.2.25)",
+          "math": "\\phi(u_{t+1}) - \\phi^* \\le \\frac{2 \\beta \\bar{D}_X^2}{t+1}",
+          "uses": []
+        },
+        {
+          "step": 2,
+          "description": "Show that min_{j=1,...,t} V_{g,u,beta}(u_j) <= 6 beta D_X^2 / (t+1) using the telescoped weighted sum of gap values",
+          "math": "\\min_{j=1,\\ldots,t} V_{g,u,\\beta}(u_j) \\le \\frac{6 \\beta \\bar{D}_X^2}{t+1}, \\quad \\forall t \\ge 1",
+          "uses": []
+        }
+      ]
+    }
+  ]
+}

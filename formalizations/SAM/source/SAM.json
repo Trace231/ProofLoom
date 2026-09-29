@@ -1,0 +1,485 @@
+{
+  "algorithm": "SAM",
+  "full_name": "Sharpness-Aware Minimization",
+  "source_reference": "Foret, Kleiner, Mobahi, Neyshabur, Sharpness-Aware Minimization for Efficiently Improving Generalization (ICLR 2021), Appendix Theorem 2",
+  "setup": {
+    "problem": {
+      "math": "\\text{Given a training dataset }\\mathcal S \\triangleq \\bigcup_{i=1}^{n} \\{(x_i,y_i)\\}\\text{ drawn i.i.d. from distribution }\\mathcal{D},\\text{ we seek to learn a model that generalizes well.}\n\n\\text{In particular, consider a family of models parameterized by }w \\in \\mathcal{W} \\subseteq \\mathbb{R}^{d};\n\n\\text{given a per-data-point loss function }\\ell : \\mathcal{W} \\times \\mathcal{X} \\times \\mathcal{Y} \\to \\mathbb{R}_{+},\n\n\\text{we define the training set loss }L_{\\mathcal S}(w) \\triangleq \\frac{1}{n}\\sum_{i=1}^{n} \\ell(w,x_i,y_i)\n\n\\text{and the population loss }L_{\\mathcal{D}}(w) \\triangleq \\mathbb{E}_{(x,y)\\sim\\mathcal{D}}[\\ell(w,x,y)].",
+      "ref": "Section 2, p. 3",
+      "description": "Given a training dataset S := union_{i=1}^n {(x_i,y_i)} drawn i.i.d. from distribution D, the paper considers a family of models parameterized by w in W subseteq R^d and a per-data-point loss l : W x X x Y -> R_+, then defines the training set loss L_{\\mathcal S}(w) := (1/n) sum_i l(w,x_i,y_i) and population loss L_D(w) := E_(x,y)~D[l(w,x,y)]."
+    },
+    "variable_space": {
+      "math": "w\\in \\mathcal W\\subseteq\\mathbb R^d",
+      "ref": "Section 2, p. 3"
+    }
+  },
+  "assumptions": [
+    {
+      "name": "IID_Training_Set",
+      "math": "\\text{Given a training dataset }\\mathcal S \\triangleq \\bigcup_{i=1}^{n} \\{(x_i,y_i)\\}\\text{ drawn i.i.d. from distribution }\\mathcal{D},\\text{ we seek to learn a model that generalizes well.}",
+      "ref": "Section 2, p. 3",
+      "parameters": ["\\mathcal S", "n", "\\mathcal{D}"],
+      "description": "This is the paper's complete opening dataset statement; the subsequent setup specifies the model family, loss function, and empirical/population losses."
+    },
+    {
+      "name": "Parameter_Space",
+      "math": "w\\in \\mathcal W\\subseteq\\mathbb R^d",
+      "ref": "Section 2, p. 3",
+      "parameters": ["w", "W", "d"]
+    },
+    {
+      "name": "Positive_Neighborhood_Radius",
+      "math": "\\rho>0",
+      "ref": "Theorem 2, p. 14",
+      "parameters": ["\\rho"]
+    },
+    {
+      "name": "Gaussian_Perturbation_NonDecreasing_Test_Error",
+      "math": "L_{\\mathcal D}(w)\\leq\\mathbb E_{\\epsilon_i\\sim\\mathcal N(0,\\rho)}[L_{\\mathcal D}(w+\\epsilon)]",
+      "ref": "Theorem 2, p. 14",
+      "parameters": ["L_D", "w", "\\epsilon", "\\rho"]
+    },
+    {
+      "name": "Finite_Sample_And_Parameter_Count",
+      "math": "n=|\\mathcal S|,\\quad k\\text{ is the number of parameters}",
+      "ref": "Theorem 2, p. 14",
+      "parameters": ["n", "\\mathcal S", "k"]
+    },
+    {
+      "name": "SAM_Norm_Range",
+      "math": "\\rho\\geq 0,\\quad p\\in[1,\\infty]",
+      "ref": "Eq. (1), p. 3",
+      "parameters": ["\\rho", "p"]
+    }
+  ],
+  "algorithm_spec": {
+    "initialization": {
+      "math": "\\text{Initialize weights }w_0,\\ t=0",
+      "ref": "Algorithm 1, p. 4"
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "convergence_loop_start",
+        "math": "\\text{while not converged do}",
+        "ref": "Algorithm 1, lines 245-255, p. 4"
+      },
+      {
+        "step": 2,
+        "name": "sample_batch",
+        "math": "\\text{Sample batch }B=\\{(x_1,y_1),\\ldots,(x_b,y_b)\\}",
+        "ref": "Algorithm 1, p. 4"
+      },
+      {
+        "step": 3,
+        "name": "batch_gradient",
+        "math": "\\text{Compute gradient }\\nabla_wL_B(w)\\text{ of the batch's training loss}",
+        "ref": "Algorithm 1, p. 4"
+      },
+      {
+        "step": 4,
+        "name": "adversarial_perturbation",
+        "math": "\\text{Compute }\\hat{\\epsilon}(w)\\text{ per equation 2}",
+        "ref": "Algorithm 1, p. 4"
+      },
+      {
+        "step": 5,
+        "name": "sam_gradient",
+        "math": "g=\\left.\\nabla_wL_B(w)\\right|_{w+\\hat{\\epsilon}(w)}",
+        "ref": "Eq. (3) and Algorithm 1, p. 4"
+      },
+      {
+        "step": 6,
+        "name": "sgd_update",
+        "math": "w_{t+1}=w_t-\\eta g",
+        "ref": "Algorithm 1, p. 4"
+      },
+      {
+        "step": 7,
+        "name": "increment",
+        "math": "t=t+1",
+        "ref": "Algorithm 1, p. 4"
+      },
+      {
+        "step": 8,
+        "name": "convergence_loop_end",
+        "math": "\\text{end}",
+        "ref": "Algorithm 1, lines 245-255, p. 4"
+      }
+    ],
+    "output": {
+      "math": "\\text{return }w_t",
+      "ref": "Algorithm 1, p. 4",
+      "type": "final iterate"
+    },
+    "parameters": [
+      {
+        "name": "SAM_objective",
+        "math": "\\min_w L_{\\mathcal S}^{SAM}(w)+\\lambda\\|w\\|_2^2\\quad\\text{where}\\quad L_{\\mathcal S}^{SAM}(w)\\triangleq\\max_{\\|\\epsilon\\|_p\\leq\\rho}L_{\\mathcal S}(w+\\epsilon)",
+        "ref": "Eq. (1), p. 3"
+      },
+      {
+        "name": "dual_exponent",
+        "math": "1/p+1/q=1",
+        "ref": "Eq. (2), p. 4"
+      },
+      {
+        "name": "dual_norm_perturbation",
+        "math": "\\hat{\\epsilon}(w)=\\rho\\,\\operatorname{sign}(\\nabla_wL_{\\mathcal S}(w))\\,|\\nabla_wL_{\\mathcal S}(w)|^{q-1}/\\left(\\|\\nabla_wL_{\\mathcal S}(w)\\|_q^q\\right)^{1/p}",
+        "ref": "Eq. (2), p. 4"
+      },
+      {
+        "name": "step_size",
+        "math": "\\eta>0",
+        "ref": "Algorithm 1, p. 4"
+      },
+      {
+        "name": "neighborhood_size",
+        "math": "\\rho>0",
+        "ref": "Algorithm 1, lines 239-241, p. 4"
+      }
+    ]
+  },
+  "main_theorem": {
+    "statement_math": "\\text{Theorem 2. For any }\\rho>0\\text{ and any distribution }\\mathcal D,\\text{ with probability }1-\\delta\\text{ over the choice of the training set }\\mathcal S\\sim\\mathcal D,\\quad L_{\\mathcal D}(w)\\leq\\max_{\\|\\epsilon\\|_2\\leq\\rho}L_{\\mathcal S}(w+\\epsilon)+\\sqrt{\\frac{k\\log\\left(1+\\frac{\\|w\\|_2^2}{\\rho^2}\\left(1+\\sqrt{\\frac{\\log(n)}{k}}\\right)^2\\right)+4\\log\\frac{n}{\\delta}+\\widetilde O(1)}{n-1}},\\quad\\text{where }n=|\\mathcal S|,\\ k\\text{ is the number of parameters and we assumed }L_{\\mathcal D}(w)\\leq\\mathbb E_{\\epsilon_i\\sim\\mathcal N(0,\\rho)}[L_{\\mathcal D}(w+\\epsilon)].",
+    "statement_ref": "Theorem 2, equation (4), Appendix A.1, PDF pp. 14-15 (lines 831-841)",
+    "rate": "sharpness-neighborhood empirical loss plus O(sqrt((k log(1+(||w||_2^2/rho^2)(1+sqrt(log n/k))^2)+log(n/delta))/n))",
+    "measure": "population loss L_D(w) with probability 1-delta over S",
+    "proof": [
+      {
+        "step": 1,
+        "description": "The theorem's right-hand side is lower bounded by the displayed square-root term.",
+        "ref": "Appendix A.1 proof, p. 14",
+        "source_pdf_lines": [847, 851],
+        "math": "\\sqrt{\\frac{k\\log(1+\\|w\\|_2^2/\\rho^2)}{4n}}",
+        "uses": ["Positive_Neighborhood_Radius", "Finite_Sample_And_Parameter_Count"],
+        "produces": "Reduction to the case ||w||_2^2 <= rho^2(exp(4n/k)-1)."
+      },
+      {
+        "step": 2,
+        "description": "When ||w||_2^2 exceeds rho^2(exp(4n/k)-1), the lower bound is greater than one and the claim is trivial.",
+        "ref": "Appendix A.1 proof, p. 14",
+        "source_pdf_lines": [849, 850],
+        "math": "\\|w\\|_2^2>\\rho^2(\\exp(4n/k)-1)",
+        "uses": ["previous_step:1"],
+        "produces": "Trivial case discharged."
+      },
+      {
+        "step": 3,
+        "description": "Restrict the remainder of the proof to the complementary norm case.",
+        "ref": "Appendix A.1 proof, p. 14",
+        "source_pdf_lines": [850, 851],
+        "math": "\\|w\\|_2^2\\leq\\rho^2(\\exp(4n/k)-1)",
+        "uses": ["previous_step:2"],
+        "produces": "Reduced case for the PAC-Bayes construction."
+      },
+      {
+        "step": 4,
+        "description": "Invoke McAllester's PAC-Bayesian bound for any prior P and posterior Q.",
+        "ref": "Eq. (5), p. 14",
+        "source_pdf_lines": [852, 859],
+        "math": "\\mathbb E_{w\\sim\\mathcal Q}[L_{\\mathcal D}(w)]\\leq\\mathbb E_{w\\sim\\mathcal Q}[L_{\\mathcal S}(w)]+\\sqrt{\\frac{\\operatorname{KL}(\\mathcal Q\\|\\mathcal P)+\\log\\frac n\\delta}{2(n-1)}}",
+        "uses": ["McAllester_PAC_Bayes_Bound"],
+        "produces": "PAC-Bayes expectation bound parameterized by P,Q."
+      },
+      {
+        "step": 5,
+        "description": "For isotropic Gaussian P and Q, substitute the closed form KL divergence.",
+        "ref": "Eq. (6), p. 14",
+        "source_pdf_lines": [861, 867],
+        "math": "\\operatorname{KL}(\\mathcal P\\|\\mathcal Q)=\\frac12\\left[\\frac{k\\sigma_Q^2+\\|\\mu_P-\\mu_Q\\|_2^2}{\\sigma_P^2}-k+k\\log\\frac{\\sigma_P^2}{\\sigma_Q^2}\\right]",
+        "uses": ["Gaussian_KL_Divergence"],
+        "produces": "Explicit KL objective in sigma_P, sigma_Q, mu_P, mu_Q."
+      },
+      {
+        "step": 6,
+        "description": "Differentiating the Gaussian KL with respect to sigma_P and setting the derivative to zero gives the unique stationary-point minimizer printed in the paper.",
+        "ref": "Appendix A.1 proof, p. 14",
+        "source_pdf_lines": [869, 872],
+        "math": "\\sigma_P^{*2}=\\sigma_Q^2+\\frac{\\|\\mu_P-\\mu_Q\\|_2^2}{k}",
+        "uses": ["Gaussian_KL_Divergence"],
+        "produces": "Unconstrained optimal prior variance."
+      },
+      {
+        "step": 7,
+        "description": "The prior must be chosen before observing S, while mu_Q and sigma_Q may depend on S, so this minimizer cannot be selected directly; use predefined prior values instead.",
+        "ref": "Appendix A.1 proof, p. 14",
+        "source_pdf_lines": [873, 875],
+        "uses": ["previous_step:6", "IID_Training_Set"],
+        "produces": "Data-independent prior-variance requirement."
+      },
+      {
+        "step": 8,
+        "description": "Define the predefined grid T={c exp((1-j)/k)|j in N} for sigma_P^2 and assign delta_j=6 delta/(pi^2 j^2); the union bound makes all PAC-Bayes bounds simultaneous with probability at least 1-delta.",
+        "ref": "Appendix A.1 proof, p. 14",
+        "source_pdf_lines": [876, 880],
+        "math": "T=\\{c\\exp((1-j)/k)\\mid j\\in\\mathbb N\\},\\quad\\delta_j=\\frac{6\\delta}{\\pi^2j^2},\\quad 1-\\sum_{j=1}^{\\infty}\\frac{6\\delta}{\\pi^2j^2}=1-\\delta",
+        "uses": ["McAllester_PAC_Bayes_Bound", "previous_step:7"],
+        "produces": "A data-independent prior grid and simultaneous confidence event."
+      },
+      {
+        "step": 9,
+        "description": "Set posterior Q=N(w,rho^2 I) and prior mean mu_P=0; under the reduced case, bound the optimal variance numerator.",
+        "ref": "Eq. (7), p. 14",
+        "source_pdf_lines": [881, 883],
+        "math": "\\sigma_Q^2+\\|\\mu_P-\\mu_Q\\|_2^2/k\\leq\\rho^2+\\|w\\|_2^2/k\\leq\\rho^2(1+\\exp(4n/k))",
+        "uses": ["Positive_Neighborhood_Radius", "previous_step:3"],
+        "produces": "Upper bound needed to choose a valid grid index j."
+      },
+      {
+        "step": 10,
+        "description": "Choose j=floor(1-k log((rho^2+||w||_2^2/k)/c)) and c=rho^2(1+exp(4n/k)); this ensures j in N and sandwiches sigma_P^2.",
+        "ref": "Eq. (8), p. 14",
+        "source_pdf_lines": [884, 889],
+        "math": "\\rho^2+\\frac{\\|w\\|_2^2}{k}\\leq\\sigma_P^2\\leq\\exp(1/k)\\left(\\rho^2+\\frac{\\|w\\|_2^2}{k}\\right)",
+        "uses": ["previous_step:9"],
+        "produces": "Grid variance interval used in the KL bound."
+      },
+      {
+        "step": 11,
+        "description": "Rewrite the KL using the selected sigma_P and Gaussian KL formula.",
+        "ref": "Eq. (9), p. 14",
+        "source_pdf_lines": [901, 908],
+        "math": "\\operatorname{KL}(\\mathcal P\\|\\mathcal Q)=\\frac12\\left[\\frac{k\\sigma_Q^2+\\|\\mu_P-\\mu_Q\\|_2^2}{\\sigma_P^2}-k+k\\log\\frac{\\sigma_P^2}{\\sigma_Q^2}\\right]",
+        "uses": ["Gaussian_KL_Divergence", "previous_step:10"],
+        "produces": "KL expression ready for interval substitution."
+      },
+      {
+        "step": 12,
+        "description": "Use the lower and upper bounds on sigma_P^2 to upper-bound the KL (equation (10)).",
+        "ref": "Eq. (10), p. 14",
+        "source_pdf_lines": [910, 914],
+        "math": "\\operatorname{KL}(\\mathcal P\\|\\mathcal Q)\\leq\\frac12\\left[\\frac{k(\\rho^2+\\|w\\|_2^2/k)}{\\rho^2+\\|w\\|_2^2/k}-k+k\\log\\frac{\\exp(1/k)(\\rho^2+\\|w\\|_2^2/k)}{\\rho^2}\\right]",
+        "uses": ["previous_step:11", "previous_step:10"],
+        "produces": "KL upper bound with cancellation available."
+      },
+      {
+        "step": 13,
+        "description": "Cancel the first two terms and simplify the KL logarithm (equation (11)).",
+        "ref": "Eq. (11), p. 14",
+        "source_pdf_lines": [915, 920],
+        "math": "\\operatorname{KL}(\\mathcal P\\|\\mathcal Q)=\\frac12 k\\log\\frac{\\exp(1/k)(\\rho^2+\\|w\\|_2^2/k)}{\\rho^2}",
+        "uses": ["previous_step:12"],
+        "produces": "Logarithmic KL expression."
+      },
+      {
+        "step": 14,
+        "description": "Using the step-9 assignment sigma_Q=rho (with mu_Q=w and mu_P=0), rewrite equation (11)'s denominator in terms of sigma_Q and factor the ratio to obtain equation (12).",
+        "ref": "Eq. (12), p. 14",
+        "source_pdf_lines": [921, 926],
+        "math": "\\operatorname{KL}(\\mathcal P\\|\\mathcal Q)=\\frac12\\left[1+k\\log\\left(1+\\frac{\\|w\\|_2^2}{k\\sigma_Q^2}\\right)\\right]",
+        "uses": ["previous_step:13", "previous_step:9"],
+        "produces": "Final KL bound used in PAC-Bayes."
+      },
+      {
+        "step": 15,
+        "description": "Expand the confidence logarithm using delta_j.",
+        "ref": "Appendix A.1 proof, p. 14",
+        "source_pdf_lines": [929, 937],
+        "math": "\\log\\frac n{\\delta_j}=\\log\\frac n\\delta+\\log\\frac{\\pi^2j^2}{6}",
+        "uses": ["previous_step:8"],
+        "produces": "Expanded confidence term."
+      },
+      {
+        "step": 16,
+        "description": "Bound the selected floor index by k log(c/(rho^2+||w||_2^2/k)).",
+        "ref": "Appendix A.1 proof, p. 14",
+        "source_pdf_lines": [938, 940],
+        "math": "\\log\\frac n{\\delta_j}\\leq\\log\\frac n\\delta+\\log\\frac{\\pi^2 k^2\\log^2(c/(\\rho^2+\\|w\\|_2^2/k))}{6}",
+        "uses": ["previous_step:10", "previous_step:15"],
+        "produces": "Confidence bound involving c and the target variance."
+      },
+      {
+        "step": 17,
+        "description": "Replace the denominator inside the logarithm by rho^2.",
+        "ref": "Appendix A.1 proof, p. 14",
+        "source_pdf_lines": [941, 943],
+        "math": "\\log\\frac n{\\delta_j}\\leq\\log\\frac n\\delta+\\log\\frac{\\pi^2 k^2\\log^2(c/\\rho^2)}{6}",
+        "uses": ["previous_step:16", "Positive_Neighborhood_Radius"],
+        "produces": "Confidence bound with c/rho^2."
+      },
+      {
+        "step": 18,
+        "description": "Substitute c=rho^2(1+exp(4n/k)).",
+        "ref": "Appendix A.1 proof, p. 14",
+        "source_pdf_lines": [944, 946],
+        "math": "\\log\\frac n{\\delta_j}\\leq\\log\\frac n\\delta+\\log\\frac{\\pi^2 k^2\\log^2(1+\\exp(4n/k))}{6}",
+        "uses": ["previous_step:17", "previous_step:10"],
+        "produces": "Confidence bound in n and k."
+      },
+      {
+        "step": 19,
+        "description": "Bound log(1+exp(4n/k)) by 2+4n/k.",
+        "ref": "Appendix A.1 proof, p. 14",
+        "source_pdf_lines": [947, 949],
+        "math": "\\log\\frac n{\\delta_j}\\leq\\log\\frac n\\delta+\\log\\frac{\\pi^2 k^2(2+4n/k)^2}{6}",
+        "uses": ["previous_step:18"],
+        "produces": "Polynomial confidence expression."
+      },
+      {
+        "step": 20,
+        "description": "Bound the polynomial expression by the final confidence logarithm.",
+        "ref": "Appendix A.1 proof, p. 14",
+        "source_pdf_lines": [950, 952],
+        "math": "\\log\\frac n{\\delta_j}\\leq\\log\\frac n\\delta+2\\log(6n+3k)",
+        "uses": ["previous_step:19"],
+        "produces": "Final confidence estimate."
+      },
+      {
+        "step": 21,
+        "description": "Insert the KL bound and confidence estimate into PAC-Bayes to obtain the Gaussian-perturbed population/empirical inequality (13).",
+        "ref": "Eq. (13), p. 15",
+        "source_pdf_lines": [955, 963],
+        "math": "\\mathbb E_{\\epsilon_i\\sim\\mathcal N(0,\\sigma)}[L_{\\mathcal D}(w+\\epsilon)]\\leq\\mathbb E_{\\epsilon_i\\sim\\mathcal N(0,\\sigma)}[L_{\\mathcal S}(w+\\epsilon)]+\\sqrt{\\frac{\\frac14 k\\log\\left(1+\\frac{\\|w\\|_2^2}{k\\sigma^2}\\right)+\\frac14+\\log\\frac n\\delta+2\\log(6n+3k)}{n-1}}",
+        "uses": ["McAllester_PAC_Bayes_Bound", "previous_step:14", "previous_step:20"],
+        "produces": "Expected Gaussian perturbation bound."
+      },
+      {
+        "step": 22,
+        "description": "The Gaussian perturbation law in equation (13) makes ||epsilon||_2^2 a scaled chi-square random variable; invoke Laurent--Massart Lemma 1 for every positive t.",
+        "ref": "Eq. (14), p. 15",
+        "source_pdf_lines": [964, 968],
+        "math": "P(\\|\\epsilon\\|_2^2-k\\sigma^2\\geq 2\\sigma^2\\sqrt{kt}+2t\\sigma^2)\\leq\\exp(-t)",
+        "uses": ["previous_step:21", "Laurent_Massart_ChiSquare_Tail"],
+        "produces": "High-probability radius control for Gaussian perturbation."
+      },
+      {
+        "step": 23,
+        "description": "Set t=ln(sqrt(n)) in the tail bound to obtain a 1-1/sqrt(n) event on which ||epsilon||_2^2 is at most sigma^2 k(1+sqrt(ln(n)/k))^2 and satisfies the displayed final <=rho^2 condition.",
+        "ref": "Appendix A.1 proof, p. 15",
+        "source_pdf_lines": [970, 976],
+        "math": "\\|\\epsilon\\|_2^2\\leq\\sigma^2\\left(2\\ln(\\sqrt n)+k+2\\sqrt{k\\ln(\\sqrt n)}\\right)\\leq\\sigma^2k\\left(1+\\sqrt{\\frac{\\ln(n)}k}\\right)^2\\leq\\rho^2",
+        "uses": ["Laurent_Massart_ChiSquare_Tail", "Positive_Neighborhood_Radius", "previous_step:22"],
+        "produces": "Perturbations lie in the SAM rho-ball with probability 1-1/sqrt(n)."
+      },
+      {
+        "step": 24,
+        "description": "Choose the Gaussian standard deviation used in (13) as the value satisfying the last inequality in the preceding radius display, namely sigma = rho/(sqrt(k)(1+sqrt(ln(n)/k))); this is the sigma substituted in the next step. This parameter choice is derived from the printed radius condition (the paper refers to it as the above value).",
+        "ref": "Appendix A.1 proof, p. 15 (substitution at lines 985-986)",
+        "source_pdf_lines": [970, 986],
+        "uses": ["previous_step:23", "Positive_Neighborhood_Radius"],
+        "produces": "Sigma substitution \\sigma=\\rho/(\\sqrt{k}(1+\\sqrt{\\ln(n)/k})) for the PAC-Bayes bound."
+      },
+      {
+        "step": 25,
+        "description": "Substitute this sigma into (13), use the theorem assumption L_D(w)<=E[L_D(w+epsilon)], split the expectation on the radius event, and bound the empirical term by the maximum over the rho-ball.",
+        "ref": "Appendix A.1 proof, p. 15",
+        "source_pdf_lines": [985, 999],
+        "math": "L_{\\mathcal D}(w)\\leq(1-1/\\sqrt n)\\max_{\\|\\epsilon\\|_2\\leq\\rho}L_{\\mathcal S}(w+\\epsilon)+1/\\sqrt n+\\sqrt{\\frac{\\frac14 k\\log\\left(1+\\frac{\\|w\\|_2^2}{\\rho^2}\\left(1+\\sqrt{\\frac{\\log(n)}k}\\right)^2\\right)+\\log\\frac n\\delta+2\\log(6n+3k)}{n-1}}",
+        "uses": ["Gaussian_Perturbation_NonDecreasing_Test_Error", "previous_step:21", "previous_step:23", "previous_step:24"],
+        "produces": "Intermediate max-over-ball generalization bound."
+      },
+      {
+        "step": 26,
+        "description": "Drop the prefactor on the nonnegative maximum term and combine the additive 1/sqrt(n) with the square-root term, retaining the explicit constants printed in the final display.",
+        "ref": "Appendix A.1 proof, p. 15",
+        "source_pdf_lines": [998, 1010],
+        "math": "L_{\\mathcal D}(w)\\leq\\max_{\\|\\epsilon\\|_2\\leq\\rho}L_{\\mathcal S}(w+\\epsilon)+\\sqrt{\\frac{k\\log\\left(1+\\frac{\\|w\\|_2^2}{\\rho^2}\\left(1+\\sqrt{\\frac{\\log(n)}{k}}\\right)^2\\right)+4\\log\\frac n\\delta+8\\log(6n+3k)}{n-1}}",
+        "uses": ["previous_step:25"],
+        "produces": "Explicit final bound with all constants shown."
+      },
+      {
+        "step": 27,
+        "description": "Absorb the constant logarithmic terms into the paper's O-tilde(1) notation, recovering theorem equation (4).",
+        "ref": "Theorem 2, equation (4), p. 14",
+        "source_pdf_lines": [831, 841],
+        "math": "L_{\\mathcal D}(w)\\leq\\max_{\\|\\epsilon\\|_2\\leq\\rho}L_{\\mathcal S}(w+\\epsilon)+\\sqrt{\\frac{k\\log\\left(1+\\frac{\\|w\\|_2^2}{\\rho^2}\\left(1+\\sqrt{\\frac{\\log(n)}{k}}\\right)^2\\right)+4\\log\\frac n\\delta+\\widetilde O(1)}{n-1}}",
+        "uses": ["previous_step:26"],
+        "produces": "Theorem 2 conclusion."
+      }
+    ]
+  },
+  "key_lemmas": [
+    {
+      "name": "Dual_Norm_Inner_Maximizer",
+      "ref": "Eq. (2), p. 4",
+      "statement_math": "\\hat{\\epsilon}(w)=\\rho\\,\\operatorname{sign}(\\nabla_wL_{\\mathcal S}(w))\\,|\\nabla_wL_{\\mathcal S}(w)|^{q-1}/\\left(\\|\\nabla_wL_{\\mathcal S}(w)\\|_q^q\\right)^{1/p},\\quad 1/p+1/q=1",
+      "role": "Provides the adversarial perturbation used in each SAM update.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Define the exact inner maximizer from the SAM objective in equation (1), then apply the first-order Taylor expansion of L_{\\mathcal S}(w+epsilon) with respect to epsilon around zero, retaining the constant and linear terms.",
+          "ref": "Section 2 derivation, p. 3",
+          "source_pdf_lines": [189, 191],
+          "math": "\\epsilon^*(w) \\triangleq \\arg\\max_{\\|\\epsilon\\|_p\\leq\\rho} L_{\\mathcal S}(w+\\epsilon) \\approx \\arg\\max_{\\|\\epsilon\\|_p\\leq\\rho} L_{\\mathcal S}(w)+\\epsilon^T\\nabla_w L_{\\mathcal S}(w)",
+          "uses": ["SAM_objective", "SAM_Norm_Range"],
+          "produces": "Taylor-approximated inner maximization retaining L_{\\mathcal S}(w) and the linear term."
+        },
+        {
+          "step": 2,
+          "description": "Since L_{\\mathcal S}(w) is constant with respect to epsilon, discard it from the argmax, yielding the linear dual-norm problem printed in the paper.",
+          "ref": "Section 2 derivation, p. 3",
+          "source_pdf_lines": [191, 192],
+          "math": "\\arg\\max_{\\|\\epsilon\\|_p\\leq\\rho} L_{\\mathcal S}(w)+\\epsilon^T\\nabla_w L_{\\mathcal S}(w) = \\arg\\max_{\\|\\epsilon\\|_p\\leq\\rho} \\epsilon^T\\nabla_w L_{\\mathcal S}(w)",
+          "uses": ["previous_step:1"],
+          "produces": "Linear dual-norm maximization problem."
+        },
+        {
+          "step": 3,
+          "description": "Use the classical dual norm optimizer to obtain the displayed perturbation formula.",
+          "ref": "Eq. (2), p. 4",
+          "source_pdf_lines": [205, 212],
+          "math": "\\hat{\\epsilon}(w)=\\rho\\,\\operatorname{sign}(\\nabla_wL_{\\mathcal S}(w))\\,|\\nabla_wL_{\\mathcal S}(w)|^{q-1}/\\left(\\|\\nabla_wL_{\\mathcal S}(w)\\|_q^q\\right)^{1/p}",
+          "uses": ["previous_step:2"],
+          "produces": "Closed-form first-order adversarial perturbation."
+        }
+      ]
+    },
+    {
+      "name": "SAM_Gradient_Approximation",
+      "ref": "Eq. (3), p. 4",
+      "statement_math": "\\nabla_wL_{\\mathcal S}^{SAM}(w)\\approx\\left.\\nabla_wL_{\\mathcal S}(w)\\right|_{w+\\hat{\\epsilon}(w)}",
+      "role": "Defines the first-order gradient used by Algorithm 1 after dropping Hessian terms.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Substitute the perturbation from equation (2) back into the SAM objective of equation (1), then differentiate through the map w+hat epsilon(w) by the chain rule, yielding its Jacobian multiplying the gradient evaluated at the perturbed weights.",
+          "ref": "Section 2 derivation, p. 4",
+          "source_pdf_lines": [212, 216],
+          "math": "\\nabla_w L_{\\mathcal S}^{SAM}(w) \\approx \\nabla_w L_{\\mathcal S}(w+\\hat{\\epsilon}(w)) = \\frac{d(w+\\hat{\\epsilon}(w))}{dw}\\left.\\nabla_w L_{\\mathcal S}(w)\\right|_{w+\\hat{\\epsilon}(w)}",
+          "uses": ["SAM_objective", "Dual_Norm_Inner_Maximizer"],
+          "produces": "Chain-rule form with Jacobian d(w+hat epsilon(w))/dw."
+        },
+        {
+          "step": 2,
+          "description": "Expand the Jacobian d(w+hat epsilon(w))/dw into the identity contribution and the derivative d hat epsilon(w)/dw, producing the direct-gradient term plus the second-order contribution.",
+          "ref": "Section 2 derivation, p. 4",
+          "source_pdf_lines": [217, 220],
+          "math": "\\nabla_w L_{\\mathcal S}(w)|_{w+\\hat{\\epsilon}(w)} + \\frac{d\\hat{\\epsilon}(w)}{dw}\\left.\\nabla_w L_{\\mathcal S}(w)\\right|_{w+\\hat{\\epsilon}(w)}",
+          "uses": ["previous_step:1"],
+          "produces": "Expanded gradient containing the Hessian-vector contribution via d hat epsilon/dw."
+        },
+        {
+          "step": 3,
+          "description": "Drop the second-order terms to obtain the final first-order SAM gradient approximation used by the algorithm.",
+          "ref": "Eq. (3), p. 4",
+          "source_pdf_lines": [221, 229],
+          "math": "\\nabla_wL_{\\mathcal S}^{SAM}(w)\\approx\\left.\\nabla_wL_{\\mathcal S}(w)\\right|_{w+\\hat{\\epsilon}(w)}",
+          "uses": ["previous_step:2"],
+          "produces": "Gradient approximation g used in Algorithm 1."
+        }
+      ]
+    },
+    {
+      "name": "McAllester_PAC_Bayes_Bound",
+      "ref": "Eq. (5), p. 14; McAllester (1999)",
+      "statement_math": "\\mathbb E_{w\\sim\\mathcal Q}[L_{\\mathcal D}(w)]\\leq\\mathbb E_{w\\sim\\mathcal Q}[L_{\\mathcal S}(w)]+\\sqrt{\\frac{\\operatorname{KL}(\\mathcal Q\\|\\mathcal P)+\\log\\frac n\\delta}{2(n-1)}}",
+      "role": "External PAC-Bayesian inequality used as the starting point of the Appendix proof.",
+      "proof": "cited"
+    },
+    {
+      "name": "Gaussian_KL_Divergence",
+      "ref": "Eq. (6), p. 14",
+      "statement_math": "\\operatorname{KL}(\\mathcal P\\|\\mathcal Q)=\\frac12\\left[\\frac{k\\sigma_Q^2+\\|\\mu_P-\\mu_Q\\|_2^2}{\\sigma_P^2}-k+k\\log\\frac{\\sigma_P^2}{\\sigma_Q^2}\\right]",
+      "role": "Evaluates the PAC-Bayes KL term for isotropic Gaussian prior and posterior.",
+      "proof": "cited"
+    },
+    {
+      "name": "Laurent_Massart_ChiSquare_Tail",
+      "ref": "Eq. (14), p. 15; Laurent & Massart (2000), Lemma 1",
+      "statement_math": "P(\\|\\epsilon\\|_2^2-k\\sigma^2\\geq 2\\sigma^2\\sqrt{kt}+2t\\sigma^2)\\leq\\exp(-t)",
+      "role": "Controls the Gaussian perturbation norm so it falls in the SAM neighborhood with high probability.",
+      "proof": "cited"
+    }
+  ]
+}

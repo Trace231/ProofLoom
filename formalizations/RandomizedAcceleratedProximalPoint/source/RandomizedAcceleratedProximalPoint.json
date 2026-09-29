@@ -1,0 +1,1344 @@
+{
+  "algorithm": "RandomizedAcceleratedProximalPoint",
+  "full_name": "Randomized Accelerated Proximal-Point Method (RapGrad) for Nonconvex Finite-Sum Optimization",
+  "source_reference": "Lan, First-order and Stochastic Optimization Methods for Machine Learning, Springer 2020 (Theorem 6.16)",
+  "setup": {
+    "problem": {
+      "math": "\\min_{x\\in X}\\left\\{f(x):=\\frac{1}{m}\\sum_{i=1}^m f_i(x)\\right\\}",
+      "ref": "Eq. (6.6.1)",
+      "description": "Nonconvex finite-sum minimization over a closed convex set."
+    },
+    "variable_space": {
+      "math": "X\\subseteq \\mathbb{R}^n\\text{ is a closed convex set, and }f_i:X\\to\\mathbb{R},\\ i=1,\\ldots,m,\\text{ are nonconvex smooth functions}",
+      "ref": "Text following Eq. (6.6.1)"
+    }
+  },
+  "assumptions": [
+    {
+      "name": "ComponentSmoothness_6_6_2",
+      "math": "\\|\\nabla f_i(x_1)-\\nabla f_i(x_2)\\|\\le L\\|x_1-x_2\\|,\\quad \\forall x_1,x_2\\in X.",
+      "ref": "Eq. (6.6.2)",
+      "parameters": [
+        "L\\ge 0"
+      ]
+    },
+    {
+      "name": "OneSidedCurvature_6_6_3",
+      "math": "f_i(x_1)-f_i(x_2)-\\langle\\nabla f_i(x_2),x_1-x_2\\rangle\\ge -\\frac{\\mu}{2}\\|x_1-x_2\\|^2,\\quad \\forall x_1,x_2\\in X.",
+      "ref": "Eq. (6.6.3)",
+      "parameters": [
+        "0<\\mu\\le L"
+      ]
+    },
+    {
+      "name": "OptimalSolutions_Theorem6_16",
+      "math": "x^*\\text{ and }x_\\ell^*\\text{ denote the optimal solutions to problem (6.6.1) and the }\\ell\\text{-th subproblem (6.6.7), respectively}.",
+      "ref": "Theorem 6.16",
+      "parameters": [
+        "x^*",
+        "x_\\ell^*"
+      ]
+    },
+    {
+      "name": "RandomOuterIndex_Theorem6_16",
+      "math": "\\hat{\\ell}\\text{ be randomly selected from }[k].",
+      "ref": "Theorem 6.16",
+      "parameters": [
+        "\\hat{\\ell}",
+        "k"
+      ]
+    },
+    {
+      "name": "InnerLoopLength_Lemma6_14",
+      "math": "s\\ge\\left\\lceil-\\frac{\\log(7M/6)}{\\log\\alpha}\\right\\rceil\\text{ with }M:=6\\left(5+\\frac{2L}{\\mu}\\right)",
+      "ref": "Lemma 6.14",
+      "parameters": [
+        "s",
+        "M",
+        "\\alpha",
+        "L",
+        "\\mu"
+      ]
+    },
+    {
+      "name": "OuterInitialization_Algorithm6_8",
+      "math": "\\bar{x}^0\\in X,\\quad \\bar{x}_i^0=\\bar{x}^0,\\quad \\bar{y}_i^0=\\nabla f_i(\\bar{x}^0),\\quad i=1,\\ldots,m.",
+      "ref": "Algorithm 6.8",
+      "parameters": [
+        "\\bar{x}^0",
+        "\\bar{x}_i^0",
+        "\\bar{y}_i^0"
+      ]
+    },
+    {
+      "name": "AlphaSchedule_6_6_16",
+      "math": "\\alpha=1-\\frac{2}{m(\\sqrt{1+16c/m}+1)},\\quad c=2+\\frac{L}{\\mu}",
+      "ref": "Eq. (6.6.16)",
+      "parameters": [
+        "\\alpha",
+        "c",
+        "m",
+        "L",
+        "\\mu"
+      ]
+    },
+    {
+      "name": "InnerParameterSchedule_6_6_17",
+      "math": "\\alpha_t=\\alpha,\\quad \\gamma_t=\\alpha^{-t},\\quad \\tau_t=\\frac{1}{m(1-\\alpha)}-1,\\quad \\eta_t=\\frac{\\alpha}{1-\\alpha},\\quad \\forall t=1,\\ldots,s.",
+      "ref": "Eq. (6.6.17)",
+      "parameters": [
+        "\\alpha_t",
+        "\\gamma_t",
+        "\\tau_t",
+        "\\eta_t",
+        "s"
+      ]
+    },
+    {
+      "name": "RandomOuterIndex_Lemma6_14",
+      "math": "\\hat{\\ell}\\text{ be randomly selected from }[k].",
+      "ref": "Lemma 6.14",
+      "parameters": [
+        "\\hat{\\ell}",
+        "k"
+      ]
+    },
+    {
+      "name": "ExactInnerLoopLength_Theorem6_16",
+      "math": "s=\\left\\lceil-\\frac{\\log M_F}{\\log\\alpha}\\right\\rceil\\text{ with }M_F:=6\\left(5+\\frac{2L}{\\mu}\\right)\\max\\left\\{\\frac{6}{5},\\frac{L^2}{\\mu^2}\\right\\},\\ \\alpha=1-\\frac{2}{m(\\sqrt{1+16c/m}+1)},\\ c=2+\\frac{L}{\\mu}.",
+      "ref": "Eq. (6.6.16)",
+      "parameters": [
+        "s",
+        "M_F",
+        "\\alpha",
+        "c"
+      ]
+    },
+    {
+      "name": "QuadraticPhiCenter_Theorem6_17",
+      "math": "\\varphi(x)=\\frac{\\mu}{2}\\|x-z\\|^2,\\text{ for some }z\\in X",
+      "ref": "Theorem 6.17",
+      "parameters": [
+        "\\varphi",
+        "z"
+      ]
+    },
+    {
+      "name": "Lemma6_12_XhatDefinition",
+      "math": "\\hat{x}_i^t=(1+\\tau_t)^{-1}(\\tilde{x}^t+\\tau_t x_i^{t-1})",
+      "ref": "Lemma 6.12",
+      "parameters": [
+        "\\hat{x}_i^t",
+        "\\tilde{x}^t",
+        "\\tau_t",
+        "x_i^{t-1}"
+      ]
+    },
+    {
+      "name": "RaGradExtrapolation_6_6_9",
+      "math": "\\tilde{x}^t=\\alpha_t(x^{t-1}-x^{t-2})+x^{t-1}.",
+      "ref": "Eq. (6.6.9)",
+      "parameters": [
+        "\\tilde{x}^t",
+        "\\alpha_t",
+        "x^{t-1}",
+        "x^{t-2}"
+      ]
+    },
+    {
+      "name": "RaGradComponentPointUpdate_6_6_10",
+      "math": "x_i^t=\\begin{cases}(1+\\tau_t)^{-1}(\\tilde{x}^t+\\tau_t x_i^{t-1}),&i=i_t,\\\\x_i^{t-1},&i\\ne i_t,\\end{cases}",
+      "ref": "Eq. (6.6.10)",
+      "parameters": [
+        "x_i^t",
+        "i_t",
+        "\\tau_t",
+        "\\tilde{x}^t"
+      ]
+    },
+    {
+      "name": "RaGradGradientMemoryUpdate_6_6_11",
+      "math": "y_i^t=\\begin{cases}\\nabla\\psi_i(x_i^t),&i=i_t,\\\\y_i^{t-1},&i\\ne i_t,\\end{cases}",
+      "ref": "Eq. (6.6.11)",
+      "parameters": [
+        "y_i^t",
+        "i_t",
+        "\\psi_i",
+        "x_i^t"
+      ]
+    },
+    {
+      "name": "RaGradGradientEstimator_6_6_12",
+      "math": "\\tilde{y}_i^t=m(y_i^t-y_i^{t-1})+y_i^{t-1},\\quad \\forall i=1,\\ldots,m",
+      "ref": "Eq. (6.6.12)",
+      "parameters": [
+        "\\tilde{y}_i^t",
+        "y_i^t",
+        "m"
+      ]
+    },
+    {
+      "name": "RaGradBregmanProxStep_6_6_13",
+      "math": "x^t=\\operatorname*{argmin}_{x\\in X}\\left\\{\\varphi(x)+\\left\\langle\\frac{1}{m}\\sum_{i=1}^m\\tilde{y}_i^t,x\\right\\rangle+\\eta_tV_\\varphi(x,x^{t-1})\\right\\}.",
+      "ref": "Eq. (6.6.13)",
+      "parameters": [
+        "x^t",
+        "\\varphi",
+        "\\tilde{y}_i^t",
+        "\\eta_t"
+      ]
+    },
+    {
+      "name": "Lemma6_13_AlphaGamma_6_6_20",
+      "math": "\\alpha_{t+1}\\gamma_{t+1}=\\gamma_t",
+      "ref": "Eq. (6.6.20)",
+      "parameters": [
+        "\\alpha_t",
+        "\\gamma_t",
+        "s"
+      ]
+    },
+    {
+      "name": "Lemma6_13_TauWeight_6_6_21",
+      "math": "\\gamma_{t+1}[m(1+\\tau_{t+1})-1]\\le m\\gamma_t(1+\\tau_t)",
+      "ref": "Eq. (6.6.21)",
+      "parameters": [
+        "\\gamma_t",
+        "\\tau_t",
+        "m",
+        "s"
+      ]
+    },
+    {
+      "name": "Lemma6_13_EtaWeight_6_6_22",
+      "math": "\\gamma_{t+1}\\eta_{t+1}\\le\\gamma_t(1+\\eta_t)",
+      "ref": "Eq. (6.6.22)",
+      "parameters": [
+        "\\gamma_t",
+        "\\eta_t",
+        "s"
+      ]
+    },
+    {
+      "name": "Lemma6_13_TerminalVariance_6_6_23",
+      "math": "\\frac{\\eta_s\\mu}{4}\\ge\\frac{(m-1)^2\\hat{L}}{m^2\\tau_s}",
+      "ref": "Eq. (6.6.23)",
+      "parameters": [
+        "\\eta_s",
+        "\\mu",
+        "m",
+        "\\hat{L}",
+        "\\tau_s"
+      ]
+    },
+    {
+      "name": "Lemma6_13_InteriorVariance_6_6_24",
+      "math": "\\frac{\\eta_t\\mu}{2}\\ge\\frac{\\alpha_{t+1}\\hat{L}}{\\tau_{t+1}}+\\frac{(m-1)^2\\hat{L}}{m^2\\tau_t}",
+      "ref": "Eq. (6.6.24)",
+      "parameters": [
+        "\\eta_t",
+        "\\mu",
+        "\\alpha_{t+1}",
+        "\\hat{L}",
+        "\\tau_t",
+        "m",
+        "s"
+      ]
+    },
+    {
+      "name": "Lemma6_13_TerminalStep_6_6_25",
+      "math": "\\frac{\\eta_s\\mu}{4}\\ge\\frac{\\hat{L}}{m(1+\\tau_s)}",
+      "ref": "Eq. (6.6.25)",
+      "parameters": [
+        "\\eta_s",
+        "\\mu",
+        "\\hat{L}",
+        "m",
+        "\\tau_s"
+      ]
+    }
+  ],
+  "algorithm_spec": {
+    "ref": "Algorithms 6.8 and 6.9",
+    "initialization": {
+      "math": "\\bar{x}^0\\in X,\\quad \\bar{x}_i^0=\\bar{x}^0,\\quad \\bar{y}_i^0=\\nabla f_i(\\bar{x}^0),\\quad i=1,\\ldots,m.",
+      "ref": "Algorithm 6.8"
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "OuterSubproblem",
+        "math": "\\min_{x\\in X}\\frac{1}{m}\\sum_{i=1}^m f_i(x)+\\frac{3\\mu}{2}\\|x-\\bar{x}^{\\ell-1}\\|^2",
+        "ref": "Eq. (6.6.7)"
+      },
+      {
+        "step": 2,
+        "name": "SubproblemSplit",
+        "math": "\\min_{x\\in X}\\frac{1}{m}\\sum_{i=1}^m\\psi_i(x)+\\varphi(x),\\quad \\psi_i(x)\\equiv\\psi_i^\\ell(x):=f_i(x)+\\mu\\|x-\\bar{x}^{\\ell-1}\\|^2,\\quad \\varphi(x)\\equiv\\varphi^\\ell(x):=\\frac{\\mu}{2}\\|x-\\bar{x}^{\\ell-1}\\|^2.",
+        "ref": "Eq. (6.6.8)"
+      },
+      {
+        "step": 3,
+        "name": "InnerInitialization",
+        "math": "x^{-1}=x^0=\\bar{x}^{\\ell-1},\\quad x_i^0=\\bar{x}_i^{\\ell-1},\\quad y_i^0=\\bar{y}_i^{\\ell-1},\\quad i=1,\\ldots,m.",
+        "ref": "Algorithm 6.8"
+      },
+      {
+        "step": 4,
+        "name": "RandomComponent",
+        "math": "i_t\\text{ uniformly distributed over }[m].",
+        "ref": "Algorithm 6.9"
+      },
+      {
+        "step": 5,
+        "name": "Extrapolation",
+        "math": "\\tilde{x}^t=\\alpha_t(x^{t-1}-x^{t-2})+x^{t-1}.",
+        "ref": "Eq. (6.6.9)"
+      },
+      {
+        "step": 6,
+        "name": "ComponentPointUpdate",
+        "math": "x_i^t=\\begin{cases}(1+\\tau_t)^{-1}(\\tilde{x}^t+\\tau_t x_i^{t-1}),&i=i_t,\\\\x_i^{t-1},&i\\ne i_t,\\end{cases}",
+        "ref": "Eq. (6.6.10)"
+      },
+      {
+        "step": 7,
+        "name": "GradientMemoryUpdate",
+        "math": "y_i^t=\\begin{cases}\\nabla\\psi_i(x_i^t),&i=i_t,\\\\y_i^{t-1},&i\\ne i_t,\\end{cases}",
+        "ref": "Eq. (6.6.11)"
+      },
+      {
+        "step": 8,
+        "name": "GradientEstimator",
+        "math": "\\tilde{y}_i^t=m(y_i^t-y_i^{t-1})+y_i^{t-1},\\quad \\forall i=1,\\ldots,m",
+        "ref": "Eq. (6.6.12)"
+      },
+      {
+        "step": 9,
+        "name": "BregmanProxStep",
+        "math": "x^t=\\operatorname*{argmin}_{x\\in X}\\left\\{\\varphi(x)+\\left\\langle\\frac{1}{m}\\sum_{i=1}^m\\tilde{y}_i^t,x\\right\\rangle+\\eta_tV_\\varphi(x,x^{t-1})\\right\\}.",
+        "ref": "Eq. (6.6.13)"
+      },
+      {
+        "step": 10,
+        "name": "OuterUpdate",
+        "math": "\\bar{x}^\\ell=x^s,\\quad \\bar{x}_i^\\ell=x_i^s,\\quad \\bar{y}_i^\\ell=y_i^s+2\\mu(\\bar{x}^{\\ell-1}-\\bar{x}^\\ell),\\quad i=1,\\ldots,m.",
+        "ref": "Algorithm 6.8"
+      }
+    ],
+    "output": {
+      "math": "\\bar{x}^{\\hat{\\ell}}\\text{ for some random }\\hat{\\ell}\\in[k].",
+      "ref": "Algorithm 6.8",
+      "type": "random outer iterate"
+    },
+    "parameters": [
+      {
+        "name": "M_F_alpha_c_s",
+        "math": "s=\\left\\lceil-\\frac{\\log M_F}{\\log\\alpha}\\right\\rceil,\\quad M_F:=6\\left(5+\\frac{2L}{\\mu}\\right)\\max\\left\\{\\frac{6}{5},\\frac{L^2}{\\mu^2}\\right\\},\\quad \\alpha=1-\\frac{2}{m(\\sqrt{1+16c/m}+1)},\\quad c=2+\\frac{L}{\\mu},",
+        "ref": "Eq. (6.6.16)"
+      },
+      {
+        "name": "InnerParameters",
+        "math": "\\alpha_t=\\alpha,\\quad \\gamma_t=\\alpha^{-t},\\quad \\tau_t=\\frac{1}{m(1-\\alpha)}-1,\\quad \\eta_t=\\frac{\\alpha}{1-\\alpha},\\quad \\forall t=1,\\ldots,s.",
+        "ref": "Eq. (6.6.17)"
+      },
+      {
+        "name": "Lhat",
+        "math": "\\hat{L}=L+2\\mu.",
+        "ref": "Text preceding Lemma 6.12"
+      }
+    ]
+  },
+  "main_theorem": {
+    "ref": "Theorem 6.16",
+    "statement_math": "\\text{Let the iterates }\\bar{x}^\\ell,\\ \\ell=1,\\ldots,k,\\text{ be generated by Algorithm 6.8 and }\\hat{\\ell}\\text{ be randomly selected from }[k].\\text{ Suppose that in Algorithm 6.9, }s=\\left\\lceil-\\frac{\\log M_F}{\\log\\alpha}\\right\\rceil\\text{ with }M_F:=6\\left(5+\\frac{2L}{\\mu}\\right)\\max\\left\\{\\frac{6}{5},\\frac{L^2}{\\mu^2}\\right\\},\\ \\alpha=1-\\frac{2}{m(\\sqrt{1+16c/m}+1)},\\ c=2+\\frac{L}{\\mu},\\text{ and }\\alpha_t=\\alpha,\\ \\gamma_t=\\alpha^{-t},\\ \\tau_t=\\frac{1}{m(1-\\alpha)}-1,\\ \\eta_t=\\frac{\\alpha}{1-\\alpha},\\ \\forall t=1,\\ldots,s.\\text{ Then }\\mathbb{E}\\left[d\\left(\\nabla f(x_{\\hat{\\ell}}^*),-N_X(x_{\\hat{\\ell}}^*)\\right)^2\\right]\\le\\frac{36\\mu}{k}\\left[f(\\bar{x}^0)-f(x^*)\\right],\\quad \\mathbb{E}\\|\\bar{x}^{\\hat{\\ell}}-x_{\\hat{\\ell}}^*\\|^2\\le\\frac{4\\mu}{kL^2}\\left[f(\\bar{x}^0)-f(x^*)\\right].",
+    "rate": "The stationarity residual is O(mu [f(xbar0)-f(x*)]/k), and the distance from the reported iterate to the exact proximal subproblem solution is O(mu [f(xbar0)-f(x*)]/(k L^2)).",
+    "measure": "Expected squared normal-cone stationarity defect at the exact solution of the randomly selected proximal subproblem, and expected squared distance between the computable random outer iterate and that exact solution.",
+    "proof": [
+      {
+        "step": 1,
+        "description": "Apply the optimality condition for the randomly selected proximal subproblem.",
+        "source_pdf_lines": [
+          24234,
+          24239
+        ],
+        "math": "\\nabla\\psi^{\\hat{\\ell}}(x_{\\hat{\\ell}}^*)+\\nabla\\varphi^{\\hat{\\ell}}(x_{\\hat{\\ell}}^*)\\in -N_X(x_{\\hat{\\ell}}^*).",
+        "ref": "Eq. (6.6.43)",
+        "uses": [
+          "OptimalSolutions_Theorem6_16"
+        ],
+        "produces": "The normal-cone inclusion for the exact solution of the selected proximal subproblem."
+      },
+      {
+        "step": 2,
+        "description": "Expand the definitions of \\psi^{\\hat{\\ell}} and \\varphi^{\\hat{\\ell}} in the optimality inclusion.",
+        "source_pdf_lines": [
+          24241,
+          24246
+        ],
+        "math": "\\nabla f(x_{\\hat{\\ell}}^*)+3\\mu(x_{\\hat{\\ell}}^*-\\bar{x}^{\\hat{\\ell}-1})\\in -N_X(x_{\\hat{\\ell}}^*).",
+        "ref": "Eq. (6.6.44)",
+        "uses": [
+          "SubproblemSplitDefinition_6_6_8",
+          "previous_step:1"
+        ],
+        "produces": "The specific normal-cone inclusion used to bound the stationarity distance."
+      },
+      {
+        "step": 3,
+        "description": "Record the prox-step optimality relation displayed in the proof before the final invocation of Lemma 6.14.",
+        "source_pdf_lines": [
+          24248,
+          24253
+        ],
+        "math": "\\varphi(x^t)-\\varphi(x^*)+\\left\\langle\\frac{1}{m}\\sum_{i=1}^m\\tilde{y}_i^t,x^t-x^*\\right\\rangle\\le\\eta_tV_\\varphi(x^*,x^{t-1})-(1+\\eta_t)V_\\varphi(x^*,x^t)-\\eta_tV_\\varphi(x^t,x^{t-1}).",
+        "ref": "Eq. (6.6.45)",
+        "uses": [
+          "RaGradProxOptimality_6_6_45"
+        ],
+        "produces": "The displayed inner-loop optimality inequality referenced as the above relation in the proof."
+      },
+      {
+        "step": 4,
+        "description": "Use the first estimate in Lemma 6.14 and the parameter choice in Theorem 6.16 to bound the distance from the exact proximal point to the previous outer iterate.",
+        "source_pdf_lines": [
+          24255,
+          24259
+        ],
+        "math": "\\mathbb{E}\\|\\bar{x}^{\\hat{\\ell}-1}-x_{\\hat{\\ell}}^*\\|^2\\le\\frac{4(1-M\\alpha^s)}{k\\mu(6-7M\\alpha^s)}[f(\\bar{x}^0)-f(x^*)]\\le\\frac{4}{k\\mu}[f(\\bar{x}^0)-f(x^*)].",
+        "ref": "Proof of Theorem 6.16, after Eq. (6.6.45)",
+        "uses": [
+          "Lemma6_14_OuterProxDecrease",
+          "ExactInnerLoopLength_Theorem6_16"
+        ],
+        "produces": "The previous-outer-iterate distance bound used in the stationarity estimate."
+      },
+      {
+        "step": 5,
+        "description": "Combine the normal-cone inclusion with the distance estimate to obtain the stationarity bound.",
+        "source_pdf_lines": [
+          24260,
+          24264
+        ],
+        "math": "\\mathbb{E}\\left[d(\\nabla f(x_{\\hat{\\ell}}^*),-N_X(x_{\\hat{\\ell}}^*))^2\\right]\\le\\mathbb{E}\\|3\\mu(\\bar{x}^{\\hat{\\ell}-1}-x_{\\hat{\\ell}}^*)\\|^2\\le\\frac{36\\mu}{k}[f(\\bar{x}^0)-f(x^*)].",
+        "ref": "Proof of Theorem 6.16, after Eq. (6.6.45)",
+        "uses": [
+          "previous_step:2",
+          "previous_step:4"
+        ]
+      },
+      {
+        "step": 6,
+        "description": "Use the second estimate in Lemma 6.14 and the stronger choice of s in M_F to convert M alpha^s into mu^2/L^2.",
+        "source_pdf_lines": [
+          24265,
+          24270
+        ],
+        "math": "\\mathbb{E}\\|\\bar{x}^{\\hat{\\ell}}-x_{\\hat{\\ell}}^*\\|^2\\le\\frac{2M\\alpha^s}{3k\\mu(6-7M\\alpha^s)}[f(\\bar{x}^0)-f(x^*)]\\le\\frac{4M\\alpha^s}{k\\mu}[f(\\bar{x}^0)-f(x^*)]\\le\\frac{4\\mu}{kL^2}[f(\\bar{x}^0)-f(x^*)].",
+        "ref": "Proof of Theorem 6.16, after Eq. (6.6.45)",
+        "uses": [
+          "Lemma6_14_OuterProxDecrease",
+          "ExactInnerLoopLength_Theorem6_16"
+        ]
+      }
+    ]
+  },
+  "key_lemmas": [
+    {
+      "name": "SubproblemSplitDefinition_6_6_8",
+      "ref": "Eq. (6.6.8)",
+      "statement_math": "\\min_{x\\in X}\\frac{1}{m}\\sum_{i=1}^m\\psi_i(x)+\\varphi(x),\\quad \\psi_i(x)\\equiv\\psi_i^\\ell(x):=f_i(x)+\\mu\\|x-\\bar{x}^{\\ell-1}\\|^2,\\quad \\varphi(x)\\equiv\\varphi^\\ell(x):=\\frac{\\mu}{2}\\|x-\\bar{x}^{\\ell-1}\\|^2.",
+      "role": "Carries the printed Algorithm 6.8 subproblem split and the quadratic definition of \\varphi used by the curvature facts before Lemma 6.12.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Algorithm 6.8 defines the proximal finite-sum subproblem and names its component functions and quadratic regularizer.",
+          "source_pdf_lines": [
+            23490,
+            23493
+          ],
+          "math": "\\min_{x\\in X}\\frac{1}{m}\\sum_{i=1}^m\\psi_i(x)+\\varphi(x),\\quad \\psi_i(x)\\equiv\\psi_i^\\ell(x):=f_i(x)+\\mu\\|x-\\bar{x}^{\\ell-1}\\|^2,\\quad \\varphi(x)\\equiv\\varphi^\\ell(x):=\\frac{\\mu}{2}\\|x-\\bar{x}^{\\ell-1}\\|^2.",
+          "ref": "Eq. (6.6.8)",
+          "uses": [],
+          "produces": "The named definitions of \\psi_i and \\varphi used in the curvature display preceding Lemma 6.12."
+        }
+      ]
+    },
+    {
+      "name": "SubproblemCurvature_6_6_8",
+      "ref": "Text preceding Lemma 6.12",
+      "statement_math": "\\frac{\\mu}{2}\\|x-y\\|^2\\le\\psi_i(x)-\\psi_i(y)-\\langle\\nabla\\psi_i(y),x-y\\rangle\\le\\frac{\\hat{L}}{2}\\|x-y\\|^2,\\quad \\forall x,y\\in X,\\ i=1,\\ldots,m,\\quad \\varphi(x)-\\varphi(y)-\\langle\\nabla\\varphi(y),x-y\\rangle\\ge\\frac{\\mu}{2}\\|x-y\\|^2,\\quad \\forall x,y\\in X.",
+      "role": "Transfers the original weak convexity and smoothness assumptions to each proximal finite-sum subproblem.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Add the quadratic term in psi_i to the one-sided curvature lower bound and to the Lipschitz-gradient upper bound for f_i.",
+          "source_pdf_lines": [
+            23679,
+            23684
+          ],
+          "math": "\\psi_i(x)=f_i(x)+\\mu\\|x-\\bar{x}^{\\ell-1}\\|^2,\\quad \\hat{L}=L+2\\mu.",
+          "ref": "Eq. (6.6.8) and text preceding Lemma 6.12",
+          "uses": [
+            "SubproblemSplitDefinition_6_6_8",
+            "ComponentSmoothness_6_6_2",
+            "OneSidedCurvature_6_6_3"
+          ],
+          "produces": "The displayed lower and upper Bregman curvature bounds for each \\psi_i, with \\hat{L}=L+2\\mu."
+        },
+        {
+          "step": 2,
+          "description": "Compute the Bregman divergence of the quadratic phi.",
+          "source_pdf_lines": [
+            23492,
+            23493
+          ],
+          "math": "\\varphi(x)=\\frac{\\mu}{2}\\|x-\\bar{x}^{\\ell-1}\\|^2.",
+          "ref": "Eq. (6.6.8)",
+          "uses": [
+            "SubproblemSplitDefinition_6_6_8"
+          ],
+          "produces": "The quadratic-phi Bregman curvature fact \\varphi(x)-\\varphi(y)-\\langle\\nabla\\varphi(y),x-y\\rangle\\ge\\frac{\\mu}{2}\\|x-y\\|^2,\\quad \\forall x,y\\in X."
+        }
+      ]
+    },
+    {
+      "name": "Lemma6_12_ConditionalExpectations",
+      "ref": "Lemma 6.12, Eqs. (6.6.18)-(6.6.19)",
+      "statement_math": "\\text{Let }\\hat{x}_i^t=(1+\\tau_t)^{-1}(\\tilde{x}^t+\\tau_t x_i^{t-1}),\\text{ for }i=1,\\ldots,m,\\ t=1,\\ldots,s.\\quad E_{i_t}[\\psi(\\hat{x}_i^t)]=m\\psi(x_i^t)-(m-1)\\psi(x_i^{t-1}),\\quad E_{i_t}[\\nabla\\psi(\\hat{x}_i^t)]=m\\nabla\\psi(x_i^t)-(m-1)\\nabla\\psi(x_i^{t-1})=E_{i_t}[\\tilde{y}_i^t].",
+      "role": "Converts the single randomly refreshed component into unbiased weighted identities used in the RaGrad potential recursion.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Condition on whether the uniformly selected index equals i.",
+          "source_pdf_lines": [
+            23697,
+            23699
+          ],
+          "math": "\\mathbb{E}_{i_t}[x_i^t]=\\frac{1}{m}\\hat{x}_i^t+\\frac{m-1}{m}x_i^{t-1}.",
+          "ref": "Proof of Lemma 6.12, before Eqs. (6.6.18)-(6.6.19)",
+          "uses": [
+            "Lemma6_12_XhatDefinition",
+            "RaGradComponentPointUpdate_6_6_10"
+          ]
+        },
+        {
+          "step": 2,
+          "description": "Apply the same conditioning split to the component value psi_i(x_i^t).",
+          "source_pdf_lines": [
+            23697,
+            23700
+          ],
+          "math": "\\mathbb{E}_{i_t}[\\psi_i(x_i^t)]=\\frac{1}{m}\\psi_i(\\hat{x}_i^t)+\\frac{m-1}{m}\\psi_i(x_i^{t-1}).",
+          "ref": "Proof of Lemma 6.12, before Eq. (6.6.18)",
+          "uses": [
+            "previous_step:1",
+            "RaGradComponentPointUpdate_6_6_10"
+          ],
+          "produces": "Derived rearrangement from proof lines 23697-23704, not the printed Eq. (6.6.18): \\psi_i(\\hat{x}_i^t)=m\\mathbb{E}_{i_t}[\\psi_i(x_i^t)]-(m-1)\\psi_i(x_i^{t-1})."
+        },
+        {
+          "step": 3,
+          "description": "Apply the same conditioning split to the refreshed gradient memory y_i^t=\\nabla\\psi_i(x_i^t).",
+          "source_pdf_lines": [
+            23697,
+            23702
+          ],
+          "math": "\\mathbb{E}_{i_t}[\\nabla\\psi_i(x_i^t)]=\\frac{1}{m}\\nabla\\psi_i(\\hat{x}_i^t)+\\frac{m-1}{m}\\nabla\\psi_i(x_i^{t-1}).",
+          "ref": "Proof of Lemma 6.12, before Eq. (6.6.19)",
+          "uses": [
+            "previous_step:1",
+            "RaGradComponentPointUpdate_6_6_10",
+            "RaGradGradientMemoryUpdate_6_6_11"
+          ],
+          "produces": "Derived rearrangement from proof lines 23697-23704: \\nabla\\psi_i(\\hat{x}_i^t)=m\\mathbb{E}_{i_t}[\\nabla\\psi_i(x_i^t)]-(m-1)\\nabla\\psi_i(x_i^{t-1})."
+        },
+        {
+          "step": 4,
+          "description": "Combine the conditional expectation of the gradient memory with the estimator definition \\tilde{y}_i^t=m(y_i^t-y_i^{t-1})+y_i^{t-1} to obtain the final equality in (6.6.19).",
+          "source_pdf_lines": [
+            23701,
+            23704
+          ],
+          "math": "\\tilde{y}_i^t=m(y_i^t-y_i^{t-1})+y_i^{t-1}.",
+          "ref": "Eq. (6.6.12) and proof of Lemma 6.12",
+          "uses": [
+            "previous_step:3",
+            "RaGradGradientMemoryUpdate_6_6_11",
+            "RaGradGradientEstimator_6_6_12"
+          ],
+          "produces": "Derived component-level conclusion from proof lines 23697-23704, using Eq. (6.6.12): \\nabla\\psi_i(\\hat{x}_i^t)=m\\mathbb{E}_{i_t}[\\nabla\\psi_i(x_i^t)]-(m-1)\\nabla\\psi_i(x_i^{t-1})=\\mathbb{E}_{i_t}[\\tilde{y}_i^t]."
+        }
+      ]
+    },
+    {
+      "name": "RaGradProxOptimality_6_6_45",
+      "ref": "Eq. (6.6.45)",
+      "statement_math": "\\varphi(x^t)-\\varphi(x^*)+\\left\\langle\\frac{1}{m}\\sum_{i=1}^m\\tilde{y}_i^t,x^t-x^*\\right\\rangle\\le\\eta_tV_\\varphi(x^*,x^{t-1})-(1+\\eta_t)V_\\varphi(x^*,x^t)-\\eta_tV_\\varphi(x^t,x^{t-1}).",
+      "role": "Supplies the Bregman prox-step descent inequality inserted into the proof of Lemma 6.13.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Write the first-order optimality inequality for the argmin defining x^t in (6.6.13).",
+          "source_pdf_lines": [
+            23530,
+            23534
+          ],
+          "math": "x^t=\\operatorname*{argmin}_{x\\in X}\\left\\{\\varphi(x)+\\left\\langle\\frac{1}{m}\\sum_{i=1}^m\\tilde{y}_i^t,x\\right\\rangle+\\eta_tV_\\varphi(x,x^{t-1})\\right\\}.",
+          "ref": "Eq. (6.6.13)",
+          "uses": [
+            "RaGradBregmanProxStep_6_6_13"
+          ]
+        },
+        {
+          "step": 2,
+          "description": "Use the optimality condition of (6.6.13) to obtain the displayed prox inequality.",
+          "source_pdf_lines": [
+            24248,
+            24253
+          ],
+          "math": "\\varphi(x^t)-\\varphi(x^*)+\\left\\langle\\frac{1}{m}\\sum_{i=1}^m\\tilde{y}_i^t,x^t-x^*\\right\\rangle\\le\\eta_tV_\\varphi(x^*,x^{t-1})-(1+\\eta_t)V_\\varphi(x^*,x^t)-\\eta_tV_\\varphi(x^t,x^{t-1}).",
+          "ref": "Eq. (6.6.45)",
+          "uses": [
+            "previous_step:1",
+            "RaGradBregmanProxStep_6_6_13"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Lemma6_13_WeightedRaGradRecursion",
+      "ref": "Lemma 6.13, Eqs. (6.6.20)-(6.6.25)",
+      "statement_math": "\\text{Let the iterates }x^t\\text{ and }y^t,\\ t=1,\\ldots,s,\\text{ be generated by Algorithm 6.9 and }x^*\\text{ be an optimal solution of (6.6.8). If the parameters in Algorithm 6.9 satisfy for all }t=1,\\ldots,s-1,\\ \\alpha_{t+1}\\gamma_{t+1}=\\gamma_t,\\ \\gamma_{t+1}[m(1+\\tau_{t+1})-1]\\le m\\gamma_t(1+\\tau_t),\\ \\gamma_{t+1}\\eta_{t+1}\\le\\gamma_t(1+\\eta_t),\\ \\frac{\\eta_s\\mu}{4}\\ge\\frac{(m-1)^2\\hat{L}}{m^2\\tau_s},\\ \\frac{\\eta_t\\mu}{2}\\ge\\frac{\\alpha_{t+1}\\hat{L}}{\\tau_{t+1}}+\\frac{(m-1)^2\\hat{L}}{m^2\\tau_t},\\ \\frac{\\eta_s\\mu}{4}\\ge\\frac{\\hat{L}}{m(1+\\tau_s)},\\text{ then }\\mathbb{E}_s\\left[\\gamma_s(1+\\eta_s)V_\\varphi(x^*,x^s)+\\sum_{i=1}^m\\frac{\\mu\\gamma_s(1+\\tau_s)}{4}\\|x_i^s-x^*\\|^2\\right]\\le\\gamma_1\\eta_1\\mathbb{E}_sV_\\varphi(x^*,x^0)+\\sum_{i=1}^m\\frac{\\gamma_1[(1+\\tau_1)-1/m]\\hat{L}}{2}\\mathbb{E}_s\\|x_i^0-x^*\\|^2.",
+      "role": "Provides the telescoping weighted potential inequality for RaGrad on one strongly convex proximal subproblem. The side conditions (6.6.20)-(6.6.22) and (6.6.24) are only required on the paper range t=1,\\ldots,s-1; (6.6.23) and (6.6.25) are terminal conditions at s.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Record the subproblem curvature modulus and define Q_t; use convexity of psi together with optimality of x^* to show the nonnegative lower bound printed in (6.6.26)-(6.6.27). The later residual proof prints the symbol r in the lower bound for V_\\varphi; this JSON treats that r as the same strong-convexity modulus \\mu from lines 23681-23683.",
+          "source_pdf_lines": [
+            23679,
+            23743
+          ],
+          "math": "\\begin{aligned}Q_t&:=\\varphi(x^t)+\\psi(x^*)+\\langle\\nabla\\psi(x^*),x^t-x^*\\rangle-\\left[\\varphi(x^*)+\\frac{1}{m}\\sum_{i=1}^m\\left(\\psi_i(\\hat{x}_i^t)+\\langle\\nabla\\psi_i(\\hat{x}_i^t),x^*-\\hat{x}_i^t\\rangle\\right)\\right]\\\\&\\ge\\varphi(x^t)+\\psi(x^*)+\\langle\\nabla\\psi(x^*),x^t-x^*\\rangle-[\\varphi(x^*)+\\psi(x^*)]\\\\&=\\varphi(x^t)-\\varphi(x^*)+\\langle\\nabla\\psi(x^*),x^t-x^*\\rangle\\\\&\\ge\\langle\\nabla\\varphi(x^*)+\\nabla\\psi(x^*),x^t-x^*\\rangle\\ge0.\\end{aligned}",
+          "ref": "Eqs. (6.6.26)-(6.6.27)",
+          "uses": [
+            "SubproblemCurvature_6_6_8"
+          ],
+          "produces": "The nonnegative Q_t lower bound used with (6.6.31), plus the source-faithful curvature dependency: the proof's printed residual parameter r is the strong-convexity modulus \\mu from the displayed bounds on \\psi_i and \\varphi."
+        },
+        {
+          "step": 2,
+          "description": "Introduce the Bregman error notation Psi and decompose Q_t into the prox term plus the two error terms delta_1^t and delta_2^t.",
+          "source_pdf_lines": [
+            23745,
+            23759
+          ],
+          "math": "\\begin{gathered}\\Psi(x,z):=\\psi(x)-\\psi(z)-\\langle\\nabla\\psi(z),x-z\\rangle,\\\\Q_t=\\varphi(x^t)-\\varphi(x^*)+\\left\\langle\\frac{1}{m}\\sum_{i=1}^m\\tilde{y}_i^t,x^t-x^*\\right\\rangle+\\delta_1^t+\\delta_2^t,\\\\\\delta_1^t:=\\psi(x^*)-\\langle\\nabla\\psi(x^*),x^*\\rangle-\\frac{1}{m}\\sum_{i=1}^m[\\psi_i(\\hat{x}_i^t)-\\langle\\nabla\\psi_i(\\hat{x}_i^t),\\hat{x}_i^t\\rangle+\\langle\\nabla\\psi_i(\\hat{x}_i^t)-\\nabla\\psi_i(x^*),\\tilde{x}^t\\rangle]\\\\=\\frac{1}{m}\\sum_{i=1}^m[\\tau_t\\Psi(x_i^{t-1},x^*)-(1+\\tau_t)\\Psi(\\hat{x}_i^t,x^*)-\\tau_t\\Psi(x_i^{t-1},\\hat{x}_i^t)],\\\\\\delta_2^t:=\\frac{1}{m}\\sum_{i=1}^m[\\langle\\nabla\\psi_i(\\hat{x}_i^t)-\\nabla\\psi_i(x^*),\\tilde{x}^t\\rangle-\\langle\\tilde{y}_i^t-\\nabla\\psi_i(x^*),x^t\\rangle+\\langle\\tilde{y}_i^t-\\nabla\\psi_i(\\hat{x}_i^t),x^*\\rangle].\\end{gathered}",
+          "ref": "Eqs. (6.6.28)-(6.6.29)",
+          "uses": [
+            "previous_step:1",
+            "Lemma6_12_ConditionalExpectations"
+          ],
+          "produces": "The displayed definitions of \\Psi, Q_t, \\delta_1^t, and \\delta_2^t; the rewrite of \\delta_1^t uses the printed definition \\hat{x}_i^t=(1+\\tau_t)^{-1}(\\tilde{x}^t+\\tau_t x_i^{t-1}) from Lemma 6.12 and the Q_t definition from previous_step:1."
+        },
+        {
+          "step": 3,
+          "description": "Apply Lemma 6.12 to compute the conditional expectation of delta_2^t as the displayed inner-product identity.",
+          "source_pdf_lines": [
+            23762,
+            23771
+          ],
+          "math": "\\mathbb{E}_{i_t}[\\delta_2^t]=\\frac{1}{m}\\sum_{i=1}^m\\mathbb{E}_{i_t}[\\langle\\nabla\\psi_i(\\hat{x}_i^t)-\\nabla\\psi_i(x^*),\\tilde{x}^t\\rangle-\\langle\\tilde{y}_i^t-\\nabla\\psi_i(x^*),x^t\\rangle+\\langle\\tilde{y}_i^t-\\nabla\\psi_i(\\hat{x}_i^t),x^*\\rangle]=\\frac{1}{m}\\sum_{i=1}^m\\mathbb{E}_{i_t}\\langle\\tilde{y}_i^t-\\nabla\\psi_i(x^*),\\tilde{x}^t-x^t\\rangle.",
+          "ref": "Eq. (6.6.30)",
+          "uses": [
+            "Lemma6_12_ConditionalExpectations",
+            "previous_step:2"
+          ],
+          "produces": "The conditional-expectation replacement for \\delta_2^t consumed in the weighted summation."
+        },
+        {
+          "step": 4,
+          "description": "Multiply each Q_t by a nonnegative gamma_t and sum over t; the first displayed inequality inserts the decomposition of Q_t, the prox optimality inequality (6.6.45), and the conditional-expectation identity (6.6.30).",
+          "source_pdf_lines": [
+            23773,
+            23788
+          ],
+          "math": "\\begin{aligned}\\mathbb{E}_s\\left[\\sum_{t=1}^s\\gamma_tQ_t\\right]&\\le\\mathbb{E}_s\\left[\\sum_{t=1}^s\\gamma_t\\left[\\eta_tV_\\varphi(x^*,x^{t-1})-(1+\\eta_t)V_\\varphi(x^*,x^t)-\\eta_tV_\\varphi(x^t,x^{t-1})\\right]\\right]\\\\&\\quad+\\mathbb{E}_s\\left[\\sum_{t=1}^s\\sum_{i=1}^m\\gamma_t\\left((1+\\tau_t-\\frac{1}{m})\\Psi(x_i^{t-1},x^*)-(1+\\tau_t)\\Psi(x_i^t,x^*)\\right)\\right]\\\\&\\quad+\\mathbb{E}_s\\left[\\sum_{t=1}^s\\sum_{i=1}^m\\gamma_t\\left[\\frac{1}{m}\\left\\langle\\tilde{y}_i^t-\\nabla\\psi_i(x^*),\\tilde{x}^t-x^t\\right\\rangle-\\tau_t\\Psi(x_i^{t-1},x_i^t)\\right]\\right].\\end{aligned}",
+          "ref": "First inequality in Eq. (6.6.31)",
+          "uses": [
+            "previous_step:2",
+            "previous_step:3",
+            "RaGradProxOptimality_6_6_45",
+            "Lemma6_12_ConditionalExpectations"
+          ],
+          "produces": "The pre-telescoping weighted summation display in (6.6.31)."
+        },
+        {
+          "step": 5,
+          "description": "Apply the gamma-eta and gamma-tau side conditions to telescope the Bregman-potential block and the component-memory Psi block.",
+          "source_pdf_lines": [
+            23810,
+            23811
+          ],
+          "math": "\\gamma_{t+1}[m(1+\\tau_{t+1})-1]\\le m\\gamma_t(1+\\tau_t),\\quad \\gamma_{t+1}\\eta_{t+1}\\le\\gamma_t(1+\\eta_t).",
+          "ref": "Eqs. (6.6.21)-(6.6.22), proof text after Eq. (6.6.32)",
+          "uses": [
+            "previous_step:4",
+            "Lemma6_13_TauWeight_6_6_21",
+            "Lemma6_13_EtaWeight_6_6_22"
+          ],
+          "produces": "The side-condition telescope needed for the second inequality in (6.6.31)."
+        },
+        {
+          "step": 6,
+          "description": "Record the final displayed inequality (6.6.31) after the side-condition telescope; as printed, the terminal V_phi term in this displayed equation is not preceded by gamma_s.",
+          "source_pdf_lines": [
+            23789,
+            23796
+          ],
+          "math": "\\begin{aligned}\\mathbb{E}_s\\left[\\sum_{t=1}^s\\gamma_tQ_t\\right]&\\le\\mathbb{E}_s\\left[\\gamma_1\\eta_1V_\\varphi(x^*,x^0)-(1+\\eta_s)V_\\varphi(x^*,x^s)\\right]\\\\&\\quad+\\mathbb{E}_s\\left\\{\\sum_{i=1}^m\\left[\\gamma_1\\left(1+\\tau_1-\\frac{1}{m}\\right)\\Psi(x_i^0,x^*)-\\gamma_s(1+\\tau_s)\\Psi(x_i^s,x^*)\\right]\\right\\}-\\mathbb{E}_s\\left[\\sum_{t=1}^s\\gamma_t\\delta_t\\right].\\end{aligned}",
+          "ref": "Eq. (6.6.31)",
+          "uses": [
+            "previous_step:4",
+            "previous_step:5"
+          ],
+          "produces": "The weighted potential inequality (6.6.31), transcribed with the paper's printed terminal V_phi coefficient."
+        },
+        {
+          "step": 7,
+          "description": "Define delta_t as the residual term subtracted in (6.6.31), using the two equivalent displayed forms in (6.6.32).",
+          "source_pdf_lines": [
+            23798,
+            23808
+          ],
+          "math": "\\delta_t:=\\eta_tV_\\varphi(x^t,x^{t-1})-\\sum_{i=1}^m\\left[\\frac{1}{m}\\langle\\tilde{y}_i^t-\\nabla\\psi_i(x^*),\\tilde{x}^t-x^t\\rangle-\\tau_t\\Psi(x_i^{t-1},x_i^t)\\right]=\\eta_tV_\\varphi(x^t,x^{t-1})-\\frac{1}{m}\\sum_{i=1}^m\\langle\\tilde{y}_i^t-\\nabla\\psi_i(x^*),\\tilde{x}^t-x^t\\rangle+\\tau_t\\Psi(x_{i_t}^{t-1},x_{i_t}^t).",
+          "ref": "Eq. (6.6.32)",
+          "uses": [
+            "previous_step:6"
+          ],
+          "produces": "The residual \\delta_t whose lower bound is developed in (6.6.33)-(6.6.35)."
+        },
+        {
+          "step": 8,
+          "description": "Use the extrapolation definition of \\tilde{x}^t from (6.6.9), then the RaGrad memory and estimator updates, to rewrite the stochastic inner-product term into the component-gradient correction identity (6.6.33).",
+          "source_pdf_lines": [
+            23812,
+            23841
+          ],
+          "math": "\\begin{aligned}\\frac{1}{m}\\sum_{i=1}^m\\left\\langle\\tilde{y}_i^t-\\nabla\\psi_i(x^*),\\tilde{x}^t-x^t\\right\\rangle&=\\frac{1}{m}\\sum_{i=1}^m\\left[\\left\\langle\\tilde{y}_i^t-\\nabla\\psi_i(x^*),x^{t-1}-x^t\\right\\rangle-\\alpha_t\\left\\langle\\tilde{y}_i^t-\\nabla\\psi_i(x^*),x^{t-2}-x^{t-1}\\right\\rangle\\right]\\\\&=\\frac{1}{m}\\sum_{i=1}^m\\left[\\left\\langle\\tilde{y}_i^t-\\nabla\\psi_i(x^*),x^{t-1}-x^t\\right\\rangle-\\alpha_t\\left\\langle\\tilde{y}_i^{t-1}-\\nabla\\psi_i(x^*),x^{t-2}-x^{t-1}\\right\\rangle\\right.\\\\&\\qquad\\left.-\\alpha_t\\left\\langle\\tilde{y}_i^t-\\tilde{y}_i^{t-1},x^{t-2}-x^{t-1}\\right\\rangle\\right]\\\\&=\\frac{1}{m}\\sum_{i=1}^m\\left[\\left\\langle\\tilde{y}_i^t-\\nabla\\psi_i(x^*),x^{t-1}-x^t\\right\\rangle-\\alpha_t\\left\\langle\\tilde{y}_i^{t-1}-\\nabla\\psi_i(x^*),x^{t-2}-x^{t-1}\\right\\rangle\\right]\\\\&\\qquad-\\alpha_t\\left\\langle\\nabla\\psi_{i_t}(x_{i_t}^t)-\\nabla\\psi_{i_t}(x_{i_t}^{t-1}),x^{t-2}-x^{t-1}\\right\\rangle\\\\&\\qquad-\\left(1-\\frac{1}{m}\\right)\\alpha_t\\left\\langle\\nabla\\psi_{i_{t-1}}(x_{i_{t-1}}^{t-2})-\\nabla\\psi_{i_{t-1}}(x_{i_{t-1}}^{t-1}),x^{t-2}-x^{t-1}\\right\\rangle.\\end{aligned}",
+          "ref": "Eq. (6.6.33)",
+          "uses": [
+            "previous_step:7",
+            "RaGradExtrapolation_6_6_9",
+            "RaGradGradientMemoryUpdate_6_6_11",
+            "RaGradGradientEstimator_6_6_12"
+          ],
+          "produces": "The expanded identity (6.6.33), including the two component-gradient correction terms used in step (b) of (6.6.35)."
+        },
+        {
+          "step": 9,
+          "description": "Apply the gamma relation and terminal estimator/memory identities to telescope the bracketed part of (6.6.33), using x^{-1}=x^0 as stated in the PDF, and obtain the terminal identity (6.6.34).",
+          "source_pdf_lines": [
+            23843,
+            23867
+          ],
+          "math": "\\begin{aligned}\\sum_{t=1}^s\\gamma_t\\frac{1}{m}\\sum_{i=1}^m\\left[\\left\\langle\\tilde{y}_i^t-\\nabla\\psi_i(x^*),x^{t-1}-x^t\\right\\rangle-\\alpha_t\\left\\langle\\tilde{y}_i^{t-1}-\\nabla\\psi_i(x^*),x^{t-2}-x^{t-1}\\right\\rangle\\right]&=\\gamma_s\\frac{1}{m}\\sum_{i=1}^m\\left\\langle\\tilde{y}_i^s-\\nabla\\psi_i(x^*),x^{s-1}-x^s\\right\\rangle\\\\&=\\gamma_s\\frac{1}{m}\\sum_{i=1}^m\\left\\langle\\nabla\\psi_i(x_i^s)-\\nabla\\psi_i(x^*),x^{s-1}-x^s\\right\\rangle\\\\&\\qquad+\\gamma_s\\sum_{i=1}^m\\left(1-\\frac{1}{m}\\right)\\left\\langle\\nabla\\psi_i(x_i^s)-\\nabla\\psi_i(x_i^{s-1}),x^{s-1}-x^s\\right\\rangle\\\\&=\\gamma_s\\frac{1}{m}\\sum_{i=1}^m\\left\\langle\\nabla\\psi_i(x_i^s)-\\nabla\\psi_i(x^*),x^{s-1}-x^s\\right\\rangle\\\\&\\qquad+\\gamma_s\\left(1-\\frac{1}{m}\\right)\\left\\langle\\nabla\\psi_{i_s}(x_{i_s}^s)-\\nabla\\psi_{i_s}(x_{i_s}^{s-1}),x^{s-1}-x^s\\right\\rangle.\\end{aligned}",
+          "ref": "Eq. (6.6.34)",
+          "uses": [
+            "previous_step:8",
+            "Lemma6_13_AlphaGamma_6_6_20",
+            "RaGradGradientMemoryUpdate_6_6_11",
+            "RaGradGradientEstimator_6_6_12"
+          ],
+          "produces": "The terminal gamma-telescoped identity (6.6.34), including the final i_s correction term."
+        },
+        {
+          "step": 10,
+          "description": "Begin (6.6.35) by substituting the definition of \\delta_t from (6.6.32); this is the paper's labeled transition (a).",
+          "source_pdf_lines": [
+            23869,
+            23879
+          ],
+          "math": "\\sum_{t=1}^s\\gamma_t\\delta_t\\overset{(a)}{=}\\sum_{t=1}^s\\gamma_t\\left[\\eta_tV_\\varphi(x^t,x^{t-1})-\\frac{1}{m}\\sum_{i=1}^m\\langle\\tilde{y}_i^t-\\nabla\\psi_i(x^*),\\tilde{x}^t-x^t\\rangle+\\tau_t\\Psi(x_{i_t}^{t-1},x_{i_t}^t)\\right].",
+          "ref": "Eq. (6.6.35), transition (a)",
+          "uses": [
+            "previous_step:7"
+          ],
+          "produces": "The residual sum rewritten by the displayed definition of \\delta_t."
+        },
+        {
+          "step": 11,
+          "description": "Use relations (6.6.33) and (6.6.34) to replace the summed stochastic inner-product term; this is the paper's labeled transition (b).",
+          "source_pdf_lines": [
+            23880,
+            23899
+          ],
+          "math": "\\begin{aligned}\\sum_{t=1}^s\\gamma_t\\delta_t&\\overset{(b)}{=}\\sum_{t=1}^s\\gamma_t\\left[\\eta_tV_\\varphi(x^t,x^{t-1})+\\alpha_t\\langle\\nabla\\psi_{i_t}(x_{i_t}^t)-\\nabla\\psi_{i_t}(x_{i_t}^{t-1}),x^{t-2}-x^{t-1}\\rangle\\right.\\\\&\\quad+\\left.\\left(1-\\frac{1}{m}\\right)\\alpha_t\\langle\\nabla\\psi_{i_{t-1}}(x_{i_{t-1}}^{t-2})-\\nabla\\psi_{i_{t-1}}(x_{i_{t-1}}^{t-1}),x^{t-2}-x^{t-1}\\rangle+\\tau_t\\Psi(x_{i_t}^{t-1},x_{i_t}^t)\\right]\\\\&\\quad+\\frac{\\gamma_s}{m}\\sum_{i=1}^m\\langle\\nabla\\psi_i(x_i^s)-\\nabla\\psi_i(x^*),x^{s-1}-x^s\\rangle-\\gamma_s\\left(1-\\frac{1}{m}\\right)\\langle\\nabla\\psi_{i_s}(x_{i_s}^s)-\\nabla\\psi_{i_s}(x_{i_s}^{s-1}),x^{s-1}-x^s\\rangle.\\end{aligned}",
+          "ref": "Eq. (6.6.35), transition (b)",
+          "uses": [
+            "previous_step:8",
+            "previous_step:9",
+            "previous_step:10"
+          ],
+          "produces": "The residual sum after inserting the component-gradient correction identity and its terminal telescoped form."
+        },
+        {
+          "step": 12,
+          "description": "Lower-bound the Bregman terms using the printed facts after (6.6.35), namely V_phi curvature and the Psi gradient lower bound; this is the paper's labeled transition (c). The printed parameter r is tracked as the strong-convexity modulus \\mu identified in previous_step:1.",
+          "source_pdf_lines": [
+            23900,
+            23932
+          ],
+          "math": "\\begin{aligned}\\sum_{t=1}^s\\gamma_t\\delta_t&\\overset{(c)}{\\ge}\\sum_{t=1}^s\\gamma_t\\left[\\frac{\\eta_t}{2}r\\|x^t-x^{t-1}\\|^2+\\alpha_t\\langle\\nabla\\psi_{i_t}(x_{i_t}^t)-\\nabla\\psi_{i_t}(x_{i_t}^{t-1}),x^{t-2}-x^{t-1}\\rangle\\right.\\\\&\\quad+\\left.\\left(1-\\frac{1}{m}\\right)\\alpha_t\\langle\\nabla\\psi_{i_{t-1}}(x_{i_{t-1}}^{t-2})-\\nabla\\psi_{i_{t-1}}(x_{i_{t-1}}^{t-1}),x^{t-2}-x^{t-1}\\rangle+\\frac{\\tau_t}{2\\hat{L}}\\|\\nabla\\psi_{i_t}(x_{i_t}^t)-\\nabla\\psi_{i_t}(x_{i_t}^{t-1})\\|^2\\right]\\\\&\\quad-\\frac{\\gamma_s}{m}\\sum_{i=1}^m\\langle x^{s-1}-x^s,\\nabla\\psi_i(x_i^s)-\\nabla\\psi_i(x^*)\\rangle\\\\&\\quad-\\gamma_s\\left(1-\\frac{1}{m}\\right)\\langle x^{s-1}-x^s,\\nabla\\psi_{i_s}(x_{i_s}^s)-\\nabla\\psi_{i_s}(x_{i_s}^{s-1})\\rangle.\\end{aligned}",
+          "ref": "Eq. (6.6.35), transition (c)",
+          "uses": [
+            "previous_step:1",
+            "previous_step:11",
+            "SubproblemCurvature_6_6_8"
+          ],
+          "produces": "The (6.6.35) residual lower bound before regrouping."
+        },
+        {
+          "step": 13,
+          "description": "Regroup the terms on the right-hand side of (6.6.35), splitting terminal and interior cross terms and reserving one quarter of the terminal and component-gradient quadratic terms.",
+          "source_pdf_lines": [
+            23935,
+            23969
+          ],
+          "math": "\\begin{aligned}\\sum_{t=1}^s\\gamma_t\\delta_t&\\ge\\gamma_s\\left[\\frac{\\eta_sr}{4}\\|x^s-x^{s-1}\\|^2-\\frac{1}{m}\\sum_{i=1}^m\\langle\\nabla\\psi_i(x_i^s)-\\nabla\\psi_i(x^*),x^{s-1}-x^s\\rangle\\right]\\\\&\\quad+\\gamma_s\\left[\\frac{\\eta_sr}{4}\\|x^s-x^{s-1}\\|^2-\\left(1-\\frac{1}{m}\\right)\\langle\\nabla\\psi_{i_s}(x_{i_s}^s)-\\nabla\\psi_{i_s}(x_{i_s}^{s-1}),x^{s-1}-x^s\\rangle+\\frac{\\tau_s}{4\\hat{L}}\\|\\nabla\\psi_{i_s}(x_{i_s}^s)-\\nabla\\psi_{i_s}(x_{i_s}^{s-1})\\|^2\\right]\\\\&\\quad+\\sum_{t=2}^s\\gamma_t\\left[\\alpha_t\\langle\\nabla\\psi_{i_t}(x_{i_t}^t)-\\nabla\\psi_{i_t}(x_{i_t}^{t-1}),x^{t-2}-x^{t-1}\\rangle+\\frac{\\tau_t}{4\\hat{L}}\\|\\nabla\\psi_{i_t}(x_{i_t}^t)-\\nabla\\psi_{i_t}(x_{i_t}^{t-1})\\|^2\\right]\\\\&\\quad+\\sum_{t=2}^s\\left[\\gamma_t\\left(1-\\frac{1}{m}\\right)\\alpha_t\\langle\\nabla\\psi_{i_{t-1}}(x_{i_{t-1}}^{t-1})-\\nabla\\psi_{i_{t-1}}(x_{i_{t-1}}^{t-2}),x^{t-2}-x^{t-1}\\rangle+\\frac{\\tau_{t-1}\\gamma_{t-1}}{4\\hat{L}}\\|\\nabla\\psi_{i_{t-1}}(x_{i_{t-1}}^{t-1})-\\nabla\\psi_{i_{t-1}}(x_{i_{t-1}}^{t-2})\\|^2\\right]+\\sum_{t=2}^s\\frac{\\gamma_{t-1}\\eta_{t-1}r}{2}\\|x^{t-1}-x^{t-2}\\|^2.\\end{aligned}",
+          "ref": "Residual regrouping after Eq. (6.6.35)",
+          "uses": [
+            "previous_step:12"
+          ],
+          "produces": "The regrouped residual lower bound immediately before the paper's labeled Young-inequality step."
+        },
+        {
+          "step": 14,
+          "description": "Apply the paper's Young-type relation b<u,v> - a||v||^2/2 <= b^2||u||^2/(2a) to the terminal and interior cross terms; this is the regrouping display's labeled step (a).",
+          "source_pdf_lines": [
+            23970,
+            23981
+          ],
+          "math": "\\begin{aligned}\\sum_{t=1}^s\\gamma_t\\delta_t&\\overset{(a)}{\\ge}\\gamma_s\\frac{\\eta_sr}{4}\\|x^s-x^{s-1}\\|^2-\\frac{\\gamma_s}{m}\\sum_{i=1}^m\\langle\\nabla\\psi_i(x_i^s)-\\nabla\\psi_i(x^*),x^{s-1}-x^s\\rangle\\\\&\\quad+\\gamma_s\\left(\\frac{\\eta_sr}{4}-\\frac{(m-1)^2\\hat{L}}{m^2\\tau_s}\\right)\\|x^s-x^{s-1}\\|^2+\\sum_{t=2}^s\\left(\\frac{\\gamma_{t-1}\\eta_{t-1}r}{2}-\\frac{\\gamma_t\\alpha_t^2\\hat{L}}{\\tau_t}-\\frac{(m-1)^2\\gamma_t^2\\alpha_t^2\\hat{L}}{m^2\\gamma_{t-1}\\tau_{t-1}}\\right)\\|x^{t-1}-x^{t-2}\\|^2.\\end{aligned}",
+          "ref": "Residual regrouping after Eq. (6.6.35), transition (a)",
+          "uses": [
+            "previous_step:13"
+          ],
+          "produces": "The residual lower bound with explicit terminal and interior coefficient brackets."
+        },
+        {
+          "step": 15,
+          "description": "Use (6.6.20), (6.6.23), and (6.6.24) to discard the nonnegative coefficient-bracket terms from the previous display; this is the regrouping display's labeled step (b).",
+          "source_pdf_lines": [
+            23982,
+            23989
+          ],
+          "math": "\\sum_{t=1}^s\\gamma_t\\delta_t\\overset{(b)}{\\ge}\\gamma_s\\frac{\\eta_sr}{4}\\|x^s-x^{s-1}\\|^2-\\frac{\\gamma_s}{m}\\sum_{i=1}^m\\langle\\nabla\\psi_i(x_i^s)-\\nabla\\psi_i(x^*),x^{s-1}-x^s\\rangle.",
+          "ref": "Residual regrouping after Eq. (6.6.35), transition (b)",
+          "uses": [
+            "previous_step:1",
+            "previous_step:14",
+            "Lemma6_13_AlphaGamma_6_6_20",
+            "Lemma6_13_TerminalVariance_6_6_23",
+            "Lemma6_13_InteriorVariance_6_6_24"
+          ],
+          "produces": "The final residual lower bound used with (6.6.26) and (6.6.31)."
+        },
+        {
+          "step": 16,
+          "description": "Combine the residual lower bound with (6.6.26) and (6.6.31) to produce the first displayed line of (6.6.36).",
+          "source_pdf_lines": [
+            23990,
+            24001
+          ],
+          "math": "\\begin{aligned}0\\le{}&\\mathbb{E}_s\\left[\\gamma_1\\eta_1V_\\varphi(x^*,x^0)-\\gamma_s(1+\\eta_s)V_\\varphi(x^*,x^s)\\right]-\\gamma_s\\frac{\\eta_s}{4}r\\mathbb{E}_s\\|x^s-x^{s-1}\\|^2\\\\&+\\gamma_s\\mathbb{E}_s\\left[\\frac{1}{m}\\sum_{i=1}^m\\langle\\nabla\\psi_i(x_i^s)-\\nabla\\psi_i(x^*),x^{s-1}-x^s\\rangle\\right]\\\\&+\\mathbb{E}_s\\sum_{i=1}^m\\left[\\gamma_1\\left(1+\\tau_1-\\frac{1}{m}\\right)\\Psi(x_i^0,x^*)-\\gamma_s(1+\\tau_s)\\Psi(x_i^s,x^*)\\right].\\end{aligned}",
+          "ref": "Eq. (6.6.36), initial inequality",
+          "uses": [
+            "previous_step:1",
+            "previous_step:6",
+            "previous_step:15"
+          ],
+          "produces": "The starting inequality in (6.6.36), before the paper's labeled transitions."
+        },
+        {
+          "step": 17,
+          "description": "Use the lower bound on \\Psi(x_i^s,x^*) by a gradient-difference norm to split off one half of the terminal \\Psi term; this is (6.6.36)'s labeled transition (a).",
+          "source_pdf_lines": [
+            24002,
+            24014
+          ],
+          "math": "\\begin{aligned}0&\\overset{(a)}{\\le}\\mathbb{E}_s[\\gamma_1\\eta_1V_\\varphi(x^*,x^0)-\\gamma_s(1+\\eta_s)V_\\varphi(x^*,x^s)]-\\gamma_s\\frac{\\eta_s}{4}r\\mathbb{E}_s\\|x^s-x^{s-1}\\|^2\\\\&\\quad+\\mathbb{E}_s\\sum_{i=1}^m\\left[\\gamma_1\\left(1+\\tau_1-\\frac{1}{m}\\right)\\Psi(x_i^0,x^*)-\\frac{\\gamma_s(1+\\tau_s)}{2}\\Psi(x_i^s,x^*)\\right]\\\\&\\quad-\\frac{\\gamma_s}{m}\\sum_{i=1}^m\\mathbb{E}_s\\left[\\frac{m(1+\\tau_s)}{4\\hat{L}}\\|\\nabla\\psi_i(x_i^s)-\\nabla\\psi_i(x^*)\\|^2-\\langle\\nabla\\psi_i(x_i^s)-\\nabla\\psi_i(x^*),x^{s-1}-x^s\\rangle\\right].\\end{aligned}",
+          "ref": "Eq. (6.6.36), transition (a)",
+          "uses": [
+            "previous_step:16",
+            "SubproblemCurvature_6_6_8"
+          ],
+          "produces": "The (6.6.36) bound containing a gradient-square-minus-inner-product bracket."
+        },
+        {
+          "step": 18,
+          "description": "Apply the same Young-type relation to the gradient-square-minus-inner-product bracket, producing the coefficient \\eta_s r/4 - \\hat{L}/(m(1+\\tau_s)); this is (6.6.36)'s labeled transition (b).",
+          "source_pdf_lines": [
+            24015,
+            24023
+          ],
+          "math": "\\begin{aligned}0&\\overset{(b)}{\\le}\\mathbb{E}_s\\left[\\gamma_1\\eta_1V_\\varphi(x^*,x^0)-\\gamma_s(1+\\eta_s)V_\\varphi(x^*,x^s)\\right]-\\gamma_s\\left(\\frac{\\eta_s r}{4}-\\frac{\\hat{L}}{m(1+\\tau_s)}\\right)\\mathbb{E}_s\\|x^s-x^{s-1}\\|^2\\\\&\\quad+\\sum_{i=1}^m\\mathbb{E}_s\\left[\\gamma_1\\left(1+\\tau_1-\\frac{1}{m}\\right)\\Psi(x_i^0,x^*)-\\frac{\\gamma_s(1+\\tau_s)}{2}\\Psi(x_i^s,x^*)\\right].\\end{aligned}",
+          "ref": "Eq. (6.6.36), transition (b)",
+          "uses": [
+            "previous_step:17"
+          ],
+          "produces": "The (6.6.36) bound before dropping the terminal step-size bracket and converting Psi terms to squared distances."
+        },
+        {
+          "step": 19,
+          "description": "Use (6.6.25) to drop the nonnegative terminal step-size bracket, then use strong convexity of \\psi_i and Lipschitz continuity of \\nabla\\psi_i to convert the initial and terminal \\Psi terms to squared distances; this is (6.6.36)'s labeled transition (c).",
+          "source_pdf_lines": [
+            24024,
+            24036
+          ],
+          "math": "\\begin{aligned}0&\\overset{(c)}{\\le}\\mathbb{E}_s\\left[\\gamma_1\\eta_1V_\\varphi(x^*,x^0)-\\gamma_s(1+\\eta_s)V_\\varphi(x^*,x^s)\\right]+\\frac{\\gamma_1[(1+\\tau_1)-\\frac{1}{m}]\\hat{L}}{2}\\sum_{i=1}^m\\mathbb{E}_s\\|x_i^0-x^*\\|^2\\\\&\\quad-\\frac{\\mu\\gamma_s(1+\\tau_s)}{4}\\sum_{i=1}^m\\mathbb{E}_s\\|x_i^s-x^*\\|^2.\\end{aligned}",
+          "ref": "Eq. (6.6.36), transition (c)",
+          "uses": [
+            "previous_step:1",
+            "previous_step:18",
+            "SubproblemCurvature_6_6_8",
+            "Lemma6_13_TerminalStep_6_6_25"
+          ],
+          "produces": "Eq. (6.6.36): an inequality of the form 0 bounded above by the initial potential and initial component-memory terms minus the terminal \\gamma_s(1+\\eta_s)V_\\varphi(x^*,x^s) and terminal \\mu\\gamma_s(1+\\tau_s) component-memory terms."
+        },
+        {
+          "step": 20,
+          "description": "Rearrange the final line of (6.6.36) by moving the negative terminal terms to the left-hand side; this is the algebraic step, not printed as a separate proof display, that gives the stated Lemma 6.13 inequality.",
+          "source_pdf_lines": [
+            23723,
+            24037
+          ],
+          "ref": "Lemma 6.13 conclusion from Eq. (6.6.36)",
+          "uses": [
+            "previous_step:19"
+          ],
+          "produces": "\\mathbb{E}_s\\left[\\gamma_s(1+\\eta_s)V_\\varphi(x^*,x^s)+\\sum_{i=1}^m\\frac{\\mu\\gamma_s(1+\\tau_s)}{4}\\|x_i^s-x^*\\|^2\\right]\\le\\gamma_1\\eta_1\\mathbb{E}_sV_\\varphi(x^*,x^0)+\\sum_{i=1}^m\\frac{\\gamma_1[(1+\\tau_1)-1/m]\\hat{L}}{2}\\mathbb{E}_s\\|x_i^0-x^*\\|^2."
+        }
+      ]
+    },
+    {
+      "name": "ParameterReference_Theorem6_17",
+      "ref": "Theorem 6.17",
+      "statement_math": "\\text{the parameters }\\{\\alpha_t\\},\\{\\tau_t\\},\\{\\eta_t\\},\\text{ and }\\{\\gamma_t\\}\\text{ are set as in (6.6.16) and (6.6.17)}",
+      "role": "Records the verbatim parameter-reference clause in Theorem 6.17 without expanding it into a constructed standalone formula.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "This is the parameter clause printed in the statement of Theorem 6.17; the displayed formulas themselves are the referenced Eqs. (6.6.16)-(6.6.17).",
+          "source_pdf_lines": [
+            24040,
+            24043
+          ],
+          "math": "\\text{the parameters }\\{\\alpha_t\\},\\{\\tau_t\\},\\{\\eta_t\\},\\text{ and }\\{\\gamma_t\\}\\text{ are set as in (6.6.16) and (6.6.17)}",
+          "ref": "Theorem 6.17",
+          "uses": []
+        }
+      ]
+    },
+    {
+      "name": "Theorem6_17_RaGradLinearContraction",
+      "ref": "Theorem 6.17",
+      "statement_math": "\\text{Let }x^*\\text{ be an optimal solution of (6.6.8), and suppose that the parameters }\\{\\alpha_t\\},\\{\\tau_t\\},\\{\\eta_t\\},\\text{ and }\\{\\gamma_t\\}\\text{ are set as in (6.6.16) and (6.6.17). If }\\varphi(x)=\\frac{\\mu}{2}\\|x-z\\|^2,\\text{ for some }z\\in X,\\text{ then, for any }s\\ge1,\\text{ we have }\\mathbb{E}_s\\|x^*-x^s\\|^2\\le\\alpha^s\\left(1+2\\frac{\\hat{L}}{\\mu}\\right)\\mathbb{E}_s\\left[\\|x^*-x^0\\|^2+\\frac{1}{m}\\sum_{i=1}^m\\|x_i^0-x^0\\|^2\\right],\\quad \\mathbb{E}_s\\left[\\frac{1}{m}\\sum_{i=1}^m\\|x_i^s-x^s\\|^2\\right]\\le6\\alpha^s\\left(1+2\\frac{\\hat{L}}{\\mu}\\right)\\mathbb{E}_s\\left[\\|x^*-x^0\\|^2+\\frac{1}{m}\\sum_{i=1}^m\\|x_i^0-x^0\\|^2\\right].",
+      "role": "Turns the abstract RaGrad potential recursion into geometric contraction for the primal point and all component memory points, using the alpha and inner-parameter formulas from (6.6.16)-(6.6.17) for any s >= 1.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Check, as the proof states, that the parameter formulas (6.6.16) and (6.6.17) satisfy all six side conditions required by Lemma 6.13.",
+          "source_pdf_lines": [
+            24057,
+            24059
+          ],
+          "ref": "Proof of Theorem 6.17, side-condition check before Eq. (6.6.37)",
+          "uses": [
+            "AlphaSchedule_6_6_16",
+            "InnerParameterSchedule_6_6_17",
+            "ParameterReference_Theorem6_17"
+          ],
+          "produces": "The Lemma 6.13 hypotheses (6.6.20), (6.6.21), (6.6.22), (6.6.23), (6.6.24), and (6.6.25) hold for the parameter schedules (6.6.16)-(6.6.17)."
+        },
+        {
+          "step": 2,
+          "description": "Apply Lemma 6.13 under the verified side conditions and the quadratic-phi hypothesis to obtain the potential contraction (6.6.37).",
+          "source_pdf_lines": [
+            24059,
+            24065
+          ],
+          "math": "\\mathbb{E}_s\\left[V_\\varphi(x^*,x^s)+\\sum_{i=1}^m\\frac{\\mu}{4m}\\|x_i^s-x^*\\|^2\\right]\\le\\alpha^s\\mathbb{E}_s\\left[V_\\varphi(x^*,x^0)+\\sum_{i=1}^m\\frac{\\hat{L}}{2m}\\|x_i^0-x^*\\|^2\\right].",
+          "ref": "Eq. (6.6.37)",
+          "uses": [
+            "previous_step:1",
+            "Lemma6_13_WeightedRaGradRecursion",
+            "QuadraticPhiCenter_Theorem6_17"
+          ],
+          "produces": "The potential contraction (6.6.37) for the quadratic-phi subproblem."
+        },
+        {
+          "step": 3,
+          "description": "Substitute the quadratic Bregman identity V_phi(x*,x)=mu/2 ||x*-x||^2 into (6.6.37) and isolate the x^s distance term.",
+          "source_pdf_lines": [
+            24067,
+            24071
+          ],
+          "math": "\\mathbb{E}_s\\|x^*-x^s\\|^2\\le\\alpha^s\\mathbb{E}_s\\left[\\|x^*-x^0\\|^2+\\sum_{i=1}^m\\frac{\\hat{L}}{m\\mu}\\|x_i^0-x^*\\|^2\\right].",
+          "ref": "Proof of Theorem 6.17 after Eq. (6.6.37), first relation line 1",
+          "uses": [
+            "previous_step:2",
+            "QuadraticPhiCenter_Theorem6_17"
+          ],
+          "produces": "The first line of the x^s-distance contraction chain."
+        },
+        {
+          "step": 4,
+          "description": "Bound each initial component-memory distance to x^* by the printed two-norm estimate through x^0.",
+          "source_pdf_lines": [
+            24074,
+            24076
+          ],
+          "math": "\\mathbb{E}_s\\|x^*-x^s\\|^2\\le\\alpha^s\\mathbb{E}_s\\left[\\|x^*-x^0\\|^2+\\sum_{i=1}^m\\frac{\\hat{L}}{m\\mu}(2\\|x_i^0-x^0\\|^2+2\\|x^0-x^*\\|^2)\\right].",
+          "ref": "Proof of Theorem 6.17 after Eq. (6.6.37), first relation line 2",
+          "uses": [
+            "previous_step:3"
+          ],
+          "produces": "The x^s-distance bound after applying ||x_i^0-x^*||^2 <= 2||x_i^0-x^0||^2+2||x^0-x^*||^2."
+        },
+        {
+          "step": 5,
+          "description": "Collect the coefficients of ||x^*-x^0||^2 and the averaged memory-spread term.",
+          "source_pdf_lines": [
+            24079,
+            24081
+          ],
+          "math": "\\alpha^s\\mathbb{E}_s\\left[\\|x^*-x^0\\|^2+\\sum_{i=1}^m\\frac{\\hat{L}}{m\\mu}(2\\|x_i^0-x^0\\|^2+2\\|x^0-x^*\\|^2)\\right]=\\alpha^s\\mathbb{E}_s\\left[(1+2\\frac{\\hat{L}}{\\mu})\\|x^*-x^0\\|^2+\\sum_{i=1}^m\\frac{2\\hat{L}}{m\\mu}\\|x_i^0-x^0\\|^2\\right].",
+          "ref": "Proof of Theorem 6.17 after Eq. (6.6.37), first relation line 3",
+          "uses": [
+            "previous_step:4"
+          ],
+          "produces": "The coefficient-collected x^s-distance bound."
+        },
+        {
+          "step": 6,
+          "description": "Dominate the memory-spread coefficient by the common factor 1+2\\hat{L}/\\mu to obtain the first theorem conclusion.",
+          "source_pdf_lines": [
+            24083,
+            24086
+          ],
+          "math": "\\mathbb{E}_s\\|x^*-x^s\\|^2\\le\\alpha^s(1+2\\frac{\\hat{L}}{\\mu})\\mathbb{E}_s\\left[\\|x^*-x^0\\|^2+\\frac{1}{m}\\sum_{i=1}^m\\|x_i^0-x^0\\|^2\\right].",
+          "ref": "Proof of Theorem 6.17 after Eq. (6.6.37), first relation line 4",
+          "uses": [
+            "previous_step:5"
+          ],
+          "produces": "The first asserted bound on \\mathbb{E}_s\\|x^*-x^s\\|^2."
+        },
+        {
+          "step": 7,
+          "description": "Read the component-memory term out of (6.6.37), using the coefficient \\mu/(4m), to obtain the first line of the average distance-to-x^* relation.",
+          "source_pdf_lines": [
+            24088,
+            24094
+          ],
+          "math": "\\mathbb{E}_s\\frac{1}{m}\\sum_{i=1}^m\\|x_i^s-x^*\\|^2\\le2\\alpha^s\\mathbb{E}_s\\left[\\|x^*-x^0\\|^2+\\sum_{i=1}^m\\frac{\\hat{L}}{m\\mu}\\|x_i^0-x^*\\|^2\\right].",
+          "ref": "Proof of Theorem 6.17 after Eq. (6.6.37), second relation line 1",
+          "uses": [
+            "previous_step:2",
+            "QuadraticPhiCenter_Theorem6_17"
+          ],
+          "produces": "The first component-memory distance-to-x^* bound."
+        },
+        {
+          "step": 8,
+          "description": "Apply the same initial-memory two-norm bound and coefficient domination as in the preceding x^s-distance chain.",
+          "source_pdf_lines": [
+            24096,
+            24098
+          ],
+          "math": "\\mathbb{E}_s\\frac{1}{m}\\sum_{i=1}^m\\|x_i^s-x^*\\|^2\\le2\\alpha^s(1+2\\frac{\\hat{L}}{\\mu})\\mathbb{E}_s\\left[\\|x^*-x^0\\|^2+\\frac{1}{m}\\sum_{i=1}^m\\|x_i^0-x^0\\|^2\\right].",
+          "ref": "Proof of Theorem 6.17 after Eq. (6.6.37), second relation line 2",
+          "uses": [
+            "previous_step:4",
+            "previous_step:5",
+            "previous_step:7"
+          ],
+          "produces": "The printed bound for \\mathbb{E}_s\\frac{1}{m}\\sum_i\\|x_i^s-x^*\\|^2."
+        },
+        {
+          "step": 9,
+          "description": "Use the displayed triangle-inequality expansion to relate each memory point's distance to x^s to distances through x^*.",
+          "source_pdf_lines": [
+            24101,
+            24108
+          ],
+          "math": "\\mathbb{E}_s\\frac{1}{m}\\sum_{i=1}^m\\|x_i^s-x^s\\|^2\\le\\mathbb{E}_s\\frac{1}{m}\\sum_{i=1}^m2(\\|x_i^s-x^*\\|^2+\\|x^*-x^s\\|^2).",
+          "ref": "Proof of Theorem 6.17, final displayed derivation line 1",
+          "uses": [],
+          "produces": "The triangle-inequality upper bound for the component-memory spread at time s."
+        },
+        {
+          "step": 10,
+          "description": "Average the second term over i to separate the component-memory distance-to-x^* term and the common x^s distance term.",
+          "source_pdf_lines": [
+            24109,
+            24113
+          ],
+          "math": "\\mathbb{E}_s\\frac{1}{m}\\sum_{i=1}^m2(\\|x_i^s-x^*\\|^2+\\|x^*-x^s\\|^2)=2\\mathbb{E}_s\\frac{1}{m}\\sum_{i=1}^m\\|x_i^s-x^*\\|^2+2\\mathbb{E}_s\\|x^*-x^s\\|^2.",
+          "ref": "Proof of Theorem 6.17, final displayed derivation line 2",
+          "uses": [
+            "previous_step:9"
+          ],
+          "produces": "The separated two-term upper bound before inserting the preceding two relations."
+        },
+        {
+          "step": 11,
+          "description": "Insert the two preceding relations for \\mathbb{E}_s||x^*-x^s||^2 and \\mathbb{E}_s m^{-1}\\sum_i||x_i^s-x^*||^2, yielding the factor 6.",
+          "source_pdf_lines": [
+            24114,
+            24116
+          ],
+          "math": "\\mathbb{E}_s\\frac{1}{m}\\sum_{i=1}^m\\|x_i^s-x^s\\|^2\\le6\\alpha^s(1+2\\frac{\\hat{L}}{\\mu})\\mathbb{E}_s\\left[\\|x^*-x^0\\|^2+\\frac{1}{m}\\sum_{i=1}^m\\|x_i^0-x^0\\|^2\\right].",
+          "ref": "Proof of Theorem 6.17, final displayed derivation line 3",
+          "uses": [
+            "previous_step:6",
+            "previous_step:8",
+            "previous_step:10"
+          ],
+          "produces": "The second asserted bound on \\mathbb{E}_s\\frac{1}{m}\\sum_i\\|x_i^s-x^s\\|^2."
+        }
+      ]
+    },
+    {
+      "name": "Lemma6_14_OuterProxDecrease",
+      "ref": "Lemma 6.14",
+      "statement_math": "\\text{Let the number of inner iterations }s\\ge\\left\\lceil-\\frac{\\log(7M/6)}{\\log\\alpha}\\right\\rceil\\text{ with }M:=6\\left(5+\\frac{2L}{\\mu}\\right)\\text{ be given. Also let the iterates }\\bar{x}^\\ell,\\ \\ell=1,\\ldots,k,\\text{ be generated by Algorithm 6.8, and }\\hat{\\ell}\\text{ be randomly selected from }[k].\\text{ Then }\\mathbb{E}\\|x_{\\hat{\\ell}}^*-\\bar{x}^{\\hat{\\ell}-1}\\|^2\\le\\frac{4(1-M\\alpha^s)}{k\\mu(6-7M\\alpha^s)}[f(\\bar{x}^0)-f(x^*)],\\quad \\mathbb{E}\\|x_{\\hat{\\ell}}^*-\\bar{x}^{\\hat{\\ell}}\\|^2\\le\\frac{2M\\alpha^s}{3k\\mu(6-7M\\alpha^s)}[f(\\bar{x}^0)-f(x^*)].",
+      "role": "Telescopes the outer proximal-point objectives and is the direct quantitative input to Theorem 6.16; its proof starts by applying Theorem 6.17 to the Algorithm 6.8 subproblem with the printed quadratic-phi condition instantiated by the previous outer iterate.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Apply Theorem 6.17 to each proximal subproblem; this step uses the Eq. (6.6.16) alpha formula, the parameter choices from (6.6.16)-(6.6.17), and the printed Theorem 6.17 quadratic phi-center condition, instantiated in the proof by the Algorithm 6.8 choice of phi.",
+          "source_pdf_lines": [
+            24145,
+            24164
+          ],
+          "math": "\\begin{aligned}\\mathbb{E}\\|x_\\ell^*-\\bar{x}^\\ell\\|^2&\\le\\alpha^s\\left(5+\\frac{2L}{\\mu}\\right)\\mathbb{E}\\left[\\|x_\\ell^*-\\bar{x}^{\\ell-1}\\|^2+\\frac{1}{m}\\sum_{i=1}^m\\|\\bar{x}_i^{\\ell-1}-\\bar{x}^{\\ell-1}\\|^2\\right]\\\\&\\le\\frac{M\\alpha^s}{6}\\mathbb{E}\\left[\\|x_\\ell^*-\\bar{x}^{\\ell-1}\\|^2+\\frac{1}{m}\\sum_{i=1}^m\\|\\bar{x}_i^{\\ell-1}-\\bar{x}^{\\ell-1}\\|^2\\right],\\\\\\mathbb{E}\\left[\\frac{1}{m}\\sum_{i=1}^m\\|\\bar{x}_i^\\ell-\\bar{x}^\\ell\\|^2\\right]&\\le4\\alpha^s\\left(5+\\frac{2L}{\\mu}\\right)\\mathbb{E}\\left[\\|x_\\ell^*-\\bar{x}^{\\ell-1}\\|^2+\\frac{1}{m}\\sum_{i=1}^m\\|\\bar{x}_i^{\\ell-1}-\\bar{x}^{\\ell-1}\\|^2\\right]\\\\&\\le M\\alpha^s\\mathbb{E}\\left[\\|x_\\ell^*-\\bar{x}^{\\ell-1}\\|^2+\\frac{1}{m}\\sum_{i=1}^m\\|\\bar{x}_i^{\\ell-1}-\\bar{x}^{\\ell-1}\\|^2\\right].\\end{aligned}",
+          "ref": "Eqs. (6.6.38)-(6.6.39)",
+          "uses": [
+            "AlphaSchedule_6_6_16",
+            "ParameterReference_Theorem6_17",
+            "QuadraticPhiCenter_Theorem6_17",
+            "SubproblemSplitDefinition_6_6_8",
+            "Theorem6_17_RaGradLinearContraction"
+          ],
+          "produces": "The Theorem 6.17 contraction estimates for each Algorithm 6.8 subproblem, with the quadratic-phi hypothesis instantiated from Eq. (6.6.8) by z=\\bar{x}^{\\ell-1}."
+        },
+        {
+          "step": 2,
+          "description": "Induct on (6.6.39), using the initialized component memories \\bar{x}_i^0=\\bar{x}^0, to express the current average component-memory error as a weighted sum of earlier proximal displacements.",
+          "source_pdf_lines": [
+            24166,
+            24172
+          ],
+          "math": "\\mathbb{E}\\left[\\frac{1}{m}\\sum_{i=1}^m\\|\\bar{x}_i^\\ell-\\bar{x}^\\ell\\|^2\\right]\\le\\sum_{j=1}^\\ell(M\\alpha^s)^{\\ell-j+1}\\mathbb{E}\\|x_j^*-\\bar{x}^{j-1}\\|^2.",
+          "ref": "Proof of Lemma 6.14, induction after Eq. (6.6.39)",
+          "uses": [
+            "previous_step:1",
+            "OuterInitialization_Algorithm6_8"
+          ],
+          "produces": "The component-memory induction bound inserted into (6.6.38)."
+        },
+        {
+          "step": 3,
+          "description": "Insert the induction bound into (6.6.38) for \\ell\\ge2, leaving the paper's displayed single-\\ell bound before summing over outer iterations.",
+          "source_pdf_lines": [
+            24173,
+            24178
+          ],
+          "math": "\\mathbb{E}\\|x_\\ell^*-\\bar{x}^\\ell\\|^2\\le\\frac{M\\alpha^s}{6}\\mathbb{E}\\left[\\|x_\\ell^*-\\bar{x}^{\\ell-1}\\|^2+\\sum_{j=1}^{\\ell-1}(M\\alpha^s)^{\\ell-j}\\|x_j^*-\\bar{x}^{j-1}\\|^2\\right].",
+          "ref": "Proof of Lemma 6.14, display before Eq. (6.6.40)",
+          "uses": [
+            "previous_step:1",
+            "previous_step:2"
+          ],
+          "produces": "The per-outer-iteration inequality summed in (6.6.40)."
+        },
+        {
+          "step": 4,
+          "description": "Record the \\ell=1 boundary term for the sum: (6.6.38) is applied with the Algorithm 6.8 initialization \\bar{x}_i^0=\\bar{x}^0, so the initial component-memory spread is zero and the first summand contributes the separate term printed in (6.6.40).",
+          "source_pdf_lines": [
+            24166,
+            24185
+          ],
+          "ref": "Eq. (6.6.40), boundary term",
+          "uses": [
+            "previous_step:1",
+            "OuterInitialization_Algorithm6_8"
+          ],
+          "produces": "The \\ell=1 boundary contribution \\frac{M\\alpha^s}{6}\\mathbb{E}\\|x_1^*-\\bar{x}^0\\|^2 used in the first line of (6.6.40)."
+        },
+        {
+          "step": 5,
+          "description": "Sum the previous single-\\ell bound from \\ell=1 to k, separating the \\ell=1 term from the \\ell\\ge2 terms exactly as the first line of (6.6.40) does.",
+          "source_pdf_lines": [
+            24180,
+            24188
+          ],
+          "math": "\\sum_{\\ell=1}^k\\mathbb{E}\\|x_\\ell^*-\\bar{x}^\\ell\\|^2\\le\\frac{M\\alpha^s}{6}\\mathbb{E}\\|x_1^*-\\bar{x}^0\\|^2+\\sum_{\\ell=2}^k\\frac{M\\alpha^s}{6}\\mathbb{E}\\left[\\|x_\\ell^*-\\bar{x}^{\\ell-1}\\|^2+\\sum_{j=1}^{\\ell-1}(M\\alpha^s)^{\\ell-j}\\|x_j^*-\\bar{x}^{j-1}\\|^2\\right]",
+          "ref": "Eq. (6.6.40), first line",
+          "uses": [
+            "previous_step:3",
+            "previous_step:4"
+          ],
+          "produces": "The summed inequality before the geometric-series reindexing."
+        },
+        {
+          "step": 6,
+          "description": "Reindex the double sum from the previous line and evaluate the finite geometric coefficient printed in the equality line of (6.6.40).",
+          "source_pdf_lines": [
+            24190,
+            24196
+          ],
+          "math": "\\frac{M\\alpha^s}{6}\\mathbb{E}\\|x_1^*-\\bar{x}^0\\|^2+\\sum_{\\ell=2}^k\\frac{M\\alpha^s}{6}\\mathbb{E}\\left[\\|x_\\ell^*-\\bar{x}^{\\ell-1}\\|^2+\\sum_{j=1}^{\\ell-1}(M\\alpha^s)^{\\ell-j}\\|x_j^*-\\bar{x}^{j-1}\\|^2\\right]=\\frac{M\\alpha^s}{6}\\mathbb{E}\\left[\\|x_k^*-\\bar{x}^{k-1}\\|^2+\\sum_{\\ell=1}^{k-1}\\left(\\frac{1}{1-M\\alpha^s}-\\frac{(M\\alpha^s)^{k+1-\\ell}}{1-M\\alpha^s}\\right)\\|x_\\ell^*-\\bar{x}^{\\ell-1}\\|^2\\right]",
+          "ref": "Eq. (6.6.40), equality line",
+          "uses": [
+            "previous_step:5"
+          ],
+          "produces": "The reindexed finite-geometric-series expression in (6.6.40)."
+        },
+        {
+          "step": 7,
+          "description": "Bound the reindexed geometric coefficients by the common denominator to obtain the final inequality (6.6.40).",
+          "source_pdf_lines": [
+            24197,
+            24198
+          ],
+          "math": "\\sum_{\\ell=1}^k\\mathbb{E}\\|x_\\ell^*-\\bar{x}^\\ell\\|^2\\le\\frac{M\\alpha^s}{6(1-M\\alpha^s)}\\sum_{\\ell=1}^k\\mathbb{E}\\|x_\\ell^*-\\bar{x}^{\\ell-1}\\|^2.",
+          "ref": "Eq. (6.6.40), final inequality",
+          "uses": [
+            "previous_step:6",
+            "InnerLoopLength_Lemma6_14"
+          ],
+          "produces": "The summed inner contraction (6.6.40)."
+        },
+        {
+          "step": 8,
+          "description": "Use optimality of x_\\ell^* for the \\ell-th proximal subproblem and set the free variable x_0^*=\\bar{x}^0 to compare consecutive exact proximal objectives.",
+          "source_pdf_lines": [
+            24200,
+            24208
+          ],
+          "math": "\\sum_{\\ell=1}^k[\\psi^\\ell(x_\\ell^*)+\\varphi^\\ell(x_\\ell^*)]\\le\\sum_{\\ell=1}^k[\\psi^\\ell(x_{\\ell-1}^*)+\\varphi^\\ell(x_{\\ell-1}^*)],\\quad \\sum_{\\ell=1}^k\\mathbb{E}\\left[f(x_\\ell^*)+\\frac{3\\mu}{2}\\|x_\\ell^*-\\bar{x}^{\\ell-1}\\|^2\\right]\\le\\sum_{\\ell=1}^k\\mathbb{E}\\left[f(x_{\\ell-1}^*)+\\frac{3\\mu}{2}\\|x_{\\ell-1}^*-\\bar{x}^{\\ell-1}\\|^2\\right].",
+          "ref": "Eq. (6.6.41)",
+          "uses": [
+            "OptimalSolutions_Theorem6_16"
+          ],
+          "produces": "The objective-comparison inequality (6.6.41)."
+        },
+        {
+          "step": 9,
+          "description": "Move the squared-displacement term from (6.6.41) to the left side and isolate the objective telescope plus the lagged exact-proximal displacement term, giving the first inequality in (6.6.42).",
+          "source_pdf_lines": [
+            24209,
+            24212
+          ],
+          "math": "\\frac{3\\mu}{2}\\sum_{\\ell=1}^k\\mathbb{E}\\|x_\\ell^*-\\bar{x}^{\\ell-1}\\|^2\\le\\sum_{\\ell=1}^k\\mathbb{E}\\{f(x_{\\ell-1}^*)-f(x_\\ell^*)\\}+\\frac{3\\mu}{2}\\sum_{\\ell=1}^k\\mathbb{E}\\|x_{\\ell-1}^*-\\bar{x}^{\\ell-1}\\|^2",
+          "ref": "Eq. (6.6.42), first inequality",
+          "uses": [
+            "previous_step:8"
+          ],
+          "produces": "The first inequality in (6.6.42), before reindexing the lagged distance sum."
+        },
+        {
+          "step": 10,
+          "description": "Reindex the lagged exact-proximal displacement sum, using x_0^*=\\bar{x}^0 and nonnegativity to replace it by the current computable displacement sum printed in the second inequality of (6.6.42).",
+          "source_pdf_lines": [
+            24213,
+            24216
+          ],
+          "math": "\\frac{3\\mu}{2}\\sum_{\\ell=1}^k\\mathbb{E}\\|x_\\ell^*-\\bar{x}^{\\ell-1}\\|^2\\le\\sum_{\\ell=1}^k\\mathbb{E}\\{f(x_{\\ell-1}^*)-f(x_\\ell^*)\\}+\\frac{3\\mu}{2}\\sum_{\\ell=1}^k\\mathbb{E}\\|x_\\ell^*-\\bar{x}^\\ell\\|^2",
+          "ref": "Eq. (6.6.42), second inequality",
+          "uses": [
+            "previous_step:8",
+            "previous_step:9"
+          ],
+          "produces": "The second inequality in (6.6.42), with the lagged displacement sum replaced by the current iterate displacement sum."
+        },
+        {
+          "step": 11,
+          "description": "Insert the summed inner contraction (6.6.40) into the second inequality of (6.6.42) to obtain the third printed inequality.",
+          "source_pdf_lines": [
+            24217,
+            24219
+          ],
+          "math": "\\frac{3\\mu}{2}\\sum_{\\ell=1}^k\\mathbb{E}\\|x_\\ell^*-\\bar{x}^{\\ell-1}\\|^2\\le\\sum_{\\ell=1}^k\\mathbb{E}\\{f(x_{\\ell-1}^*)-f(x_\\ell^*)\\}+\\frac{3\\mu}{2}\\frac{M\\alpha^s}{6(1-M\\alpha^s)}\\sum_{\\ell=1}^k\\mathbb{E}\\|x_\\ell^*-\\bar{x}^{\\ell-1}\\|^2.",
+          "ref": "Eq. (6.6.42), third inequality",
+          "uses": [
+            "previous_step:7",
+            "previous_step:10"
+          ],
+          "produces": "The displayed inequality (6.6.42) relating the displacement sum to objective telescoping and the summed inner contraction."
+        },
+        {
+          "step": 12,
+          "description": "Telescope the objective difference term in (6.6.42) using the paper's declaration x_0^*=\\bar{x}^0, yielding f(\\bar{x}^0)-\\mathbb{E}f(x_k^*) as the endpoint expression before the global lower bound is applied.",
+          "source_pdf_lines": [
+            24200,
+            24223
+          ],
+          "ref": "Proof of Lemma 6.14 after Eq. (6.6.42), objective telescope",
+          "uses": [
+            "previous_step:8",
+            "previous_step:11"
+          ],
+          "produces": "The objective telescope \\sum_{\\ell=1}^k\\mathbb{E}\\{f(x_{\\ell-1}^*)-f(x_\\ell^*)\\}=f(\\bar{x}^0)-\\mathbb{E}f(x_k^*) used before line 24223."
+        },
+        {
+          "step": 13,
+          "description": "Use global optimality of x^* for problem (6.6.1) to bound the telescoped endpoint by f(\\bar{x}^0)-f(x^*).",
+          "source_pdf_lines": [
+            24142,
+            24225
+          ],
+          "ref": "Proof of Lemma 6.14 after Eq. (6.6.42), optimal endpoint",
+          "uses": [
+            "previous_step:12",
+            "OptimalSolutions_Theorem6_16"
+          ],
+          "produces": "The endpoint bound f(\\bar{x}^0)-\\mathbb{E}f(x_k^*)\\le f(\\bar{x}^0)-f(x^*) used in the displayed summed estimates."
+        },
+        {
+          "step": 14,
+          "description": "Use (6.6.42), (6.6.40), and the condition on s to solve for both summed squared proximal displacements.",
+          "source_pdf_lines": [
+            24221,
+            24226
+          ],
+          "math": "\\sum_{\\ell=1}^k\\mathbb{E}\\|x_\\ell^*-\\bar{x}^{\\ell-1}\\|^2\\le\\frac{4(1-M\\alpha^s)}{\\mu(6-7M\\alpha^s)}[f(\\bar{x}^0)-f(x^*)],\\quad \\sum_{\\ell=1}^k\\mathbb{E}\\|x_\\ell^*-\\bar{x}^\\ell\\|^2\\le\\frac{2M\\alpha^s}{3\\mu(6-7M\\alpha^s)}[f(\\bar{x}^0)-f(x^*)].",
+          "ref": "Proof of Lemma 6.14 after Eq. (6.6.42)",
+          "uses": [
+            "previous_step:7",
+            "previous_step:11",
+            "previous_step:13",
+            "InnerLoopLength_Lemma6_14"
+          ],
+          "produces": "The two summed bounds before random-index averaging."
+        },
+        {
+          "step": 15,
+          "description": "Convert the summed inequalities to the displayed bounds only by averaging over the random outer index \\hat{\\ell}; this is not a fixed-\\ell conclusion. The proof prints the averaging sentence at line 24230, and the displayed random-index inequalities are the Lemma 6.14 statement.",
+          "source_pdf_lines": [
+            24230,
+            24230
+          ],
+          "math": "\\mathbb{E}\\|x_{\\hat{\\ell}}^*-\\bar{x}^{\\hat{\\ell}-1}\\|^2\\le\\frac{4(1-M\\alpha^s)}{k\\mu(6-7M\\alpha^s)}[f(\\bar{x}^0)-f(x^*)],\\quad \\mathbb{E}\\|x_{\\hat{\\ell}}^*-\\bar{x}^{\\hat{\\ell}}\\|^2\\le\\frac{2M\\alpha^s}{3k\\mu(6-7M\\alpha^s)}[f(\\bar{x}^0)-f(x^*)].",
+          "ref": "Lemma 6.14",
+          "uses": [
+            "previous_step:14",
+            "RandomOuterIndex_Lemma6_14"
+          ]
+        }
+      ]
+    }
+  ]
+}

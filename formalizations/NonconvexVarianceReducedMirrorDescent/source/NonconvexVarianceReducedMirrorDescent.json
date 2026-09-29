@@ -1,0 +1,1015 @@
+{
+  "algorithm": "NonconvexVarianceReducedMirrorDescent",
+  "full_name": "Nonconvex variance-reduced mirror descent method for deterministic finite-sum optimization",
+  "source_reference": "Lan, First-order and Stochastic Optimization Methods for Machine Learning, Springer 2020, Section 6.5.1, Algorithm 6.6, Theorem 6.14, Corollary 6.20",
+  "setup": {
+    "problem": {
+      "math": "\\Psi^* := \\min_{x\\in X}\\{\\Psi(x):=f(x)+h(x)\\}",
+      "ref": "Eq. (6.5.1)",
+      "description": "Nonconvex finite-sum composite optimization over a closed convex feasible set."
+    },
+    "variable_space": {
+      "math": "X\\subseteq \\mathbb{R}^n",
+      "ref": "Section 6.5, p. 388"
+    }
+  },
+  "assumptions": [
+    {
+      "name": "Finite_sum_problem_6_5_1",
+      "math": "\\Psi^* := \\min_{x\\in X}\\{\\Psi(x):=f(x)+h(x)\\}",
+      "ref": "Eq. (6.5.1)",
+      "parameters": [
+        "\\Psi",
+        "f",
+        "h",
+        "X"
+      ]
+    },
+    {
+      "name": "Closed_convex_X_section_6_5",
+      "math": "\\text{$X$ is a closed convex set in Euclidean space $\\mathbb{R}^n$}",
+      "ref": "Section 6.5, prose after (6.5.1)",
+      "parameters": [
+        "X"
+      ]
+    },
+    {
+      "name": "Finite_sum_f_section_6_5",
+      "math": "f(x)=\\sum_{i=1}^m f_i(x)/m",
+      "ref": "Section 6.5, prose after (6.5.1)",
+      "parameters": [
+        "f",
+        "f_i",
+        "m"
+      ]
+    },
+    {
+      "name": "Convex_simple_h_section_6_5",
+      "math": "\\text{$h$ is a simple convex function with known structure, but possibly nonsmooth}",
+      "ref": "Section 6.5, prose after (6.5.1)",
+      "parameters": [
+        "h"
+      ]
+    },
+    {
+      "name": "Component_Lipschitz_gradients_section_6_5",
+      "math": "\\forall i=1,2,\\ldots,m,\\ \\exists L_i>0,\\ \\text{s.t.}\\ \\|\\nabla f_i(x)-\\nabla f_i(y)\\|_*\\le L_i\\|x-y\\|,\\ \\forall x,y\\in X.",
+      "ref": "Section 6.5, displayed assumption before (6.5.2)",
+      "parameters": [
+        "L_i",
+        "f_i"
+      ]
+    },
+    {
+      "name": "Aggregate_smoothness_6_5_2",
+      "math": "L_f\\le L\\equiv \\frac{1}{m}\\sum_{i=1}^m L_i",
+      "ref": "Eq. (6.5.2)",
+      "parameters": [
+        "L_f",
+        "L",
+        "L_i"
+      ]
+    },
+    {
+      "name": "Psi_bounded_below_section_6_5",
+      "math": "\\text{$\\Psi$ is bounded below over $X$, i.e., $\\Psi^*$ is finite}",
+      "ref": "Section 6.5, prose after (6.5.2)",
+      "parameters": [
+        "\\Psi^*"
+      ]
+    },
+    {
+      "name": "Euclidean_norm_section_6_5",
+      "math": "\\text{we assume that $\\|\\cdot\\|$ is the Euclidean norm}",
+      "ref": "Section 6.5, final sentence before Section 6.5.1",
+      "parameters": [
+        "\\|\\cdot\\|"
+      ]
+    },
+    {
+      "name": "DGF_strong_convexity_6_2_4",
+      "math": "\\langle x-z,\\nabla\\nu(x)-\\nabla\\nu(z)\\rangle\\ge \\|x-z\\|^2,\\ \\forall x,z\\in X.",
+      "ref": "Eq. (6.2.4)",
+      "parameters": [
+        "\\nu",
+        "X"
+      ]
+    },
+    {
+      "name": "Prox_function_definition_6_2_5",
+      "math": "V(z,x)=\\nu(x)-[\\nu(z)+\\langle\\nabla\\nu(z),x-z\\rangle].",
+      "ref": "Eq. (6.2.5)",
+      "parameters": [
+        "V",
+        "\\nu"
+      ]
+    },
+    {
+      "name": "Prox_projection_definition_6_2_6",
+      "math": "x^+=\\arg\\min_{u\\in X}\\{\\langle g,u\\rangle+\\frac{1}{\\gamma}V(x,u)+h(u)\\}",
+      "ref": "Eq. (6.2.6)",
+      "parameters": [
+        "x^+",
+        "g",
+        "\\gamma"
+      ]
+    },
+    {
+      "name": "Projected_gradient_definition_6_2_7",
+      "math": "P_X(x,g,\\gamma)=\\frac{1}{\\gamma}(x-x^+)",
+      "ref": "Eq. (6.2.7)",
+      "parameters": [
+        "P_X",
+        "x^+",
+        "\\gamma"
+      ]
+    },
+    {
+      "name": "Gradient_mapping_notation_section_6_5",
+      "math": "g_{X,k}\\equiv P_X(x_k,\\nabla f(x_k),\\gamma)\\ \\text{and}\\ \\tilde{g}_{X,k}\\equiv P_X(x_k,G_k,\\gamma).",
+      "ref": "Section 6.5.1, displayed notation before (6.5.3)",
+      "parameters": [
+        "g_{X,k}",
+        "\\tilde{g}_{X,k}"
+      ]
+    },
+    {
+      "name": "Estimator_error_definition_section_6_5",
+      "math": "\\delta_k\\equiv G_k-\\nabla f(x_k)",
+      "ref": "Section 6.5.1, sentence before (6.5.3)",
+      "parameters": [
+        "\\delta_k",
+        "G_k"
+      ]
+    },
+    {
+      "name": "Algorithm_6_6_gradient_estimator",
+      "math": "G_k=\\nabla f(x_k)\\ \\text{if }k\\%T=1,\\quad G_k=\\frac{1}{b}\\sum_{i\\in I_b}\\frac{\\nabla f_i(x_k)-\\nabla f_i(x_{k-1})}{q_i m}+G_{k-1}\\ \\text{otherwise}",
+      "ref": "Algorithm 6.6",
+      "parameters": [
+        "G_k",
+        "I_b",
+        "b",
+        "q_i"
+      ]
+    },
+    {
+      "name": "Algorithm_6_6_mirror_step",
+      "math": "x_{k+1}=\\arg\\min_{x\\in X}\\{\\gamma[\\langle G_k,x\\rangle+h(x)]+V(x_k,x)\\}",
+      "ref": "Algorithm 6.6",
+      "parameters": [
+        "x_{k+1}",
+        "\\gamma",
+        "G_k"
+      ]
+    },
+    {
+      "name": "Epoch_indexing_section_6_5_1",
+      "math": "\\{\\{1,2,\\ldots,T\\},\\{T+1,T+2,\\ldots,2T\\},\\ldots,\\{sT+1,sT+2,\\ldots,(s+1)T\\},\\ldots\\}",
+      "ref": "Section 6.5.1, displayed epoch grouping",
+      "parameters": [
+        "s",
+        "t",
+        "T"
+      ]
+    },
+    {
+      "name": "Importance_sampling_6_5_4",
+      "math": "q_i=\\frac{L_i}{mL}",
+      "ref": "Eq. (6.5.4)",
+      "parameters": [
+        "q_i",
+        "L_i",
+        "L"
+      ]
+    },
+    {
+      "name": "Parameter_choice_6_5_7",
+      "math": "\\gamma=1/L\\ \\text{and}\\ b=17T.",
+      "ref": "Eq. (6.5.7)",
+      "parameters": [
+        "\\gamma",
+        "b",
+        "T"
+      ]
+    },
+    {
+      "name": "Uniform_random_output_R",
+      "math": "R\\ \\text{is uniformly distributed over}\\ \\{1,\\ldots,N\\}",
+      "ref": "Algorithm 6.6 output",
+      "parameters": [
+        "R",
+        "N"
+      ]
+    },
+    {
+      "name": "Corollary_6_20_epoch_length",
+      "math": "T=\\sqrt{m}",
+      "ref": "Corollary 6.20",
+      "parameters": [
+        "T",
+        "m"
+      ]
+    }
+  ],
+  "algorithm_spec": {
+    "initialization": {
+      "math": "x_1,\\ \\gamma,\\ T,\\ \\{\\theta_t\\}\\ \\text{and probability distribution}\\ Q=\\{q_1,\\ldots,q_m\\}\\ \\text{on}\\ \\{1,\\ldots,m\\}",
+      "ref": "Algorithm 6.6 input"
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "full_gradient_at_epoch_start",
+        "math": "\\text{if }k\\%T==1\\ \\text{ then set }G_k=\\nabla f(x_k).",
+        "ref": "Algorithm 6.6"
+      },
+      {
+        "step": 2,
+        "name": "recursive_minibatch_estimator",
+        "math": "\\text{Generate i.i.d. samples }I_b\\text{ of size }b\\text{ according to }Q.\\ \\text{Set }G_k=\\frac{1}{b}\\sum_{i\\in I_b}(\\nabla f_i(x_k)-\\nabla f_i(x_{k-1}))/(q_i m)+G_{k-1}.",
+        "ref": "Algorithm 6.6"
+      },
+      {
+        "step": 3,
+        "name": "mirror_descent_update",
+        "math": "x_{k+1}=\\arg\\min_{x\\in X}\\{\\gamma[\\langle G_k,x\\rangle+h(x)]+V(x_k,x)\\}.",
+        "ref": "Algorithm 6.6"
+      }
+    ],
+    "output": {
+      "math": "x_R,\\ \\text{where }R\\text{ is uniformly distributed over }\\{1,\\ldots,N\\}.",
+      "ref": "Algorithm 6.6 output",
+      "type": "random_iterate"
+    },
+    "parameters": [
+      {
+        "name": "epoch_indexing",
+        "math": "k=sT+t,\\quad (s,T+1)==(s+1,1)",
+        "ref": "Section 6.5.1"
+      },
+      {
+        "name": "projected_gradients",
+        "math": "g_{X,k}\\equiv P_X(x_k,\\nabla f(x_k),\\gamma)\\ \\text{and}\\ \\tilde{g}_{X,k}\\equiv P_X(x_k,G_k,\\gamma).",
+        "ref": "Section 6.5.1"
+      },
+      {
+        "name": "estimator_error",
+        "math": "\\delta_k\\equiv G_k-\\nabla f(x_k)",
+        "ref": "Section 6.5.1"
+      },
+      {
+        "name": "importance_sampling",
+        "math": "q_i=\\frac{L_i}{mL}",
+        "ref": "Eq. (6.5.4)"
+      },
+      {
+        "name": "theorem_stepsizes",
+        "math": "\\gamma=1/L\\ \\text{and}\\ b=17T.",
+        "ref": "Eq. (6.5.7)"
+      },
+      {
+        "name": "corollary_epoch_length",
+        "math": "T=\\sqrt{m}",
+        "ref": "Corollary 6.20"
+      }
+    ]
+  },
+  "main_theorem": {
+    "ref": "Corollary 6.20",
+    "statement_math": "\\text{Assume that the probabilities }q_i\\text{ are set to (6.5.4) and that }\\gamma\\text{ and }b\\text{ are set to (6.5.7). In addition if }T=\\sqrt{m},\\text{ then the total number of gradient evaluations required by the nonconvex variance-reduced mirror descent method to find a solution }\\bar{x}\\in X\\text{ s.t. }\\mathbb{E}[\\|P_X(x_k,\\nabla f(x_k),\\gamma)\\|^2]\\le \\epsilon\\text{ can be bounded by }\\mathcal{O}\\left(m+\\frac{\\sqrt{m}L[\\Psi(x_1)-\\Psi^*]}{\\epsilon}\\right).",
+    "rate": "\\mathcal{O}\\left(m+\\frac{\\sqrt{m}L[\\Psi(x_1)-\\Psi^*]}{\\epsilon}\\right)",
+    "measure": "total number of component-gradient evaluations required to make the expected squared generalized projected gradient at most epsilon",
+    "proof": [
+      {
+        "step": 1,
+        "description": "Count one full gradient computation at the start of each epoch and mini-batches of size b in the remaining iterations; the paper bounds this by one full-gradient cost plus bT component-gradient calls per epoch, multiplied by the number of epochs.",
+        "ref": "Corollary 6.20 proof, first displayed formula",
+        "source_pdf_lines": [
+          23180,
+          23183
+        ],
+        "math": "(m+bT)\\left\\lceil \\frac{N}{T}\\right\\rceil=(m+17T^2)\\left\\lceil \\frac{N}{T}\\right\\rceil.",
+        "uses": [
+          "Algorithm_6_6_gradient_estimator",
+          "Parameter_choice_6_5_7"
+        ],
+        "produces": "gradient_evaluation_count"
+      },
+      {
+        "step": 2,
+        "description": "Use the consequence (6.5.9) of Theorem 6.14 to choose an iteration count sufficient for the target expected projected-gradient bound.",
+        "ref": "Corollary 6.20 proof, sentence after count",
+        "source_pdf_lines": [
+          23184,
+          23186
+        ],
+        "math": "N=\\frac{8L}{\\epsilon}[\\Psi(x_1)-\\Psi^*].",
+        "uses": [
+          "Theorem_6_14_iteration_bound"
+        ],
+        "produces": "iteration_count_for_epsilon"
+      },
+      {
+        "step": 3,
+        "description": "Substitute the corollary epoch length into the per-epoch gradient count.",
+        "ref": "Corollary 6.20 proof, final sentence",
+        "source_pdf_lines": [
+          23184,
+          23188
+        ],
+        "uses": [
+          "previous_step:1",
+          "previous_step:2",
+          "Corollary_6_20_epoch_length"
+        ],
+        "produces": "With T=sqrt(m), (m+17T^2)ceil(N/T) is O(m+sqrt(m)L[Psi(x_1)-Psi^*]/epsilon)."
+      },
+      {
+        "step": 4,
+        "description": "Conclude the displayed big-O complexity bound from the count and the iteration choice.",
+        "ref": "Corollary 6.20 statement and proof",
+        "source_pdf_lines": [
+          23174,
+          23188
+        ],
+        "math": "\\mathcal{O}\\left(m+\\frac{\\sqrt{m}L[\\Psi(x_1)-\\Psi^*]}{\\epsilon}\\right).",
+        "uses": [
+          "previous_step:3"
+        ],
+        "produces": "Corollary 6.20"
+      }
+    ]
+  },
+  "key_lemmas": [
+    {
+      "name": "Lemma_6_4_basic_prox_mapping_inequality",
+      "ref": "Lemma 6.4 / Eq. (6.2.10)",
+      "statement_math": "\\langle g,P_X(x,g,\\gamma)\\rangle\\ge \\|P_X(x,g,\\gamma)\\|^2+\\frac{1}{\\gamma}[h(x^+)-h(x)].",
+      "role": "Used in the first displayed chain of Theorem 6.14 to replace the prox inner product by a negative squared mapping norm plus the h difference.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Apply the optimality condition of the generalized projection problem and the definition of the prox-function.",
+          "ref": "Lemma 6.4 proof, first display",
+          "source_pdf_lines": [
+            19457,
+            19461
+          ],
+          "math": "\\langle g+\\frac{1}{\\gamma}[\\nabla\\nu(x^+)-\\nabla\\nu(x)]+p,u-x^+\\rangle\\ge 0,\\quad \\text{for any }u\\in X.",
+          "uses": [
+            "Prox_projection_definition_6_2_6",
+            "Prox_function_definition_6_2_5"
+          ],
+          "produces": "prox_optimality_condition"
+        },
+        {
+          "step": 2,
+          "description": "Let u=x; convexity of h and strong convexity of the distance generating function give the printed two-line lower bound.",
+          "ref": "Lemma 6.4 proof, second display",
+          "source_pdf_lines": [
+            19463,
+            19466
+          ],
+          "math": "\\langle g,x-x^+\\rangle\\ge \\frac{1}{\\gamma}\\langle \\nabla\\nu(x^+)-\\nabla\\nu(x),x^+-x\\rangle+\\langle p,x^+-x\\rangle\\ge \\frac{1}{\\gamma}\\|x^+-x\\|^2+h(x^+)-h(x).",
+          "uses": [
+            "previous_step:1",
+            "Convex_simple_h_section_6_5",
+            "DGF_strong_convexity_6_2_4"
+          ],
+          "produces": "lower_bound_for_<g,x-x+>"
+        },
+        {
+          "step": 3,
+          "description": "Use the definition of P_X and gamma positivity to rewrite the previous inequality as the statement of Lemma 6.4.",
+          "ref": "Lemma 6.4 proof, final sentence",
+          "source_pdf_lines": [
+            19467,
+            19468
+          ],
+          "uses": [
+            "previous_step:2",
+            "Projected_gradient_definition_6_2_7"
+          ],
+          "produces": "Eq. (6.2.10)"
+        }
+      ]
+    },
+    {
+      "name": "Lemma_6_5_prox_mapping_Lipschitz",
+      "ref": "Lemma 6.5 / Eq. (6.2.11)",
+      "statement_math": "\\|x_2^+-x_1^+\\|\\le \\gamma\\|g_2-g_1\\|.",
+      "role": "Provides the last inequality in Proposition 6.1.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Write the two optimality conditions for the prox subproblems with g_1 and g_2.",
+          "ref": "Eqs. (6.2.12)-(6.2.13)",
+          "source_pdf_lines": [
+            19474,
+            19482
+          ],
+          "math": "\\langle g_1+\\frac{1}{\\gamma}[\\nabla\\nu(x_1^+)-\\nabla\\nu(x)]+p_1,u-x_1^+\\rangle\\ge 0,\\quad \\langle g_2+\\frac{1}{\\gamma}[\\nabla\\nu(x_2^+)-\\nabla\\nu(x)]+p_2,u-x_2^+\\rangle\\ge 0.",
+          "uses": [
+            "Prox_projection_definition_6_2_6",
+            "Prox_function_definition_6_2_5"
+          ],
+          "produces": "prox_optimality_conditions_for_two_gradients"
+        },
+        {
+          "step": 2,
+          "description": "Let u=x_2^+ in (6.2.12), keeping the displayed subgradient term p_1 before applying convexity of h.",
+          "ref": "Eq. (6.2.14), first inequality",
+          "source_pdf_lines": [
+            19483,
+            19486
+          ],
+          "math": "\\langle g_1,x_2^+-x_1^+\\rangle\\ge \\frac{1}{\\gamma}\\langle\\nabla\\nu(x)-\\nabla\\nu(x_1^+),x_2^+-x_1^+\\rangle+\\langle p_1,x_1^+-x_2^+\\rangle.",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "Eq. (6.2.14) first inequality with p_1 term"
+        },
+        {
+          "step": 3,
+          "description": "Apply convexity of h to replace the p_1 subgradient term by h(x_1^+)-h(x_2^+) and split the gradient difference at x_2^+.",
+          "ref": "Eq. (6.2.14), second inequality",
+          "source_pdf_lines": [
+            19486,
+            19490
+          ],
+          "math": "\\langle g_1,x_2^+-x_1^+\\rangle\\ge \\frac{1}{\\gamma}\\langle\\nabla\\nu(x_2^+)-\\nabla\\nu(x_1^+),x_2^+-x_1^+\\rangle+\\frac{1}{\\gamma}\\langle\\nabla\\nu(x)-\\nabla\\nu(x_2^+),x_2^+-x_1^+\\rangle+h(x_1^+)-h(x_2^+).",
+          "uses": [
+            "previous_step:2",
+            "Convex_simple_h_section_6_5"
+          ],
+          "produces": "Eq. (6.2.14) final inequality"
+        },
+        {
+          "step": 4,
+          "description": "Let u=x_1^+ in (6.2.13), keeping the displayed subgradient term p_2 before applying convexity of h.",
+          "ref": "Eq. (6.2.15), first inequality",
+          "source_pdf_lines": [
+            19492,
+            19495
+          ],
+          "math": "\\langle g_2,x_1^+-x_2^+\\rangle\\ge \\frac{1}{\\gamma}\\langle\\nabla\\nu(x)-\\nabla\\nu(x_2^+),x_1^+-x_2^+\\rangle+\\langle p_2,x_2^+-x_1^+\\rangle.",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "Eq. (6.2.15) first inequality with p_2 term"
+        },
+        {
+          "step": 5,
+          "description": "Apply convexity of h to replace the p_2 subgradient term by h(x_2^+)-h(x_1^+).",
+          "ref": "Eq. (6.2.15), second inequality",
+          "source_pdf_lines": [
+            19494,
+            19495
+          ],
+          "math": "\\langle g_2,x_1^+-x_2^+\\rangle\\ge \\frac{1}{\\gamma}\\langle\\nabla\\nu(x)-\\nabla\\nu(x_2^+),x_1^+-x_2^+\\rangle+h(x_2^+)-h(x_1^+).",
+          "uses": [
+            "previous_step:4",
+            "Convex_simple_h_section_6_5"
+          ],
+          "produces": "Eq. (6.2.15) final inequality"
+        },
+        {
+          "step": 6,
+          "description": "Sum (6.2.14) and (6.2.15); the h terms and common gradient terms cancel, and strong convexity of nu bounds the remaining term.",
+          "ref": "Lemma 6.5 proof, summation display",
+          "source_pdf_lines": [
+            19497,
+            19499
+          ],
+          "math": "\\|g_1-g_2\\|\\|x_2^+-x_1^+\\|\\ge \\langle g_1-g_2,x_2^+-x_1^+\\rangle\\ge \\frac{1}{\\gamma}\\|x_2^+-x_1^+\\|^2.",
+          "uses": [
+            "previous_step:3",
+            "previous_step:5",
+            "DGF_strong_convexity_6_2_4"
+          ],
+          "produces": "summed_lipschitz_inequality"
+        },
+        {
+          "step": 7,
+          "description": "Cancel one factor of the norm to obtain (6.2.11).",
+          "ref": "Lemma 6.5 proof, final sentence",
+          "source_pdf_lines": [
+            19499,
+            19501
+          ],
+          "uses": [
+            "previous_step:6"
+          ],
+          "produces": "Eq. (6.2.11)"
+        }
+      ]
+    },
+    {
+      "name": "Proposition_6_1_projected_gradient_Lipschitz",
+      "ref": "Proposition 6.1 / Eq. (6.2.16)",
+      "statement_math": "\\|P_X(x,g_1,\\gamma)-P_X(x,g_2,\\gamma)\\|\\le \\|g_1-g_2\\|.",
+      "role": "Used to compare the exact generalized projected gradient with the stochastic one in (6.5.3).",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Use the definition of P_X to express the mapping difference through x_2^+-x_1^+, then apply Lemma 6.5.",
+          "ref": "Proposition 6.1 proof",
+          "source_pdf_lines": [
+            19504,
+            19510
+          ],
+          "math": "\\|P_X(x,g_1,\\gamma)-P_X(x,g_2,\\gamma)\\|=\\frac{1}{\\gamma}\\|x_2^+-x_1^+\\|\\le \\|g_1-g_2\\|.",
+          "uses": [
+            "Projected_gradient_definition_6_2_7",
+            "Lemma_6_5_prox_mapping_Lipschitz"
+          ],
+          "produces": "Eq. (6.2.16)"
+        }
+      ]
+    },
+        {
+            "name": "Gradient_mapping_perturbation_6_5_3",
+            "ref": "Eq. (6.5.3)",
+            "statement_math": "\\|g_{X,k}-\\tilde{g}_{X,k}\\|\\le \\|\\delta_k\\|.",
+            "role": "Used in Theorem 6.14 to bound \\|g_{X,k}\\|^2 by \\|\\delta_k\\|^2 and \\|\\tilde g_{X,k}\\|^2.",
+            "proof": [
+                {
+                    "step": 1,
+                    "description": "Record the paper's printed invocation: after defining \\delta_k, the source says 'Then by Corollary 6.1' and displays (6.5.3). Corollary 6.1 is an unrelated RSGD stepsize corollary in the same chapter, so this JSON treats the citation as a source typo and uses Proposition 6.1, the prox-mapping Lipschitz result (6.2.16), with g_1=\\nabla f(x_k), g_2=G_k together with \\delta_k=G_k-\\nabla f(x_k).",
+                    "ref": "Section 6.5.1, printed citation to Corollary 6.1 before (6.5.3); mathematical repair via Proposition 6.1 / Eq. (6.2.16)",
+                    "source_pdf_lines": [
+                        23019,
+                        23021
+                    ],
+          "math": "\\|g_{X,k}-\\tilde{g}_{X,k}\\|\\le \\|\\delta_k\\|.",
+          "uses": [
+            "Proposition_6_1_projected_gradient_Lipschitz",
+            "Gradient_mapping_notation_section_6_5",
+            "Estimator_error_definition_section_6_5"
+          ],
+          "produces": "Eq. (6.5.3)"
+        }
+      ]
+    },
+    {
+      "name": "Lemma_6_10_epochwise_estimator_variance_bound",
+      "ref": "Lemma 6.10 / Eqs. (6.5.4)-(6.5.5)",
+      "statement_math": "\\text{Let }L\\text{ be defined in (6.5.2) and suppose that the probabilities }q_i\\text{ are set to }q_i=\\frac{L_i}{mL}\\text{ for }i=1,\\ldots,m.\\text{ If }k\\text{ (or equivalently }(s,t)\\text{) represents the }t\\text{-th iteration at the }s\\text{-epoch, then }\\mathbb{E}[\\|\\delta_k\\|^2]\\equiv \\mathbb{E}[\\|\\delta_{(s,t)}\\|^2]\\le \\frac{L^2}{b}\\sum_{i=2}^t\\mathbb{E}[\\|x_{(s,i)}-x_{(s,i-1)}\\|^2].",
+      "role": "Controls the recursive estimator error inside an epoch and is substituted into the epochwise descent recursion.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Fix an epoch and introduce the simplified notations delta_t and x_t; the first estimator in each epoch is exact.",
+          "ref": "Lemma 6.10 proof, first paragraph",
+          "source_pdf_lines": [
+            23034,
+            23036
+          ],
+          "math": "\\delta_t\\equiv\\delta_{s,t},\\quad x_t\\equiv x_{(s,t)},\\quad \\delta_1=0.",
+          "uses": [
+            "Epoch_indexing_section_6_5_1",
+            "Algorithm_6_6_gradient_estimator",
+            "Estimator_error_definition_section_6_5"
+          ],
+          "produces": "epoch_notation_and_delta_one_zero"
+        },
+        {
+          "step": 2,
+          "description": "Expand delta_t using the recursive estimator and subtract the mean gradient increment.",
+          "ref": "Lemma 6.10 proof, first displayed identity",
+          "source_pdf_lines": [
+            23036,
+            23040
+          ],
+          "math": "\\mathbb{E}[\\|\\delta_t\\|^2]=\\mathbb{E}\\left[\\left\\|\\frac{1}{b}\\sum_{i\\in I_b}\\frac{\\nabla f_i(x_t)-\\nabla f_i(x_{t-1})}{q_i m}+G_{t-1}-\\nabla f(x_t)\\right\\|^2\\right]=\\mathbb{E}\\left[\\left\\|\\frac{1}{b}\\sum_{i\\in I_b}\\frac{\\nabla f_i(x_t)-\\nabla f_i(x_{t-1})}{q_i m}-(\\nabla f(x_t)-\\nabla f(x_{t-1}))+\\delta_{t-1}\\right\\|^2\\right].",
+          "uses": [
+            "previous_step:1",
+            "Algorithm_6_6_gradient_estimator",
+            "Estimator_error_definition_section_6_5",
+            "Finite_sum_f_section_6_5"
+          ],
+          "produces": "expanded_delta_t_identity"
+        },
+        {
+          "step": 3,
+          "description": "Define zeta_i and record its conditional expectation with respect to the sampled indices.",
+          "ref": "Lemma 6.10 proof, zeta definition paragraph",
+          "source_pdf_lines": [
+            23042,
+            23044
+          ],
+          "math": "\\zeta_i=\\frac{\\nabla f_i(x_t)-\\nabla f_i(x_{t-1})}{q_i m},\\quad \\mathbb{E}[\\zeta_i]=\\nabla f(x_t)-\\nabla f(x_{t-1}).",
+          "uses": [
+            "Importance_sampling_6_5_4",
+            "Finite_sum_f_section_6_5"
+          ],
+          "produces": "centered_minibatch_increment"
+        },
+        {
+          "step": 4,
+          "description": "Use the centered minibatch identity to remove the cross term with delta_{t-1} and bound the sample average variance.",
+          "ref": "Lemma 6.10 proof, first two lines of (6.5.6)",
+          "source_pdf_lines": [
+            23045,
+            23047
+          ],
+          "math": "\\mathbb{E}[\\|\\delta_t\\|^2]=\\mathbb{E}\\left[\\left\\|\\frac{1}{b}\\sum_{i\\in I_b}[\\zeta_i-(\\nabla f(x_t)-\\nabla f(x_{t-1}))]\\right\\|^2\\right]+\\mathbb{E}[\\|\\delta_{t-1}\\|^2]\\le \\frac{1}{b^2}\\sum_{i\\in I_b}\\mathbb{E}[\\|\\zeta_i\\|^2]+\\mathbb{E}[\\|\\delta_{t-1}\\|^2].",
+          "uses": [
+            "previous_step:2",
+            "previous_step:3",
+            "Euclidean_norm_section_6_5"
+          ],
+          "produces": "variance_recurrence_before_smoothness"
+        },
+        {
+          "step": 5,
+          "description": "Substitute the definition of zeta_i.",
+          "ref": "Lemma 6.10 proof, third line of (6.5.6)",
+          "source_pdf_lines": [
+            23048,
+            23049
+          ],
+          "math": "\\frac{1}{b^2}\\sum_{i\\in I_b}\\mathbb{E}[\\|\\zeta_i\\|^2]+\\mathbb{E}[\\|\\delta_{t-1}\\|^2]=\\frac{1}{b^2}\\sum_{i\\in I_b}\\mathbb{E}\\left[\\frac{1}{m^2q_i^2}\\|\\nabla f_i(x_t)-\\nabla f_i(x_{t-1})\\|^2\\right]+\\mathbb{E}[\\|\\delta_{t-1}\\|^2].",
+          "uses": [
+            "previous_step:3",
+            "previous_step:4"
+          ],
+          "produces": "variance_recurrence_with_zeta_expanded"
+        },
+        {
+          "step": 6,
+          "description": "Average over the sampling distribution and apply component Lipschitz continuity.",
+          "ref": "Lemma 6.10 proof, fourth line of (6.5.6)",
+          "source_pdf_lines": [
+            23050,
+            23052
+          ],
+          "math": "\\mathbb{E}[\\|\\delta_t\\|^2]\\le \\frac{1}{b}\\sum_{j=1}^m\\frac{L_j^2}{m^2q_j}\\|x_t-x_{t-1}\\|^2+\\mathbb{E}[\\|\\delta_{t-1}\\|^2].",
+          "uses": [
+            "previous_step:5",
+            "Component_Lipschitz_gradients_section_6_5"
+          ],
+          "produces": "sample_distribution_smoothness_bound"
+        },
+        {
+          "step": 7,
+          "description": "Use q_j=L_j/(mL) and L=(1/m)sum L_i to simplify the coefficient.",
+          "ref": "Eq. (6.5.6), final line",
+          "source_pdf_lines": [
+            23052,
+            23053
+          ],
+          "math": "\\mathbb{E}[\\|\\delta_t\\|^2]\\le \\frac{L^2}{b}\\|x_t-x_{t-1}\\|^2+\\mathbb{E}[\\|\\delta_{t-1}\\|^2].",
+          "uses": [
+            "previous_step:6",
+            "Importance_sampling_6_5_4",
+            "Aggregate_smoothness_6_5_2"
+          ],
+          "produces": "Eq. (6.5.6)"
+        },
+        {
+          "step": 8,
+          "description": "Apply (6.5.6) inductively from delta_1=0 over the epoch.",
+          "ref": "Lemma 6.10 proof, final sentence",
+          "source_pdf_lines": [
+            23055,
+            23055
+          ],
+          "math": "\\mathbb{E}[\\|\\delta_k\\|^2]\\equiv \\mathbb{E}[\\|\\delta_{(s,t)}\\|^2]\\le \\frac{L^2}{b}\\sum_{i=2}^t\\mathbb{E}[\\|x_{(s,i)}-x_{(s,i-1)}\\|^2].",
+          "uses": [
+            "previous_step:1",
+            "previous_step:7"
+          ],
+          "produces": "Eq. (6.5.5)"
+        }
+      ]
+    },
+    {
+      "name": "Theorem_6_14_iteration_bound",
+      "ref": "Theorem 6.14 / Eqs. (6.5.7)-(6.5.9)",
+      "statement_math": "\\text{Assume that the probabilities }q_i\\text{ are set to (6.5.4) and that }\\gamma=1/L\\text{ and }b=17T.\\text{ Then for any }k\\ge 1,\\ \\mathbb{E}[\\Psi(x_{k+1})]+\\frac{1}{8L}\\sum_{j=1}^k\\mathbb{E}[\\|g_{X,j}\\|^2]\\le \\mathbb{E}[\\Psi(x_1)],\\ \\forall k\\ge 1.\\ \\text{As a consequence, }\\mathbb{E}[\\|g_{X,R}\\|^2]\\le \\frac{8L}{N}[\\Psi(x_1)-\\Psi^*].",
+      "role": "The central convergence theorem converted by Corollary 6.20 into the component-gradient evaluation bound.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Apply L-smoothness of f at x_k and x_{k+1}.",
+          "ref": "Theorem 6.14 proof, first displayed chain line 1",
+          "source_pdf_lines": [
+            23074,
+            23078
+          ],
+          "math": "f(x_{k+1})\\le f(x_k)+\\langle\\nabla f(x_k),x_{k+1}-x_k\\rangle+\\frac{L}{2}\\|x_{k+1}-x_k\\|^2.",
+          "uses": [
+            "Aggregate_smoothness_6_5_2"
+          ],
+          "produces": "smoothness_descent_start"
+        },
+        {
+          "step": 2,
+          "description": "Continue the same displayed upper-bound chain by inserting G_k and delta_k=G_k-nabla f(x_k); the PDF prints this as an equality continuation, so the produced fact is the corresponding upper bound from the chain.",
+          "ref": "Theorem 6.14 proof, first displayed chain line 2",
+          "source_pdf_lines": [
+            23077,
+            23077
+          ],
+          "math": "f(x_{k+1})\\le f(x_k)+\\langle G_k,x_{k+1}-x_k\\rangle+\\frac{L}{2}\\|x_{k+1}-x_k\\|^2-\\langle\\delta_k,x_{k+1}-x_k\\rangle.",
+          "uses": [
+            "previous_step:1",
+            "Estimator_error_definition_section_6_5"
+          ],
+          "produces": "smoothness_descent_with_estimator_error_upper_bound"
+        },
+        {
+          "step": 3,
+          "description": "Continue the displayed upper-bound chain using the mirror step and projected-gradient notation to substitute x_{k+1}-x_k=-gamma tilde g_{X,k}; the produced fact remains an upper bound for f(x_{k+1}).",
+          "ref": "Theorem 6.14 proof, first displayed chain line 3",
+          "source_pdf_lines": [
+            23078,
+            23079
+          ],
+          "math": "f(x_{k+1})\\le f(x_k)-\\gamma\\langle G_k,\\tilde{g}_{X,k}\\rangle+\\frac{L\\gamma^2}{2}\\|\\tilde{g}_{X,k}\\|^2+\\gamma\\langle\\delta_k,\\tilde{g}_{X,k}\\rangle.",
+          "uses": [
+            "previous_step:2",
+            "Algorithm_6_6_mirror_step",
+            "Gradient_mapping_notation_section_6_5",
+            "Projected_gradient_definition_6_2_7"
+          ],
+          "produces": "descent_with_tilde_gradient_upper_bound"
+        },
+        {
+          "step": 4,
+          "description": "Apply Lemma 6.4 with g=G_k to lower-bound the inner product term and introduce h(x_{k+1})-h(x_k).",
+          "ref": "Theorem 6.14 proof, first displayed chain final line",
+          "source_pdf_lines": [
+            23083,
+            23086
+          ],
+          "math": "f(x_{k+1})\\le f(x_k)-\\gamma\\|\\tilde{g}_{X,k}\\|^2-\\bigl(h(x_{k+1})-h(x_k)\\bigr)+\\frac{L\\gamma^2}{2}\\|\\tilde{g}_{X,k}\\|^2+\\gamma\\langle\\delta_k,\\tilde{g}_{X,k}\\rangle.",
+          "uses": [
+            "previous_step:3",
+            "Lemma_6_4_basic_prox_mapping_inequality"
+          ],
+          "produces": "f_descent_with_h_difference"
+        },
+        {
+          "step": 5,
+          "description": "Rearrange using Psi=f+h to move the h difference to the left.",
+          "ref": "Theorem 6.14 proof, display before (6.5.10), first line",
+          "source_pdf_lines": [
+            23088,
+            23093
+          ],
+          "math": "\\Psi(x_{k+1})\\le \\Psi(x_k)-\\gamma\\|\\tilde{g}_{X,k}\\|^2+\\frac{L\\gamma^2}{2}\\|\\tilde{g}_{X,k}\\|^2+\\gamma\\langle\\delta_k,\\tilde{g}_{X,k}\\rangle.",
+          "uses": [
+            "previous_step:4",
+            "Finite_sum_problem_6_5_1"
+          ],
+          "produces": "psi_descent_before_young"
+        },
+        {
+          "step": 6,
+          "description": "Apply Cauchy-Schwarz and Young's inequality to gamma<delta_k, tilde g_{X,k}> for arbitrary q>0.",
+          "ref": "Eq. (6.5.10)",
+          "source_pdf_lines": [
+            23093,
+            23097
+          ],
+          "math": "\\Psi(x_{k+1})\\le \\Psi(x_k)-\\gamma\\left(1-\\frac{L\\gamma}{2}-\\frac{q}{2}\\right)\\|\\tilde{g}_{X,k}\\|^2+\\frac{\\gamma}{2q}\\|\\delta_k\\|^2.",
+          "uses": [
+            "previous_step:5",
+            "Euclidean_norm_section_6_5"
+          ],
+          "produces": "Eq. (6.5.10)"
+        },
+        {
+          "step": 7,
+          "description": "Use the perturbation inequality (6.5.3) and the elementary two-term norm inequality to bound the exact projected-gradient norm.",
+          "ref": "Theorem 6.14 proof, display after (6.5.10)",
+          "source_pdf_lines": [
+            23098,
+            23100
+          ],
+          "math": "\\|g_{X,k}\\|^2=\\|g_{X,k}-\\tilde{g}_{X,k}+\\tilde{g}_{X,k}\\|^2\\le 2\\|\\delta_k\\|^2+2\\|\\tilde{g}_{X,k}\\|^2.",
+          "uses": [
+            "Gradient_mapping_perturbation_6_5_3"
+          ],
+          "produces": "exact_gradient_mapping_square_bound"
+        },
+        {
+          "step": 8,
+          "description": "Multiply the previous bound by p>0 and add it to (6.5.10).",
+          "ref": "Theorem 6.14 proof, display after projected-gradient bound",
+          "source_pdf_lines": [
+            23102,
+            23105
+          ],
+          "math": "\\Psi(x_{k+1})+p\\|g_{X,k}\\|^2\\le \\Psi(x_k)-\\left[\\gamma\\left(1-\\frac{L\\gamma}{2}\\right)-2p\\right]\\|\\tilde{g}_{X,k}\\|^2+\\left(\\frac{\\gamma}{2q}+2p\\right)\\|\\delta_k\\|^2.",
+          "uses": [
+            "previous_step:6",
+            "previous_step:7"
+          ],
+          "produces": "one_step_descent_with_p"
+        },
+                {
+                    "step": 9,
+                    "description": "For an epoch, the paper prints the citation 'Using (7.4.4)' to obtain the variance bound. Equation (7.4.4) is Lemma 7.4 in Section 7.4 and has the same displayed form as Lemma 6.10 / (6.5.5) for this variance-reduced estimator, so the mathematical dependency recorded here is Lemma 6.10 while preserving the printed cross-reference.",
+                    "ref": "Theorem 6.14 proof, printed citation (7.4.4); same bound as Lemma 6.10 / Eq. (6.5.5)",
+                    "source_pdf_lines": [
+                        23107,
+                        23112
+                    ],
+                    "math": "\\mathbb{E}[\\|\\delta_{(s,t)}\\|^2]\\le \\frac{L^2}{b}\\sum_{i=2}^t\\|x_{s,i}-x_{s,i-1}\\|^2.",
+                    "uses": [
+                        "Lemma_6_10_epochwise_estimator_variance_bound",
+                        "Epoch_indexing_section_6_5_1"
+                    ],
+                    "produces": "printed_7_4_4_epoch_variance_bound_identified_with_6_5_5"
+                },
+                {
+                    "step": 10,
+                    "description": "Use the printed displacement identity x_{s,t}-x_{s,t-1}=-\\gamma\\tilde{g}_{X,t} for t=1,\\ldots,T+1, together with the notation (s,T+1)=(s+1,1), to rewrite the epoch variance bound in terms of stochastic projected gradients.",
+                    "ref": "Theorem 6.14 proof, sentence and display after printed citation (7.4.4)",
+                    "source_pdf_lines": [
+                        23109,
+                        23113
+                    ],
+                    "math": "\\mathbb{E}[\\|\\delta_{(s,t)}\\|^2]\\le \\frac{L^2}{b}\\sum_{i=2}^t\\|x_{s,i}-x_{s,i-1}\\|^2=\\frac{\\gamma^2L^2}{b}\\sum_{i=2}^t\\|\\tilde{g}_{X,(s,i)}\\|^2.",
+                    "uses": [
+                        "previous_step:9",
+                        "Algorithm_6_6_mirror_step",
+                        "Gradient_mapping_notation_section_6_5",
+                        "Projected_gradient_definition_6_2_7",
+                        "Epoch_indexing_section_6_5_1"
+                    ],
+                    "produces": "epoch_variance_in_tilde_gradients"
+                },
+                {
+                    "step": 11,
+                    "description": "Combine the one-step descent with the epoch variance bound to obtain (6.5.11).",
+                    "ref": "Eq. (6.5.11)",
+                    "source_pdf_lines": [
+                        23115,
+            23122
+          ],
+          "math": "\\mathbb{E}[\\Psi(x_{s,t+1})]+p\\mathbb{E}[\\|g_{X,(s,t)}\\|^2]\\le \\mathbb{E}[\\Psi(x_{s,t})]-\\left[\\gamma\\left(1-\\frac{L\\gamma}{2}\\right)-2p\\right]\\mathbb{E}[\\|\\tilde{g}_{X,(s,t)}\\|^2]+\\left(\\frac{\\gamma}{2q}+2p\\right)\\frac{\\gamma^2L^2}{b}\\sum_{i=2}^t\\mathbb{E}[\\|\\tilde{g}_{X,(s,i)}\\|^2].",
+                    "uses": [
+                        "previous_step:8",
+                        "previous_step:10"
+                    ],
+                    "produces": "Eq. (6.5.11)"
+                },
+                {
+                    "step": 12,
+                    "description": "Take the telescope sum of (6.5.11) over j=1,...,t within one epoch.",
+                    "ref": "Theorem 6.14 proof, first telescope display",
+                    "source_pdf_lines": [
+            23124,
+            23133
+          ],
+          "math": "\\mathbb{E}[\\Psi(x_{s,t+1})]+p\\sum_{j=1}^t\\mathbb{E}[\\|g_{X,(s,j)}\\|^2]\\le \\mathbb{E}[\\Psi(x_{(s,1)})]-\\left[\\gamma\\left(1-\\frac{L\\gamma}{2}\\right)-2p\\right]\\sum_{j=1}^t\\mathbb{E}[\\|\\tilde{g}_{X,(s,j)}\\|^2]+\\left(\\frac{\\gamma}{2q}+2p\\right)\\frac{\\gamma^2L^2}{b}\\sum_{j=1}^t\\sum_{i=2}^j\\mathbb{E}[\\|\\tilde{g}_{X,(s,i)}\\|^2].",
+                    "uses": [
+                        "previous_step:11",
+                        "Epoch_indexing_section_6_5_1"
+                    ],
+                    "produces": "telescoped_epoch_with_double_sum"
+                },
+                {
+                    "step": 13,
+                    "description": "Bound the double sum by (t-1) times the single sum over the epoch. The PDF's printed middle line has \\mathbb{E}[\\Psi(x_1)] on the right; this step preserves that source text and records the x_1 versus x_{(s,1)} mismatch as a source typo before the next displayed line returns to x_{(s,1)}.",
+                    "ref": "Theorem 6.14 proof, second telescope inequality",
+                    "source_pdf_lines": [
+                        23133,
+                        23139
+                    ],
+                    "math": "\\mathbb{E}[\\Psi(x_{s,t+1})]+p\\sum_{j=1}^t\\mathbb{E}[\\|g_{X,(s,j)}\\|^2]\\le \\mathbb{E}[\\Psi(x_1)]-\\left[\\gamma\\left(1-\\frac{L\\gamma}{2}\\right)-2p\\right]\\sum_{j=1}^t\\mathbb{E}[\\|\\tilde{g}_{X,(s,j)}\\|^2]+\\left(\\frac{\\gamma}{2q}+2p\\right)\\frac{\\gamma^2L^2(t-1)}{b}\\sum_{j=2}^t\\mathbb{E}[\\|\\tilde{g}_{X,(s,j)}\\|^2].",
+                    "uses": [
+                        "previous_step:12"
+                    ],
+                    "produces": "full_printed_middle_telescope_inequality_with_x_1; source_typo_note: the following line (6.5.12) uses x_{(s,1)}, so the repaired continuation replaces x_1 by x_{(s,1)}; derived double_sum_bound: sum_{j=1}^t sum_{i=2}^j E[||tilde_g_{X,(s,i)}||^2] <= (t-1) sum_{j=2}^t E[||tilde_g_{X,(s,j)}||^2]"
+                },
+                {
+                    "step": 14,
+                    "description": "Absorb the bounded double sum into the coefficient of the tilde-gradient sum to obtain (6.5.12). The PDF prints the final summand as \\tilde{g}_{X,j}, without the epoch index; the repaired epoch-index version is recorded only in produces.",
+                    "ref": "Eq. (6.5.12)",
+                    "source_pdf_lines": [
+            23140,
+            23144
+          ],
+                    "math": "\\mathbb{E}[\\Psi(x_{s,t+1})]+p\\sum_{j=1}^t\\mathbb{E}[\\|g_{X,(s,j)}\\|^2]\\le \\mathbb{E}[\\Psi(x_{(s,1)})]-\\left[\\gamma\\left(1-\\frac{L\\gamma}{2}\\right)-2p-\\left(\\frac{\\gamma}{2q}+2p\\right)\\frac{\\gamma^2L^2(t-1)}{b}\\right]\\sum_{j=1}^t\\mathbb{E}[\\|\\tilde{g}_{X,j}\\|^2].",
+                    "uses": [
+                        "previous_step:12",
+                        "previous_step:13"
+                    ],
+                    "produces": "Eq. (6.5.12) as printed; source_typo_note: the final summand prints tilde{g}_{X,j} without the epoch index; repaired continuation for later epoch summation uses sum_{j=1}^t E[||tilde{g}_{X,(s,j)}||^2]"
+                },
+                {
+                    "step": 15,
+                    "description": "Fix the auxiliary proof parameters exactly as the prose after (6.5.12) states.",
+                    "ref": "Theorem 6.14 proof, prose after (6.5.12)",
+                    "source_pdf_lines": [
+                        23146,
+                        23148
+                    ],
+                    "math": "p=1/(8L)\\quad\\text{and}\\quad q=1/8.",
+                    "uses": [
+                        "previous_step:14"
+                    ],
+                    "produces": "coefficient_auxiliary_parameters_p_q"
+                },
+                {
+                    "step": 16,
+                    "description": "Import the theorem parameter choice for \\gamma and b from the displayed assumption (6.5.7).",
+                    "ref": "Eq. (6.5.7)",
+                    "source_pdf_lines": [
+                        23058,
+                        23060
+                    ],
+                    "math": "\\gamma=1/L\\ \\text{and}\\ b=17T.",
+                    "uses": [
+                        "Parameter_choice_6_5_7"
+                    ],
+                    "produces": "coefficient_parameter_choice_gamma_b"
+                },
+                {
+                    "step": 17,
+                    "description": "Record the proof-prose sentence after (6.5.12): it prints the facts gamma=1/L, b=21T, and 1<=t<=T. The b=21T phrase conflicts with the displayed theorem assumption (6.5.7), so the later coefficient substitution follows (6.5.7) while preserving this source inconsistency.",
+                    "ref": "Theorem 6.14 proof, prose after (6.5.12), printed b=21T inconsistency",
+                    "source_pdf_lines": [
+                        23148,
+                        23149
+                    ],
+                    "math": "\\gamma=1/L,\\ b=21T,\\ \\text{and}\\ 1\\le t\\le T.",
+                    "uses": [
+                        "Epoch_indexing_section_6_5_1",
+                        "previous_step:16"
+                    ],
+                    "produces": "proof_prose_printed_b_21T_and_coefficient_epoch_range; source_inconsistency: proof prose prints b=21T but (6.5.7) prints b=17T"
+                },
+                {
+                    "step": 18,
+                    "description": "Substitute p=1/(8L), q=1/8, gamma=1/L, b from (6.5.7), and the epoch range into the bracketed coefficient from (6.5.12); the PDF prints the coefficient display with the factor 17 and strict positivity.",
+                    "ref": "Theorem 6.14 proof, coefficient display after (6.5.12)",
+                    "source_pdf_lines": [
+                        23151,
+                        23157
+                    ],
+                    "math": "\\gamma\\left(1-\\frac{L\\gamma}{2}\\right)-2p-\\left(\\frac{\\gamma}{2q}+2p\\right)\\frac{\\gamma^2L^2(t-1)}{b}=\\frac{1}{4L}-\\frac{17(T-1)}{4Lb}>0.",
+                    "uses": [
+                        "previous_step:14",
+                        "previous_step:15",
+                        "previous_step:16",
+                        "previous_step:17"
+                    ],
+                    "produces": "positive_epoch_coefficient"
+                },
+                {
+                    "step": 19,
+                    "description": "Drop the negative tilde-gradient term from (6.5.12) after establishing coefficient positivity, yielding the epoch inequality (6.5.13). The source display has a summation-index typo: it sums over j but prints g_{X,(s,i)} in the summand.",
+                    "ref": "Eq. (6.5.13)",
+                    "source_pdf_lines": [
+            23156,
+            23163
+                    ],
+                    "math": "\\mathbb{E}[\\Psi(x_{(s,t+1)})]+\\frac{1}{8L}\\sum_{j=1}^t\\mathbb{E}[\\|g_{X,(s,i)}\\|^2]\\le \\mathbb{E}[\\Psi(x_{(s,1)})].",
+                    "uses": [
+                        "previous_step:14",
+                        "previous_step:18"
+                    ],
+                    "produces": "Eq. (6.5.13) as printed; source_typo_note: summation index is j but the summand prints g_{X,(s,i)}; the repaired version for the following summation replaces i by j"
+                },
+                {
+                    "step": 20,
+                    "description": "Sum the first k epoch-form inequalities (6.5.13), using the repaired summand-index interpretation noted in the previous step, to obtain the global descent inequality; the proof sentence is at lines 23165-23166, while the displayed formula itself is the theorem statement (6.5.8).",
+                    "ref": "Eq. (6.5.8), theorem statement; proof sentence after (6.5.13)",
+                    "source_pdf_lines": [
+            23062,
+            23066
+          ],
+                    "math": "\\mathbb{E}[\\Psi(x_{k+1})]+\\frac{1}{8L}\\sum_{j=1}^k\\mathbb{E}[\\|g_{X,j}\\|^2]\\le \\mathbb{E}[\\Psi(x_1)],\\quad \\forall k\\ge 1.",
+                    "uses": [
+                        "previous_step:19",
+                        "Epoch_indexing_section_6_5_1"
+                    ],
+                    "produces": "Eq. (6.5.8)"
+                },
+                {
+                    "step": 21,
+                    "description": "Set k=N in (6.5.8), use the uniform random output R, and use Psi(x_{N+1})>=Psi^*; the proof sentence is at lines 23166-23167, while the displayed formula itself is the theorem statement (6.5.9).",
+                    "ref": "Eq. (6.5.9), theorem statement; Theorem 6.14 proof final sentence",
+                    "source_pdf_lines": [
+            23068,
+            23073
+          ],
+                    "math": "\\mathbb{E}[\\|g_{X,R}\\|^2]\\le \\frac{8L}{N}[\\Psi(x_1)-\\Psi^*].",
+                    "uses": [
+                        "previous_step:20",
+                        "Uniform_random_output_R",
+                        "Psi_bounded_below_section_6_5"
+                    ],
+          "produces": "Eq. (6.5.9)"
+        }
+      ]
+    }
+  ]
+}

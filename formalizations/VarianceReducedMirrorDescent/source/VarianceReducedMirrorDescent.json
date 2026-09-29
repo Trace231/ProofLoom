@@ -1,0 +1,311 @@
+{
+  "algorithm": "VarianceReducedMirrorDescent",
+  "full_name": "Variance-Reduced Mirror Descent for Smooth Convex Finite-Sum Optimization",
+  "source_reference": "Lan, First-order and Stochastic Optimization Methods for Machine Learning, Springer 2020 (Corollary 5.8)",
+  "setup": {
+    "problem": {
+      "math": "\\min_{x \\in X} \\left\\{ \\Psi(x) := f(x) + h(x) \\right\\}",
+      "ref": "Eq. (5.3.1)",
+      "description": "Composite finite-sum convex optimization over a closed convex set"
+    },
+    "variable_space": {
+      "math": "X \\subseteq \\mathbb{R}^m \\text{ closed convex}; \\; f(x) = \\frac{1}{m} \\sum_{i=1}^{m} f_i(x); \\; h : X \\to \\mathbb{R} \\text{ simple convex (possibly nondifferentiable)}",
+      "ref": "Section 5.3"
+    }
+  },
+  "assumptions": [
+    {
+      "name": "Component smoothness",
+      "math": "\\|\\nabla f_i(x) - \\nabla f_i(y)\\|_* \\le L_i \\|x - y\\|, \\quad \\forall x, y \\in X, \\; i = 1, \\ldots, m",
+      "ref": "Section 5.3, after Eq. (5.3.1)",
+      "parameters": [
+        "L_i > 0",
+        "L \\equiv \\frac{1}{m} \\sum_{i=1}^{m} L_i"
+      ]
+    },
+    {
+      "name": "Component convexity",
+      "math": "f_i \\text{ is convex on } X, \\quad \\forall i = 1, \\ldots, m",
+      "ref": "Section 5.3, p.279 (prose preceding Eq. 5.3.1): 'f is the average of m smooth convex component functions f_i'",
+      "_origin_correction": "Initial JSON extraction captured only displayed-math assumptions; this prose-stated component convexity (page 279, in the setup paragraph immediately preceding Eq. 5.3.1) was missed. Verified against PDF Section 5.3 setup paragraph. Used in Lemma 5.12 proof (page 280): 'By Lemma 5.8 (with f = f_i)' --- Lemma 5.8 is co-coercivity, mathematically requiring f_i convex.",
+      "parameters": []
+    },
+    {
+      "name": "Convexity of f",
+      "math": "f(y) \\ge f(x) + \\langle \\nabla f(x), y - x \\rangle, \\quad \\forall x, y \\in X",
+      "ref": "Eq. (5.3.2) with \\mu = 0",
+      "parameters": []
+    },
+    {
+      "name": "Convexity of h",
+      "math": "h : X \\to \\mathbb{R} \\text{ is convex}",
+      "ref": "Section 5.3",
+      "parameters": []
+    },
+    {
+      "name": "Sampling distribution",
+      "math": "Q = \\{q_1, \\ldots, q_m\\} \\text{ probability distribution on } \\{1, \\ldots, m\\}; \\quad L_Q := \\frac{1}{m} \\max_{i=1,\\ldots,m} \\frac{L_i}{q_i}",
+      "ref": "Eq. (5.3.4)",
+      "parameters": [
+        "L_Q"
+      ]
+    },
+    {
+      "name": "Distance generating function",
+      "math": "v : X \\to \\mathbb{R} \\text{ continuously differentiable, 1-strongly convex w.r.t. } \\|\\cdot\\|; \\quad V(x, z) = v(z) - [v(x) + \\langle \\nabla v(x), z - x \\rangle]",
+      "ref": "Eq. (3.2.1)-(3.2.2)",
+      "parameters": []
+    }
+  ],
+  "algorithm_spec": {
+    "ref": "Algorithm 5.6",
+    "initialization": {
+      "math": "x^0 \\in X, \\; \\tilde{x}^0 = x^0",
+      "ref": "Algorithm 5.6"
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "Epoch setup",
+        "math": "\\tilde{x} = \\tilde{x}^{s-1}, \\; \\tilde{g} = \\nabla f(\\tilde{x}), \\; x_1 = x^{s-1}, \\; T = T_s, \\; Q = \\{q_1, \\ldots, q_m\\} \\text{ on } \\{1, \\ldots, m\\}",
+        "ref": "Algorithm 5.6"
+      },
+      {
+        "step": 2,
+        "name": "Variance-reduced gradient estimator",
+        "math": "\\text{Pick } i_t \\in \\{1, \\ldots, m\\} \\text{ randomly according to } Q; \\quad G_t = \\frac{\\nabla f_{i_t}(x_t) - \\nabla f_{i_t}(\\tilde{x})}{q_{i_t} m} + \\tilde{g}",
+        "ref": "Algorithm 5.6"
+      },
+      {
+        "step": 3,
+        "name": "Mirror descent prox update",
+        "math": "x_{t+1} = \\operatorname{argmin}_{x \\in X} \\left\\{ \\gamma [\\langle G_t, x \\rangle + h(x)] + V(x_t, x) \\right\\}",
+        "ref": "Algorithm 5.6"
+      },
+      {
+        "step": 4,
+        "name": "Epoch output",
+        "math": "x^s = x_{T+1}, \\quad \\tilde{x}^s = \\frac{\\sum_{t=2}^{T} \\theta_t x_t}{\\sum_{t=2}^{T} \\theta_t}",
+        "ref": "Algorithm 5.6"
+      }
+    ],
+    "output": {
+      "math": "\\bar{x}^S = \\frac{\\sum_{s=1}^{S} w_s \\tilde{x}^s}{\\sum_{s=1}^{S} w_s}",
+      "ref": "Eq. (5.3.16)",
+      "type": "weighted_average"
+    },
+    "parameters": [
+      {
+        "name": "\\theta",
+        "math": "\\theta = 1, \\; \\gamma = 1/(16 L_Q)",
+        "ref": "Corollary 5.8"
+      },
+      {
+        "name": "T_s",
+        "math": "T_s = 2 T_{s-1}, \\; s = 2, 3, \\ldots, \\; T_1 = 7",
+        "ref": "Eq. (5.3.17)"
+      },
+      {
+        "name": "w_s",
+        "math": "w_s := (1 - 4 L_Q \\gamma)(T_{s-1} - 1) - 4 L_Q \\gamma T_s > 0, \\; s \\ge 2",
+        "ref": "Eq. (5.3.14)"
+      },
+      {
+        "name": "V",
+        "math": "V(x, z) = v(z) - [v(x) + \\langle \\nabla v(x), z - x \\rangle] \\text{ (Bregman divergence)}",
+        "ref": "Eq. (3.2.2)"
+      },
+      {
+        "name": "\\delta_t",
+        "math": "\\delta_t := G_t - \\nabla f(x_t)",
+        "ref": "Section 5.3"
+      }
+    ]
+  },
+  "main_theorem": {
+    "ref": "Corollary 5.8",
+    "statement_math": "\\mathbb{E}[\\Psi(\\bar{x}^S) - \\Psi(x^*)] \\le \\frac{8}{2^S - 1} \\left[ \\frac{11}{4} (\\Psi(x^0) - \\Psi(x^*)) + 16 L_Q V(x^0, x^*) \\right]",
+    "rate": "\\mathscr{O}\\left\\{ m \\log \\frac{\\Psi(x^0) - \\Psi(x^*) + L_Q V(x^0, x^*)}{\\varepsilon} + \\frac{\\Psi(x^0) - \\Psi(x^*) + L_Q V(x^0, x^*)}{\\varepsilon} \\right\\}",
+    "measure": "expected suboptimality",
+    "proof": [
+      {
+        "step": 1,
+        "description": "Sum the one-step expected recursion (5.3.11) with mu=0 over t=1,...,T inside one epoch and take expectation over i_1,...,i_T",
+        "math": "\\gamma \\mathbb{E}[\\Psi(x_{T+1}) - \\Psi(x^*)] + (1 - 4L_Q \\gamma) \\gamma \\sum_{t=2}^{T} \\mathbb{E}[\\Psi(x_t) - \\Psi(x^*)] + \\mathbb{E}[V(x_{T+1}, x^*)] \\le 4L_Q \\gamma^2 [\\Psi(x_1) - \\Psi(x^*)] + 4L_Q \\gamma^2 T [\\Psi(\\tilde{x}) - \\Psi(x^*)] + V(x_1, x^*)",
+        "uses": [
+          "One-step VRMD progress bound (Lemma 5.14)"
+        ]
+      },
+      {
+        "step": 2,
+        "description": "For epoch s, set x_1 = x^{s-1}, \\tilde{x} = \\tilde{x}^{s-1}, x^s = x_{T_s+1}, and \\tilde{x}^s = \\sum_{t=2}^{T_s} x_t/(T_s - 1); use convexity of \\Psi and 4L_Q\\gamma \\le 1 to obtain the epoch recursion",
+        "math": "\\gamma \\mathbb{E}[\\Psi(x^s) - \\Psi(x^*)] + (1 - 4L_Q\\gamma) \\gamma (T_s - 1) \\mathbb{E}[\\Psi(\\tilde{x}^s) - \\Psi(x^*)] + \\mathbb{E}[V(x^s, x^*)] \\le \\gamma [\\Psi(x^{s-1}) - \\Psi(x^*)] + 4L_Q \\gamma^2 T_s [\\Psi(\\tilde{x}^{s-1}) - \\Psi(x^*)] + V(x^{s-1}, x^*)",
+        "uses": []
+      },
+      {
+        "step": 3,
+        "description": "Sum the epoch inequalities over s=1,...,S using the definition of w_s, apply convexity of Psi on bar{x}^S, and use 4L_Q gamma <= 1",
+        "math": "\\mathbb{E}[\\Psi(\\bar{x}^S) - \\Psi(x^*)] \\le \\frac{\\gamma(1 + 4L_Q \\gamma T_1)[\\Psi(x^0) - \\Psi(x^*)] + V(x^0, x^*)}{\\gamma \\sum_{s=1}^{S} w_s}",
+        "uses": [
+          "Epoch-averaged bound (Theorem 5.6)"
+        ]
+      },
+      {
+        "step": 4,
+        "description": "Substitute the Corollary 5.8 choices \\theta=1, \\gamma = 1/(16L_Q), and T_s = 2T_{s-1} with T_1 = 7; then w_s = \\frac{1}{8} T_s - \\frac{3}{4} \\ge \\frac{1}{56} T_s, so \\sum_{s=1}^{S} w_s \\ge \\frac{1}{8}(2^S - 1), and combine this with \\gamma(1 + 4L_Q\\gamma T_1) = \\frac{11}{64L_Q}",
+        "math": "\\mathbb{E}[\\Psi(\\bar{x}^S) - \\Psi(x^*)] \\le \\frac{8}{2^S - 1} \\left[ \\frac{11}{4}(\\Psi(x^0) - \\Psi(x^*)) + 16 L_Q V(x^0, x^*) \\right]",
+        "uses": []
+      },
+      {
+        "step": 5,
+        "description": "Count total gradient evaluations: each epoch s costs m + T_s component gradient evaluations; sum over S epochs to get the complexity bound (5.3.19)",
+        "math": "\\mathscr{O}\\left\\{ m \\log \\frac{\\Psi(x^0) - \\Psi(x^*) + L_Q V(x^0, x^*)}{\\varepsilon} + \\frac{\\Psi(x^0) - \\Psi(x^*) + L_Q V(x^0, x^*)}{\\varepsilon} \\right\\}",
+        "uses": []
+      }
+    ]
+  },
+  "key_lemmas": [
+    {
+      "name": "Smoothness gap inequality (Lemma 5.8)",
+      "ref": "Lemma 5.8",
+      "statement_math": "\\frac{1}{2L} \\|\\nabla f(x) - \\nabla f(z)\\|_*^2 \\le f(x) - f(z) - \\langle \\nabla f(z), x - z \\rangle, \\quad \\forall x, z \\in X",
+      "role": "Provides a co-coercivity-type bound that converts gradient differences into function-value gaps, used componentwise to derive Lemma 5.12",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Define phi(x) = f(x) - f(z) - <nabla f(z), x - z> so that nabla phi(z) = 0 and phi has the same Lipschitz constant L",
+          "math": "\\phi(x) := f(x) - f(z) - \\langle \\nabla f(z), x - z \\rangle, \\quad \\nabla \\phi(z) = 0, \\quad \\|\\nabla \\phi(x) - \\nabla \\phi(y)\\|_* \\le L \\|x - y\\|",
+          "uses": []
+        },
+        {
+          "step": 2,
+          "description": "Evaluate phi at x - nabla phi(x)/L, use smoothness upper bound, and rearrange to obtain the co-coercivity inequality",
+          "math": "\\phi(x) \\ge \\phi(x - \\nabla \\phi(x)/L) + \\frac{1}{2L} \\|\\nabla \\phi(x)\\|_*^2 = \\frac{1}{2L} \\|\\nabla f(x) - \\nabla f(z)\\|_*^2",
+          "uses": []
+        }
+      ]
+    },
+    {
+      "name": "Weighted component gradient-gap bound (Lemma 5.12)",
+      "ref": "Lemma 5.12",
+      "statement_math": "\\frac{1}{m} \\sum_{i=1}^{m} \\frac{1}{m q_i} \\|\\nabla f_i(x) - \\nabla f_i(x^*)\\|_*^2 \\le 2 L_Q [\\Psi(x) - \\Psi(x^*)], \\quad \\forall x \\in X",
+      "role": "Bounds the weighted sum of component gradient differences by the composite objective gap, feeding into the variance bound of Lemma 5.13",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Apply Lemma 5.8 componentwise with f = f_i, divide by 1/(m^2 q_i), and sum over i = 1,...,m",
+          "math": "\\frac{1}{m} \\sum_{i=1}^{m} \\frac{1}{m q_i} \\|\\nabla f_i(x) - \\nabla f_i(x^*)\\|_*^2 \\le 2 L_Q [f(x) - f(x^*) - \\langle \\nabla f(x^*), x - x^* \\rangle]",
+          "uses": [
+            "Smoothness gap inequality (Lemma 5.8)"
+          ]
+        },
+        {
+          "step": 2,
+          "description": "Use optimality of x* for Psi and convexity of h to replace -<nabla f(x*), x - x*> by the h-gap",
+          "math": "f(x) - f(x^*) - \\langle \\nabla f(x^*), x - x^* \\rangle \\le f(x) - f(x^*) + h(x) - h(x^*) = \\Psi(x) - \\Psi(x^*)",
+          "uses": []
+        }
+      ]
+    },
+    {
+      "name": "Variance bound for VR estimator (Lemma 5.13)",
+      "ref": "Lemma 5.13",
+      "statement_math": "\\text{Conditionally on } x_1, \\ldots, x_t: \\quad \\mathbb{E}[\\delta_t] = 0, \\quad \\mathbb{E}[\\|\\delta_t\\|_*^2] \\le 2 L_Q [f(\\tilde{x}) - f(x_t) - \\langle \\nabla f(x_t), \\tilde{x} - x_t \\rangle], \\quad \\mathbb{E}[\\|\\delta_t\\|_*^2] \\le 4 L_Q [\\Psi(x_t) - \\Psi(x^*) + \\Psi(\\tilde{x}) - \\Psi(x^*)]",
+      "role": "Establishes unbiasedness and bounded variance of the variance-reduced estimator G_t, providing the key stochastic error control for Lemma 5.14",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Take conditional expectation over i_t to verify E[G_t] = nabla f(x_t) via (5.3.9), hence E[delta_t] = 0",
+          "math": "\\mathbb{E}[G_t] = \\mathbb{E}\\left[\\frac{1}{m q_{i_t}} (\\nabla f_{i_t}(x_t) - \\nabla f_{i_t}(\\tilde{x})) + \\nabla f(\\tilde{x})\\right] = \\nabla f(x_t)",
+          "uses": []
+        },
+        {
+          "step": 2,
+          "description": "Expand E[||delta_t||^2_*], drop the negative centered term, and apply Eq. (5.3.5) with (x, x*) replaced by (tilde{x}, x_t) to get (5.3.7)",
+          "math": "\\mathbb{E}[\\|\\delta_t\\|_*^2] \\le \\mathbb{E}\\left[\\frac{1}{(m q_{i_t})^2} \\|\\nabla f_{i_t}(x_t) - \\nabla f_{i_t}(\\tilde{x})\\|_*^2\\right] \\le 2 L_Q [f(\\tilde{x}) - f(x_t) - \\langle \\nabla f(x_t), \\tilde{x} - x_t \\rangle]",
+          "uses": []
+        },
+        {
+          "step": 3,
+          "description": "Insert and subtract nabla f_i(x*), split the square, and apply Lemma 5.12 twice to obtain (5.3.8)",
+          "math": "\\mathbb{E}[\\|\\delta_t\\|_*^2] \\le 4 L_Q [\\Psi(x_t) - \\Psi(x^*) + \\Psi(\\tilde{x}) - \\Psi(x^*)]",
+          "uses": [
+            "Weighted component gradient-gap bound (Lemma 5.12)"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Two-center Bregman prox inequality (Lemma 3.5)",
+      "ref": "Lemma 3.5",
+      "statement_math": "\\text{Let } p : X \\to \\mathbb{R} \\text{ be convex, } \\tilde{x}, \\tilde{y} \\in X, \\; \\mu_1, \\mu_2 \\ge 0. \\text{ If } \\hat{u} \\in \\operatorname{Argmin}\\{p(u) + \\mu_1 V(\\tilde{x}, u) + \\mu_2 V(\\tilde{y}, u) : u \\in X\\}, \\text{ then } p(\\hat{u}) + \\mu_1 V(\\tilde{x}, \\hat{u}) + \\mu_2 V(\\tilde{y}, \\hat{u}) \\le p(u) + \\mu_1 V(\\tilde{x}, u) + \\mu_2 V(\\tilde{y}, u) - (\\mu_1 + \\mu_2) V(\\hat{u}, u), \\; \\forall u \\in X",
+      "role": "Provides the general Bregman prox inequality used in the one-step analysis of the mirror descent update in Lemma 5.14",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Write the first-order optimality condition for the minimizer hat{u}",
+          "math": "\\langle p'(\\hat{u}) + \\mu_1 \\nabla V(\\tilde{x}, \\hat{u}) + \\mu_2 \\nabla V(\\tilde{y}, \\hat{u}), u - \\hat{u} \\rangle \\ge 0, \\quad \\forall u \\in X",
+          "uses": []
+        },
+        {
+          "step": 2,
+          "description": "Use the Bregman three-point identity V(tilde{x}, u) = V(tilde{x}, hat{u}) + <nabla V(tilde{x}, hat{u}), u - hat{u}> + V(hat{u}, u) and convexity of p to derive the inequality",
+          "math": "p(\\hat{u}) + \\mu_1 V(\\tilde{x}, \\hat{u}) + \\mu_2 V(\\tilde{y}, \\hat{u}) \\le p(u) + \\mu_1 V(\\tilde{x}, u) + \\mu_2 V(\\tilde{y}, u) - (\\mu_1 + \\mu_2) V(\\hat{u}, u)",
+          "uses": []
+        }
+      ]
+    },
+    {
+      "name": "One-step VRMD progress bound (Lemma 5.14)",
+      "ref": "Lemma 5.14",
+      "statement_math": "\\text{If } L\\gamma \\le 1/2, \\text{ then } \\forall x \\in X: \\quad \\gamma [\\Psi(x_{t+1}) - \\Psi(x)] + V(x_{t+1}, x) \\le (1 - \\gamma \\mu) V(x_t, x) + \\gamma \\langle \\delta_t, x - x_t \\rangle + \\gamma^2 \\|\\delta_t\\|_*^2. \\quad \\text{Moreover, conditionally on } i_1, \\ldots, i_{t-1}: \\quad \\gamma \\mathbb{E}[\\Psi(x_{t+1}) - \\Psi(x^*)] + \\mathbb{E}[V(x_{t+1}, x^*)] \\le (1 - \\gamma \\mu) V(x_t, x^*) + 4 L_Q \\gamma^2 [\\Psi(x_t) - \\Psi(x^*) + \\Psi(\\tilde{x}) - \\Psi(x^*)]",
+      "role": "Provides the per-step descent recursion that is summed over epochs to yield the convergence bound",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Use smoothness of f with L*gamma <= 1/2 to upper-bound gamma*f(x_{t+1}) by a linearization plus the quadratic error term gamma^2 ||delta_t||^2_*",
+          "math": "\\gamma f(x_{t+1}) \\le \\gamma [f(x_t) + \\langle G_t, x_{t+1} - x_t \\rangle] + V(x_t, x_{t+1}) + \\gamma^2 \\|\\delta_t\\|_*^2",
+          "uses": []
+        },
+        {
+          "step": 2,
+          "description": "Apply Lemma 3.5 to the prox update defining x_{t+1} and combine with convexity of f to obtain (5.3.10)",
+          "math": "\\gamma [\\Psi(x_{t+1}) - \\Psi(x)] + V(x_{t+1}, x) \\le (1 - \\gamma \\mu) V(x_t, x) + \\gamma \\langle \\delta_t, x - x_t \\rangle + \\gamma^2 \\|\\delta_t\\|_*^2",
+          "uses": [
+            "Two-center Bregman prox inequality (Lemma 3.5)"
+          ]
+        },
+        {
+          "step": 3,
+          "description": "Set x = x*, take conditional expectation, use E[delta_t] = 0, and apply the variance bound (5.3.8) from Lemma 5.13 to obtain (5.3.11)",
+          "math": "\\gamma \\mathbb{E}[\\Psi(x_{t+1}) - \\Psi(x^*)] + \\mathbb{E}[V(x_{t+1}, x^*)] \\le (1 - \\gamma \\mu) V(x_t, x^*) + 4 L_Q \\gamma^2 [\\Psi(x_t) - \\Psi(x^*) + \\Psi(\\tilde{x}) - \\Psi(x^*)]",
+          "uses": [
+            "Variance bound for VR estimator (Lemma 5.13)"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Epoch-averaged bound (Theorem 5.6)",
+      "ref": "Theorem 5.6",
+      "statement_math": "\\text{Suppose } \\theta_t = 1, \\; 4 L_Q \\gamma \\le 1, \\; w_s := (1 - 4 L_Q \\gamma)(T_{s-1} - 1) - 4 L_Q \\gamma T_s > 0. \\text{ Then } \\mathbb{E}[\\Psi(\\bar{x}^S) - \\Psi(x^*)] \\le \\frac{\\gamma (1 + 4 L_Q \\gamma T_1)[\\Psi(x^0) - \\Psi(x^*)] + V(x^0, x^*)}{\\gamma \\sum_{s=1}^{S} w_s}",
+      "role": "Provides the multi-epoch convergence bound for the smooth (mu=0) case by telescoping the one-step recursion, directly yielding Corollary 5.8 after parameter substitution",
+      "proof": [
+        {
+          "step": 1,
+          "description": "For epoch s, sum Eq. (5.3.11) with mu=0 over t=1,...,T_s, take expectation, and use convexity of Psi together with 4L_Q\\gamma \\le 1 to replace the inner-iterate average by \\tilde{x}^s",
+          "math": "\\gamma \\mathbb{E}[\\Psi(x^s) - \\Psi(x^*)] + (1 - 4L_Q\\gamma)\\gamma(T_s - 1)\\mathbb{E}[\\Psi(\\tilde{x}^s) - \\Psi(x^*)] + \\mathbb{E}[V(x^s, x^*)] \\le \\gamma [\\Psi(x^{s-1}) - \\Psi(x^*)] + 4L_Q \\gamma^2 T_s [\\Psi(\\tilde{x}^{s-1}) - \\Psi(x^*)] + V(x^{s-1}, x^*)",
+          "uses": [
+            "One-step VRMD progress bound (Lemma 5.14)"
+          ]
+        },
+        {
+          "step": 2,
+          "description": "Telescope the epoch recursion over s=1,...,S, use the definition of w_s and nonnegativity of V, and apply convexity of Psi on bar{x}^S",
+          "math": "\\mathbb{E}[\\Psi(\\bar{x}^S) - \\Psi(x^*)] \\le \\frac{\\gamma(1 + 4L_Q\\gamma T_1)[\\Psi(x^0) - \\Psi(x^*)] + V(x^0, x^*)}{\\gamma \\sum_{s=1}^{S} w_s}",
+          "uses": []
+        }
+      ]
+    }
+  ]
+}

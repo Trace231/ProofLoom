@@ -1,0 +1,87 @@
+{
+  "scope": "All library modules, umbrella, and release verification entry; all theorem dependencies inspected, including unused historical axiom consumers.",
+  "algorithms": [
+    {
+      "id": "SOptLib",
+      "compiled": true,
+      "source_files": 45,
+      "axiom_inspection_exit_code": 0,
+      "theorems_checked": 2874,
+      "algorithm_theorems_checked": 0,
+      "nonstandard_dependencies": [
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_nonneg_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.projectedWithinGradient_smoothness_gap_of_convex_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_of_convex_lipschitz_gradient",
+          "module": "SOptLib.Axioms.BaillonHaddad",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_affineDirectionDualNorm_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        }
+      ],
+      "algorithm_nonstandard_dependencies": [],
+      "algorithm_uses_sorryAx": false,
+      "public_algorithm_nonstandard_dependencies": [],
+      "public_algorithm_uses_sorryAx": false,
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "source_tree_sha256": "fd27a6858cf01d9fdf7f8a874fe01a09ade487b75f0aa129ea08a442f9c5839a",
+      "source_holes": [],
+      "source_declarations": [
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 46,
+          "kind": "axiom",
+          "name": "perez_aros_vilches_open_convex_inner_cocoercivity"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 79,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 117,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_separating_seminorm_affine_support"
+        }
+      ]
+    }
+  ]
+}

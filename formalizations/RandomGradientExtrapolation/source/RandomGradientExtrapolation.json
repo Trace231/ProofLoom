@@ -1,0 +1,1741 @@
+{
+  "algorithm": "RandomGradientExtrapolation",
+  "full_name": "Randomized Gradient Extrapolation Method (RGEM) for deterministic strongly convex finite-sum optimization",
+  "source_reference": "Lan, First-order and Stochastic Optimization Methods for Machine Learning, Springer 2020 (Algorithm 5.4, Theorem 5.4)",
+  "setup": {
+    "problem": {
+      "math": "\\psi^* := \\min_{x\\in X}\\left\\{\\psi(x) := \\frac{1}{m}\\sum_{i=1}^m f_i(x)+\\mu\\nu(x)\\right\\}.",
+      "ref": "Eq. (5.2.1)",
+      "description": "Deterministic finite-sum convex optimization problem treated by RGEM."
+    },
+    "variable_space": {
+      "math": "X\\subseteq \\mathbb{R}^n \\text{ is a closed convex set},\\quad f_i:X\\to\\mathbb{R},\\ i=1,\\ldots,m.",
+      "ref": "p. 252, lines 14541-14542"
+    }
+  },
+  "assumptions": [
+    {
+      "name": "X_closed_convex",
+      "math": "X\\subseteq \\mathbb{R}^n\\text{ is a closed convex set}",
+      "ref": "p. 252, lines 14541-14542",
+      "parameters": [
+        "X"
+      ]
+    },
+    {
+      "name": "component_smooth_convexity",
+      "math": "\\|\\nabla f_i(x_1)-\\nabla f_i(x_2)\\|_*\\le L_i\\|x_1-x_2\\|,\\quad \\forall x_1,x_2\\in X.",
+      "ref": "Eq. (5.2.2)",
+      "parameters": [
+        "L_i\\ge 0",
+        "i=1,\\ldots,m"
+      ]
+    },
+    {
+      "name": "component_convexity",
+      "math": "f_i : X \\to \\mathbb{R},\\ i = 1, \\ldots, m,\\ \\text{are smooth convex functions with Lipschitz continuous gradients over } X.",
+      "ref": "p. 252, lines 14541-14542",
+      "parameters": [
+        "i=1,\\ldots,m"
+      ]
+    },
+    {
+      "name": "nu_strong_convexity",
+      "math": "\\nu(x_1)-\\nu(x_2)-\\langle \\nu'(x_2),x_1-x_2\\rangle\\ge \\frac{1}{2}\\|x_1-x_2\\|^2,\\quad \\forall x_1,x_2\\in X.",
+      "ref": "Eq. (5.2.3)",
+      "parameters": [
+        "\\mu\\ge 0"
+      ]
+    },
+    {
+      "name": "average_smoothness",
+      "math": "\\|\\nabla f(x_1)-\\nabla f(x_2)\\|_*\\le L_f\\|x_1-x_2\\|\\le L\\|x_1-x_2\\|,\\quad \\forall x_1,x_2\\in X.",
+      "ref": "Eq. (5.2.4)",
+      "parameters": [
+        "f(x)\\equiv \\frac{1}{m}\\sum_{i=1}^m f_i(x)",
+        "L\\equiv \\frac{1}{m}\\sum_{i=1}^m L_i",
+        "\\hat L=\\max_{i=1,\\ldots,m}L_i"
+      ]
+    },
+    {
+      "name": "prox_mapping_computable",
+      "math": "\\operatorname*{argmin}_{x\\in X}\\{\\langle g,x\\rangle+\\mu\\nu(x)+\\eta V(x^0,x)\\}",
+      "ref": "Eq. (5.2.9)",
+      "parameters": [
+        "x^0\\in X",
+        "g\\in\\mathbb{R}^n",
+        "\\mu\\ge 0",
+        "\\eta>0"
+      ]
+    },
+    {
+      "name": "strongly_convex_regime",
+      "math": "\\mu\\ge 0\\text{ is a given constant. Hence, the objective function }\\psi\\text{ is strongly convex whenever }\\mu>0.",
+      "ref": "p. 252, lines 14550-14551",
+      "parameters": [
+        "\\mu"
+      ]
+    },
+    {
+      "name": "optimal_solution_feasible_context",
+      "math": "x^*\\text{, an optimal solution of (5.2.1) (or (5.2.5)),}\\quad x\\text{ any feasible solution of (5.2.1) (or (5.2.5))}",
+      "ref": "p. 263, lines 15203-15204",
+      "parameters": [
+        "x^*",
+        "x"
+      ]
+    },
+    {
+      "name": "uniform_block_sampling",
+      "math": "\\operatorname{Prob}\\{i_t=i\\}=\\frac{1}{m},\\quad i=1,\\ldots,m.",
+      "ref": "Algorithm 5.4, p. 261",
+      "parameters": [
+        "i_t"
+      ]
+    },
+    {
+      "name": "RGEMNonnegativeInputParameters_Algorithm_5_4",
+      "math": "\\text{Let }x^0\\in X,\\text{ and the nonnegative parameters }\\{\\alpha_t\\},\\{\\eta_t\\},\\text{ and }\\{\\tau_t\\}\\text{ be given.}",
+      "ref": "Algorithm 5.4, p. 261",
+      "parameters": [
+        "x^0",
+        "\\alpha_t",
+        "\\eta_t",
+        "\\tau_t"
+      ]
+    },
+    {
+      "name": "proposition_output_weight_nonnegativity",
+      "math": "\\theta_t\\ge 0,\\quad t=1,\\ldots,k.",
+      "ref": "Proposition 5.6, p. 264",
+      "parameters": [
+        "\\theta_t"
+      ]
+    },
+    {
+      "name": "initial_gradient_bound",
+      "math": "\\frac{1}{m}\\sum_{i=1}^m\\|\\nabla f_i(x^0)\\|_*^2=\\sigma_0^2.",
+      "ref": "Eq. (5.2.56)",
+      "parameters": [
+        "\\sigma_0\\ge 0"
+      ]
+    },
+    {
+      "name": "proposition_weight_condition_5_2_61",
+      "math": "\\theta_t(m(1+\\tau_t)-1)=\\theta_{t-1}m(1+\\tau_{t-1}),\\quad t=2,\\ldots,k.",
+      "ref": "Eq. (5.2.61)",
+      "parameters": [
+        "\\theta_t",
+        "\\tau_t"
+      ]
+    },
+    {
+      "name": "proposition_alpha_theta_condition_5_2_65",
+      "math": "m\\theta_{t-1}=\\alpha_t\\theta_t,\\quad t\\ge 2.",
+      "ref": "Eq. (5.2.65)",
+      "parameters": [
+        "\\alpha_t",
+        "\\theta_t"
+      ]
+    },
+    {
+      "name": "proposition_eta_condition_5_2_66",
+      "math": "\\theta_t\\eta_t\\le \\theta_{t-1}(\\mu+\\eta_{t-1}),\\quad t\\ge 2.",
+      "ref": "Eq. (5.2.66)",
+      "parameters": [
+        "\\eta_t",
+        "\\theta_t"
+      ]
+    },
+    {
+      "name": "proposition_cross_condition_5_2_67",
+      "math": "2\\alpha_tL_i\\le m\\tau_{t-1}\\eta_t,\\quad i=1,\\ldots,m;\\ t\\ge 2.",
+      "ref": "Eq. (5.2.67)",
+      "parameters": [
+        "\\alpha_t",
+        "\\tau_t",
+        "\\eta_t",
+        "L_i"
+      ]
+    },
+    {
+      "name": "proposition_terminal_condition_5_2_68",
+      "math": "4L_i\\le \\tau_k(\\mu+\\eta_k),\\quad i=1,\\ldots,m.",
+      "ref": "Eq. (5.2.68)",
+      "parameters": [
+        "\\tau_k",
+        "\\eta_k",
+        "L_i"
+      ]
+    }
+  ],
+  "algorithm_spec": {
+    "ref": "Algorithm 5.4",
+    "input": {
+      "name": "RGEMInput_Algorithm_5_4",
+      "math": "\\text{Let }x^0\\in X,\\text{ and the nonnegative parameters }\\{\\alpha_t\\},\\{\\eta_t\\},\\text{ and }\\{\\tau_t\\}\\text{ be given.}",
+      "ref": "Algorithm 5.4, p. 261"
+    },
+    "initialization": {
+      "name": "initialization",
+      "math": "x_i^0=x^0,\\quad y_i^{-1}=y_i^0=0,\\quad i=1,\\ldots,m.",
+      "ref": "Algorithm 5.4, p. 261"
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "sample_block",
+        "math": "\\operatorname{Prob}\\{i_t=i\\}=\\frac{1}{m},\\quad i=1,\\ldots,m.",
+        "ref": "Algorithm 5.4, p. 261"
+      },
+      {
+        "step": 2,
+        "name": "gradient_extrapolation",
+        "math": "\\tilde y_i^t=y_i^{t-1}+\\alpha_t(y_i^{t-1}-y_i^{t-2}),\\quad \\forall i.",
+        "ref": "Eq. (5.2.49)"
+      },
+      {
+        "step": 3,
+        "name": "proximal_primal_update",
+        "math": "x^t=\\operatorname*{argmin}_{x\\in X}\\left\\{\\left\\langle \\frac{1}{m}\\sum_{i=1}^m\\tilde y_i^t,x\\right\\rangle+\\mu\\nu(x)+\\eta_tV(x^{t-1},x)\\right\\}.",
+        "ref": "Eq. (5.2.50)"
+      },
+      {
+        "step": 4,
+        "name": "random_block_point_update",
+        "math": "x_i^t=\\begin{cases}(1+\\tau_t)^{-1}(x^t+\\tau_tx_i^{t-1}),& i=i_t,\\\\ x_i^{t-1},& i\\ne i_t,\\end{cases}",
+        "ref": "Eq. (5.2.51)"
+      },
+      {
+        "step": 5,
+        "name": "component_gradient_update",
+        "math": "y_i^t=\\begin{cases}\\nabla f_i(x_i^t),& i=i_t,\\\\ y_i^{t-1},& i\\ne i_t.\\end{cases}",
+        "ref": "Eq. (5.2.52)"
+      }
+    ],
+    "output": {
+      "math": "\\text{For some }\\theta_t>0,\\ t=1,\\ldots,k,\\ \\text{set }\\underline{x}^k:=\\left(\\sum_{t=1}^k\\theta_t\\right)^{-1}\\sum_{t=1}^k\\theta_tx^t.",
+      "ref": "Eq. (5.2.53)",
+      "type": "weighted_average"
+    },
+    "parameters": [
+      {
+        "name": "output_weight_positivity",
+        "math": "\\theta_t>0,\\quad t=1,\\ldots,k.",
+        "ref": "Algorithm 5.4 output, p. 261"
+      },
+      {
+        "name": "auxiliary_point",
+        "math": "\\hat x_i^t=(1+\\tau_t)^{-1}(x^t+\\tau_tx_i^{t-1}).",
+        "ref": "Eq. (5.2.57)"
+      },
+      {
+        "name": "auxiliary_gradient",
+        "math": "\\hat y_i^t=\\nabla f_i(\\hat x_i^t).",
+        "ref": "Eq. (5.2.58)"
+      },
+      {
+        "name": "Q",
+        "math": "Q(\\underline{x},x):=\\langle \\nabla f(x),\\underline{x}-x\\rangle+\\mu\\nu(\\underline{x})-\\mu\\nu(x).",
+        "ref": "Eq. (5.2.59)"
+      },
+      {
+        "name": "constant_tau",
+        "math": "\\tau_t\\equiv \\tau=\\frac{1}{m(1-\\alpha)}-1.",
+        "ref": "Eq. (5.2.76)"
+      },
+      {
+        "name": "constant_eta",
+        "math": "\\eta_t\\equiv \\eta=\\frac{\\alpha}{1-\\alpha}\\mu.",
+        "ref": "Eq. (5.2.76)"
+      },
+      {
+        "name": "constant_alpha_t",
+        "math": "\\alpha_t\\equiv m\\alpha.",
+        "ref": "Eq. (5.2.76)"
+      },
+      {
+        "name": "alpha",
+        "math": "\\alpha=1-\\frac{1}{m+\\sqrt{m^2+16m\\hat L/\\mu}}.",
+        "ref": "Eq. (5.2.77)"
+      },
+      {
+        "name": "Delta_0_sigma_0",
+        "math": "\\Delta_{0,\\sigma_0}:=\\mu V(x^0,x^*)+\\psi(x^0)-\\psi^*+\\frac{\\sigma_0^2}{m\\mu}.",
+        "ref": "Eq. (5.2.80)"
+      }
+    ]
+  },
+  "main_theorem": {
+    "ref": "Theorem 5.4",
+    "statement_math": "\\text{Let }x^*\\text{ be an optimal solution of (5.2.1), }x^k\\text{ and }\\underline{x}^k\\text{ be defined in (5.2.50) and (5.2.53), respectively, and }\\hat L=\\max_{i=1,\\ldots,m}L_i.\\ \\text{Also let }\\{\\tau_t\\},\\{\\eta_t\\},\\text{ and }\\{\\alpha_t\\}\\text{ be set to }\\tau_t\\equiv\\tau=\\frac{1}{m(1-\\alpha)}-1,\\quad \\eta_t\\equiv\\eta=\\frac{\\alpha}{1-\\alpha}\\mu,\\quad \\text{and }\\alpha_t\\equiv m\\alpha.\\ \\text{If (5.2.56) holds and }\\alpha\\text{ is set as }\\alpha=1-\\frac{1}{m+\\sqrt{m^2+16m\\hat L/\\mu}},\\text{ then }\\mathbb{E}[V(x^k,x^*)]\\le \\frac{2\\Delta_{0,\\sigma_0}\\alpha^k}{\\mu},\\quad \\mathbb{E}[\\psi(\\underline{x}^k)-\\psi(x^*)]\\le 16\\max\\left\\{m,\\frac{\\hat L}{\\mu}\\right\\}\\Delta_{0,\\sigma_0}\\alpha^{k/2},\\quad \\Delta_{0,\\sigma_0}:=\\mu V(x^0,x^*)+\\psi(x^0)-\\psi^*+\\frac{\\sigma_0^2}{m\\mu}.",
+    "rate": "Linear in expectation, with objective gap bounded by O(max{m, Lhat/mu} Delta alpha^{k/2}) and distance bounded by O(Delta alpha^k / mu).",
+    "measure": "expected Bregman distance to x^* and expected objective suboptimality of the weighted output",
+    "proof": [
+      {
+        "step": 1,
+        "description": "Set \\theta_t=\\alpha^{-t}, t=1,\\ldots,k, as the proof does before checking the Proposition 5.6 side conditions.",
+        "ref": "Theorem 5.4 proof, p. 269",
+        "source_pdf_lines": [
+          15696,
+          15696
+        ],
+        "uses": [
+          "alpha"
+        ],
+        "produces": "Weight schedule \\theta_t=\\alpha^{-t}."
+      },
+      {
+        "step": 2,
+        "description": "Using \\tau_t\\equiv\\tau from (5.2.76) and the weight schedule, verify the component-weight recurrence (5.2.61). This is one of the conditions the proof says is easily checked.",
+        "ref": "Theorem 5.4 proof, verification of Eq. (5.2.61)",
+        "source_pdf_lines": [
+          15696,
+          15698
+        ],
+        "uses": [
+          "constant_tau",
+          "previous_step:1"
+        ],
+        "produces": "Derived condition (5.2.61): \\theta_t(m(1+\\tau_t)-1)=\\theta_{t-1}m(1+\\tau_{t-1}) for t=2,\\ldots,k."
+      },
+      {
+        "step": 3,
+        "description": "Using \\alpha_t\\equiv m\\alpha from (5.2.76) and \\theta_t=\\alpha^{-t}, verify the extrapolation-weight relation (5.2.65).",
+        "ref": "Theorem 5.4 proof, verification of Eq. (5.2.65)",
+        "source_pdf_lines": [
+          15696,
+          15698
+        ],
+        "uses": [
+          "constant_alpha_t",
+          "previous_step:1"
+        ],
+        "produces": "Derived condition (5.2.65): m\\theta_{t-1}=\\alpha_t\\theta_t for t\\ge 2."
+      },
+      {
+        "step": 4,
+        "description": "Using \\eta_t\\equiv\\eta from (5.2.76), \\alpha from (5.2.77), and the weight schedule, verify the Bregman-telescope condition (5.2.66).",
+        "ref": "Theorem 5.4 proof, verification of Eq. (5.2.66)",
+        "source_pdf_lines": [
+          15696,
+          15698
+        ],
+        "uses": [
+          "constant_eta",
+          "alpha",
+          "previous_step:1"
+        ],
+        "produces": "Derived condition (5.2.66): \\theta_t\\eta_t\\le\\theta_{t-1}(\\mu+\\eta_{t-1}) for t\\ge 2."
+      },
+      {
+        "step": 5,
+        "description": "Using the constant policy (5.2.76), the definition of \\alpha in (5.2.77), and \\hat L=\\max_i L_i, verify the cross and terminal bounds (5.2.67) and (5.2.68).",
+        "ref": "Theorem 5.4 proof, verification of Eqs. (5.2.67)--(5.2.68)",
+        "source_pdf_lines": [
+          15696,
+          15698
+        ],
+        "uses": [
+          "constant_tau",
+          "constant_eta",
+          "constant_alpha_t",
+          "alpha",
+          "average_smoothness",
+          "strongly_convex_regime"
+        ],
+        "produces": "Derived conditions (5.2.67) and (5.2.68) for all component Lipschitz constants L_i\\le\\hat L."
+      },
+      {
+        "step": 6,
+        "description": "Collect the verified conditions (5.2.61) and (5.2.65)--(5.2.68), together with the initial-gradient assumption (5.2.56), to make Proposition 5.6 applicable under the theorem's parameter policy.",
+        "ref": "Theorem 5.4 proof, p. 269",
+        "source_pdf_lines": [
+          15696,
+          15698
+        ],
+        "uses": [
+          "initial_gradient_bound",
+          "previous_step:2",
+          "previous_step:3",
+          "previous_step:4",
+          "previous_step:5"
+        ],
+        "produces": "Proposition 5.6 is applicable with \\theta_t=\\alpha^{-t}."
+      },
+      {
+        "step": 7,
+        "description": "Substitute the constant parameter policy (5.2.76) into the two estimates of Proposition 5.6.",
+        "ref": "Theorem 5.4 proof, after Eq. (5.2.77)",
+        "source_pdf_lines": [
+          15698,
+          15708
+        ],
+        "math": "\\mathbb{E}[Q(\\underline{x}^k,x^*)]\\le \\frac{\\alpha^k}{1-\\alpha^k}\\left[\\mu V(x^0,x^*)+\\psi(x^0)-\\psi^*+\\frac{2m(1-\\alpha)^2\\sigma_0^2}{(m-1)\\mu}\\sum_{t=1}^k\\left(\\frac{m-1}{m\\alpha}\\right)^t\\right],\\quad \\mathbb{E}[V(x^k,x^*)]\\le 2\\alpha^k\\left[V(x^0,x^*)+\\frac{\\psi(x^0)-\\psi^*}{\\mu}+\\frac{2m(1-\\alpha)^2\\sigma_0^2}{(m-1)\\mu^2}\\sum_{t=1}^k\\left(\\frac{m-1}{m\\alpha}\\right)^t\\right],\\ \\forall k\\ge 1.",
+        "uses": [
+          "GeneralRGEMBound_Proposition_5_6",
+          "previous_step:6"
+        ],
+        "produces": "Pre-geometric bounds for \\mathbb{E}[Q(\\underline{x}^k,x^*)] and \\mathbb{E}[V(x^k,x^*)]."
+      },
+      {
+        "step": 8,
+        "description": "Use the observation \\alpha\\ge (2m-1)/(2m) to dominate the geometric factor and sum it.",
+        "ref": "Theorem 5.4 proof",
+        "source_pdf_lines": [
+          15710,
+          15717
+        ],
+        "math": "\\sum_{t=1}^k\\left(\\frac{m-1}{m\\alpha}\\right)^t\\le \\sum_{t=1}^k\\left(\\frac{2(m-1)}{2m-1}\\right)^t\\le 2(m-1).",
+        "uses": [
+          "alpha"
+        ],
+        "produces": "Uniform bound on the stale-gradient geometric series."
+      },
+      {
+        "step": 9,
+        "description": "Combine the two substituted estimates with the geometric sum and the fact m(1-\\alpha)\\le 1/2.",
+        "ref": "Eq. (5.2.81)",
+        "source_pdf_lines": [
+          15719,
+          15727
+        ],
+        "math": "\\mathbb{E}[Q(\\underline{x}^k,x^*)]\\le \\frac{\\alpha^k}{1-\\alpha^k}\\Delta_{0,\\sigma_0},\\quad \\mathbb{E}[V(x^k,x^*)]\\le \\frac{2\\alpha^k\\Delta_{0,\\sigma_0}}{\\mu},\\quad \\forall k\\ge 1.",
+        "uses": [
+          "Delta_0_sigma_0",
+          "alpha",
+          "previous_step:7",
+          "previous_step:8"
+        ],
+        "produces": "Equation (5.2.81), including the distance estimate."
+      },
+      {
+        "step": 10,
+        "description": "Read the second relation in (5.2.81) as the bound (5.2.78).",
+        "ref": "Eq. (5.2.78)",
+        "source_pdf_lines": [
+          15728,
+          15730
+        ],
+        "math": "\\mathbb{E}[V(x^k,x^*)]\\le \\frac{2\\Delta_{0,\\sigma_0}\\alpha^k}{\\mu}.",
+        "uses": [
+          "previous_step:9"
+        ],
+        "produces": "The first conclusion of Theorem 5.4."
+      },
+      {
+        "step": 11,
+        "description": "Use the weighted output formula and convexity of the squared norm to bound the squared distance of \\underline{x}^k by the weighted average of iterate squared distances.",
+        "ref": "Theorem 5.4 proof, weighted-average inequality",
+        "source_pdf_lines": [
+          15729,
+          15735
+        ],
+        "math": "\\frac{L_f}{2}\\mathbb{E}[\\|\\underline{x}^k-x^*\\|^2]\\le \\frac{L_f}{2}\\left(\\sum_{t=1}^k\\theta_t\\right)^{-1}\\sum_{t=1}^k\\theta_t\\mathbb{E}[\\|x^t-x^*\\|^2].",
+        "uses": [
+          "WeightedOutputDefinition_Eq_5_2_53",
+          "previous_step:1"
+        ],
+        "produces": "First line of the output-distance estimate."
+      },
+      {
+        "step": 12,
+        "description": "Apply the Bregman lower bound (5.2.8) and the geometric sum of weights for \\theta_t=\\alpha^{-t}.",
+        "ref": "Theorem 5.4 proof, labeled (5.2.8) step",
+        "source_pdf_lines": [
+          15737,
+          15741
+        ],
+        "math": "\\frac{L_f}{2}\\left(\\sum_{t=1}^k\\theta_t\\right)^{-1}\\sum_{t=1}^k\\theta_t\\mathbb{E}[\\|x^t-x^*\\|^2]\\le \\frac{L_f(1-\\alpha)\\alpha^k}{1-\\alpha^k}\\sum_{t=1}^k\\alpha^{-t}\\mathbb{E}[V(x^t,x^*)].",
+        "uses": [
+          "ProxLowerBound_Eq_5_2_8",
+          "previous_step:1",
+          "previous_step:11"
+        ],
+        "produces": "Output-distance estimate after using (5.2.8)."
+      },
+      {
+        "step": 13,
+        "description": "Use the just-proved (5.2.78) inside the weighted sum and simplify the printed finite sum.",
+        "ref": "Theorem 5.4 proof, labeled (5.2.78) step",
+        "source_pdf_lines": [
+          15742,
+          15745
+        ],
+        "math": "\\frac{L_f(1-\\alpha)\\alpha^k}{1-\\alpha^k}\\sum_{t=1}^k\\alpha^{-t}\\mathbb{E}[V(x^t,x^*)]\\le \\frac{L_f(1-\\alpha)\\alpha^k}{1-\\alpha^k}\\sum_{t=1}^k\\frac{2\\Delta_{0,\\sigma_0}}{\\mu}=\\frac{2L_f(1-\\alpha)\\Delta_{0,\\sigma_0}k\\alpha^k}{\\mu(1-\\alpha^k)}.",
+        "uses": [
+          "previous_step:10",
+          "previous_step:12"
+        ],
+        "produces": "Weighted output squared-distance estimate."
+      },
+      {
+        "step": 14,
+        "description": "Before applying (5.2.60), record that the output point is feasible: (5.2.50) gives x^t\\in X, Algorithm 5.4 gives \\theta_t>0 and the normalized formula (5.2.53), and convexity of X makes \\underline{x}^k a convex combination of feasible iterates.",
+        "ref": "Algorithm 5.4 output and Eq. (5.2.50)",
+        "source_pdf_lines": [
+          15091,
+          15112
+        ],
+        "uses": [
+          "X_closed_convex",
+          "PrimalUpdateFeasibility_Eq_5_2_50",
+          "WeightedOutputDefinition_Eq_5_2_53",
+          "output_weight_positivity"
+        ],
+        "produces": "\\underline{x}^k is a feasible solution of (5.2.1), so the comparison (5.2.60) may be specialized at x=\\underline{x}^k."
+      },
+      {
+        "step": 15,
+        "description": "Specialize the generic feasible-solution comparison (5.2.60) at x=\\underline{x}^k, then combine it with the Q-bound from (5.2.81) and the weighted output squared-distance estimate.",
+        "ref": "Theorem 5.4 proof, objective estimate before alpha simplification",
+        "source_pdf_lines": [
+          15747,
+          15758
+        ],
+        "math": "\\mathbb{E}[\\psi(\\underline{x}^k)-\\psi(x^*)]\\le \\mathbb{E}[Q(\\underline{x}^k,x^*)]+\\frac{L_f}{2}\\mathbb{E}[\\|\\underline{x}^k-x^*\\|^2]\\le \\left[\\frac{1}{1-\\alpha}+\\frac{2L_f}{\\mu}k\\right]\\frac{\\Delta_{0,\\sigma_0}\\alpha^k(1-\\alpha)}{1-\\alpha^k}.",
+        "uses": [
+          "QComparison_Eq_5_2_60",
+          "previous_step:9",
+          "previous_step:13",
+          "previous_step:14"
+        ],
+        "produces": "Objective-gap estimate with factor [1/(1-alpha)+2L_f k/mu]."
+      },
+      {
+        "step": 16,
+        "description": "Record the two printed max bounds used to control the bracket in the objective-gap estimate.",
+        "ref": "Theorem 5.4 proof, alpha max bounds",
+        "source_pdf_lines": [
+          15760,
+          15767
+        ],
+        "math": "\\frac{1}{1-\\alpha}\\le \\frac{16}{3}\\max\\{m,\\hat L/\\mu\\},\\quad \\frac{2L_f}{\\mu}\\le \\frac{16}{3}\\max\\{m,\\hat L/\\mu\\}.",
+        "uses": [
+          "average_smoothness",
+          "alpha"
+        ],
+        "produces": "Uniform max bound for 1/(1-alpha) and 2L_f/mu."
+      },
+      {
+        "step": 17,
+        "description": "Start the printed alpha-chain by rewriting k+1 as a sum of unit ratios.",
+        "ref": "Theorem 5.4 proof, alpha-chain equality",
+        "source_pdf_lines": [
+          15770,
+          15775
+        ],
+        "math": "(k+1)\\frac{\\alpha^k(1-\\alpha)}{1-\\alpha^k}=\\left(\\sum_{t=1}^k\\frac{\\alpha^t}{\\alpha^t}+1\\right)\\frac{\\alpha^k(1-\\alpha)}{1-\\alpha^k}.",
+        "uses": [
+          "alpha"
+        ],
+        "produces": "First equality in the alpha-chain."
+      },
+      {
+        "step": 18,
+        "description": "Use \\alpha^t/\\alpha^t\\le \\alpha^t/\\alpha^{3t/2} for 0<\\alpha<1 to enlarge the sum.",
+        "ref": "Theorem 5.4 proof, first alpha-chain inequality",
+        "source_pdf_lines": [
+          15775,
+          15778
+        ],
+        "math": "\\left(\\sum_{t=1}^k\\frac{\\alpha^t}{\\alpha^t}+1\\right)\\frac{\\alpha^k(1-\\alpha)}{1-\\alpha^k}\\le \\left(\\sum_{t=1}^k\\frac{\\alpha^t}{\\alpha^{3t/2}}+1\\right)\\frac{\\alpha^k(1-\\alpha)}{1-\\alpha^k}.",
+        "uses": [
+          "alpha",
+          "previous_step:17"
+        ],
+        "produces": "Alpha-chain after replacing each unit ratio."
+      },
+      {
+        "step": 19,
+        "description": "Sum the geometric series with ratio \\alpha^{-1/2} as printed in the next line of the alpha-chain.",
+        "ref": "Theorem 5.4 proof, geometric alpha-chain step",
+        "source_pdf_lines": [
+          15779,
+          15782
+        ],
+        "math": "\\left(\\sum_{t=1}^k\\frac{\\alpha^t}{\\alpha^{3t/2}}+1\\right)\\frac{\\alpha^k(1-\\alpha)}{1-\\alpha^k}\\le \\frac{1-\\alpha^{k/2}}{\\alpha^{k/2}(1-\\alpha^{1/2})}\\frac{\\alpha^k(1-\\alpha)}{1-\\alpha^k}+\\alpha^k.",
+        "uses": [
+          "previous_step:18"
+        ],
+        "produces": "Geometric-series bound in the alpha-chain."
+      },
+      {
+        "step": 20,
+        "description": "Use the remaining printed alpha inequalities to finish the alpha-chain.",
+        "ref": "Theorem 5.4 proof, final alpha-chain inequalities",
+        "source_pdf_lines": [
+          15781,
+          15783
+        ],
+        "math": "\\frac{1-\\alpha^{k/2}}{\\alpha^{k/2}(1-\\alpha^{1/2})}\\frac{\\alpha^k(1-\\alpha)}{1-\\alpha^k}+\\alpha^k\\le 2\\alpha^{k/2}+\\alpha^k\\le 3\\alpha^{k/2}.",
+        "uses": [
+          "previous_step:19"
+        ],
+        "produces": "(k+1)\\alpha^k(1-\\alpha)/(1-\\alpha^k)\\le 3\\alpha^{k/2}."
+      },
+      {
+        "step": 21,
+        "description": "Substitute the max bounds and the alpha-chain into the objective estimate.",
+        "ref": "Eq. (5.2.79)",
+        "source_pdf_lines": [
+          15785,
+          15793
+        ],
+        "math": "\\mathbb{E}[\\psi(\\underline{x}^k)-\\psi(x^*)]\\le \\frac{16}{3}\\max\\{m,\\hat L/\\mu\\}\\frac{(k+1)\\alpha^k(1-\\alpha)\\Delta_{0,\\sigma_0}}{1-\\alpha^k}\\le 16\\max\\{m,\\hat L/\\mu\\}\\Delta_{0,\\sigma_0}\\alpha^{k/2}.",
+        "uses": [
+          "previous_step:15",
+          "previous_step:16",
+          "previous_step:20"
+        ],
+        "produces": "The second conclusion of Theorem 5.4."
+      }
+    ]
+  },
+  "key_lemmas": [
+    {
+      "name": "ProxMappingInequality_Lemma_3_5",
+      "ref": "Lemma 3.5",
+      "statement_math": "\\text{Let the convex function }p:X\\to\\mathbb{R},\\ \\tilde x,\\tilde y\\in X,\\ \\mu_1,\\mu_2\\ge 0\\text{ be given. Let }\\nu:X\\to\\mathbb{R}\\text{ be a differentiable convex function and }V(x,z)\\text{ be defined in (3.2.2). If }\\hat u\\in \\operatorname{Argmin}\\{p(u)+\\mu_1V(\\tilde x,u)+\\mu_2V(\\tilde y,u):u\\in X\\},\\text{ then for any }u\\in X,\\text{ we have }p(\\hat u)+\\mu_1V(\\tilde x,\\hat u)+\\mu_2V(\\tilde y,\\hat u)\\le p(u)+\\mu_1V(\\tilde x,u)+\\mu_2V(\\tilde y,u)-(\\mu_1+\\mu_2)V(\\hat u,u).",
+      "role": "Applied to the prox update (5.2.50) to produce the one-step prox inequality (5.2.71).",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Use optimality of \\hat u in the prox-mapping and differentiability of V(\\tilde x,\\cdot).",
+          "ref": "Lemma 3.5 proof",
+          "source_pdf_lines": [
+            3555,
+            3558
+          ],
+          "math": "\\langle p'(\\hat u)+\\mu_1\\nabla V(\\tilde x,\\hat u)+\\mu_2\\nabla V(\\tilde y,\\hat u),u-\\hat u\\rangle\\ge 0,\\quad \\forall u\\in X.",
+          "uses": [],
+          "produces": "First-order variational inequality for \\hat u."
+        },
+        {
+          "step": 2,
+          "description": "Apply the three-point identity for the Bregman distance.",
+          "ref": "Lemma 3.5 proof",
+          "source_pdf_lines": [
+            3558,
+            3562
+          ],
+          "math": "V(\\tilde x,u)=V(\\tilde x,\\hat u)+\\langle \\nabla V(\\tilde x,\\hat u),u-\\hat u\\rangle+V(\\hat u,u),\\quad \\forall u\\in X.",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "Bregman expansion around \\hat u."
+        },
+        {
+          "step": 3,
+          "description": "Expand both Bregman-distance terms around \\hat u; the second center \\tilde y uses the same identity as the one displayed for \\tilde x.",
+          "ref": "Lemma 3.5 proof",
+          "source_pdf_lines": [
+            3563,
+            3568
+          ],
+          "math": "p(u)+\\mu_1V(\\tilde x,u)+\\mu_2V(\\tilde y,u)=p(u)+\\mu_1[V(\\tilde x,\\hat u)+\\langle \\nabla V(\\tilde x,\\hat u),u-\\hat u\\rangle+V(\\hat u,u)]+\\mu_2[V(\\tilde y,\\hat u)+\\langle \\nabla V(\\tilde y,\\hat u),u-\\hat u\\rangle+V(\\hat u,u)].",
+          "uses": [
+            "previous_step:2"
+          ],
+          "produces": "Expanded expression for p(u)+\\mu_1V(\\tilde x,u)+\\mu_2V(\\tilde y,u)."
+        },
+        {
+          "step": 4,
+          "description": "Use convexity of p and the variational inequality for \\hat u to replace p(u) and collect the first-order terms.",
+          "ref": "Lemma 3.5 proof",
+          "source_pdf_lines": [
+            3569,
+            3571
+          ],
+          "math": "p(u)+\\mu_1V(\\tilde x,u)+\\mu_2V(\\tilde y,u)\\ge p(\\hat u)+\\mu_1V(\\tilde x,\\hat u)+\\mu_2V(\\tilde y,\\hat u)+\\langle p'(\\hat u)+\\mu_1\\nabla V(\\tilde x,\\hat u)+\\mu_2\\nabla V(\\tilde y,\\hat u),u-\\hat u\\rangle+(\\mu_1+\\mu_2)V(\\hat u,u).",
+          "uses": [
+            "previous_step:1",
+            "previous_step:3"
+          ],
+          "produces": "Intermediate lower bound with the variational inner-product term retained."
+        },
+        {
+          "step": 5,
+          "description": "Drop the nonnegative variational inner-product term and rearrange to the lemma's stated inequality.",
+          "ref": "Lemma 3.5 proof",
+          "source_pdf_lines": [
+            3570,
+            3572
+          ],
+          "math": "p(u)+\\mu_1V(\\tilde x,u)+\\mu_2V(\\tilde y,u)\\ge [p(\\hat u)+\\mu_1V(\\tilde x,\\hat u)+\\mu_2V(\\tilde y,\\hat u)]+(\\mu_1+\\mu_2)V(\\hat u,u).",
+          "uses": [
+            "previous_step:1",
+            "previous_step:4"
+          ],
+          "produces": "Lemma 3.5 inequality after rearrangement."
+        }
+      ]
+    },
+    {
+      "name": "ProxLowerBound_Eq_5_2_8",
+      "ref": "Eq. (5.2.8)",
+      "statement_math": "V(x^0,x)\\ge \\frac{1}{2}\\|x-x^0\\|^2,\\quad \\forall x,x^0\\in X.",
+      "role": "Converts Bregman distance terms into squared norm bounds in Proposition 5.6 and Theorem 5.4.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "The paper derives (5.2.8) directly from strong convexity of \\nu in (5.2.3) and the definition of V in (5.2.7).",
+          "ref": "p. 253, Eq. (5.2.8)",
+          "source_pdf_lines": [
+            14612,
+            14616
+          ],
+          "math": "V(x^0,x)\\ge \\frac{1}{2}\\|x-x^0\\|^2,\\quad \\forall x,x^0\\in X.",
+          "uses": [
+            "nu_strong_convexity"
+          ],
+          "produces": "Bregman lower bound."
+        }
+      ]
+    },
+    {
+      "name": "SmoothnessGradientGap_Lemma_5_8",
+      "ref": "Lemma 5.8",
+      "statement_math": "\\text{If }f:X\\to\\mathbb{R}\\text{ has Lipschitz continuous gradients with constant }L,\\text{ then }\\frac{1}{2L}\\|\\nabla f(x)-\\nabla f(z)\\|_*^2\\le f(x)-f(z)-\\langle \\nabla f(z),x-z\\rangle\\quad \\forall x,z\\in X.",
+      "role": "Transforms component gradient-difference squares into smoothness gaps in (5.2.72).",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Define \\phi(x)=f(x)-f(z)-\\langle \\nabla f(z),x-z\\rangle. The paper notes that \\phi also has L-Lipschitz continuous gradients, \\nabla\\phi(z)=0, and \\min_x\\phi(x)=\\phi(z)=0.",
+          "ref": "Lemma 5.8 proof",
+          "source_pdf_lines": [
+            14735,
+            14737
+          ],
+          "uses": [],
+          "produces": "Auxiliary function \\phi with minimizer z."
+        },
+        {
+          "step": 2,
+          "description": "Since z minimizes \\phi, compare \\phi(z) with the value at the gradient step x-(1/L)\\nabla\\phi(x).",
+          "ref": "Lemma 5.8 proof",
+          "source_pdf_lines": [
+            14739,
+            14739
+          ],
+          "math": "\\phi(z)\\le \\phi\\left(x-\\frac{1}{L}\\nabla\\phi(x)\\right)",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "Initial comparison in the displayed chain."
+        },
+        {
+          "step": 3,
+          "description": "Expand \\phi at x-(1/L)\\nabla\\phi(x) by the fundamental theorem of calculus along the segment from x to that point.",
+          "ref": "Lemma 5.8 proof",
+          "source_pdf_lines": [
+            14740,
+            14742
+          ],
+          "math": "\\phi\\left(x-\\frac{1}{L}\\nabla\\phi(x)\\right)=\\phi(x)+\\int_0^1\\left\\langle \\nabla\\phi\\left(x-\\frac{\\tau}{L}\\nabla\\phi(x)\\right),-\\frac{1}{L}\\nabla\\phi(x)\\right\\rangle d\\tau",
+          "uses": [
+            "previous_step:2"
+          ],
+          "produces": "Integral representation of the gradient-step value."
+        },
+        {
+          "step": 4,
+          "description": "Add and subtract \\nabla\\phi(x) inside the integral, producing the split displayed in the proof.",
+          "ref": "Lemma 5.8 proof",
+          "source_pdf_lines": [
+            14743,
+            14745
+          ],
+          "math": "=\\phi(x)+\\left\\langle\\nabla\\phi(x),-\\frac{1}{L}\\nabla\\phi(x)\\right\\rangle+\\int_0^1\\left\\langle\\nabla\\phi\\left(x-\\frac{\\tau}{L}\\nabla\\phi(x)\\right)-\\nabla\\phi(x),-\\frac{1}{L}\\nabla\\phi(x)\\right\\rangle d\\tau",
+          "uses": [
+            "previous_step:3"
+          ],
+          "produces": "Split integral with the linear descent term isolated."
+        },
+        {
+          "step": 5,
+          "description": "Use L-Lipschitz continuity of \\nabla\\phi to bound the integral term in the split expression.",
+          "ref": "Lemma 5.8 proof",
+          "source_pdf_lines": [
+            14746,
+            14749
+          ],
+          "math": "\\le \\phi(x)-\\frac{1}{L}\\|\\nabla\\phi(x)\\|_*^2+\\int_0^1 L\\frac{\\tau}{L}\\|\\nabla\\phi(x)\\|_*\\frac{1}{L}\\|\\nabla\\phi(x)\\|_*d\\tau",
+          "uses": [
+            "previous_step:1",
+            "previous_step:4"
+          ],
+          "produces": "Lipschitz-bounded integral expression."
+        },
+        {
+          "step": 6,
+          "description": "Evaluate the scalar integral to obtain the final line of the displayed chain.",
+          "ref": "Lemma 5.8 proof",
+          "source_pdf_lines": [
+            14750,
+            14752
+          ],
+          "math": "=\\phi(x)-\\frac{1}{2L}\\|\\nabla\\phi(x)\\|_*^2.",
+          "uses": [
+            "previous_step:5"
+          ],
+          "produces": "Upper bound \\phi(z)\\le \\phi(x)-\\frac{1}{2L}\\|\\nabla\\phi(x)\\|_*^2."
+        },
+        {
+          "step": 7,
+          "description": "Rearrange the displayed chain using \\phi(z)=0 to isolate the gradient norm term.",
+          "ref": "Lemma 5.8 proof",
+          "source_pdf_lines": [
+            14754,
+            14755
+          ],
+          "math": "\\frac{1}{2L}\\|\\nabla\\phi(x)\\|_*^2\\le \\phi(x)-\\phi(z)=\\phi(x)",
+          "uses": [
+            "previous_step:1",
+            "previous_step:6"
+          ],
+          "produces": "Gradient norm controlled by the \\phi gap."
+        },
+        {
+          "step": 8,
+          "description": "Substitute \\nabla\\phi(x)=\\nabla f(x)-\\nabla f(z) and \\phi(x)=f(x)-f(z)-\\langle\\nabla f(z),x-z\\rangle; the result follows immediately from the previous displayed relation.",
+          "ref": "Lemma 5.8 proof",
+          "source_pdf_lines": [
+            14754,
+            14756
+          ],
+          "uses": [
+            "previous_step:7"
+          ],
+          "produces": "Lemma 5.8 inequality."
+        }
+      ]
+    },
+    {
+      "name": "ConditionalBlockExpectation_Lemma_5_9",
+      "ref": "Lemma 5.9",
+      "statement_math": "\\text{Let }x^t\\text{ and }y_i^t\\text{ be defined in (5.2.50) and (5.2.52), respectively, and }\\hat x_i^t\\text{ and }\\hat y_i^t\\text{ be defined as in (5.2.57) and (5.2.58), respectively. Then we have, for any }i=1,\\ldots,m\\text{ and }t=1,\\ldots,k,\\quad \\mathbb{E}_t[y_i^t]=\\frac{1}{m}\\hat y_i^t+\\left(1-\\frac{1}{m}\\right)y_i^{t-1},\\quad \\mathbb{E}_t[x_i^t]=\\frac{1}{m}\\hat x_i^t+\\left(1-\\frac{1}{m}\\right)x_i^{t-1},\\quad \\mathbb{E}_t[f_i(x_i^t)]=\\frac{1}{m}f_i(\\hat x_i^t)+\\left(1-\\frac{1}{m}\\right)f_i(x_i^{t-1}),\\quad \\mathbb{E}_t[\\|\\nabla f_i(x_i^t)-\\nabla f_i(x_i^{t-1})\\|_*^2]=\\frac{1}{m}\\|\\nabla f_i(\\hat x_i^t)-\\nabla f_i(x_i^{t-1})\\|_*^2,\\quad \\text{where }\\mathbb{E}_t\\text{ denotes the conditional expectation w.r.t. }i_t\\text{ given }i_1,\\ldots,i_{t-1}\\text{ when }y_i^t\\text{ is defined in (5.2.52).",
+      "role": "Supplies the conditional expectation identities used in Lemma 5.10 and Proposition 5.6.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Condition on whether the sampled block equals i. The first equality follows from the sampled-block probability together with the RGEM gradient update (5.2.52) and the auxiliary gradient definition (5.2.58), which identify the two conditional branches y_i^t=\\hat y_i^t and y_i^t=y_i^{t-1}.",
+          "ref": "Lemma 5.9 proof",
+          "source_pdf_lines": [
+            15189,
+            15195
+          ],
+          "math": "\\operatorname{Prob}_t\\{y_i^t=\\hat y_i^t\\}=\\operatorname{Prob}_t\\{i_t=i\\}=\\frac{1}{m}\\quad\\text{and}\\quad \\operatorname{Prob}_t\\{y_i^t=y_i^{t-1}\\}=1-\\frac{1}{m}.",
+          "uses": [
+            "uniform_block_sampling",
+            "component_gradient_update",
+            "AuxiliaryGradientIdentity_Eq_5_2_58"
+          ],
+          "produces": "\\mathbb{E}_t[y_i^t]=\\frac{1}{m}\\hat y_i^t+\\left(1-\\frac{1}{m}\\right)y_i^{t-1}."
+        },
+        {
+          "step": 2,
+          "description": "The paper states that the remaining equalities are proved similarly by the same conditioning; the point identity uses the RGEM point update (5.2.51) and auxiliary point definition (5.2.57), and the function-value and gradient-difference identities follow from those same two branches.",
+          "ref": "Lemma 5.9 proof",
+          "source_pdf_lines": [
+            15195,
+            15196
+          ],
+          "math": "",
+          "uses": [
+            "uniform_block_sampling",
+            "random_block_point_update",
+            "AuxiliaryPointIdentity_Eq_5_2_57",
+            "component_gradient_update",
+            "AuxiliaryGradientIdentity_Eq_5_2_58",
+            "previous_step:1"
+          ],
+          "produces": "All four identities in Lemma 5.9."
+        }
+      ]
+    },
+    {
+      "name": "StochasticComponentGradientUpdate_Eq_5_2_85",
+      "ref": "Eq. (5.2.85)",
+      "statement_math": "y_i^t=\\begin{cases}\\frac{1}{B_t}\\sum_{j=1}^{B_t}G_i(x_i^t,\\xi_{i,t}^j),& i=i_t,\\\\ y_i^{t-1},& i\\ne i_t.\\end{cases}",
+      "role": "Supplies the stochastic y_i^t branch definition used in Lemma 5.11.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Algorithm 5.5 replaces the deterministic gradient update (5.2.52) by the stochastic batch-average update.",
+          "ref": "Eq. (5.2.85)",
+          "source_pdf_lines": [
+            15874,
+            15882
+          ],
+          "math": "y_i^t=\\begin{cases}\\frac{1}{B_t}\\sum_{j=1}^{B_t}G_i(x_i^t,\\xi_{i,t}^j),& i=i_t,\\\\ y_i^{t-1},& i\\ne i_t.\\end{cases}",
+          "uses": [],
+          "produces": "Stochastic component-gradient branch update (5.2.85)."
+        }
+      ]
+    },
+    {
+      "name": "StochasticAuxiliaryGradientDefinition_Eq_5_2_86",
+      "ref": "Eq. (5.2.86)",
+      "statement_math": "\\hat y_i^t=\\frac{1}{B_t}\\sum_{j=1}^{B_t}G_i(\\hat x_i^t,\\xi_{i,t}^j).",
+      "role": "Defines the auxiliary stochastic gradient value used in Lemma 5.11's sampled-block branch.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "The stochastic RGEM analysis defines \\hat y_i^t as the same batch-average estimator evaluated at \\hat x_i^t.",
+          "ref": "Eq. (5.2.86)",
+          "source_pdf_lines": [
+            15893,
+            15898
+          ],
+          "math": "\\hat y_i^t=\\frac{1}{B_t}\\sum_{j=1}^{B_t}G_i(\\hat x_i^t,\\xi_{i,t}^j).",
+          "uses": [
+            "AuxiliaryPointIdentity_Eq_5_2_57"
+          ],
+          "produces": "Stochastic auxiliary gradient definition (5.2.86)."
+        }
+      ]
+    },
+    {
+      "name": "ConditionalBlockExpectation_Lemma_5_11",
+      "ref": "Lemma 5.11",
+      "statement_math": "\\text{Let }x^t\\text{ and }y_i^t\\text{ be defined in (5.2.50) and (5.2.85), respectively, and }\\hat x_i^t\\text{ and }\\hat y_i^t\\text{ be defined as in (5.2.57) and (5.2.86), respectively. Then we have, for any }i=1,\\ldots,m\\text{ and }t=1,\\ldots,k,\\quad \\mathbb{E}_t[y_i^t]=\\frac{1}{m}\\hat y_i^t+\\left(1-\\frac{1}{m}\\right)y_i^{t-1},\\quad \\mathbb{E}_t[x_i^t]=\\frac{1}{m}\\hat x_i^t+\\left(1-\\frac{1}{m}\\right)x_i^{t-1},\\quad \\mathbb{E}_t[f_i(x_i^t)]=\\frac{1}{m}f_i(\\hat x_i^t)+\\left(1-\\frac{1}{m}\\right)f_i(x_i^{t-1}),\\quad \\mathbb{E}_t[\\|\\nabla f_i(x_i^t)-\\nabla f_i(x_i^{t-1})\\|_*^2]=\\frac{1}{m}\\|\\nabla f_i(\\hat x_i^t)-\\nabla f_i(x_i^{t-1})\\|_*^2,\\quad \\text{where }\\mathbb{E}_t\\text{ denotes the conditional expectation w.r.t. }i_t\\text{ given }i_1,\\ldots,i_{t-1}\\text{ when }y_i^t\\text{ is defined in (5.2.52), and w.r.t. }i_t\\text{ given }i_1,\\ldots,i_{t-1},\\xi_1^t,\\ldots,\\xi_m^t\\text{ when }y_i^t\\text{ is defined in (5.2.85), respectively.",
+      "role": "Supplies the stochastic conditional block identities for Algorithm 5.5; the deterministic proof route in this JSON uses Lemma 5.9, while preserving the source proof's printed Lemma 5.11 cross-reference in the relevant proof-step descriptions.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "The first equality follows by conditioning on whether the sampled block equals i; the sampled branch y_i^t=\\hat y_i^t uses the point update (5.2.51), the auxiliary point definition (5.2.57), the stochastic update (5.2.85), and the auxiliary gradient definition (5.2.86), while the unsampled branch gives y_i^t=y_i^{t-1}.",
+          "ref": "Lemma 5.11 proof",
+          "source_pdf_lines": [
+            15925,
+            15931
+          ],
+          "math": "\\operatorname{Prob}_t\\{y_i^t=\\hat y_i^t\\}=\\operatorname{Prob}_t\\{i_t=i\\}=\\frac{1}{m},\\quad \\operatorname{Prob}_t\\{y_i^t=y_i^{t-1}\\}=1-\\frac{1}{m}.",
+          "uses": [
+            "uniform_block_sampling",
+            "random_block_point_update",
+            "AuxiliaryPointIdentity_Eq_5_2_57",
+            "StochasticComponentGradientUpdate_Eq_5_2_85",
+            "StochasticAuxiliaryGradientDefinition_Eq_5_2_86"
+          ],
+          "produces": "First conditional expectation identity in Lemma 5.11."
+        },
+        {
+          "step": 2,
+          "description": "The remaining identities are proved by the same conditioning argument; the point identity uses (5.2.51) and (5.2.57), while the function-value and gradient-difference identities follow from those same point branches.",
+          "ref": "Lemma 5.11 proof",
+          "source_pdf_lines": [
+            15931,
+            15934
+          ],
+          "uses": [
+            "uniform_block_sampling",
+            "random_block_point_update",
+            "AuxiliaryPointIdentity_Eq_5_2_57",
+            "previous_step:1"
+          ],
+          "produces": "All conditional expectation identities displayed in Lemma 5.11."
+        }
+      ]
+    },
+    {
+      "name": "GradientStateCharacterization_Eq_5_2_64",
+      "ref": "Eq. (5.2.64)",
+      "statement_math": "y_i^t=\\begin{cases}0,&\\text{if the }i\\text{-th block has never been updated for the first }t\\text{ iterations},\\\\ \\nabla f_i(x_i^t),&\\text{o.w.}\\end{cases}",
+      "role": "Identifies exactly when the stale-gradient error is nonzero in Proposition 5.6.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Since RGEM starts from x_i^0=x^0 and y_i^0=0 and only updates the sampled pair (x_{i_t}^t,y_{i_t}^t) according to (5.2.51) and (5.2.52), the component y_i^t is either still zero or the gradient at its latest stored block point.",
+          "ref": "Eq. (5.2.64)",
+          "source_pdf_lines": [
+            15290,
+            15301
+          ],
+          "math": "y_i^t=\\begin{cases}0,&\\text{if the }i\\text{-th block has never been updated for the first }t\\text{ iterations},\\\\ \\nabla f_i(x_i^t),&\\text{o.w.}\\end{cases}",
+          "uses": [
+            "initialization",
+            "random_block_point_update",
+            "component_gradient_update"
+          ],
+          "produces": "Two-case description of y_i^t."
+        }
+      ]
+    },
+    {
+      "name": "OptimalityCondition_Problem_5_2_1",
+      "ref": "p. 263, before Eq. (5.2.60)",
+      "statement_math": "\\text{for }x^*\\text{ an optimal solution of (5.2.1) (or (5.2.5)) and any feasible solution }x\\text{ of (5.2.1) (or (5.2.5)),}\\quad \\langle \\nabla f(x^*)+\\mu\\nu'(x^*),x-x^*\\rangle\\ge 0",
+      "role": "Names the first-order optimality condition for an optimal solution x^* of (5.2.1), invoked in the proof of (5.2.60).",
+      "proof": [
+        {
+          "step": 1,
+          "description": "The paper invokes this as the optimality condition of x^* after declaring x^* an optimal solution of (5.2.1) (or (5.2.5)) and x any feasible solution of the same problem.",
+          "ref": "p. 263, before Eq. (5.2.60)",
+          "source_pdf_lines": [
+            15203,
+            15207
+          ],
+          "math": "\\langle \\nabla f(x^*)+\\mu\\nu'(x^*),x-x^*\\rangle\\ge 0",
+          "uses": [
+            "optimal_solution_feasible_context"
+          ],
+          "produces": "First-order optimality condition for x^*."
+        }
+      ]
+    },
+    {
+      "name": "QNonnegativity_Optimality_Pre_5_2_60",
+      "ref": "p. 263, before Eq. (5.2.60)",
+      "statement_math": "\\text{if we fix the second argument at }x^*\\text{, an optimal solution of (5.2.1) (or (5.2.5)), then for any feasible solution }x\\text{ of (5.2.1) (or (5.2.5)),}\\quad Q(x, x^*)\\ge \\langle \\nabla f(x^*)+\\mu\\nu'(x^*),x-x^*\\rangle\\ge 0.",
+      "role": "Records the separate pre-(5.2.60) nonnegativity/optimality fact used in Proposition 5.6 before applying the Q-comparison inequality.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Fix the second argument of Q at x^*, with x^* an optimal solution, take x to be any feasible solution, and use the convexity of \\nu inside the definition of Q to obtain the first inequality in the displayed chain.",
+          "ref": "p. 263, before Eq. (5.2.60)",
+          "source_pdf_lines": [
+            15203,
+            15207
+          ],
+          "math": "Q(x, x^*)\\ge \\langle \\nabla f(x^*)+\\mu\\nu'(x^*),x-x^*\\rangle",
+          "uses": [
+            "nu_strong_convexity",
+            "QDefinition_Eq_5_2_59",
+            "optimal_solution_feasible_context"
+          ],
+          "produces": "Q(x,x^*) is bounded below by the first-order optimality expression."
+        },
+        {
+          "step": 2,
+          "description": "Apply the optimality condition of x^* to the first-order expression, giving the nonnegativity conclusion printed before (5.2.60).",
+          "ref": "p. 263, before Eq. (5.2.60)",
+          "source_pdf_lines": [
+            15203,
+            15208
+          ],
+          "math": "Q(x, x^*)\\ge \\langle \\nabla f(x^*)+\\mu\\nu'(x^*),x-x^*\\rangle\\ge 0.",
+          "uses": [
+            "OptimalityCondition_Problem_5_2_1",
+            "previous_step:1"
+          ],
+          "produces": "Q(x,x^*)\\ge 0 for any feasible solution x."
+        }
+      ]
+    },
+    {
+      "name": "QComparison_Eq_5_2_60",
+      "ref": "Eq. (5.2.60)",
+      "statement_math": "\\text{if we fix the second argument at }x^*\\text{, an optimal solution of (5.2.1) (or (5.2.5)), for any feasible solution }x\\text{ of (5.2.1) (or (5.2.5)) and observing that }f\\text{ is smooth,}\\quad Q(x, x^*)=f(x^*)+\\langle \\nabla f(x^*),x-x^*\\rangle+\\mu\\nu(x)-\\psi(x^*)\\ge -\\frac{L_f}{2}\\|x-x^*\\|^2+\\psi(x)-\\psi(x^*).",
+      "role": "Converts the auxiliary gap Q into objective suboptimality plus a smoothness residual.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "After fixing the second argument at x^*, convexity of \\nu and the optimality condition of x^* give nonnegativity of Q(x, x^*) for any feasible solution x.",
+          "ref": "p. 263, before Eq. (5.2.60)",
+          "source_pdf_lines": [
+            15203,
+            15208
+          ],
+          "math": "Q(x, x^*)\\ge \\langle \\nabla f(x^*)+\\mu\\nu'(x^*),x-x^*\\rangle\\ge 0.",
+          "uses": [
+            "nu_strong_convexity",
+            "QDefinition_Eq_5_2_59",
+            "OptimalityCondition_Problem_5_2_1",
+            "optimal_solution_feasible_context"
+          ],
+          "produces": "Q(x, x^*)\\ge 0 for any feasible solution x."
+        },
+        {
+          "step": 2,
+          "description": "Use smoothness of f at x^* and rearrange the definition of Q.",
+          "ref": "Eq. (5.2.60)",
+          "source_pdf_lines": [
+            15209,
+            15214
+          ],
+          "math": "Q(x, x^*)=f(x^*)+\\langle \\nabla f(x^*),x-x^*\\rangle+\\mu\\nu(x)-\\psi(x^*)\\ge -\\frac{L_f}{2}\\|x-x^*\\|^2+\\psi(x)-\\psi(x^*).",
+          "uses": [
+            "average_smoothness",
+            "QDefinition_Eq_5_2_59",
+            "optimal_solution_feasible_context"
+          ],
+          "produces": "Gap-to-objective comparison (5.2.60)."
+        }
+      ]
+    },
+    {
+      "name": "PrimalUpdateFeasibility_Eq_5_2_50",
+      "ref": "Eq. (5.2.50)",
+      "statement_math": "x^t=\\operatorname*{argmin}_{x\\in X}\\left\\{\\left\\langle \\frac{1}{m}\\sum_{i=1}^m\\tilde y_i^t,x\\right\\rangle+\\mu\\nu(x)+\\eta_tV(x^{t-1},x)\\right\\}.",
+      "role": "Supplies that each primal RGEM update x^t lies in X because the minimization in (5.2.50) is over x\\in X.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "The RGEM primal update is defined as an argmin over X; Algorithm 5.4 supplies the initial feasible point x^0\\in X for the recursive prox update.",
+          "ref": "Eq. (5.2.50)",
+          "source_pdf_lines": [
+            15091,
+            15094
+          ],
+          "math": "x^t=\\operatorname*{argmin}_{x\\in X}\\left\\{\\left\\langle \\frac{1}{m}\\sum_{i=1}^m\\tilde y_i^t,x\\right\\rangle+\\mu\\nu(x)+\\eta_tV(x^{t-1},x)\\right\\}.",
+          "uses": [
+            "RGEMNonnegativeInputParameters_Algorithm_5_4",
+            "prox_mapping_computable"
+          ],
+          "produces": "For each t, the primal iterate x^t produced by (5.2.50) belongs to X."
+        }
+      ]
+    },
+    {
+      "name": "WeightedOutputDefinition_Eq_5_2_53",
+      "ref": "Eq. (5.2.53)",
+      "statement_math": "\\text{For some }\\theta_t>0,\\ t=1,\\ldots,k,\\ \\text{set }\\underline{x}^k:=\\left(\\sum_{t=1}^k\\theta_t\\right)^{-1}\\sum_{t=1}^k\\theta_tx^t.",
+      "role": "Names the weighted output definition used for Jensen/convexity steps in Proposition 5.6 and Theorem 5.4.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Algorithm 5.4 requires positive output weights before defining the weighted output.",
+          "ref": "Algorithm 5.4 output",
+          "source_pdf_lines": [
+            15106,
+            15106
+          ],
+          "math": "\\theta_t>0,\\quad t=1,\\ldots,k.",
+          "uses": [
+            "output_weight_positivity"
+          ],
+          "produces": "The output weights are strictly positive, so \\sum_{t=1}^k\\theta_t is positive."
+        },
+        {
+          "step": 2,
+          "description": "This is the paper definition of the RGEM weighted output.",
+          "ref": "Eq. (5.2.53)",
+          "source_pdf_lines": [
+            15108,
+            15112
+          ],
+          "math": "\\underline{x}^k:=\\left(\\sum_{t=1}^k\\theta_t\\right)^{-1}\\sum_{t=1}^k\\theta_tx^t.",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "Weighted output definition (5.2.53)."
+        }
+      ]
+    },
+    {
+      "name": "GradientExtrapolationDefinition_Eq_5_2_49",
+      "ref": "Eq. (5.2.49)",
+      "statement_math": "\\tilde y_i^t=y_i^{t-1}+\\alpha_t(y_i^{t-1}-y_i^{t-2}),\\quad \\forall i.",
+      "role": "Names the extrapolated-gradient definition used when combining (5.2.71) with (5.2.72) in Proposition 5.6.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "This is the paper definition of the extrapolated gradient in RGEM.",
+          "ref": "Eq. (5.2.49)",
+          "source_pdf_lines": [
+            15088,
+            15090
+          ],
+          "math": "\\tilde y_i^t=y_i^{t-1}+\\alpha_t(y_i^{t-1}-y_i^{t-2}),\\quad \\forall i.",
+          "uses": [],
+          "produces": "Extrapolated-gradient definition (5.2.49)."
+        }
+      ]
+    },
+    {
+      "name": "AuxiliaryPointIdentity_Eq_5_2_57",
+      "ref": "Eq. (5.2.57)",
+      "statement_math": "\\hat x_i^t=(1+\\tau_t)^{-1}(x^t+\\tau_tx_i^{t-1}).",
+      "role": "Used in Lemma 5.10 and Proposition 5.6 to rewrite x^t through the auxiliary point and the stored component point.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "This is the paper definition of the auxiliary point before Lemma 5.9.",
+          "ref": "Eq. (5.2.57)",
+          "source_pdf_lines": [
+            15161,
+            15164
+          ],
+          "math": "\\hat x_i^t=(1+\\tau_t)^{-1}(x^t+\\tau_tx_i^{t-1}).",
+          "uses": [],
+          "produces": "Auxiliary point identity (5.2.57)."
+        }
+      ]
+    },
+    {
+      "name": "AuxiliaryGradientIdentity_Eq_5_2_58",
+      "ref": "Eq. (5.2.58)",
+      "statement_math": "\\hat y_i^t=\\nabla f_i(\\hat x_i^t).",
+      "role": "Supplies the identification of the auxiliary gradient used in Lemma 5.9 and in the convexity/smoothness chain of Proposition 5.6.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "This is the paper definition of the auxiliary gradient before Lemma 5.9.",
+          "ref": "Eq. (5.2.58)",
+          "source_pdf_lines": [
+            15161,
+            15165
+          ],
+          "math": "\\hat y_i^t=\\nabla f_i(\\hat x_i^t).",
+          "uses": [],
+          "produces": "Auxiliary gradient identity (5.2.58)."
+        }
+      ]
+    },
+    {
+      "name": "QDefinition_Eq_5_2_59",
+      "ref": "Eq. (5.2.59)",
+      "statement_math": "Q(\\underline{x},x):=\\langle \\nabla f(x),\\underline{x}-x\\rangle+\\mu\\nu(\\underline{x})-\\mu\\nu(x).",
+      "role": "Defines the Q-gap expanded in Lemma 5.10 and converted to objective gap in Theorem 5.4.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "This is the paper definition of Q.",
+          "ref": "Eq. (5.2.59)",
+          "source_pdf_lines": [
+            15197,
+            15201
+          ],
+          "math": "Q(\\underline{x},x):=\\langle \\nabla f(x),\\underline{x}-x\\rangle+\\mu\\nu(\\underline{x})-\\mu\\nu(x).",
+          "uses": [],
+          "produces": "Definition of Q in (5.2.59)."
+        }
+      ]
+    },
+    {
+      "name": "WeightedQRecursion_Lemma_5_10",
+      "ref": "Lemma 5.10",
+      "statement_math": "\\text{Let }x^t\\text{ be defined in (5.2.50), and }x\\in X\\text{ be any feasible solution of (5.2.1) or (5.2.5). Suppose that }\\tau_t\\text{ in RGEM satisfy }\\theta_t(m(1+\\tau_t)-1)=\\theta_{t-1}m(1+\\tau_{t-1}),\\ t=2,\\ldots,k,\\text{ for some }\\theta_t\\ge 0,\\ t=1,\\ldots,k.\\text{ Then, we have }\\sum_{t=1}^k\\theta_t\\mathbb{E}[Q(x^t,x)]\\le \\theta_k(1+\\tau_k)\\sum_{i=1}^m\\mathbb{E}[f_i(x_i^k)]+\\sum_{t=1}^k\\theta_t\\mathbb{E}[\\mu\\nu(x^t)-\\psi(x)]-\\theta_1(m(1+\\tau_1)-1)[\\langle x^0-x,\\nabla f(x)\\rangle+f(x)].",
+      "role": "Relates the sum of Q gaps to final component values and initial data; it is invoked inside Proposition 5.6.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Expand Q(x^t,x) using its definition and rewrite x^t through \\hat x_i^t and x_i^{t-1} via (5.2.57).",
+          "ref": "Lemma 5.10 proof",
+          "source_pdf_lines": [
+            15232,
+            15243
+          ],
+          "math": "Q(x^t,x)=\\frac{1}{m}\\sum_{i=1}^m\\langle \\nabla f_i(x),x^t-x\\rangle+\\mu\\nu(x^t)-\\mu\\nu(x)=\\frac{1}{m}\\sum_{i=1}^m[(1+\\tau_t)\\langle \\hat x_i^t-x,\\nabla f_i(x)\\rangle-\\tau_t\\langle x_i^{t-1}-x,\\nabla f_i(x)\\rangle]+\\mu\\nu(x^t)-\\mu\\nu(x).",
+          "uses": [
+            "QDefinition_Eq_5_2_59",
+            "AuxiliaryPointIdentity_Eq_5_2_57"
+          ],
+          "produces": "Per-iteration Q decomposition."
+        },
+        {
+          "step": 2,
+          "description": "Take expectation over the sampled indices and apply the deterministic conditional block identities. The source proof prints a reference to Lemma 5.11 at this step; in the deterministic RGEM context, the applicable identities are those of Lemma 5.9 with y_i^t defined by (5.2.52) and \\hat y_i^t by (5.2.58).",
+          "ref": "Lemma 5.10 proof",
+          "source_pdf_lines": [
+            15246,
+            15253
+          ],
+          "math": "\\mathbb{E}[Q(x^t,x)]=\\sum_{i=1}^m\\mathbb{E}[(1+\\tau_t)\\langle x_i^t-x,\\nabla f_i(x)\\rangle-((1+\\tau_t)-\\frac{1}{m})\\langle x_i^{t-1}-x,\\nabla f_i(x)\\rangle]+\\mathbb{E}[\\mu\\nu(x^t)-\\mu\\nu(x)].",
+          "uses": [
+            "ConditionalBlockExpectation_Lemma_5_9",
+            "previous_step:1"
+          ],
+          "produces": "Expected one-step Q relation; the paper's printed Lemma 5.11 cross-reference is treated as the deterministic conditional-expectation identity recorded in Lemma 5.9."
+        },
+        {
+          "step": 3,
+          "description": "Multiply the one-step relation by \\theta_t and sum from t=1 to k.",
+          "ref": "Lemma 5.10 proof",
+          "source_pdf_lines": [
+            15255,
+            15264
+          ],
+          "math": "\\sum_{t=1}^k\\theta_t\\mathbb{E}[Q(x^t,x)]=\\sum_{i=1}^m\\sum_{t=1}^k\\mathbb{E}[\\theta_t(1+\\tau_t)\\langle x_i^t-x,\\nabla f_i(x)\\rangle-\\theta_t((1+\\tau_t)-\\frac{1}{m})\\langle x_i^{t-1}-x,\\nabla f_i(x)\\rangle]+\\sum_{t=1}^k\\theta_t\\mathbb{E}[\\mu\\nu(x^t)-\\mu\\nu(x)].",
+          "uses": [
+            "previous_step:2"
+          ],
+          "produces": "Summed pre-telescope relation."
+        },
+        {
+          "step": 4,
+          "description": "Use (5.2.61) and x_i^0=x^0 to telescope the scalar weights.",
+          "ref": "Eq. (5.2.63)",
+          "source_pdf_lines": [
+            15266,
+            15271
+          ],
+          "math": "\\sum_{t=1}^k\\theta_t=\\sum_{t=2}^k[\\theta_tm(1+\\tau_t)-\\theta_{t-1}m(1+\\tau_{t-1})]+\\theta_1=\\theta_km(1+\\tau_k)-\\theta_1(m(1+\\tau_1)-1).",
+          "uses": [
+            "proposition_weight_condition_5_2_61"
+          ],
+          "produces": "Scalar sum identity (5.2.63)."
+        },
+        {
+          "step": 5,
+          "description": "Use the same weight condition to telescope each component's inner-product contribution; the terminal initial term is written with x^0 because Algorithm 5.4 initializes x_i^0=x^0.",
+          "ref": "Lemma 5.10 proof",
+          "source_pdf_lines": [
+            15272,
+            15275
+          ],
+          "math": "\\sum_{t=1}^k[\\theta_t(1+\\tau_t)\\langle x_i^t-x,\\nabla f_i(x)\\rangle-\\theta_t((1+\\tau_t)-\\frac{1}{m})\\langle x_i^{t-1}-x,\\nabla f_i(x)\\rangle]=\\theta_k(1+\\tau_k)\\langle x_i^k-x,\\nabla f_i(x)\\rangle-\\theta_1((1+\\tau_1)-\\frac{1}{m})\\langle x^0-x,\\nabla f_i(x)\\rangle.",
+          "uses": [
+            "proposition_weight_condition_5_2_61",
+            "initialization",
+            "previous_step:3"
+          ],
+          "produces": "Component telescope with x_i^0 replaced by x^0."
+        },
+        {
+          "step": 6,
+          "description": "Combine the telescopes and use convexity of each f_i to replace inner products at the final component points by f_i(x_i^k)-f_i(x).",
+          "ref": "Lemma 5.10 proof",
+          "source_pdf_lines": [
+            15277,
+            15287
+          ],
+          "math": "\\sum_{t=1}^k\\theta_t\\mathbb{E}[Q(x^t,x)]\\le \\theta_k(1+\\tau_k)\\sum_{i=1}^m\\mathbb{E}[f_i(x_i^k)-f_i(x)]-\\theta_1(m(1+\\tau_1)-1)\\langle x^0-x,\\nabla f(x)\\rangle+\\sum_{t=1}^k\\theta_t\\mathbb{E}[\\mu\\nu(x^t)-\\mu\\nu(x)].",
+          "uses": [
+            "component_convexity",
+            "previous_step:4",
+            "previous_step:5"
+          ],
+          "produces": "Pre-final Lemma 5.10 inequality."
+        },
+        {
+          "step": 7,
+          "description": "Use (5.2.63) to collect the f(x) and \\mu\\nu(x) terms into \\psi(x), giving (5.2.62).",
+          "ref": "Eq. (5.2.62)",
+          "source_pdf_lines": [
+            15288,
+            15289
+          ],
+          "math": "\\sum_{t=1}^k\\theta_t\\mathbb{E}[Q(x^t,x)]\\le \\theta_k(1+\\tau_k)\\sum_{i=1}^m\\mathbb{E}[f_i(x_i^k)]+\\sum_{t=1}^k\\theta_t\\mathbb{E}[\\mu\\nu(x^t)-\\psi(x)]-\\theta_1(m(1+\\tau_1)-1)[\\langle x^0-x,\\nabla f(x)\\rangle+f(x)].",
+          "uses": [
+            "previous_step:4",
+            "previous_step:6"
+          ],
+          "produces": "Lemma 5.10 bound (5.2.62)."
+        }
+      ]
+    },
+    {
+      "name": "GeneralRGEMBound_Proposition_5_6",
+      "ref": "Proposition 5.6",
+      "statement_math": "\\text{Let }x^t\\text{ and }\\underline{x}^k\\text{ be defined as in (5.2.50) and (5.2.53), respectively, and }x^*\\text{ be an optimal solution of (5.2.1). Let }\\sigma_0\\text{ be defined in (5.2.56), and suppose that }\\{\\eta_t\\},\\{\\tau_t\\},\\text{ and }\\{\\alpha_t\\}\\text{ in RGEM satisfy }\\theta_t(m(1+\\tau_t)-1)=\\theta_{t-1}m(1+\\tau_{t-1}),\\quad t=2,\\ldots,k,\\quad \\text{and }m\\theta_{t-1}=\\alpha_t\\theta_t,\\quad t\\ge 2,\\quad \\theta_t\\eta_t\\le \\theta_{t-1}(\\mu+\\eta_{t-1}),\\quad t\\ge 2,\\quad 2\\alpha_tL_i\\le m\\tau_{t-1}\\eta_t,\\quad i=1,\\ldots,m;\\ t\\ge 2,\\quad 4L_i\\le \\tau_k(\\mu+\\eta_k),\\quad i=1,\\ldots,m,\\quad \\text{for some }\\theta_t\\ge 0,\\ t=1,\\ldots,k.\\text{ Then, for any }k\\ge 1,\\text{ we have }\\mathbb{E}[Q(\\underline{x}^k,x^*)]\\le \\left(\\sum_{t=1}^k\\theta_t\\right)^{-1}\\widetilde\\Delta_{0,\\sigma_0},\\quad \\mathbb{E}[V(x^k,x^*)]\\le \\frac{2\\widetilde\\Delta_{0,\\sigma_0}}{\\theta_k(\\mu+\\eta_k)},\\quad \\text{where }\\widetilde\\Delta_{0,\\sigma_0}:=\\theta_1(m(1+\\tau_1)-1)(\\psi(x^0)-\\psi^*)+\\theta_1\\eta_1V(x^0,x^*)+\\sum_{t=1}^k\\left(\\frac{m-1}{m}\\right)^{t-1}\\frac{2\\theta_t\\alpha_{t+1}}{m\\eta_{t+1}}\\sigma_0^2.",
+      "role": "The general strongly convex RGEM estimate specialized by Theorem 5.4.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Apply Lemma 3.5 to the prox update (5.2.50).",
+          "ref": "Eq. (5.2.71)",
+          "source_pdf_lines": [
+            15335,
+            15341
+          ],
+          "math": "\\left\\langle x^t-x,\\frac{1}{m}\\sum_{i=1}^m\\tilde y_i^t\\right\\rangle+\\mu\\nu(x^t)-\\mu\\nu(x)\\le \\eta_tV(x^{t-1},x)-(\\mu+\\eta_t)V(x^t,x)-\\eta_tV(x^{t-1},x^t).",
+          "uses": [
+            "ProxMappingInequality_Lemma_3_5"
+          ],
+          "produces": "One-step prox descent inequality (5.2.71)."
+        },
+        {
+          "step": 2,
+          "description": "Use the definition of \\psi in (5.2.1), convexity of f_i, and \\hat y_i^t=\\nabla f_i(\\hat x_i^t) to get the first displayed inequality in the derivation of (5.2.72).",
+          "ref": "Proposition 5.6 proof, first line toward (5.2.72)",
+          "source_pdf_lines": [
+            15344,
+            15351
+          ],
+          "math": "\\frac{1+\\tau_t}{m}\\sum_{i=1}^m f_i(\\hat x_i^t)+\\mu\\nu(x^t)-\\psi(x)\\le \\frac{1+\\tau_t}{m}\\sum_{i=1}^m f_i(\\hat x_i^t)+\\mu\\nu(x^t)-\\mu\\nu(x)-\\frac{1}{m}\\sum_{i=1}^m[f_i(\\hat x_i^t)+\\langle \\hat y_i^t,x-\\hat x_i^t\\rangle].",
+          "uses": [
+            "component_convexity",
+            "AuxiliaryGradientIdentity_Eq_5_2_58"
+          ],
+          "produces": "First convexity inequality in the displayed derivation of (5.2.72)."
+        },
+        {
+          "step": 3,
+          "description": "Apply the definition of \\hat x_i^t in (5.2.57) to rewrite the previous display as the equality line printed in the proof.",
+          "ref": "Proposition 5.6 proof, equality in (5.2.72) derivation",
+          "source_pdf_lines": [
+            15353,
+            15356
+          ],
+          "math": "=\\frac{\\tau_t}{m}\\sum_{i=1}^m[f_i(\\hat x_i^t)+\\langle \\hat y_i^t,x_i^{t-1}-\\hat x_i^t\\rangle]+\\mu\\nu(x^t)-\\mu\\nu(x)-\\frac{1}{m}\\sum_{i=1}^m\\langle \\hat y_i^t,x-x^t\\rangle.",
+          "uses": [
+            "AuxiliaryPointIdentity_Eq_5_2_57",
+            "previous_step:2"
+          ],
+          "produces": "Equality line in the displayed derivation of (5.2.72)."
+        },
+        {
+          "step": 4,
+          "description": "Apply the smoothness inequality of Lemma 5.8, with \\hat y_i^t=\\nabla f_i(\\hat x_i^t), to obtain the final displayed inequality (5.2.72).",
+          "ref": "Eq. (5.2.72)",
+          "source_pdf_lines": [
+            15358,
+            15367
+          ],
+          "math": "\\frac{1+\\tau_t}{m}\\sum_{i=1}^mf_i(\\hat x_i^t)+\\mu\\nu(x^t)-\\psi(x)\\le -\\frac{\\tau_t}{2m}\\sum_{i=1}^m\\frac{1}{L_i}\\|\\nabla f_i(\\hat x_i^t)-\\nabla f_i(x_i^{t-1})\\|_*^2+\\frac{\\tau_t}{m}\\sum_{i=1}^mf_i(x_i^{t-1})+\\mu\\nu(x^t)-\\mu\\nu(x)-\\frac{1}{m}\\sum_{i=1}^m\\langle \\hat y_i^t,x-x^t\\rangle.",
+          "uses": [
+            "SmoothnessGradientGap_Lemma_5_8",
+            "AuxiliaryGradientIdentity_Eq_5_2_58",
+            "previous_step:3"
+          ],
+          "produces": "Component inequality (5.2.72)."
+        },
+        {
+          "step": 5,
+          "description": "Combine (5.2.71) with (5.2.72) and substitute \\tilde y_i^t from (5.2.49), producing the non-expected inequality printed before the expectation step.",
+          "ref": "Proposition 5.6 proof, inequality before expectation",
+          "source_pdf_lines": [
+            15368,
+            15386
+          ],
+          "math": "\\frac{1+\\tau_t}{m}\\sum_{i=1}^m f_i(\\hat x_i^t)+\\mu\\nu(x^t)-\\psi(x)\\le -\\frac{\\tau_t}{2m}\\sum_{i=1}^m\\frac{1}{L_i}\\|\\nabla f_i(\\hat x_i^t)-\\nabla f_i(x_i^{t-1})\\|_*^2+\\frac{\\tau_t}{m}\\sum_{i=1}^m f_i(x_i^{t-1})+\\left\\langle x^t-x,\\frac{1}{m}\\sum_{i=1}^m[\\hat y_i^t-y_i^{t-1}-\\alpha_t(y_i^{t-1}-y_i^{t-2})]\\right\\rangle+\\eta_tV(x^{t-1},x)-(\\mu+\\eta_t)V(x^t,x)-\\eta_tV(x^{t-1},x^t).",
+          "uses": [
+            "GradientExtrapolationDefinition_Eq_5_2_49",
+            "previous_step:1",
+            "previous_step:4"
+          ],
+          "produces": "Non-expected one-step inequality before applying Lemma 5.11."
+        },
+        {
+          "step": 6,
+          "description": "Take expectation over {i_1,\\ldots,i_k} on both sides of the preceding relation and apply the deterministic conditional block identities to replace the auxiliary quantities by the sampled-block terms. The source proof prints a reference to Lemma 5.11 here; for Algorithm 5.4 with y_i^t from (5.2.52) and \\hat y_i^t from (5.2.58), this JSON uses Lemma 5.9 as the formal dependency.",
+          "ref": "Proposition 5.6 proof, one-step expected inequality",
+          "source_pdf_lines": [
+            15389,
+            15406
+          ],
+          "math": "\\mathbb{E}[(1+\\tau_t)\\sum_{i=1}^mf_i(x_i^t)+\\mu\\nu(x^t)-\\psi(x)]\\le \\mathbb{E}\\left[-\\frac{\\tau_t}{2L_{i_t}}\\|\\nabla f_{i_t}(x_{i_t}^t)-\\nabla f_{i_t}(x_{i_t}^{t-1})\\|_*^2+\\frac{1}{m}\\sum_{i=1}^m(m(1+\\tau_t)-1)f_i(x_i^{t-1})\\right]+\\mathbb{E}\\left\\{\\left\\langle x^t-x,\\frac{1}{m}\\sum_{i=1}^m[m(y_i^t-y_i^{t-1})-\\alpha_t(y_i^{t-1}-y_i^{t-2})]\\right\\rangle\\right\\}+\\mathbb{E}[\\eta_tV(x^{t-1},x)-(\\mu+\\eta_t)V(x^t,x)-\\eta_tV(x^{t-1},x^t)].",
+          "uses": [
+            "ConditionalBlockExpectation_Lemma_5_9",
+            "previous_step:5"
+          ],
+          "produces": "Expected one-step RGEM inequality."
+        },
+        {
+          "step": 7,
+          "description": "Multiply the expected one-step inequality by \\theta_t and sum from t=1 to k.",
+          "ref": "Eq. (5.2.73)",
+          "source_pdf_lines": [
+            15408,
+            15432
+          ],
+          "math": "\\sum_{t=1}^k\\sum_{i=1}^m\\mathbb{E}[\\theta_t(1+\\tau_t)f_i(x_i^t)]+\\sum_{t=1}^k\\theta_t\\mathbb{E}[\\mu\\nu(x^t)-\\psi(x)]\\le \\sum_{t=1}^k\\theta_t\\mathbb{E}\\left[-\\frac{\\tau_t}{2L_{i_t}}\\|\\nabla f_{i_t}(x_{i_t}^t)-\\nabla f_{i_t}(x_{i_t}^{t-1})\\|_*^2+\\sum_{i=1}^m((1+\\tau_t)-\\frac{1}{m})f_i(x_i^{t-1})\\right]+\\sum_{t=1}^k\\sum_{i=1}^m\\theta_t\\mathbb{E}\\left[\\left\\langle x^t-x,y_i^t-y_i^{t-1}-\\frac{\\alpha_t}{m}(y_i^{t-1}-y_i^{t-2})\\right\\rangle\\right]+\\sum_{t=1}^k\\theta_t\\mathbb{E}[\\eta_tV(x^{t-1},x)-(\\mu+\\eta_t)V(x^t,x)-\\eta_tV(x^{t-1},x^t)].",
+          "uses": [
+            "previous_step:6"
+          ],
+          "produces": "Summed inequality (5.2.73)."
+        },
+        {
+          "step": 8,
+          "description": "Rewrite the double gradient-extrapolation sum using y_i^{-1}=y_i^0 and the fact that only the sampled component y_{i_t}^t is updated by (5.2.52). This is the first displayed equality before applying (5.2.65).",
+          "ref": "Proposition 5.6 proof, updated-block expansion",
+          "source_pdf_lines": [
+            15434,
+            15457
+          ],
+          "math": "\\sum_{t=1}^k\\sum_{i=1}^m\\theta_t\\langle x^t-x,y_i^t-y_i^{t-1}-\\frac{\\alpha_t}{m}(y_i^{t-1}-y_i^{t-2})\\rangle=\\sum_{t=1}^k\\left[\\theta_t\\langle x^t-x,y_{i_t}^t-y_{i_t}^{t-1}\\rangle-\\frac{\\theta_t\\alpha_t}{m}\\langle x^{t-1}-x,y_{i_{t-1}}^{t-1}-y_{i_{t-1}}^{t-2}\\rangle\\right]-\\sum_{t=2}^k\\frac{\\theta_t\\alpha_t}{m}\\langle x^t-x^{t-1},y_{i_{t-1}}^{t-1}-y_{i_{t-1}}^{t-2}\\rangle.",
+          "uses": [
+            "initialization",
+            "component_gradient_update",
+            "GradientStateCharacterization_Eq_5_2_64",
+            "previous_step:7"
+          ],
+          "produces": "Updated-block expansion of the gradient-extrapolation inner-product sum before the (5.2.65) telescope."
+        },
+        {
+          "step": 9,
+          "description": "Apply (5.2.65) to the updated-block expansion so the first bracketed sum telescopes to the terminal stochastic-gradient term.",
+          "ref": "Proposition 5.6 proof, (5.2.65) gradient telescope",
+          "source_pdf_lines": [
+            15458,
+            15463
+          ],
+          "math": "\\sum_{t=1}^k\\sum_{i=1}^m\\theta_t\\langle x^t-x,y_i^t-y_i^{t-1}-\\frac{\\alpha_t}{m}(y_i^{t-1}-y_i^{t-2})\\rangle=\\theta_k\\langle x^k-x,y_{i_k}^k-y_{i_k}^{k-1}\\rangle-\\sum_{t=2}^k\\frac{\\theta_t\\alpha_t}{m}\\langle x^t-x^{t-1},y_{i_{t-1}}^{t-1}-y_{i_{t-1}}^{t-2}\\rangle.",
+          "uses": [
+            "proposition_alpha_theta_condition_5_2_65",
+            "previous_step:8"
+          ],
+          "produces": "Telescope for the stochastic gradient extrapolation term."
+        },
+        {
+          "step": 10,
+          "description": "Use (5.2.66) to telescope the Bregman terms from the summed inequality.",
+          "ref": "Proposition 5.6 proof, (5.2.66) Bregman telescope",
+          "source_pdf_lines": [
+            15465,
+            15470
+          ],
+          "math": "\\sum_{t=1}^k\\theta_t[\\eta_tV(x^{t-1},x)-(\\mu+\\eta_t)V(x^t,x)]\\le \\theta_1\\eta_1V(x^0,x)-\\theta_k(\\mu+\\eta_k)V(x^k,x).",
+          "uses": [
+            "proposition_eta_condition_5_2_66",
+            "previous_step:7"
+          ],
+          "produces": "Bregman telescope used in deriving (5.2.74)."
+        },
+        {
+          "step": 11,
+          "description": "Use (5.2.61) and x_i^0=x^0 to telescope the component-function weights from the summed inequality.",
+          "ref": "Proposition 5.6 proof, (5.2.61) component-function telescope",
+          "source_pdf_lines": [
+            15471,
+            15477
+          ],
+          "math": "\\sum_{t=1}^k\\sum_{i=1}^m\\theta_t(1+\\tau_t)f_i(x_i^t)-\\theta_t((1+\\tau_t)-\\frac{1}{m})f_i(x_i^{t-1})=\\sum_{i=1}^m\\theta_k(1+\\tau_k)f_i(x_i^k)-\\theta_1(m(1+\\tau_1)-1)f(x^0).",
+          "uses": [
+            "initialization",
+            "proposition_weight_condition_5_2_61",
+            "random_block_point_update",
+            "previous_step:7"
+          ],
+          "produces": "Component-function telescope used in deriving (5.2.74)."
+        },
+      {
+        "step": 12,
+        "description": "Record the nonnegativity fact named in the paper before (5.2.74), allowing the initial adjacent Bregman term to be dropped in the combined inequality.",
+        "ref": "Proposition 5.6 proof, nonnegative initial Bregman term",
+          "source_pdf_lines": [
+            15480,
+            15480
+          ],
+        "math": "\\theta_1\\eta_1V(x^0,x^1)\\ge 0.",
+        "uses": [
+          "RGEMNonnegativeInputParameters_Algorithm_5_4",
+          "proposition_output_weight_nonnegativity",
+          "ProxLowerBound_Eq_5_2_8"
+        ],
+        "produces": "The term \\theta_1\\eta_1V(x^0,x^1) can be omitted from the right-hand side when deriving (5.2.74)."
+      },
+        {
+          "step": 13,
+          "description": "Combine (5.2.73), the gradient telescope, the Bregman telescope, the component-function telescope, the state characterization (5.2.64), and nonnegativity of \\theta_1\\eta_1V(x^0,x^1) to obtain the residual inequality (5.2.74).",
+          "ref": "Eq. (5.2.74)",
+          "source_pdf_lines": [
+            15480,
+            15503
+          ],
+          "math": "\\theta_k(1+\\tau_k)\\sum_{i=1}^m\\mathbb{E}[f_i(x_i^k)]+\\sum_{t=1}^k\\theta_t\\mathbb{E}[\\mu\\nu(x^t)-\\psi(x)]+\\frac{\\theta_k(\\mu+\\eta_k)}{2}\\mathbb{E}[V(x^k,x)]\\le \\theta_1(m(1+\\tau_1)-1)f(x^0)+\\theta_1\\eta_1V(x^0,x)+\\sum_{t=2}^k\\mathbb{E}\\left[-\\frac{\\theta_t\\alpha_t}{m}\\langle x^t-x^{t-1},y_{i_{t-1}}^{t-1}-y_{i_{t-1}}^{t-2}\\rangle-\\theta_t\\eta_tV(x^{t-1},x^t)-\\frac{\\theta_{t-1}\\tau_{t-1}}{2L_{i_{t-1}}}\\|y_{i_{t-1}}^{t-1}-\\nabla f_{i_{t-1}}(x_{i_{t-1}}^{t-2})\\|_*^2\\right]+\\theta_k\\mathbb{E}\\left[\\langle x^k-x,y_{i_k}^k-y_{i_k}^{k-1}\\rangle-\\frac{\\mu+\\eta_k}{2}V(x^k,x)-\\frac{\\tau_k}{2L_{i_k}}\\|y_{i_k}^k-\\nabla f_{i_k}(x_{i_k}^{k-1})\\|_*^2\\right].",
+          "uses": [
+            "GradientStateCharacterization_Eq_5_2_64",
+            "previous_step:7",
+            "previous_step:9",
+            "previous_step:10",
+            "previous_step:11",
+            "previous_step:12"
+          ],
+          "produces": "Residual inequality (5.2.74)."
+        },
+        {
+          "step": 14,
+          "description": "Apply the Bregman lower bound (5.2.8) to replace V(x^{t-1},x^t) by a squared norm in the accumulated residual.",
+          "ref": "Proposition 5.6 proof, (5.2.8) residual step",
+          "source_pdf_lines": [
+            15506,
+            15534
+          ],
+          "math": "\\sum_{t=2}^k\\left[-\\frac{\\theta_t\\alpha_t}{m}\\langle x^t-x^{t-1},y_{i_{t-1}}^{t-1}-y_{i_{t-1}}^{t-2}\\rangle-\\theta_t\\eta_tV(x^{t-1},x^t)-\\frac{\\theta_{t-1}\\tau_{t-1}}{2L_{i_{t-1}}}\\|y_{i_{t-1}}^{t-1}-\\nabla f_{i_{t-1}}(x_{i_{t-1}}^{t-2})\\|_*^2\\right]\\le \\sum_{t=2}^k\\left[-\\frac{\\theta_t\\alpha_t}{m}\\langle x^t-x^{t-1},y_{i_{t-1}}^{t-1}-y_{i_{t-1}}^{t-2}\\rangle-\\frac{\\theta_t\\eta_t}{2}\\|x^{t-1}-x^t\\|^2-\\frac{\\theta_{t-1}\\tau_{t-1}}{2L_{i_{t-1}}}\\|y_{i_{t-1}}^{t-1}-\\nabla f_{i_{t-1}}(x_{i_{t-1}}^{t-2})\\|_*^2\\right].",
+          "uses": [
+            "ProxLowerBound_Eq_5_2_8",
+            "previous_step:13"
+          ],
+          "produces": "Residual sum after the (5.2.8) replacement."
+        },
+        {
+          "step": 15,
+          "description": "Apply b\\langle u,v\\rangle-a\\|v\\|^2/2\\le b^2\\|u\\|^2/(2a) to the inner product and squared step term.",
+          "ref": "Proposition 5.6 proof, Young inequality residual step",
+          "source_pdf_lines": [
+            15535,
+            15542
+          ],
+          "math": "\\sum_{t=2}^k\\left[-\\frac{\\theta_t\\alpha_t}{m}\\langle x^t-x^{t-1},y_{i_{t-1}}^{t-1}-y_{i_{t-1}}^{t-2}\\rangle-\\frac{\\theta_t\\eta_t}{2}\\|x^{t-1}-x^t\\|^2-\\frac{\\theta_{t-1}\\tau_{t-1}}{2L_{i_{t-1}}}\\|y_{i_{t-1}}^{t-1}-\\nabla f_{i_{t-1}}(x_{i_{t-1}}^{t-2})\\|_*^2\\right]\\le \\sum_{t=2}^k\\left[\\frac{\\theta_{t-1}\\alpha_t}{2m\\eta_t}\\|y_{i_{t-1}}^{t-1}-y_{i_{t-1}}^{t-2}\\|_*^2-\\frac{\\theta_{t-1}\\tau_{t-1}}{2L_{i_{t-1}}}\\|y_{i_{t-1}}^{t-1}-\\nabla f_{i_{t-1}}(x_{i_{t-1}}^{t-2})\\|_*^2\\right].",
+          "uses": [
+            "proposition_alpha_theta_condition_5_2_65",
+            "previous_step:14"
+          ],
+          "produces": "Residual sum after Young inequality."
+        },
+        {
+          "step": 16,
+          "description": "Apply \\|a+b\\|^2\\le 2\\|a\\|^2+2\\|b\\|^2 to split y_{i_{t-1}}^{t-1}-y_{i_{t-1}}^{t-2} through the stored gradient.",
+          "ref": "Proposition 5.6 proof, norm-square split residual step",
+          "source_pdf_lines": [
+            15543,
+            15550
+          ],
+          "math": "\\sum_{t=2}^k\\left[\\frac{\\theta_{t-1}\\alpha_t}{2m\\eta_t}\\|y_{i_{t-1}}^{t-1}-y_{i_{t-1}}^{t-2}\\|_*^2-\\frac{\\theta_{t-1}\\tau_{t-1}}{2L_{i_{t-1}}}\\|y_{i_{t-1}}^{t-1}-\\nabla f_{i_{t-1}}(x_{i_{t-1}}^{t-2})\\|_*^2\\right]\\le \\sum_{t=2}^k\\left[\\left(\\frac{\\theta_{t-1}\\alpha_t}{m\\eta_t}-\\frac{\\theta_{t-1}\\tau_{t-1}}{2L_{i_{t-1}}}\\right)\\|y_{i_{t-1}}^{t-1}-\\nabla f_{i_{t-1}}(x_{i_{t-1}}^{t-2})\\|_*^2+\\frac{\\theta_{t-1}\\alpha_t}{m\\eta_t}\\|\\nabla f_{i_{t-1}}(x_{i_{t-1}}^{t-2})-y_{i_{t-1}}^{t-2}\\|_*^2\\right].",
+          "uses": [
+            "previous_step:15"
+          ],
+          "produces": "Residual sum before applying (5.2.67)."
+        },
+        {
+          "step": 17,
+          "description": "Apply condition (5.2.67) to discard the nonpositive coefficient and keep only the previous stale-gradient error.",
+          "ref": "Proposition 5.6 proof, consequence of (5.2.67)",
+          "source_pdf_lines": [
+            15555,
+            15574
+          ],
+          "math": "\\sum_{t=2}^k\\left[-\\frac{\\theta_t\\alpha_t}{m}\\langle x^t-x^{t-1},y_{i_{t-1}}^{t-1}-y_{i_{t-1}}^{t-2}\\rangle-\\theta_t\\eta_tV(x^{t-1},x^t)-\\frac{\\theta_{t-1}\\tau_{t-1}}{2L_{i_{t-1}}}\\|y_{i_{t-1}}^{t-1}-\\nabla f_{i_{t-1}}(x_{i_{t-1}}^{t-2})\\|_*^2\\right]\\le \\sum_{t=2}^k\\frac{\\theta_{t-1}\\alpha_t}{m\\eta_t}\\|\\nabla f_{i_{t-1}}(x_{i_{t-1}}^{t-2})-y_{i_{t-1}}^{t-2}\\|_*^2.",
+          "uses": [
+            "proposition_cross_condition_5_2_67",
+            "previous_step:16"
+          ],
+          "produces": "Bounded accumulated residuals."
+        },
+        {
+          "step": 18,
+          "description": "Apply terminal condition (5.2.68) to the final residual and then use m\\eta_{k+1}\\le \\alpha_{k+1}(\\mu+\\eta_k), induced by (5.2.65) and (5.2.66).",
+          "ref": "Proposition 5.6 proof, terminal residual",
+          "source_pdf_lines": [
+            15577,
+            15595
+          ],
+          "math": "\\theta_k\\left[\\langle x^k-x,y_{i_k}^k-y_{i_k}^{k-1}\\rangle-\\frac{\\mu+\\eta_k}{2}V(x^k,x)-\\frac{\\tau_k}{2L_{i_k}}\\|y_{i_k}^k-\\nabla f_{i_k}(x_{i_k}^{k-1})\\|_*^2\\right]\\le \\frac{2\\theta_k}{\\mu+\\eta_k}\\|\\nabla f_{i_k}(x_{i_k}^{k-1})-y_{i_k}^{k-1}\\|_*^2\\le \\frac{2\\theta_k\\alpha_{k+1}}{m\\eta_{k+1}}\\|\\nabla f_{i_k}(x_{i_k}^{k-1})-y_{i_k}^{k-1}\\|_*^2.",
+          "uses": [
+            "proposition_terminal_condition_5_2_68",
+            "proposition_alpha_theta_condition_5_2_65",
+            "proposition_eta_condition_5_2_66",
+            "previous_step:13"
+          ],
+          "produces": "Terminal stale-gradient residual bound."
+        },
+        {
+          "step": 19,
+          "description": "Combine the residual inequality (5.2.74), the accumulated residual bound, and the terminal residual bound to get (5.2.75).",
+          "ref": "Eq. (5.2.75)",
+          "source_pdf_lines": [
+            15596,
+            15611
+          ],
+          "math": "\\theta_k(1+\\tau_k)\\sum_{i=1}^m\\mathbb{E}[f_i(x_i^k)]+\\sum_{t=1}^k\\theta_t\\mathbb{E}[\\mu\\nu(x^t)-\\psi(x)]+\\frac{\\theta_k(\\mu+\\eta_k)}{2}\\mathbb{E}[V(x^k,x)]\\le \\theta_1(m(1+\\tau_1)-1)f(x^0)+\\theta_1\\eta_1V(x^0,x)+\\sum_{t=1}^k\\frac{2\\theta_t\\alpha_{t+1}}{m\\eta_{t+1}}\\mathbb{E}[\\|\\nabla f_{i_t}(x_{i_t}^{t-1})-y_{i_t}^{t-1}\\|_*^2].",
+          "uses": [
+            "previous_step:13",
+            "previous_step:17",
+            "previous_step:18"
+          ],
+          "produces": "Key pre-stale-error inequality (5.2.75)."
+        },
+        {
+          "step": 20,
+          "description": "Use the two-case state characterization (5.2.64) to identify the stale-gradient error as nonzero only if the sampled block has never been updated.",
+          "ref": "Proposition 5.6 proof, stale-gradient split",
+          "source_pdf_lines": [
+            15614,
+            15628
+          ],
+          "math": "\\|\\nabla f_{i_t}(x_{i_t}^{t-1})-y_{i_t}^{t-1}\\|_*^2=\\begin{cases}\\|\\nabla f_{i_t}(x_{i_t}^{t-1})\\|_*^2,&\\text{no update on the }i_t\\text{-th block until iteration }t,\\\\0,&\\text{o.w.}\\end{cases}",
+          "uses": [
+            "GradientStateCharacterization_Eq_5_2_64"
+          ],
+          "produces": "Two-case stale-gradient error."
+        },
+        {
+          "step": 21,
+          "description": "Define B_{i_t} as the event that the sampled block has never been updated until iteration t; by the point update (5.2.51), on this event x_{i_t}^{t-1}=x^0, so its probability and the initial gradient bound (5.2.56) give the displayed estimate.",
+          "ref": "Proposition 5.6 proof, stale-gradient expectation bound",
+          "source_pdf_lines": [
+            15629,
+            15638
+          ],
+          "math": "\\mathbb{E}[\\|\\nabla f_{i_t}(x_{i_t}^{t-1})-y_{i_t}^{t-1}\\|_*^2]=\\mathbb{E}[\\|\\nabla f_{i_t}(x_{i_t}^{t-1})\\|_*^2\\mid B_{i_t}]\\operatorname{Prob}\\{B_{i_t}\\}\\le \\left(\\frac{m-1}{m}\\right)^{t-1}\\sigma_0^2.",
+          "uses": [
+            "initial_gradient_bound",
+            "uniform_block_sampling",
+            "random_block_point_update",
+            "previous_step:20"
+          ],
+          "produces": "Expected stale-gradient error bound."
+        },
+      {
+        "step": 22,
+        "description": "Set x=x^*, using the feasible optimal-solution context for the comparator x^*. Insert the stale-gradient bound into (5.2.75), then apply Lemma 5.10 with the recurrence hypothesis supplied by (5.2.61). Combine this with nonnegativity of Q(\\cdot,x^*), where the nonnegativity side uses that each x^t is feasible by (5.2.50) and that the Proposition 5.6 weights satisfy \\theta_t\\ge0.",
+        "ref": "Proposition 5.6 proof, pre-Delta inequality",
+        "source_pdf_lines": [
+          15638,
+          15652
+        ],
+        "math": "0\\le \\sum_{t=1}^k\\theta_t\\mathbb{E}[Q(x^t,x^*)]\\le \\theta_1(m(1+\\tau_1)-1)[f(x^0)-\\langle x^0-x^*,\\nabla f(x^*)\\rangle-f(x^*)]+\\theta_1\\eta_1V(x^0,x^*)+\\sum_{t=1}^k\\left(\\frac{m-1}{m}\\right)^{t-1}\\frac{2\\theta_t\\alpha_{t+1}}{m\\eta_{t+1}}\\sigma_0^2-\\frac{\\theta_k(\\mu+\\eta_k)}{2}\\mathbb{E}[V(x^k,x^*)].",
+        "uses": [
+          "WeightedQRecursion_Lemma_5_10",
+          "proposition_weight_condition_5_2_61",
+          "optimal_solution_feasible_context",
+          "QNonnegativity_Optimality_Pre_5_2_60",
+          "PrimalUpdateFeasibility_Eq_5_2_50",
+          "proposition_output_weight_nonnegativity",
+          "previous_step:19",
+          "previous_step:21"
+        ],
+        "produces": "Pre-\\widetilde\\Delta inequality."
+      },
+        {
+          "step": 23,
+          "description": "Use the printed optimality relation to replace the linearized f-term by the regularizer difference.",
+          "ref": "Proposition 5.6 proof, optimality relation",
+          "source_pdf_lines": [
+            15654,
+            15655
+          ],
+          "math": "-\\langle x^0-x^*,\\nabla f(x^*)\\rangle\\le \\langle x^0-x^*,\\mu\\nu'(x^*)\\rangle\\le \\mu\\nu(x^0)-\\mu\\nu(x^*).",
+          "uses": [
+            "OptimalityCondition_Problem_5_2_1",
+            "nu_strong_convexity",
+            "previous_step:22"
+          ],
+          "produces": "The bracketed term in previous_step:22 is bounded by \\psi(x^0)-\\psi(x^*)."
+        },
+      {
+        "step": 24,
+        "description": "Before invoking convexity of Q(\\cdot,x^*), record the admissible weighted-average structure: Proposition 5.6 supplies \\theta_t\\ge0, Algorithm 5.4's output clause supplies positive output weights for (5.2.53), and the normalized denominator is therefore positive.",
+        "ref": "Proposition 5.6 hypothesis and Eq. (5.2.53)",
+        "source_pdf_lines": [
+          15106,
+          15318
+        ],
+        "uses": [
+          "proposition_output_weight_nonnegativity",
+          "output_weight_positivity",
+          "WeightedOutputDefinition_Eq_5_2_53"
+        ],
+        "produces": "\\underline{x}^k is the normalized convex combination of the points x^t with admissible weights, so Jensen/convexity may compare Q(\\underline{x}^k,x^*) to (\\sum_{t=1}^k\\theta_t)^{-1}\\sum_{t=1}^k\\theta_t Q(x^t,x^*)."
+      },
+      {
+        "step": 25,
+        "description": "Use convexity of Q(\\cdot,x^*) and the weighted output definition to pass from the weighted Q-sum to Q(\\underline{x}^k,x^*), giving the first result in (5.2.69).",
+        "ref": "Eq. (5.2.69), first inequality",
+        "source_pdf_lines": [
+          15320,
+            15324
+          ],
+          "math": "\\mathbb{E}[Q(\\underline{x}^k,x^*)]\\le \\left(\\sum_{t=1}^k\\theta_t\\right)^{-1}\\widetilde\\Delta_{0,\\sigma_0}.",
+          "uses": [
+            "WeightedOutputDefinition_Eq_5_2_53",
+            "QDefinition_Eq_5_2_59",
+            "nu_strong_convexity",
+            "previous_step:22",
+            "previous_step:23",
+            "previous_step:24"
+          ],
+          "produces": "First bound in (5.2.69)."
+        },
+        {
+          "step": 26,
+          "description": "Drop the nonnegative Q-sum from the pre-Delta inequality and rearrange to bound the final Bregman distance.",
+          "ref": "Proposition 5.6 proof, second result in (5.2.69)",
+          "source_pdf_lines": [
+            15656,
+            15667
+          ],
+          "math": "\\frac{\\theta_k(\\mu+\\eta_k)}{2}\\mathbb{E}[V(x^k,x^*)]\\le \\theta_1(m(1+\\tau_1)-1)[\\psi(x^0)-\\psi(x^*)]+\\theta_1\\eta_1V(x^0,x^*)+\\sum_{t=1}^k\\left(\\frac{m-1}{m}\\right)^{t-1}\\frac{2\\theta_t\\alpha_{t+1}}{m\\eta_{t+1}}\\sigma_0^2.",
+          "uses": [
+            "previous_step:22",
+            "previous_step:23"
+          ],
+          "produces": "\\mathbb{E}[V(x^k,x^*)]\\le 2\\widetilde\\Delta_{0,\\sigma_0}/(\\theta_k(\\mu+\\eta_k))."
+        }
+      ]
+    }
+  ]
+}

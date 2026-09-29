@@ -1,0 +1,2683 @@
+{
+  "algorithm": "PAGE",
+  "full_name": "ProbAbilistic Gradient Estimator for Nonconvex Optimization",
+  "source_reference": "Li, Bao, Zhang, Richtarik, PAGE: A Simple and Optimal Probabilistic Gradient Estimator for Nonconvex Optimization, ICML 2021 (Theorem 1)",
+  "setup": {
+    "problem": {
+      "math": "\\min_{x\\in\\mathbb{R}^d} f(x)",
+      "ref": "Eq. (1), p. 1",
+      "description": "General differentiable, possibly nonconvex optimization problem."
+    },
+    "variable_space": {
+      "math": "f(x) := \\frac{1}{n}\\sum_{i=1}^n f_i(x)",
+      "ref": "Eq. (2), p. 1"
+    }
+  },
+  "definitions": [
+    {
+      "name": "Delta0_initial_gap",
+      "math": "\\Delta_0 := f(x^0)-f^*",
+      "ref": "Notation, p. 4, PDF lines 317-321",
+      "description": "Paper notation for the initial objective gap: \"We will write Delta_0 := f(x^0)-f^*\"."
+    },
+    {
+      "name": "f_star_minimum_value",
+      "math": "f^* := \\min_{x\\in\\mathbb{R}^d} f(x)",
+      "ref": "Notation, p. 4, PDF lines 317-321",
+      "description": "Paper notation for the optimal value: \"f^* := min_{x in R^d} f(x)\"."
+    }
+  ],
+  "assumptions": [
+    {
+      "name": "Bounded_variance",
+      "math": "\\mathbb{E}_i[\\|\\nabla f_i(x)-\\nabla f(x)\\|^2]\\le \\sigma^2,\\quad \\forall x\\in\\mathbb{R}^d.",
+      "ref": "Assumption 1 / Eq. (4), p. 4",
+      "parameters": [
+        "\\sigma",
+        "f_i",
+        "f",
+        "x"
+      ]
+    },
+    {
+      "name": "Average_L_smoothness",
+      "math": "\\mathbb{E}_i[\\|\\nabla f_i(x)-\\nabla f_i(y)\\|^2]\\le L^2\\|x-y\\|^2,\\quad \\forall x,y\\in\\mathbb{R}^d.",
+      "ref": "Assumption 2 / Eq. (5), p. 4",
+      "parameters": [
+        "L",
+        "f_i",
+        "x",
+        "y"
+      ]
+    },
+    {
+      "name": "PL_condition",
+      "math": "\\|\\nabla f(x)\\|^2\\ge 2\\mu(f(x)-f^*),\\quad \\forall x\\in\\mathbb{R}^d.",
+      "ref": "Assumption 3 / Eq. (6), p. 4",
+      "parameters": [
+        "\\mu",
+        "f",
+        "f^*",
+        "x"
+      ]
+    },
+    {
+      "name": "PAGE_input",
+      "math": "\\text{initial point }x^0,\\text{ stepsize }\\eta,\\text{ minibatch size }b,\\ b'<b,\\text{ probability }\\{p_t\\}\\in(0,1]",
+      "ref": "Algorithm 1 input, p. 4",
+      "parameters": [
+        "x^0",
+        "\\eta",
+        "b",
+        "b'",
+        "p_t"
+      ]
+    },
+    {
+      "name": "PAGE_initial_estimator",
+      "math": "g^0=\\frac{1}{b}\\sum_{i\\in I}\\nabla f_i(x^0)\\quad\\text{// }I\\text{ denotes random minibatch samples with }|I|=b",
+      "ref": "Algorithm 1, Line 1, p. 4",
+      "parameters": [
+        "g^0",
+        "I",
+        "b",
+        "x^0"
+      ]
+    },
+    {
+      "name": "PAGE_primal_update",
+      "math": "x^{t+1}=x^t-\\eta g^t",
+      "ref": "Algorithm 1, Line 3, p. 4",
+      "parameters": [
+        "x^t",
+        "x^{t+1}",
+        "\\eta",
+        "g^t"
+      ]
+    },
+    {
+      "name": "PAGE_gradient_estimator",
+      "math": "g^{t+1}=\\begin{cases}\\frac{1}{b}\\sum_{i\\in I}\\nabla f_i(x^{t+1})&\\text{with probability }p_t,\\\\ g^t+\\frac{1}{b'}\\sum_{i\\in I'}(\\nabla f_i(x^{t+1})-\\nabla f_i(x^t))&\\text{with probability }1-p_t.\\end{cases}",
+      "ref": "Algorithm 1, Line 4, p. 4",
+      "parameters": [
+        "g^{t+1}",
+        "p_t",
+        "b",
+        "b'",
+        "I",
+        "I'"
+      ]
+    },
+    {
+      "name": "PAGE_output",
+      "math": "\\hat{x}_T\\text{ chosen uniformly from }\\{x^t\\}_{t\\in[T]}",
+      "ref": "Algorithm 1 output, p. 4",
+      "parameters": [
+        "\\hat{x}_T",
+        "T",
+        "x^t"
+      ]
+    },
+    {
+      "name": "Theorem1_parameter_schedule",
+      "math": "\\eta\\le \\frac{1}{L\\left(1+\\sqrt{\\frac{1-p}{pb'}}\\right)},\\quad b=n,\\quad b'<b,\\quad p_t\\equiv p\\in(0,1]",
+      "ref": "Theorem 1 / Eq. (20), pp. 12, 14",
+      "parameters": [
+        "\\eta",
+        "L",
+        "p",
+        "b",
+        "b'",
+        "n"
+      ]
+    },
+    {
+      "name": "Lemma2_f_is_L_smooth",
+      "math": "\\text{Suppose that function }f\\text{ is }L\\text{-smooth}",
+      "ref": "Lemma 2 statement, p. 12, PDF line 947",
+      "parameters": [
+        "f",
+        "L"
+      ],
+      "scope": "Local premise of Lemma 2, recorded here as a legal named dependency; it is not an additional global assumption of Theorem 1."
+    },
+    {
+      "name": "Lemma2_update_definition",
+      "math": "\\text{let }x^{t+1}:=x^t-\\eta g^t",
+      "ref": "Lemma 2 statement, p. 12, PDF line 947",
+      "parameters": [
+        "x^t",
+        "x^{t+1}",
+        "\\eta",
+        "g^t"
+      ],
+      "scope": "Local update premise of Lemma 2, recorded here as a legal named dependency."
+    },
+    {
+      "name": "Lemma2_gradient_estimator_and_stepsize",
+      "math": "\\text{for any }g^t\\in\\mathbb{R}^d\\text{ and }\\eta>0",
+      "ref": "Lemma 2 statement, p. 12, PDF line 947",
+      "parameters": [
+        "g^t",
+        "\\eta"
+      ],
+      "scope": "Local domain premise of Lemma 2, recorded here as a legal named dependency."
+    }
+  ],
+  "algorithm_spec": {
+    "initialization": {
+      "math": "g^0=\\frac{1}{b}\\sum_{i\\in I}\\nabla f_i(x^0)\\quad\\text{// }I\\text{ denotes random minibatch samples with }|I|=b",
+      "ref": "Algorithm 1, Line 1, p. 4"
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "primal_update",
+        "math": "x^{t+1}=x^t-\\eta g^t",
+        "ref": "Algorithm 1, Line 3, p. 4"
+      },
+      {
+        "step": 2,
+        "name": "probabilistic_gradient_estimator",
+        "math": "g^{t+1}=\\begin{cases}\\frac{1}{b}\\sum_{i\\in I}\\nabla f_i(x^{t+1})&\\text{with probability }p_t,\\\\ g^t+\\frac{1}{b'}\\sum_{i\\in I'}(\\nabla f_i(x^{t+1})-\\nabla f_i(x^t))&\\text{with probability }1-p_t.\\end{cases}",
+        "ref": "Algorithm 1, Line 4, p. 4"
+      }
+    ],
+    "output": {
+      "math": "\\hat{x}_T\\text{ chosen uniformly from }\\{x^t\\}_{t\\in[T]}",
+      "ref": "Algorithm 1 output, p. 4",
+      "type": "random iterate"
+    },
+    "parameters": [
+      {
+        "name": "stepsize",
+        "math": "\\eta\\le \\frac{1}{L\\left(1+\\sqrt{\\frac{1-p}{pb'}}\\right)}",
+        "ref": "Theorem 1 / Eq. (20), pp. 12, 14"
+      },
+      {
+        "name": "finite_sum_minibatch",
+        "math": "b=n,\\quad b'<b",
+        "ref": "Theorem 1, p. 12"
+      },
+      {
+        "name": "constant_probability",
+        "math": "p_t\\equiv p\\in(0,1]",
+        "ref": "Theorem 1, p. 12"
+      },
+      {
+        "name": "optimal_probability",
+        "math": "p_t\\equiv \\frac{b'}{b+b'}",
+        "ref": "Section 2.1, p. 4; Corollary 2, pp. 14-15"
+      }
+    ]
+  },
+  "cited_theorems": [
+    {
+      "name_in_source": "Jensen's inequality",
+      "name_in_lean": "jensen_inequality_for_convex_function",
+      "source_reference": "Standard inequality invoked in PAGE, Appendix A, Proof of Lemma 1 and Proof of Theorem 1",
+      "statement_math": "g(\\mathbb{E}[x])\\le \\mathbb{E}[g(x)]\\text{ for a convex function }g",
+      "ref": "Proof of Lemma 1 after Eq. (9), p. 12, PDF line 923; Proof of Theorem 1 after Eq. (24), p. 14, PDF lines 1151-1156",
+      "source_pdf_lines": [
+        923,
+        923
+      ],
+      "main_paper_citation_context": [
+        {
+          "quote": "where the first inequality uses Jensen's inequality: g(E[x]) <= E[g(x)] for a convex function g.",
+          "source_pdf_lines": [
+            923,
+            923
+          ],
+          "role": "Justifies the first inequality in Eq. (9), replacing the squared norm of an expected gradient difference by the expectation of squared norms."
+        },
+        {
+          "quote": "then (23) and Jensen's inequality imply",
+          "source_pdf_lines": [
+            1151,
+            1156
+          ],
+          "role": "Justifies passing from the expected squared output-gradient bound in Eq. (23) to the expected gradient norm guarantee."
+        }
+      ],
+      "proof_in_source": "cited",
+      "role_for_main": "Provides the convex-expectation inequality explicitly invoked in Lemma 1 and again in the final output conversion of Theorem 1."
+    },
+    {
+      "name_in_source": "Cauchy-Schwarz inequality",
+      "name_in_lean": "cauchy_schwarz_inner_product_bound",
+      "source_reference": "Standard inequality invoked in PAGE, Appendix A, Proof of Lemma 1",
+      "statement_math": "\\langle u,v\\rangle\\le \\|u\\|\\|v\\|",
+      "ref": "Proof of Lemma 1 after Eq. (10), p. 12, PDF line 943",
+      "source_pdf_lines": [
+        943,
+        943
+      ],
+      "main_paper_citation_context": [
+        {
+          "quote": "where the first inequality uses Cauchy-Schwarz inequality <u, v> <= ||u||||v||.",
+          "source_pdf_lines": [
+            943,
+            943
+          ],
+          "role": "Justifies bounding the integral inner product in the proof of Eq. (10) by the product of gradient-difference and displacement norms."
+        }
+      ],
+      "proof_in_source": "cited",
+      "role_for_main": "Provides the inner-product norm bound explicitly invoked in Lemma 1's derivation of the smoothness descent inequality."
+    }
+  ],
+  "main_theorem": {
+    "statement_math": "\\text{Suppose that Assumption 2 holds. Choose the stepsize }\\eta\\le \\frac{1}{L\\left(1+\\sqrt{\\frac{1-p}{pb'}}\\right)},\\text{ minibatch size }b=n,\\text{ secondary minibatch size }b'<b,\\text{ and probability }p_t\\equiv p\\in(0,1].\\text{ Then the number of iterations performed by PAGE sufficient for finding an }\\epsilon\\text{-approximate solution (i.e., }\\mathbb{E}[\\|\\nabla f(\\hat{x}_T)\\|]\\le \\epsilon\\text{) of nonconvex finite-sum problem (2) can be bounded by }T=\\frac{2\\Delta_0L}{\\epsilon^2}\\left(1+\\sqrt{\\frac{1-p}{pb'}}\\right).\\text{ Moreover, the number of stochastic gradient computations (i.e., gradient complexity) is }\\#\\mathrm{grad}=b+T(pb+(1-p)b')=b+\\frac{2\\Delta_0L}{\\epsilon^2}\\left(1+\\sqrt{\\frac{1-p}{pb'}}\\right)(pb+(1-p)b').",
+    "rate": "Theorem 1 gives T = (2 Delta_0 L / epsilon^2)(1 + sqrt((1-p)/(p b'))) iterations and gradient complexity b + T(pb + (1-p)b'); Corollary 2 chooses p=b'/(b+b') and b'<=sqrt(b) to obtain O(n + sqrt(n)/epsilon^2).",
+    "measure": "Expected gradient norm E[||nabla f(xhat_T)||] for the random output iterate.",
+    "proof": [
+      {
+        "step": 1,
+        "description": "From Assumption 2 and Lemma 1, f is L-smooth. Applying Lemma 2 to the PAGE update x^{t+1}:=x^t-eta g^t gives the one-step descent inequality.",
+        "ref": "Eq. (14), p. 12",
+        "source_pdf_lines": [
+          1014,
+          1019
+        ],
+        "math": "f(x^{t+1})\\le f(x^t)-\\frac{\\eta}{2}\\|\\nabla f(x^t)\\|^2-\\left(\\frac{1}{2\\eta}-\\frac{L}{2}\\right)\\|x^{t+1}-x^t\\|^2+\\frac{\\eta}{2}\\|g^t-\\nabla f(x^t)\\|^2.",
+        "uses": [
+          "Average_L_smoothness",
+          "PAGE_primal_update",
+          "Lemma1_average_smooth_implies_smooth",
+          "Lemma2_descent_with_inexact_gradient"
+        ],
+        "produces": "one_step_descent_14"
+      },
+      {
+        "step": 2,
+        "description": "Invoke Lemma 3 to bound the next estimator error by the old estimator error and the PAGE step length.",
+        "ref": "Eq. (15), p. 13",
+        "source_pdf_lines": [
+          1022,
+          1028
+        ],
+        "math": "\\mathbb{E}[\\|g^{t+1}-\\nabla f(x^{t+1})\\|^2]\\le (1-p_t)\\|g^t-\\nabla f(x^t)\\|^2+\\frac{(1-p_t)L^2}{b'}\\|x^{t+1}-x^t\\|^2.",
+        "uses": [
+          "Theorem1_parameter_schedule",
+          "Lemma3_finite_sum_PAGE_variance_recursion"
+        ],
+        "produces": "variance_recursion_15"
+      },
+      {
+        "step": 3,
+        "description": "Set p_t equiv p, add (14) to eta/(2p) times (15), and take expectation. This is the expanded add-and-scale inequality before like terms are collected.",
+        "ref": "First inequality in Eq. (19), p. 13",
+        "source_pdf_lines": [
+          1089,
+          1104
+        ],
+        "math": "\\mathbb{E}\\left[f(x^{t+1})-f^*+\\frac{\\eta}{2p}\\|g^{t+1}-\\nabla f(x^{t+1})\\|^2\\right]\\le \\mathbb{E}\\left[f(x^t)-f^*-\\frac{\\eta}{2}\\|\\nabla f(x^t)\\|^2-\\left(\\frac{1}{2\\eta}-\\frac{L}{2}\\right)\\|x^{t+1}-x^t\\|^2+\\frac{\\eta}{2}\\|g^t-\\nabla f(x^t)\\|^2\\right]+\\mathbb{E}\\left[\\frac{\\eta}{2p}\\left((1-p)\\|g^t-\\nabla f(x^t)\\|^2+\\frac{(1-p)L^2}{b'}\\|x^{t+1}-x^t\\|^2\\right)\\right].",
+        "uses": [
+          "Theorem1_parameter_schedule",
+          "previous_step:1",
+          "previous_step:2"
+        ],
+        "produces": "expanded_add_scaled_variance_19"
+      },
+      {
+        "step": 4,
+        "description": "Collect the old estimator-error coefficients and the step-norm coefficients in the expanded inequality.",
+        "ref": "Collected form in Eq. (19), p. 13",
+        "source_pdf_lines": [
+          1105,
+          1111
+        ],
+        "math": "\\mathbb{E}\\left[f(x^{t+1})-f^*+\\frac{\\eta}{2p}\\|g^{t+1}-\\nabla f(x^{t+1})\\|^2\\right]\\le\\mathbb{E}\\left[f(x^t)-f^*+\\frac{\\eta}{2p}\\|g^t-\\nabla f(x^t)\\|^2-\\frac{\\eta}{2}\\|\\nabla f(x^t)\\|^2-\\left(\\frac{1}{2\\eta}-\\frac{L}{2}-\\frac{(1-p)\\eta L^2}{2pb'}\\right)\\|x^{t+1}-x^t\\|^2\\right].",
+        "uses": [
+          "previous_step:3"
+        ],
+        "produces": "collected_lyapunov_terms_19"
+      },
+      {
+        "step": 5,
+        "description": "Use the stepsize condition to make the coefficient of ||x^{t+1}-x^t||^2 nonnegative, so the negative step-norm term can be dropped.",
+        "ref": "Last inequality in Eq. (19) and Eq. (20), p. 14",
+        "source_pdf_lines": [
+          1112,
+          1125
+        ],
+        "math": "\\mathbb{E}\\left[f(x^{t+1})-f^*+\\frac{\\eta}{2p}\\|g^{t+1}-\\nabla f(x^{t+1})\\|^2\\right]\\le \\mathbb{E}\\left[f(x^t)-f^*+\\frac{\\eta}{2p}\\|g^t-\\nabla f(x^t)\\|^2-\\frac{\\eta}{2}\\|\\nabla f(x^t)\\|^2\\right],\\quad \\frac{1}{2\\eta}-\\frac{L}{2}-\\frac{(1-p)\\eta L^2}{2pb'}\\ge 0\\quad\\text{by choosing stepsize}\\quad \\eta\\le \\frac{1}{L\\left(1+\\sqrt{\\frac{1-p}{pb'}}\\right)}.",
+        "uses": [
+          "Theorem1_parameter_schedule",
+          "previous_step:4"
+        ],
+        "produces": "lyapunov_descent_19_and_stepsize_coefficient_20"
+      },
+      {
+        "step": 6,
+        "description": "Define the Lyapunov function Phi_t using the function gap and scaled gradient-estimator error.",
+        "ref": "Definition before Eq. (21), p. 14",
+        "source_pdf_lines": [
+          1127,
+          1128
+        ],
+        "math": "\\Phi_t:=f(x^t)-f^*+\\frac{\\eta}{2p}\\|g^t-\\nabla f(x^t)\\|^2",
+        "uses": [
+          "previous_step:5"
+        ],
+        "produces": "Phi_t_definition"
+      },
+      {
+        "step": 7,
+        "description": "Rewrite (19) in terms of Phi_t and Phi_{t+1}.",
+        "ref": "Eq. (21), p. 14",
+        "source_pdf_lines": [
+          1128,
+          1131
+        ],
+        "math": "\\mathbb{E}[\\Phi_{t+1}]\\le \\mathbb{E}[\\Phi_t]-\\frac{\\eta}{2}\\mathbb{E}[\\|\\nabla f(x^t)\\|^2].",
+        "uses": [
+          "previous_step:5",
+          "previous_step:6"
+        ],
+        "produces": "Phi_descent_21"
+      },
+      {
+        "step": 8,
+        "description": "Sum the Lyapunov descent inequality from t=0 to T-1 to telescope the Phi terms.",
+        "ref": "Eq. (22), p. 14",
+        "source_pdf_lines": [
+          1132,
+          1136
+        ],
+        "math": "\\mathbb{E}[\\Phi_T]\\le \\mathbb{E}[\\Phi_0]-\\frac{\\eta}{2}\\sum_{t=0}^{T-1}\\mathbb{E}[\\|\\nabla f(x^t)\\|^2].",
+        "uses": [
+          "previous_step:7"
+        ],
+        "produces": "telescoped_Phi_bound_22"
+      },
+      {
+        "step": 9,
+        "description": "Identify the initial Lyapunov value. Since the theorem sets b=n, Line 1 computes the full gradient g^0=nabla f(x^0), so the estimator-error term in Phi_0 vanishes and the paper writes Phi_0=f(x^0)-f^*=Delta_0.",
+        "ref": "Text before Eq. (23), p. 14",
+        "source_pdf_lines": [
+          1137,
+          1142
+        ],
+        "uses": [
+          "PAGE_initial_estimator",
+          "Theorem1_parameter_schedule",
+          "previous_step:6",
+          "Delta0_initial_gap_identity",
+          "f_star_minimum_value_lower_bound"
+        ],
+        "produces": "initial_lyapunov_equals_Delta0"
+      },
+      {
+        "step": 10,
+        "description": "Use nonnegativity of the terminal Lyapunov value: f(x^T)-f^* is nonnegative by the definition of f^*, and the squared estimator-error term is nonnegative.",
+        "ref": "Between Eq. (22) and Eq. (23), p. 14",
+        "source_pdf_lines": [
+          1132,
+          1145
+        ],
+        "uses": [
+          "previous_step:6",
+          "f_star_minimum_value_lower_bound"
+        ],
+        "produces": "terminal_lyapunov_nonnegative"
+      },
+      {
+        "step": 11,
+        "description": "Drop the nonnegative E[Phi_T] term from the telescoped inequality and substitute Phi_0=Delta_0, deriving the summed squared-gradient bound consumed by the output step.",
+        "ref": "Eq. (22) to Eq. (23), p. 14",
+        "source_pdf_lines": [
+          1132,
+          1145
+        ],
+        "uses": [
+          "previous_step:8",
+          "previous_step:9",
+          "previous_step:10"
+        ],
+        "produces": "\\sum_{t=0}^{T-1}\\mathbb{E}[\\|\\nabla f(x^t)\\|^2]\\le 2\\Delta_0/\\eta"
+      },
+      {
+        "step": 12,
+        "description": "Use the PAGE output rule that \\hat{x}_T is uniformly chosen from \\{x^t\\}_{t\\in[T]} to divide the summed squared-gradient bound by T and obtain (23).",
+        "ref": "Eq. (23), p. 14",
+        "source_pdf_lines": [
+          1137,
+          1145
+        ],
+        "math": "\\mathbb{E}[\\|\\nabla f(\\hat{x}_T)\\|^2]\\le \\frac{2\\Delta_0}{\\eta T}.",
+        "uses": [
+          "PAGE_output",
+          "previous_step:11"
+        ],
+        "produces": "random_output_squared_gradient_bound_23"
+      },
+      {
+        "step": 13,
+        "description": "Set the iteration count using the reciprocal stepsize bound from (20).",
+        "ref": "Eq. (24), p. 14",
+        "source_pdf_lines": [
+          1146,
+          1150
+        ],
+        "math": "T=\\frac{2\\Delta_0}{\\epsilon^2\\eta}\\overset{(20)}{=}\\frac{2\\Delta_0L}{\\epsilon^2}\\left(1+\\sqrt{\\frac{1-p}{pb'}}\\right).",
+        "uses": [
+          "Theorem1_parameter_schedule",
+          "previous_step:5",
+          "previous_step:12"
+        ],
+        "produces": "iteration_bound_24"
+      },
+      {
+        "step": 14,
+        "description": "Apply Jensen's inequality to pass from the second-moment output bound to the expected norm guarantee.",
+        "ref": "Text after Eq. (24), p. 14",
+        "source_pdf_lines": [
+          1151,
+          1156
+        ],
+        "math": "\\mathbb{E}[\\|\\nabla f(\\hat{x}_T)\\|]\\le \\sqrt{\\mathbb{E}[\\|\\nabla f(\\hat{x}_T)\\|^2]}\\le \\sqrt{\\frac{2\\Delta_0}{\\eta T}}=\\epsilon.",
+        "uses": [
+          "Jensen's inequality",
+          "previous_step:12",
+          "previous_step:13"
+        ],
+        "produces": "epsilon_approximate_solution"
+      },
+      {
+        "step": 15,
+        "description": "Combine the iteration bound with the expected number of stochastic gradients per PAGE iteration and include the initial minibatch cost.",
+        "ref": "Eq. (13), p. 12",
+        "source_pdf_lines": [
+          1007,
+          1012
+        ],
+        "math": "\\#\\mathrm{grad}=b+T(pb+(1-p)b')=b+\\frac{2\\Delta_0L}{\\epsilon^2}\\left(1+\\sqrt{\\frac{1-p}{pb'}}\\right)(pb+(1-p)b').",
+        "uses": [
+          "PAGE_initial_estimator",
+          "PAGE_gradient_estimator",
+          "previous_step:13"
+        ],
+        "produces": "gradient_complexity_13"
+      }
+    ],
+    "ref": "Theorem 1 / Eqs. (12)-(13), Appendix A.1, pp. 4, 12-14"
+  },
+  "key_lemmas": [
+    {
+      "name": "Lemma1_average_smooth_implies_smooth",
+      "ref": "Lemma 1 / Eqs. (7)-(8), pp. 11-12",
+      "statement_math": "\\text{If function }f(x):=\\frac{1}{n}\\sum_{i=1}^n f_i(x)\\text{ is average }L\\text{-smooth (see Assumption 2), i.e., if }\\mathbb{E}_i[\\|\\nabla f_i(x)-\\nabla f_i(y)\\|^2]\\le L^2\\|x-y\\|^2,\\ \\forall x,y\\in\\mathbb{R}^d,\\text{ then }f\\text{ is also }L\\text{-smooth, i.e., }\\|\\nabla f(x)-\\nabla f(y)\\|\\le L\\|x-y\\|\\text{ and thus }f(y)\\le f(x)+\\langle\\nabla f(x),y-x\\rangle+\\frac{L}{2}\\|y-x\\|^2,\\ \\forall x,y\\in\\mathbb{R}^d.",
+      "role": "Supplies ordinary L-smoothness of f and the descent upper bound used by Lemma 2 and Theorem 1.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Apply Jensen's inequality to the norm square of the expectation of gradient differences, then use average L-smoothness to obtain L-Lipschitzness of the full gradient.",
+          "ref": "Eq. (9), p. 12",
+          "source_pdf_lines": [
+            913,
+            923
+          ],
+          "math": "\\|\\nabla f(x)-\\nabla f(y)\\|=\\sqrt{\\|\\mathbb{E}_i[\\nabla f_i(x)-\\nabla f_i(y)]\\|^2}\\le \\sqrt{\\mathbb{E}_i[\\|\\nabla f_i(x)-\\nabla f_i(y)\\|^2]}\\overset{(7)}{\\le}\\sqrt{L^2\\|x-y\\|^2}=L\\|x-y\\|.",
+          "uses": [
+            "Jensen's inequality",
+            "Average_L_smoothness"
+          ],
+          "produces": "full_gradient_Lipschitz_9"
+        },
+        {
+          "step": 2,
+          "description": "Represent f(y)-f(x) as the integral of the gradient along the segment from x to y and split off the gradient at x.",
+          "ref": "Displayed chain before Eq. (10), p. 12",
+          "source_pdf_lines": [
+            926,
+            931
+          ],
+          "math": "f(y)=f(x)+\\int_0^1\\langle\\nabla f(x+\\tau(y-x)),y-x\\rangle d\\tau=f(x)+\\langle\\nabla f(x),y-x\\rangle+\\int_0^1\\langle\\nabla f(x+\\tau(y-x))-\\nabla f(x),y-x\\rangle d\\tau.",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "segment_integral_expansion"
+        },
+        {
+          "step": 3,
+          "description": "Bound the integrand using Cauchy-Schwarz.",
+          "ref": "Displayed chain before Eq. (10), p. 12",
+          "source_pdf_lines": [
+            932,
+            934
+          ],
+          "math": "f(y)\\le f(x)+\\langle\\nabla f(x),y-x\\rangle+\\int_0^1\\|\\nabla f(x+\\tau(y-x))-\\nabla f(x)\\|\\|y-x\\|d\\tau.",
+          "uses": [
+            "Cauchy-Schwarz inequality",
+            "previous_step:2"
+          ],
+          "produces": "cauchy_schwarz_integral_bound"
+        },
+        {
+          "step": 4,
+          "description": "Use the L-Lipschitz gradient bound from (9) along the segment and integrate tau from 0 to 1.",
+          "ref": "Eq. (10), p. 12",
+          "source_pdf_lines": [
+            935,
+            941
+          ],
+          "math": "f(y)\\le f(x)+\\langle\\nabla f(x),y-x\\rangle+\\int_0^1 L\\tau\\|y-x\\|^2d\\tau=f(x)+\\langle\\nabla f(x),y-x\\rangle+\\frac{L}{2}\\|y-x\\|^2.",
+          "uses": [
+            "previous_step:1",
+            "previous_step:3"
+          ],
+          "produces": "smoothness_descent_8"
+        }
+      ]
+    },
+    {
+      "name": "Lemma2_descent_with_inexact_gradient",
+      "ref": "Lemma 2 / Eq. (11), p. 12",
+      "statement_math": "\\text{Suppose that function }f\\text{ is }L\\text{-smooth and let }x^{t+1}:=x^t-\\eta g^t.\\text{ Then for any }g^t\\in\\mathbb{R}^d\\text{ and }\\eta>0,\\text{ we have }f(x^{t+1})\\le f(x^t)-\\frac{\\eta}{2}\\|\\nabla f(x^t)\\|^2-\\left(\\frac{1}{2\\eta}-\\frac{L}{2}\\right)\\|x^{t+1}-x^t\\|^2+\\frac{\\eta}{2}\\|g^t-\\nabla f(x^t)\\|^2.",
+      "local_hypotheses": [
+        {
+          "name": "Lemma2_f_is_L_smooth",
+          "math": "\\text{Suppose that function }f\\text{ is }L\\text{-smooth}",
+          "ref": "Lemma 2 statement, p. 12, PDF line 947"
+        },
+        {
+          "name": "Lemma2_update_definition",
+          "math": "\\text{let }x^{t+1}:=x^t-\\eta g^t",
+          "ref": "Lemma 2 statement, p. 12, PDF line 947"
+        },
+        {
+          "name": "Lemma2_gradient_estimator_and_stepsize",
+          "math": "\\text{for any }g^t\\in\\mathbb{R}^d\\text{ and }\\eta>0",
+          "ref": "Lemma 2 statement, p. 12, PDF line 947"
+        }
+      ],
+      "role": "Converts a PAGE primal update with an inexact gradient estimator into the descent inequality (14).",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Define the exact-gradient comparison point and apply the L-smoothness inequality (8) at y=x^{t+1}. This uses Lemma 2's local hypothesis that f is L-smooth, not the average-smoothness-to-smoothness conversion from Lemma 1.",
+          "ref": "Proof of Lemma 2, p. 12",
+          "source_pdf_lines": [
+            954,
+            957
+          ],
+          "math": "\\bar{x}^{t+1}:=x^t-\\eta\\nabla f(x^t),\\quad f(x^{t+1})\\overset{(8)}{\\le}f(x^t)+\\langle\\nabla f(x^t),x^{t+1}-x^t\\rangle+\\frac{L}{2}\\|x^{t+1}-x^t\\|^2.",
+          "uses": [
+            "Lemma2_f_is_L_smooth"
+          ],
+          "produces": "smoothness_applied_to_xtplus1"
+        },
+        {
+          "step": 2,
+          "description": "Split the inner product into the estimator error part and the estimator part while preserving the upper-bound chain from the preceding line.",
+          "ref": "Proof of Lemma 2, p. 12",
+          "source_pdf_lines": [
+            958,
+            960
+          ],
+          "math": "f(x^{t+1})\\le f(x^t)+\\langle\\nabla f(x^t)-g^t,x^{t+1}-x^t\\rangle+\\langle g^t,x^{t+1}-x^t\\rangle+\\frac{L}{2}\\|x^{t+1}-x^t\\|^2.",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "inner_product_split"
+        },
+        {
+          "step": 3,
+          "description": "Use x^{t+1}=x^t-eta g^t to rewrite the estimator inner product as a negative squared step length.",
+          "ref": "Proof of Lemma 2, p. 12",
+          "source_pdf_lines": [
+            961,
+            963
+          ],
+          "math": "f(x^{t+1})\\le f(x^t)+\\langle\\nabla f(x^t)-g^t,-\\eta g^t\\rangle-\\left(\\frac{1}{\\eta}-\\frac{L}{2}\\right)\\|x^{t+1}-x^t\\|^2.",
+          "uses": [
+            "Lemma2_update_definition",
+            "Lemma2_gradient_estimator_and_stepsize",
+            "previous_step:2"
+          ],
+          "produces": "step_substitution"
+        },
+        {
+          "step": 4,
+          "description": "Expand -eta<gradient error,g^t> by writing g^t as nabla f(x^t) minus the estimator error.",
+          "ref": "Proof of Lemma 2, p. 12",
+          "source_pdf_lines": [
+            964,
+            966
+          ],
+          "math": "f(x^{t+1})\\le f(x^t)+\\eta\\|\\nabla f(x^t)-g^t\\|^2-\\eta\\langle\\nabla f(x^t)-g^t,\\nabla f(x^t)\\rangle-\\left(\\frac{1}{\\eta}-\\frac{L}{2}\\right)\\|x^{t+1}-x^t\\|^2.",
+          "uses": [
+            "previous_step:3"
+          ],
+          "produces": "gradient_error_expansion"
+        },
+        {
+          "step": 5,
+          "description": "Replace the cross term by the comparison-point expression involving x^{t+1}-bar{x}^{t+1} and x^t-bar{x}^{t+1}.",
+          "ref": "Proof of Lemma 2, p. 12",
+          "source_pdf_lines": [
+            967,
+            969
+          ],
+          "math": "f(x^{t+1})\\le f(x^t)+\\eta\\|\\nabla f(x^t)-g^t\\|^2-\\frac{1}{\\eta}\\langle x^{t+1}-\\bar{x}^{t+1},x^t-\\bar{x}^{t+1}\\rangle-\\left(\\frac{1}{\\eta}-\\frac{L}{2}\\right)\\|x^{t+1}-x^t\\|^2.",
+          "uses": [
+            "Lemma2_update_definition",
+            "previous_step:1",
+            "previous_step:4"
+          ],
+          "produces": "comparison_point_cross_term"
+        },
+        {
+          "step": 6,
+          "description": "Use the polarization identity to rewrite the comparison-point cross term as a difference of three squared norms.",
+          "ref": "Proof of Lemma 2, p. 12",
+          "source_pdf_lines": [
+            970,
+            975
+          ],
+          "math": "f(x^{t+1})\\le f(x^t)+\\eta\\|\\nabla f(x^t)-g^t\\|^2-\\left(\\frac{1}{\\eta}-\\frac{L}{2}\\right)\\|x^{t+1}-x^t\\|^2-\\frac{1}{2\\eta}\\left(\\|x^{t+1}-\\bar{x}^{t+1}\\|^2+\\|x^t-\\bar{x}^{t+1}\\|^2-\\|x^{t+1}-x^t\\|^2\\right).",
+          "uses": [
+            "previous_step:5"
+          ],
+          "produces": "polarization_identity_form"
+        },
+        {
+          "step": 7,
+          "description": "Substitute x^{t+1}-bar{x}^{t+1}=-eta(g^t-nabla f(x^t)) and x^t-bar{x}^{t+1}=eta nabla f(x^t).",
+          "ref": "Proof of Lemma 2, p. 12",
+          "source_pdf_lines": [
+            976,
+            981
+          ],
+          "math": "f(x^{t+1})\\le f(x^t)+\\eta\\|\\nabla f(x^t)-g^t\\|^2-\\left(\\frac{1}{\\eta}-\\frac{L}{2}\\right)\\|x^{t+1}-x^t\\|^2-\\frac{1}{2\\eta}\\left(\\eta^2\\|\\nabla f(x^t)-g^t\\|^2+\\eta^2\\|\\nabla f(x^t)\\|^2-\\|x^{t+1}-x^t\\|^2\\right).",
+          "uses": [
+            "Lemma2_update_definition",
+            "Lemma2_gradient_estimator_and_stepsize",
+            "previous_step:1",
+            "previous_step:6"
+          ],
+          "produces": "squared_norm_substitution"
+        },
+        {
+          "step": 8,
+          "description": "Collect the coefficients of the true gradient norm, the step norm, and the estimator-error norm to obtain the displayed inequality (11).",
+          "ref": "Eq. (11), p. 12",
+          "source_pdf_lines": [
+            982,
+            985
+          ],
+          "math": "f(x^{t+1})\\le f(x^t)-\\frac{\\eta}{2}\\|\\nabla f(x^t)\\|^2-\\left(\\frac{1}{2\\eta}-\\frac{L}{2}\\right)\\|x^{t+1}-x^t\\|^2+\\frac{\\eta}{2}\\|g^t-\\nabla f(x^t)\\|^2.",
+          "uses": [
+            "previous_step:7"
+          ],
+          "produces": "inexact_gradient_descent_11"
+        }
+      ]
+    },
+    {
+      "name": "Lemma3_finite_sum_PAGE_variance_recursion",
+      "ref": "Lemma 3 / Eq. (15), p. 13",
+      "statement_math": "\\text{Suppose that Assumption 2 holds. If the gradient estimator }g^{t+1}\\text{ is defined in Line 4 of Algorithm 1, then we have }\\mathbb{E}[\\|g^{t+1}-\\nabla f(x^{t+1})\\|^2]\\le (1-p_t)\\|g^t-\\nabla f(x^t)\\|^2+\\frac{(1-p_t)L^2}{b'}\\|x^{t+1}-x^t\\|^2.",
+      "role": "Provides the variance recursion that cancels with the descent inequality in the Lyapunov proof of Theorem 1.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Restate the two-branch PAGE gradient estimator from Algorithm 1.",
+          "ref": "Eq. (16), p. 13",
+          "source_pdf_lines": [
+            1030,
+            1042
+          ],
+          "math": "g^{t+1}=\\begin{cases}\\frac{1}{b}\\sum_{i\\in I}\\nabla f_i(x^{t+1})&\\text{with probability }p_t,\\ g^t+\\frac{1}{b'}\\sum_{i\\in I'}(\\nabla f_i(x^{t+1})-\\nabla f_i(x^t))&\\text{with probability }1-p_t.\\end{cases}",
+          "uses": [
+            "PAGE_gradient_estimator"
+          ],
+          "produces": "estimator_definition_16"
+        },
+        {
+          "step": 2,
+          "description": "Expand the expected squared estimator error according to the two branches in (16).",
+          "ref": "Display before Eq. (17), p. 13",
+          "source_pdf_lines": [
+            1044,
+            1052
+          ],
+          "math": "\\mathbb{E}[\\|g^{t+1}-\\nabla f(x^{t+1})\\|^2]=p_t\\mathbb{E}\\left[\\left\\|\\frac{1}{b}\\sum_{i\\in I}\\nabla f_i(x^{t+1})-\\nabla f(x^{t+1})\\right\\|^2\\right]+(1-p_t)\\mathbb{E}\\left[\\left\\|g^t+\\frac{1}{b'}\\sum_{i\\in I'}(\\nabla f_i(x^{t+1})-\\nabla f_i(x^t))-\\nabla f(x^{t+1})\\right\\|^2\\right].",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "branch_expectation_expansion"
+        },
+        {
+          "step": 3,
+          "description": "Because the finite-sum proof lets b=n, the first branch is the full gradient and its error term vanishes, yielding (17).",
+          "ref": "Eq. (17) and finite-sum note after Eq. (18), p. 13, PDF lines 1044-1057 and 1086-1087",
+          "source_pdf_lines": [
+            1053,
+            1058
+          ],
+          "math": "\\mathbb{E}[\\|g^{t+1}-\\nabla f(x^{t+1})\\|^2]=(1-p_t)\\mathbb{E}\\left[\\left\\|g^t+\\frac{1}{b'}\\sum_{i\\in I'}(\\nabla f_i(x^{t+1})-\\nabla f_i(x^t))-\\nabla f(x^{t+1})\\right\\|^2\\right].",
+          "uses": [
+            "Theorem1_parameter_schedule",
+            "previous_step:2"
+          ],
+          "produces": "full_batch_branch_removed_17"
+        },
+        {
+          "step": 4,
+          "description": "Insert and subtract nabla f(x^t) inside the squared norm.",
+          "ref": "Display after Eq. (17), p. 13",
+          "source_pdf_lines": [
+            1059,
+            1064
+          ],
+          "math": "\\mathbb{E}[\\|g^{t+1}-\\nabla f(x^{t+1})\\|^2]=(1-p_t)\\mathbb{E}\\left[\\left\\|g^t-\\nabla f(x^t)+\\frac{1}{b'}\\sum_{i\\in I'}(\\nabla f_i(x^{t+1})-\\nabla f_i(x^t))-\\nabla f(x^{t+1})+\\nabla f(x^t)\\right\\|^2\\right].",
+          "uses": [
+            "previous_step:3"
+          ],
+          "produces": "insert_subtract_current_gradient"
+        },
+        {
+          "step": 5,
+          "description": "Name the centered minibatch residual from the displayed expression: it is the minibatch average of gradient differences minus the corresponding full finite-sum mean.",
+          "ref": "Display after Eq. (17), p. 13",
+          "source_pdf_lines": [
+            1061,
+            1068
+          ],
+          "uses": [
+            "PAGE_gradient_estimator",
+            "previous_step:4"
+          ],
+          "produces": "R_t:=\\frac{1}{b'}\\sum_{i\\in I'}(\\nabla f_i(x^{t+1})-\\nabla f_i(x^t))-\\nabla f(x^{t+1})+\\nabla f(x^t)"
+        },
+        {
+          "step": 6,
+          "description": "Use the random minibatch sampling in I' to record the centering property consumed in the next displayed equality: conditionally on the iterates and g^t, the residual has zero mean.",
+          "ref": "Display after Eq. (17), p. 13",
+          "source_pdf_lines": [
+            1061,
+            1068
+          ],
+          "uses": [
+            "PAGE_gradient_estimator",
+            "previous_step:5"
+          ],
+          "produces": "\\mathbb{E}_{I'}[R_t\\mid x^t,x^{t+1},g^t]=0"
+        },
+        {
+          "step": 7,
+          "description": "Under the random minibatch I', the centered residual has conditional mean zero, so expanding ||old_error + residual||^2 cancels the cross term and leaves the residual second moment plus the old-error norm.",
+          "ref": "Display after Eq. (17), p. 13",
+          "source_pdf_lines": [
+            1065,
+            1070
+          ],
+          "math": "\\mathbb{E}[\\|g^{t+1}-\\nabla f(x^{t+1})\\|^2]=(1-p_t)\\mathbb{E}\\left[\\left\\|\\frac{1}{b'}\\sum_{i\\in I'}(\\nabla f_i(x^{t+1})-\\nabla f_i(x^t))-\\nabla f(x^{t+1})+\\nabla f(x^t)\\right\\|^2\\right]+(1-p_t)\\|g^t-\\nabla f(x^t)\\|^2.",
+          "uses": [
+            "PAGE_gradient_estimator",
+            "previous_step:4",
+            "previous_step:5",
+            "previous_step:6"
+          ],
+          "produces": "cross_term_cancelled_old_error_split"
+        },
+        {
+          "step": 8,
+          "description": "Rewrite the centered minibatch residual as a b'^{-2} squared norm of the centered sample sum.",
+          "ref": "Display after Eq. (17), p. 13",
+          "source_pdf_lines": [
+            1071,
+            1079
+          ],
+          "math": "\\mathbb{E}[\\|g^{t+1}-\\nabla f(x^{t+1})\\|^2]=\\frac{1-p_t}{(b')^2}\\mathbb{E}\\left[\\left\\|\\sum_{i\\in I'}(\\nabla f_i(x^{t+1})-\\nabla f_i(x^t)-\\nabla f(x^{t+1})+\\nabla f(x^t))\\right\\|^2\\right]+(1-p_t)\\|g^t-\\nabla f(x^t)\\|^2.",
+          "uses": [
+            "previous_step:7"
+          ],
+          "produces": "minibatch_centered_sum_variance"
+        },
+        {
+          "step": 9,
+          "description": "Record the sampling prerequisite behind the following inequality: the random minibatch I' makes the centered summands average to a single-sample second moment with the factor 1/b'.",
+          "ref": "Display before Eq. (18), p. 13",
+          "source_pdf_lines": [
+            1080,
+            1082
+          ],
+          "uses": [
+            "PAGE_gradient_estimator",
+            "previous_step:6",
+            "previous_step:8"
+          ],
+          "produces": "\\frac{1}{(b')^2}\\mathbb{E}\\left[\\left\\|\\sum_{i\\in I'}(\\nabla f_i(x^{t+1})-\\nabla f_i(x^t)-\\nabla f(x^{t+1})+\\nabla f(x^t))\\right\\|^2\\right]\\le \\frac{1}{b'}\\mathbb{E}[\\|\\nabla f_i(x^{t+1})-\\nabla f_i(x^t)\\|^2]"
+        },
+        {
+          "step": 10,
+          "description": "Use the variance-of-sum bound for the random minibatch I': cross terms of centered samples do not add positive covariance, so the b'^{-2} sum is bounded by a single-sample second moment scaled by 1/b'.",
+          "ref": "Display before Eq. (18), p. 13",
+          "source_pdf_lines": [
+            1080,
+            1082
+          ],
+          "math": "\\mathbb{E}[\\|g^{t+1}-\\nabla f(x^{t+1})\\|^2]\\le \\frac{1-p_t}{b'}\\mathbb{E}[\\|\\nabla f_i(x^{t+1})-\\nabla f_i(x^t)\\|^2]+(1-p_t)\\|g^t-\\nabla f(x^t)\\|^2.",
+          "uses": [
+            "PAGE_gradient_estimator",
+            "previous_step:8",
+            "previous_step:9"
+          ],
+          "produces": "single_sample_second_moment_bound"
+        },
+        {
+          "step": 11,
+          "description": "Apply average L-smoothness to replace the single-sample gradient difference by L^2||x^{t+1}-x^t||^2, obtaining (18) and hence (15).",
+          "ref": "Eq. (18), p. 13",
+          "source_pdf_lines": [
+            1083,
+            1087
+          ],
+          "math": "\\mathbb{E}[\\|g^{t+1}-\\nabla f(x^{t+1})\\|^2]\\le \\frac{(1-p_t)L^2}{b'}\\|x^{t+1}-x^t\\|^2+(1-p_t)\\|g^t-\\nabla f(x^t)\\|^2.",
+          "uses": [
+            "Average_L_smoothness",
+            "previous_step:10"
+          ],
+          "produces": "finite_sum_variance_recursion_15"
+        }
+      ]
+    },
+    {
+      "name": "Delta0_initial_gap_identity",
+      "ref": "Notation, p. 4, PDF lines 317-321",
+      "statement_math": "\\Delta_0 := f(x^0)-f^*",
+      "role": "Names the paper's initial objective-gap definition used when initializing the Lyapunov function and stating the iteration and complexity bounds.",
+      "source_status": "Verbatim source notation promoted from the definition collection to a legal proof dependency.",
+      "proof": []
+    },
+    {
+      "name": "f_star_minimum_value_lower_bound",
+      "ref": "Notation, p. 4, PDF lines 317-321; inherited Setup.fStar_le_objective interface",
+      "statement_math": "f^* := \\min_{x\\in\\mathbb{R}^d} f(x)",
+      "role": "Names the paper's minimum-value definition together with the inherited minimum-value interface used to establish f^*\\le f(x) and hence nonnegativity of the objective gap.",
+      "source_status": "The displayed math is the verbatim paper definition; the lower-bound use is a derived formal adapter consequence, not a newly assumed source inequality.",
+      "formal_obligation": "The Lean setup supplies fStar_le_objective at each iterate, and the proof uses that derived lower bound to show the function-gap component of the Lyapunov value is nonnegative.",
+      "proof": []
+    }
+  ],
+  "extension": {
+    "base_id": "e3005d2fa7d125cb7b52ae1451bfa84c45e2ba1d61b048e1282cc328ab28ba4a",
+    "request": "Add the paper-facing PAGE Corollary 2 incrementally, preserving the existing Theorem 1, finite-sum model, and prior proofs. Formalize the exact source corollary and its complexity specialization with explicit source alignment and Lean verification.",
+    "reuse": [
+      {
+        "base_json_pointer": "/main_theorem",
+        "base_symbols": [
+          "Algorithms.Unverified.PAGE.Setup.theoremOne"
+        ],
+        "target_json_pointer": "/extension/additions/main_theorem/proof/1",
+        "method": "adapt",
+        "reason": "Corollary 2 is the Theorem 1 finite-sum specialization at p=b'/(b+b') and b=n. The existing Lean theoremOne declaration is the canonical convergence interface; Phase 0 must adapt its inherited schedule and output guarantee to the paper-facing Corollary 2 parameter record."
+      },
+      {
+        "base_json_pointer": "/main_theorem/proof/12",
+        "base_symbols": [
+          "Algorithms.Unverified.PAGE.Setup.theoremOneIterationCount_eq_eta_horizon"
+        ],
+        "target_json_pointer": "/extension/additions/main_theorem/proof/2",
+        "method": "reuse",
+        "reason": "The inherited Eq. (24) eta-horizon identity is exactly the source transition used after substituting p=b'/(b+b'); it is reused at the extension proof's array index 2 (step 3), after the scalar schedule and strict-batch adapters construct the inherited schedule."
+      },
+      {
+        "base_json_pointer": "/main_theorem/proof/14",
+        "base_symbols": [
+          "Algorithms.Unverified.PAGE.Setup.theoremOneGradientComplexity_def"
+        ],
+        "target_json_pointer": "/extension/additions/main_theorem/proof/8",
+        "method": "adapt",
+        "reason": "The inherited gradient-complexity identity supplies #grad=b+T(pb+(1-p)b'); it is adapted at the extension proof's array index 8 (step 9), where Corollary 2 substitutes the specialized iteration count before performing the displayed b' and sqrt(b) bounds."
+      },
+      {
+        "base_json_pointer": "/assumptions/1",
+        "base_symbols": [
+          "Algorithms.Unverified.PAGE.Setup.AverageLSmooth"
+        ],
+        "target_json_pointer": "/extension/additions/main_theorem/proof/1",
+        "method": "reuse",
+        "reason": "Corollary 2 retains the paper's Assumption 2 unchanged; the extension does not introduce a stronger smoothness condition."
+      }
+    ],
+    "additions": {
+      "algorithm": "PAGE_Corollary2",
+      "full_name": "PAGE optimal finite-sum specialization",
+      "source_reference": "Li, Bao, Zhang, Richtárik, PAGE: A Simple and Optimal Probabilistic Gradient Estimator for Nonconvex Optimization, ICML 2021 (Corollary 2)",
+      "assumptions": [
+        {
+          "name": "Corollary2_parameter_specialization",
+          "math": "\\eta\\le \\frac{1}{L(1+\\frac{\\sqrt{b}}{b'})},\\quad b=n,\\quad b'\\le \\sqrt{b},\\quad p_t\\equiv \\frac{b'}{b+b'}",
+          "ref": "Corollary 2, p. 5; Appendix A.2, p. 15",
+          "parameters": [
+            "\\eta",
+            "L",
+            "b",
+            "b'",
+            "n",
+            "p_t"
+          ]
+        },
+        {
+          "name": "Corollary2_batch_range",
+          "math": "b'\\le \\sqrt{b}",
+          "ref": "Corollary 2, p. 5; Appendix A.2, p. 15",
+          "parameters": [
+            "b",
+            "b'"
+          ]
+        }
+      ],
+      "key_lemmas": [
+        {
+          "name": "Corollary2_finite_sum_index_bridge",
+          "ref": "Corollary 2, p. 5; inherited finite-sum index interface in Algorithms.Unverified.PAGE",
+          "statement_math": "b=n",
+          "role": "Connects the source full-batch scalar condition to the inherited finite-sum index cardinality before the strict TheoremOneSchedule branch is built.",
+          "source_status": "source condition plus explicitly named non-source model bridge",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Carry the source full-batch condition b=n into the finite-sum adapter.",
+              "ref": "Corollary 2, p. 5",
+              "source_pdf_lines": [
+                391,
+                397
+              ],
+              "math": "b=n",
+              "uses": [
+                "Corollary2_parameter_specialization"
+              ],
+              "produces": "corollary2_source_full_batch"
+            },
+            {
+              "step": 2,
+              "description": "Thread the explicit formal model bridge n=Fintype.card ι together with b=Fintype.card B from the conditional adapter input. Combining it with the source equality produces the required full-batch cardinality fact Fintype.card B=Fintype.card ι; this is not claimed to be printed in the PDF.",
+              "ref": "Inherited finite-sum model interface; formal adapter obligation",
+              "source_pdf_lines": [
+                391,
+                397
+              ],
+              "uses": [
+                "Corollary2_scalar_cardinality_bridge",
+                "previous_step:1"
+              ],
+              "produces": "corollary2_b_eq_n_eq_card_index_and_full_batch_cardinality"
+            }
+          ]
+        },
+        {
+          "name": "theoremOneIterationCount_eq_eta_horizon",
+          "ref": "Inherited Theorem 1 proof / Eq. (24), p. 14; Algorithms.Unverified.PAGE.Setup.theoremOneIterationCount_eq_eta_horizon",
+          "statement_math": "T=\\frac{2\\Delta_0}{\\epsilon^2\\eta}\\overset{(20)}{=}\\frac{2\\Delta_0L}{\\epsilon^2}\\left(1+\\sqrt{\\frac{1-p}{pb'}}\\right).",
+          "role": "Inherited eta-horizon identity used after the Corollary 2 probability substitution; this is a reused base result, not a new paper assumption.",
+          "source_status": "reused from the approved Theorem 1 model",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Reuse the approved Theorem 1 eta-horizon identity, whose source-facing displayed form is Eq. (24), after explicitly supplying the formal prerequisites required by the compiled declaration: maximal TheoremOneSchedule, strict-cardinality branch, and positive epsilon.",
+              "ref": "Inherited Theorem 1 proof / Eq. (24), p. 14",
+              "source_pdf_lines": [
+                1146,
+                1150
+              ],
+              "math": "T=\\frac{2\\Delta_0}{\\epsilon^2\\eta}\\overset{(20)}{=}\\frac{2\\Delta_0L}{\\epsilon^2}\\left(1+\\sqrt{\\frac{1-p}{pb'}}\\right).",
+              "uses": [
+                "Theorem1_parameter_schedule",
+                "Corollary2_maximal_schedule_adapter",
+                "Corollary2_batch_boundary_adapter",
+                "Corollary2_positive_epsilon_input",
+                "Corollary2_finite_sum_index_bridge"
+              ],
+              "produces": "inherited_eta_horizon_identity"
+            }
+          ]
+        },
+        {
+          "name": "Corollary2_strict_horizon_adapter",
+          "ref": "Corollary 2, p. 5, PDF lines 391-414; Proof of Corollary 2, Appendix A.2, PDF lines 1198-1202; formal horizon adapter: Algorithms.Unverified.PAGE.Setup.theoremOne_finiteDimensional and theoremOne_eta_horizon_bound",
+          "statement_math": "T=\\frac{2\\Delta_0L}{\\epsilon^2}\\left(1+\\frac{\\sqrt{b}}{b'}\\right)",
+          "role": "Constructs the natural-number horizon required by the inherited convergence declaration. The source displays the real iteration count; the Lean adapter additionally constructs a positive horizon at least that count.",
+          "source_status": "non-source formal horizon adapter",
+          "formal_obligation": "The adapter must choose a natural T_hor with [NeZero T_hor] and theoremOneIterationCount L p epsilon <= (T_hor : R), rather than treating the real source expression itself as an already-available natural horizon.",
+          "proof": [
+            {
+              "step": 1,
+              "description": "On the strict branch, combine the maximal endpoint input, the source probability and batch specialization, and the full-batch/cardinality bridge with the strict cardinality branch to construct the inherited TheoremOneSchedule.",
+              "ref": "Inherited TheoremOneSchedule interface; formal strict-branch adapter",
+              "source_pdf_lines": [
+                391,
+                397
+              ],
+              "uses": [
+                "Corollary2_maximal_schedule_adapter",
+                "Corollary2_maximal_endpoint_input",
+                "Corollary2_batch_boundary_adapter",
+                "Corollary2_finite_sum_index_bridge",
+                "Corollary2_scalar_cardinality_bridge",
+                "Corollary2_positive_epsilon_input"
+              ],
+              "produces": "corollary2_strict_schedule_for_horizon"
+            },
+            {
+              "step": 2,
+              "description": "Use the initial-gap, smoothness, positive-epsilon, positive-batch, and ratio-domain prerequisites to establish that the inherited real iteration count is nonnegative before applying a natural ceiling.",
+              "ref": "Algorithms.Unverified.PAGE.Setup.theoremOne_finiteDimensional; formal horizon adapter",
+              "source_pdf_lines": [
+                317,
+                321
+              ],
+              "uses": [
+                "previous_step:1",
+                "theoremOneIterationCount_eq_eta_horizon",
+                "Corollary2_positive_epsilon_input",
+                "Corollary2_initial_gap_nonnegative"
+              ],
+              "produces": "corollary2_iteration_count_nonnegative"
+            },
+            {
+              "step": 3,
+              "description": "Choose the formal natural horizon T_hor as a positive ceiling/max construction for the inherited real iteration count: take the maximum of 1 and a natural ceiling of theoremOneIterationCount L p epsilon. This construction supplies the NeZero T_hor instance and does not alter the paper's displayed real count.",
+              "ref": "Algorithms.Unverified.PAGE.Setup.theoremOne_finiteDimensional; theoremOne_eta_horizon_bound interface",
+              "source_pdf_lines": [
+                1146,
+                1150
+              ],
+              "uses": [
+                "previous_step:2",
+                "theoremOneIterationCount_eq_eta_horizon"
+              ],
+              "produces": "corollary2_selected_horizon_nezero"
+            },
+            {
+              "step": 4,
+              "description": "Use the ceiling/max construction to prove the inherited horizon premise theoremOneIterationCount L p epsilon <= (T_hor : R). This is the explicit count-at-least-horizon fact required by theoremOne_finiteDimensional.",
+              "ref": "Algorithms.Unverified.PAGE.Setup.theoremOne_finiteDimensional; theoremOne_eta_horizon_bound interface",
+              "source_pdf_lines": [
+                1146,
+                1150
+              ],
+              "uses": [
+                "previous_step:3",
+                "theoremOneIterationCount_eq_eta_horizon"
+              ],
+              "produces": "corollary2_selected_horizon_at_least_iteration_count"
+            }
+          ]
+        },
+        {
+          "name": "Corollary2_stochastic_laws_adapter",
+          "ref": "Algorithm 1, Line 4, p. 4; Eq. (16), p. 13; formal interface: Algorithms.Unverified.PAGE.Setup.StochasticLaws and theoremOne_finiteDimensional",
+          "statement_math": "g^{t+1}=\\begin{cases}\\frac{1}{b}\\sum_{i\\in I}\\nabla f_i(x^{t+1})&\\text{with probability }p_t,\\\\ g^t+\\frac{1}{b'}\\sum_{i\\in I'}(\\nabla f_i(x^{t+1})-\\nabla f_i(x^t))&\\text{with probability }1-p_t.\\end{cases}",
+          "role": "Named non-source adapter supplying the stochastic-law premise required by the inherited PAGE convergence theorem. It records the actual formal input consumed by theoremOne_finiteDimensional without adding a paper-facing Corollary 2 assumption.",
+          "source_status": "non-source formal interface input",
+          "formal_obligation": "The conditional Lean Corollary 2 route receives h_laws : S.StochasticLaws P and passes it to theoremOne_finiteDimensional; the source PDF describes the random branch and minibatch sampling but does not print this formal predicate.",
+          "proof": []
+        },
+        {
+          "name": "Inherited_theoremOne_finiteDimensional_convergence",
+          "ref": "Algorithms.Unverified.PAGE.Setup.theoremOne_finiteDimensional; inherited Theorem 1 proof Eqs. (14)-(24), pp. 12-14",
+          "statement_math": "\\mathbb{E}[\\|\\nabla f(\\hat{x}_T)\\|]\\le\\epsilon",
+          "role": "Inherited finite-dimensional convergence declaration supplying the expected-gradient output guarantee for the strict Corollary 2 branch. The extension reuses this theorem after constructing its exact maximal schedule and positive-epsilon prerequisites.",
+          "source_status": "reused from the approved Theorem 1 model",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Apply the inherited finite-dimensional Theorem 1 declaration only after supplying its actual formal inputs: average L-smoothness, the maximal TheoremOneSchedule, stochastic laws, positive epsilon, and an iteration horizon at least the eta-dependent count.",
+              "ref": "Algorithms.Unverified.PAGE.Setup.theoremOne_finiteDimensional",
+              "source_pdf_lines": [
+                1014,
+                1156
+              ],
+              "uses": [
+                "Average_L_smoothness",
+                "Corollary2_maximal_schedule_adapter",
+                "Corollary2_batch_boundary_adapter",
+                "Corollary2_positive_epsilon_input",
+                "Corollary2_stochastic_laws_adapter",
+                "theoremOneIterationCount_eq_eta_horizon",
+                "Corollary2_strict_horizon_adapter"
+              ],
+              "produces": "inherited_theoremOne_expected_gradient_guarantee"
+            },
+            {
+              "step": 2,
+              "description": "Reuse the inherited declaration's output component for the strict Corollary 2 branch; the count identity and the expected-gradient guarantee are separate inherited consequences and are both carried into the recombination step.",
+              "ref": "Algorithms.Unverified.PAGE.Setup.theoremOne_finiteDimensional; Theorem 1 Eq. (24), p. 14",
+              "source_pdf_lines": [
+                1146,
+                1156
+              ],
+              "uses": [
+                "previous_step:1"
+              ],
+              "produces": "strict_branch_output_guarantee"
+            }
+          ]
+        },
+        {
+          "name": "Corollary2_initial_gap_identity",
+          "ref": "Notation, p. 4, PDF lines 317-321; inherited Setup.initialGap interface",
+          "statement_math": "\\Delta_0 := f(x^0)-f^*",
+          "role": "Names the source initial-gap identity as a legal prerequisite for the complexity and Lyapunov initialization routes.",
+          "source_status": "source notation exposed as a named key lemma for the extension dependency graph",
+          "formal_obligation": "The adapter identifies the inherited initialGap quantity with the paper notation Delta_0 before using it in nonnegativity and initialization steps.",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Record the paper's definition of the initial objective gap as the named identity consumed by the Corollary 2 arithmetic and boundary-initialization proofs.",
+              "ref": "Notation, p. 4, PDF lines 317-321",
+              "source_pdf_lines": [
+                317,
+                321
+              ],
+              "math": "\\Delta_0 := f(x^0)-f^*",
+              "uses": [],
+              "produces": "corollary2_initial_gap_identity"
+            }
+          ]
+        },
+        {
+          "name": "Corollary2_f_star_lower_bound",
+          "ref": "Inherited Setup.fStar_le_objective interface; Notation, p. 4, PDF lines 317-321",
+          "statement_math": "f^* := \\min_{x\\in\\mathbb{R}^d} f(x)",
+          "role": "Names the source minimum-value definition whose inherited formal interface yields the lower bound needed for nonnegativity of the source initial objective gap.",
+          "source_status": "reused formal consequence of the inherited PAGE setup, not an additional paper-facing assumption",
+          "formal_obligation": "The adapter supplies the derived instance f^*\\le f(x^0) from the inherited fStar_le_objective interface at the initial point x^0 before the gap sign is used in the complexity specialization. The inequality is not presented as source statement_math because the PDF prints only the definition above.",
+          "proof": []
+        },
+        {
+          "name": "Corollary2_optimality_gap_nonnegative",
+          "ref": "Notation, p. 4, PDF lines 317-321; inherited Setup.fStar_le_objective interface",
+          "statement_math": "\\Delta_0 := f(x^0)-f^*",
+          "role": "Names the source initial-gap definition; its derived nonnegativity consequence is used to preserve the inequality direction in the Corollary 2 complexity specialization.",
+          "source_status": "derived formal prerequisite, not an additional paper-facing assumption",
+          "formal_obligation": "The adapter obtains f^*\\le f(x^0) from the inherited fStar_le_objective interface and combines it with Corollary2_initial_gap_identity to supply Delta_0\\ge0.",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Apply the inherited minimum-value lower-bound interface at x^0 and rewrite the resulting gap with the named source identity, producing the nonnegative initial objective gap.",
+              "ref": "Inherited Setup.fStar_le_objective interface; Notation, p. 4, PDF lines 317-321",
+              "source_pdf_lines": [
+                317,
+                321
+              ],
+              "uses": [
+                "Corollary2_initial_gap_identity",
+                "Corollary2_f_star_lower_bound"
+              ],
+              "produces": "corollary2_initial_gap_nonnegative"
+            }
+          ]
+        },
+        {
+          "name": "Corollary2_positive_epsilon_input",
+          "ref": "Corollary 2, p. 5, PDF lines 391-414; separate Lean domain adapter obligation",
+          "statement_math": "\\epsilon\\text{-approximate solution}",
+          "role": "Explicit formal-domain input required by the inherited eta-horizon and convergence declarations. This is a Lean interface obligation, not a paper-facing Corollary 2 assumption.",
+          "source_status": "non-source formal interface input",
+          "formal_obligation": "The conditional Lean adapter receives 0<\\epsilon as an explicit input before any denominator, horizon, Jensen, or complexity step. The PDF prints only the phrase epsilon-approximate solution, not this standalone domain inequality.",
+          "proof": []
+        },
+        {
+          "name": "Corollary2_scalar_cardinality_bridge",
+          "ref": "Corollary 2, p. 5, PDF lines 391-397; separate Lean finite-batch adapter obligation",
+          "statement_math": "b=n,\\quad b'\\le\\sqrt{b}",
+          "role": "The source-facing scalar batch condition is quoted here; the conditional Lean adapter separately receives the scalar/cardinality identification and nonempty-batch facts needed by the inherited finite-type model.",
+          "source_status": "non-source formal model adapter",
+          "formal_obligation": "The conditional Lean adapter receives b=Fintype.card B, b'=Fintype.card B', n=Fintype.card ι, and the nonempty finite-batch facts 1<=b and 1<=b'. These are model-interface inputs, not paper assumptions and not consequences of b=n or b'<=sqrt(b) alone.",
+          "proof": []
+        },
+        {
+          "name": "Corollary2_maximal_endpoint_input",
+          "ref": "Lean maximal-step adapter for the exact-count route; source upper bound in Appendix A.2, PDF lines 1198-1202",
+          "statement_math": "\\eta\\le\\frac{1}{L(1+\\frac{\\sqrt{b}}{b'})}",
+          "role": "Explicit maximal-endpoint choice required by the inherited displayed-count interface. The equality is not derived from the source upper bound and is not added to the paper-facing theorem statement.",
+          "source_status": "non-source formal interface input",
+          "formal_obligation": "The conditional Lean adapter receives the additional endpoint choice eta=1/(L(1+sqrt(b)/b')). This equality is deliberately not inferred from the source upper bound and is not a paper-facing assumption.",
+          "proof": []
+        },
+        {
+          "name": "Corollary2_scalar_domain_adapter",
+          "ref": "Lean adapter only for the Proof of Corollary 2, Appendix A.2, PDF lines 1196-1221",
+          "statement_math": "p=\\frac{b'}{b+b'},\\quad \\sqrt{\\frac{1-p}{pb'}}=\\frac{\\sqrt{b}}{b'}",
+          "role": "Non-source Lean adapter carrying the positive-epsilon, positive-smoothness, positive-cardinality, and nonzero-denominator facts needed for the displayed scalar substitutions. It is not an additional Corollary 2 assumption.",
+          "source_status": "derived adapter facts; not stated as a paper-facing condition",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Introduce the explicit positive-epsilon scalar-domain adapter input required by the inherited eta-horizon and complexity interfaces. This is a Lean input obligation, not a new paper-facing Corollary 2 assumption.",
+              "ref": "Lean scalar-domain adapter input; not stated in the source corollary",
+              "source_pdf_lines": [
+                1196,
+                1221
+              ],
+              "uses": [
+                "Corollary2_positive_epsilon_input"
+              ],
+              "produces": "corollary2_positive_epsilon_input"
+            },
+            {
+              "step": 2,
+              "description": "Use the first component of the inherited average-smoothness interface to derive L>0, and combine it with the explicit positive-epsilon input before any denominator or multiplier is formed.",
+              "ref": "Lean scalar-domain adapter; inherited AverageLSmooth interface",
+              "source_pdf_lines": [
+                1196,
+                1221
+              ],
+              "uses": [
+                "Average_L_smoothness",
+                "previous_step:1"
+              ],
+              "produces": "corollary2_positive_epsilon_and_L"
+            },
+            {
+              "step": 3,
+              "description": "Use nonempty finite batch types and the scalar-to-cardinality bridge to derive positive real cardinalities and hence the nonzero denominators b, b', and b+b' used by the source substitution.",
+              "ref": "Lean scalar-domain adapter; source-to-cardinality bridge for the PAGE batch types",
+              "source_pdf_lines": [
+                1196,
+                1221
+              ],
+              "uses": [
+                "Corollary2_parameter_specialization",
+                "Corollary2_scalar_cardinality_bridge",
+                "Corollary2_finite_sum_index_bridge",
+                "previous_step:2"
+              ],
+              "produces": "corollary2_positive_batch_denominators"
+            },
+            {
+              "step": 4,
+              "description": "Substitute p=b'/(b+b') and use the positive batch denominators to establish the probability-domain facts 0<p, p<=1, 0<p b', and the nonnegative ratio under the square root.",
+              "ref": "Proof of Corollary 2, Appendix A.2, PDF lines 1196-1201; Lean scalar adapter",
+              "source_pdf_lines": [
+                1196,
+                1201
+              ],
+              "math": "p=\\frac{b'}{b+b'}",
+              "uses": [
+                "Corollary2_parameter_specialization",
+                "previous_step:3"
+              ],
+              "produces": "corollary2_probability_domain_and_ratio_denominator"
+            },
+            {
+              "step": 5,
+              "description": "Take the nonnegative square root of the ratio from the preceding step and use b'>0 to obtain the source substitution sqrt((1-p)/(p b'))=sqrt(b)/b'.",
+              "ref": "Proof of Corollary 2, Appendix A.2, PDF lines 1196-1201",
+              "source_pdf_lines": [
+                1196,
+                1201
+              ],
+              "math": "\\sqrt{\\frac{1-p}{pb'}}=\\frac{\\sqrt{b}}{b'}",
+              "uses": [
+                "previous_step:4"
+              ],
+              "produces": "corollary2_ratio_identity"
+            }
+          ]
+        },
+        {
+          "name": "Corollary2_maximal_schedule_adapter",
+          "ref": "Proof of Corollary 2, Appendix A.2, PDF lines 1198-1202; inherited TheoremOneSchedule interface",
+          "statement_math": "\\eta\\le \\frac{1}{L(1+\\frac{\\sqrt{b}}{b'})}",
+          "role": "Non-source Lean adapter for the exact-count route. The source gives eta <= 1/(L(1+sqrt(b)/b')); this record explicitly chooses the maximal endpoint as an adapter input, rather than deriving equality from the upper bound. The strict branch then packages that equality into the inherited TheoremOneSchedule interface.",
+          "source_status": "derived maximal-endpoint choice; not a strengthened paper-facing assumption",
+          "proof": [
+            {
+              "step": 1,
+              "description": "The source upper-bound condition does not imply equality. For the exact iteration-count route, make the explicit maximal-endpoint choice eta := 1/(L(1+sqrt(b)/b')); this choice is the adapter input required by the inherited eta-horizon identity and leaves the paper-facing upper-bound statement unchanged.",
+              "ref": "Proof of Corollary 2, Appendix A.2, PDF lines 1198-1202; Lean maximal-endpoint adapter",
+              "source_pdf_lines": [
+                1198,
+                1202
+              ],
+              "math": "\\eta\\le \\frac{1}{L(1+\\frac{\\sqrt{b}}{b'})}",
+              "uses": [
+                "Corollary2_parameter_specialization",
+                "Corollary2_scalar_domain_adapter",
+                "Corollary2_maximal_endpoint_input"
+              ],
+              "produces": "corollary2_maximal_endpoint_choice"
+            },
+            {
+              "step": 2,
+              "description": "Introduce the non-source maximal-endpoint adapter input by choosing eta equal to 1/(L(1+sqrt(b)/b')). This equality is an explicit endpoint choice required by the inherited eta-horizon interface and is not inferred from the source upper bound.",
+              "ref": "Lean maximal-endpoint adapter input; source endpoint from Appendix A.2, PDF lines 1198-1202",
+              "source_pdf_lines": [
+                1198,
+                1202
+              ],
+              "uses": [
+                "Corollary2_maximal_endpoint_input"
+              ],
+              "produces": "corollary2_eta_eq_maximal_endpoint"
+            },
+            {
+              "step": 3,
+              "description": "On the strict branch, combine the explicit endpoint equality, the source probability and batch specialization, and the scalar-to-cardinality bridge to construct the exact inherited TheoremOneSchedule hypothesis. This branch-local schedule fact supplies both maximal eta and card B'<card B before theoremOneIterationCount_eq_eta_horizon is invoked.",
+              "ref": "Theorem 1, p. 12; inherited Lean schedule interface; Proof of Corollary 2, Appendix A.2, PDF lines 1196-1202",
+              "source_pdf_lines": [
+                1196,
+                1202
+              ],
+              "uses": [
+                "Corollary2_parameter_specialization",
+                "Corollary2_batch_boundary_adapter",
+                "Corollary2_scalar_cardinality_bridge",
+                "Corollary2_finite_sum_index_bridge",
+                "Corollary2_scalar_domain_adapter",
+                "Corollary2_maximal_endpoint_input",
+                "previous_step:2"
+              ],
+              "produces": "corollary2_strict_theoremOneSchedule"
+            },
+            {
+              "step": 4,
+              "description": "Apply the inherited eta-horizon identity on the strict branch using the exact schedule fact from the preceding step, then use the named ratio identity to obtain the specialized iteration expression.",
+              "ref": "Proof of Corollary 2, Appendix A.2, PDF lines 1198-1202; inherited Eq. (24) adapter",
+              "source_pdf_lines": [
+                1198,
+                1202
+              ],
+              "math": "T=\\frac{2\\Delta_0L}{\\epsilon^2}\\left(1+\\frac{\\sqrt{b}}{b'}\\right)",
+              "uses": [
+                "theoremOneIterationCount_eq_eta_horizon",
+                "previous_step:3",
+                "Corollary2_scalar_domain_adapter"
+              ],
+              "produces": "corollary2_exact_eta_horizon_after_substitution"
+            }
+          ]
+        },
+        {
+          "name": "Corollary2_batch_boundary_adapter",
+          "ref": "Corollary 2, p. 5; Theorem 1, p. 12; inherited TheoremOneSchedule interface",
+          "statement_math": "b'\\le \\sqrt{b}",
+          "role": "Non-source Lean case split preserving the source's non-strict batch condition: the strict branch feeds the inherited Theorem 1 interface, while the source-allowed equality branch is isolated as b=b'=1 rather than silently strengthened away.",
+          "source_status": "derived interface adapter; not a replacement theorem-head assumption",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Carry the source non-strict scalar condition b'<=sqrt(b) into the adapter before translating it to the inherited finite-type cardinality interface.",
+              "ref": "Corollary 2, p. 5",
+              "source_pdf_lines": [
+                391,
+                397
+              ],
+              "math": "b'\\le \\sqrt{b}",
+              "uses": [
+                "Corollary2_batch_range"
+              ],
+              "produces": "corollary2_source_batch_range"
+            },
+            {
+              "step": 2,
+              "description": "Record the non-source scalar-to-cardinality bridge b=card B and b'=card B' used to compare the source batch parameters with the inherited TheoremOneSchedule fields.",
+              "ref": "Lean adapter only; inherited finite-batch interface",
+              "source_pdf_lines": [
+                391,
+                397
+              ],
+              "uses": [
+                "Corollary2_scalar_cardinality_bridge",
+                "Corollary2_parameter_specialization",
+                "Corollary2_finite_sum_index_bridge"
+              ],
+              "produces": "corollary2_scalar_to_cardinality_bridge"
+            },
+            {
+              "step": 3,
+              "description": "Use nonempty finite batch types and the scalar-to-cardinality bridge to establish 1<=b and 1<=b', hence that the real batch sizes are positive.",
+              "ref": "Lean cardinality adapter; not stated in the source corollary",
+              "source_pdf_lines": [
+                391,
+                397
+              ],
+              "uses": [
+                "Corollary2_scalar_cardinality_bridge",
+                "Corollary2_finite_sum_index_bridge",
+                "previous_step:2"
+              ],
+              "produces": "corollary2_positive_integer_batch_sizes"
+            },
+            {
+              "step": 4,
+              "description": "From b>=1, derive the auxiliary inequality sqrt(b)<=b needed to exclude the b'>b branch under the source condition.",
+              "ref": "Lean arithmetic adapter; not stated in the source corollary",
+              "source_pdf_lines": [
+                391,
+                397
+              ],
+              "uses": [
+                "previous_step:3"
+              ],
+              "produces": "corollary2_sqrt_batch_le_batch"
+            },
+            {
+              "step": 5,
+              "description": "Apply trichotomy to b' and b, then use b'<=sqrt(b)<=b to exclude b'>b. The adapter therefore produces the strict branch b'<b or the equality branch b'=b before any inherited schedule is constructed.",
+              "ref": "Lean batch-boundary adapter; source condition from Corollary 2, p. 5",
+              "source_pdf_lines": [
+                391,
+                397
+              ],
+              "uses": [
+                "previous_step:1",
+                "previous_step:4"
+              ],
+              "produces": "corollary2_strict_or_equal_batch_cases"
+            },
+            {
+              "step": 6,
+              "description": "On the strict branch, use b'<b together with b=card B and b'=card B' to produce the exact cardinality inequality required by TheoremOneSchedule. The endpoint equality and probability schedule are combined with this branch fact in the separate maximal-schedule adapter.",
+              "ref": "Theorem 1, p. 12; inherited TheoremOneSchedule interface",
+              "source_pdf_lines": [
+                391,
+                397
+              ],
+              "uses": [
+                "previous_step:2",
+                "previous_step:5",
+                "Corollary2_parameter_specialization",
+                "Corollary2_finite_sum_index_bridge"
+              ],
+              "produces": "corollary2_strict_cardinality_schedule_branch"
+            },
+            {
+              "step": 7,
+              "description": "On the equality branch b'=b, combine b'<=sqrt(b), sqrt(b)<=b, and the positive integer batch-size facts to derive b=b'=1. This is the separate unit-batch boundary obligation rather than an invocation of the strict inherited interface.",
+              "ref": "Lean batch-boundary adapter; source condition from Corollary 2, p. 5",
+              "source_pdf_lines": [
+                391,
+                397
+              ],
+              "uses": [
+                "previous_step:1",
+                "previous_step:3",
+                "previous_step:4",
+                "previous_step:5"
+              ],
+              "produces": "corollary2_unit_batch_boundary"
+            },
+            {
+              "step": 8,
+              "description": "For the boundary branch, retain the source probability substitution and source stepsize upper bound; the values p=1/2 and eta<=1/(2L) are derived adapter consequences of b=b'=1 and are recorded in produces rather than source math.",
+              "ref": "Proof of Corollary 2, Appendix A.2, PDF lines 1196-1202",
+              "source_pdf_lines": [
+                1196,
+                1202
+              ],
+              "math": "p=\\frac{b'}{b+b'},\\quad \\eta\\le \\frac{1}{L(1+\\frac{\\sqrt{b}}{b'})}",
+              "uses": [
+                "previous_step:7",
+                "Corollary2_parameter_specialization"
+              ],
+              "produces": "corollary2_unit_batch_boundary_parameters"
+            },
+            {
+              "step": 9,
+              "description": "Introduce the non-source maximal-endpoint boundary choice eta=1/(2L), together with the derived p=1/2 and b=b'=1 values, for the separate boundary convergence route.",
+              "ref": "Lean boundary adapter; source endpoint formula from Proof of Corollary 2, Appendix A.2, PDF lines 1196-1202",
+              "source_pdf_lines": [
+                1196,
+                1202
+              ],
+              "uses": [
+                "previous_step:8",
+                "Corollary2_maximal_endpoint_input"
+              ],
+              "produces": "corollary2_unit_batch_maximal_schedule"
+            }
+          ]
+        },
+        {
+          "name": "Corollary2_unit_boundary_coefficient_nonnegative",
+          "ref": "Eq. (19)-Eq. (20), pp. 13-14; Proof of Corollary 2, Appendix A.2, PDF lines 1196-1221",
+          "statement_math": "\\frac{1}{2\\eta}-\\frac{L}{2}-\\frac{(1-p)\\eta L^2}{2pb'}\\ge 0",
+          "role": "Boundary-specific arithmetic prerequisite used to drop the displacement term in the replayed Eq. (19) inequality without invoking the strict TheoremOneSchedule adapter.",
+          "source_status": "the coefficient condition is printed in Eq. (19)-Eq. (20); its unit-boundary verification is a derived Lean adapter fact, not a new paper-facing assumption",
+          "formal_obligation": "On the source-allowed equality branch b=b'=1, use p=b'/(b+b') and the explicit maximal endpoint eta=1/(L(1+sqrt(b)/b')) to prove the displayed coefficient is nonnegative directly.",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Substitute the boundary facts b=b'=1 together with the source probability specialization p=b'/(b+b') and the explicit maximal endpoint into the printed displacement coefficient.",
+              "ref": "Proof of Corollary 2, Appendix A.2, PDF lines 1196-1202; Eq. (19)-Eq. (20), pp. 13-14",
+              "source_pdf_lines": [
+                1112,
+                1125
+              ],
+              "math": "\\frac{1}{2\\eta}-\\frac{L}{2}-\\frac{(1-p)\\eta L^2}{2pb'}\\ge 0",
+              "uses": [
+                "Corollary2_batch_boundary_adapter",
+                "Corollary2_parameter_specialization",
+                "Corollary2_maximal_endpoint_input",
+                "Corollary2_scalar_domain_adapter"
+              ],
+              "produces": "unit_boundary_coefficient_after_parameter_substitution"
+            },
+            {
+              "step": 2,
+              "description": "Use the specialized values p=1/2, b'=1, eta=1/(2L), and L>0 to simplify the coefficient to a positive multiple of L and conclude the nonnegative coefficient fact consumed by the boundary Eq. (19) step.",
+              "ref": "Lean boundary arithmetic adapter for Eq. (19)-Eq. (20)",
+              "source_pdf_lines": [
+                1112,
+                1125
+              ],
+              "uses": [
+                "previous_step:1",
+                "Corollary2_scalar_domain_adapter"
+              ],
+              "produces": "unit_boundary_coefficient_nonnegative"
+            }
+          ]
+        },
+        {
+          "name": "Corollary2_unit_batch_boundary_adapter",
+          "ref": "Corollary 2, p. 5; inherited Lyapunov proof Eqs. (19)-(24), pp. 13-14; Appendix A.2, PDF lines 1196-1202",
+          "statement_math": "\\eta\\le \\frac{1}{L(1+\\frac{\\sqrt{b}}{b'})},\\quad b=n,\\quad b'\\le \\sqrt{b},\\quad p_t\\equiv \\frac{b'}{b+b'}",
+          "role": "Explicit non-source adapter obligation for the source-allowed unit-batch boundary. It derives the output guarantee and specialized iteration count by replaying the printed Theorem 1 Eq. (14)-(24) route when the inherited strict b'<b schedule interface cannot be instantiated.",
+          "source_status": "non-source boundary adapter obligation; no standalone boundary lemma is printed in the PDF",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Enter the separately dispatched equality branch and consume the adapter-produced boundary facts b=b'=1 together with the explicit maximal-endpoint input. These values are derived adapter inputs, not a source-displayed boundary theorem, and no strict TheoremOneSchedule premise is used on this branch.",
+              "ref": "Lean batch-boundary and maximal-endpoint adapters; source formulas in Proof of Corollary 2, Appendix A.2, PDF lines 1196-1202",
+              "source_pdf_lines": [
+                1196,
+                1202
+              ],
+              "uses": [
+                "Corollary2_batch_boundary_adapter",
+                "Corollary2_parameter_specialization",
+                "Corollary2_maximal_endpoint_input",
+                "Corollary2_positive_epsilon_input",
+                "Corollary2_stochastic_laws_adapter"
+              ],
+              "produces": "unit_boundary_fixed_parameters"
+            },
+            {
+              "step": 2,
+              "description": "Apply the inherited average-smoothness implication, the PAGE primal update, and the inexact-gradient descent lemma to obtain the one-step descent inequality before specializing the boundary parameters.",
+              "ref": "Eq. (14), p. 12",
+              "source_pdf_lines": [
+                1014,
+                1019
+              ],
+              "math": "f(x^{t+1})\\le f(x^t)-\\frac{\\eta}{2}\\|\\nabla f(x^t)\\|^2-\\left(\\frac{1}{2\\eta}-\\frac{L}{2}\\right)\\|x^{t+1}-x^t\\|^2+\\frac{\\eta}{2}\\|g^t-\\nabla f(x^t)\\|^2.",
+              "uses": [
+                "Average_L_smoothness",
+                "Lemma1_average_smooth_implies_smooth",
+                "Lemma2_descent_with_inexact_gradient",
+                "PAGE_primal_update",
+                "previous_step:1"
+              ],
+              "produces": "unit_boundary_one_step_descent"
+            },
+            {
+              "step": 3,
+              "description": "Instantiate the PAGE estimator definition needed for the finite-sum variance recursion, retaining the refresh and recursive branches before taking conditional expectation.",
+              "ref": "Eq. (16), p. 13; Algorithm 1, Line 4",
+              "source_pdf_lines": [
+                1030,
+                1042
+              ],
+              "math": "g^{t+1}=\\begin{cases}\\frac{1}{b}\\sum_{i\\in I}\\nabla f_i(x^{t+1})&\\text{with probability }p_t,\\\\ g^t+\\frac{1}{b'}\\sum_{i\\in I'}(\\nabla f_i(x^{t+1})-\\nabla f_i(x^t))&\\text{with probability }1-p_t.\\end{cases}",
+              "uses": [
+                "PAGE_gradient_estimator",
+                "previous_step:1"
+              ],
+              "produces": "unit_boundary_estimator_branch_definition"
+            },
+            {
+              "step": 4,
+              "description": "Expand the expected squared estimator error according to the two branches of Eq. (16).",
+              "ref": "Direct calculation after Eq. (16), p. 13",
+              "source_pdf_lines": [
+                1044,
+                1052
+              ],
+              "math": "\\mathbb{E}[\\|g^{t+1}-\\nabla f(x^{t+1})\\|^2]=p_t\\mathbb{E}\\left[\\left\\|\\frac{1}{b}\\sum_{i\\in I}\\nabla f_i(x^{t+1})-\\nabla f(x^{t+1})\\right\\|^2\\right]+(1-p_t)\\mathbb{E}\\left[\\left\\|g^t+\\frac{1}{b'}\\sum_{i\\in I'}(\\nabla f_i(x^{t+1})-\\nabla f_i(x^t))-\\nabla f(x^{t+1})\\right\\|^2\\right].",
+              "uses": [
+                "previous_step:3",
+                "Corollary2_stochastic_laws_adapter"
+              ],
+              "produces": "unit_boundary_branchwise_error_expansion"
+            },
+            {
+              "step": 5,
+              "description": "Use the full-batch specialization b=n to remove the refresh-branch contribution and retain only the recursive branch.",
+              "ref": "Eq. (17), p. 13",
+              "source_pdf_lines": [
+                1053,
+                1058
+              ],
+              "math": "\\mathbb{E}[\\|g^{t+1}-\\nabla f(x^{t+1})\\|^2]=(1-p_t)\\mathbb{E}\\left[\\left\\|g^t+\\frac{1}{b'}\\sum_{i\\in I'}(\\nabla f_i(x^{t+1})-\\nabla f_i(x^t))-\\nabla f(x^{t+1})\\right\\|^2\\right]",
+              "uses": [
+                "previous_step:4",
+                "Corollary2_parameter_specialization",
+                "Corollary2_finite_sum_index_bridge",
+                "Corollary2_stochastic_laws_adapter"
+              ],
+              "produces": "unit_boundary_full_batch_error_reduction"
+            },
+            {
+              "step": 6,
+              "description": "Recenter the recursive estimator error by adding and subtracting g^t-nabla f(x^t) inside the squared norm.",
+              "ref": "Direct calculation after Eq. (17), p. 13",
+              "source_pdf_lines": [
+                1059,
+                1064
+              ],
+              "math": "(1-p_t)\\mathbb{E}\\left[\\left\\|g^t-\\nabla f(x^t)+\\frac{1}{b'}\\sum_{i\\in I'}(\\nabla f_i(x^{t+1})-\\nabla f_i(x^t))-\\nabla f(x^{t+1})+\\nabla f(x^t)\\right\\|^2\\right]",
+              "uses": [
+                "previous_step:5"
+              ],
+              "produces": "unit_boundary_recentered_error"
+            },
+            {
+              "step": 7,
+              "description": "Use the zero-mean centered minibatch increment to separate it from the previous estimator error; the displayed equality leaves the increment's second moment and the old estimator-error term as two summands.",
+              "ref": "Direct calculation after Eq. (17), p. 13",
+              "source_pdf_lines": [
+                1065,
+                1070
+              ],
+              "math": "(1-p_t)\\mathbb{E}\\left[\\left\\|\\frac{1}{b'}\\sum_{i\\in I'}(\\nabla f_i(x^{t+1})-\\nabla f_i(x^t))-\\nabla f(x^{t+1})+\\nabla f(x^t)\\right\\|^2\\right]+(1-p_t)\\|g^t-\\nabla f(x^t)\\|^2",
+              "uses": [
+                "previous_step:6",
+                "PAGE_gradient_estimator",
+                "Corollary2_stochastic_laws_adapter"
+              ],
+              "produces": "unit_boundary_centered_increment_split"
+            },
+            {
+              "step": 8,
+              "description": "Rewrite the centered minibatch increment as the b'^{-2} squared norm of the centered sample sum, preserving the old-error term from the preceding equality.",
+              "ref": "Displayed chain after Eq. (17), p. 13",
+              "source_pdf_lines": [
+                1071,
+                1079
+              ],
+              "math": "\\frac{1-p_t}{(b')^2}\\mathbb{E}\\left[\\left\\|\\sum_{i\\in I'}(\\nabla f_i(x^{t+1})-\\nabla f_i(x^t)-\\nabla f(x^{t+1})+\\nabla f(x^t))\\right\\|^2\\right]+(1-p_t)\\|g^t-\\nabla f(x^t)\\|^2",
+              "uses": [
+                "previous_step:7"
+              ],
+              "produces": "unit_boundary_centered_sum_variance"
+            },
+            {
+              "step": 9,
+              "description": "Bound the centered increment by the second moment of a single sampled gradient difference, yielding the 1/b' factor.",
+              "ref": "First inequality after Eq. (17), p. 13",
+              "source_pdf_lines": [
+                1080,
+                1082
+              ],
+              "math": "\\mathbb{E}[\\|g^{t+1}-\\nabla f(x^{t+1})\\|^2]\\le\\frac{1-p_t}{b'}\\mathbb{E}[\\|\\nabla f_i(x^{t+1})-\\nabla f_i(x^t)\\|^2]+(1-p_t)\\|g^t-\\nabla f(x^t)\\|^2.",
+              "uses": [
+                "previous_step:8",
+                "Corollary2_stochastic_laws_adapter"
+              ],
+              "produces": "unit_boundary_single_sample_variance_bound"
+            },
+            {
+              "step": 10,
+              "description": "Apply average L-smoothness to the single-sample gradient difference and obtain the finite-sum variance recursion Eq. (18).",
+              "ref": "Eq. (18), p. 13",
+              "source_pdf_lines": [
+                1083,
+                1087
+              ],
+              "math": "\\mathbb{E}[\\|g^{t+1}-\\nabla f(x^{t+1})\\|^2]\\le\\frac{(1-p_t)L^2}{b'}\\|x^{t+1}-x^t\\|^2+(1-p_t)\\|g^t-\\nabla f(x^t)\\|^2.",
+              "uses": [
+                "Average_L_smoothness",
+                "previous_step:9"
+              ],
+              "produces": "unit_boundary_variance_recursion"
+            },
+            {
+              "step": 11,
+              "description": "Add the descent inequality Eq. (14) to eta/(2p) times the variance recursion Eq. (15), set p_t equal to p, and take expectation. Record the expanded first inequality in the Eq. (19) chain before collecting like terms.",
+              "ref": "Proof of Theorem 1 between Eqs. (18) and (19), p. 13",
+              "source_pdf_lines": [
+                1088,
+                1104
+              ],
+              "math": "\\mathbb{E}\\left[f(x^{t+1})-f^*+\\frac{\\eta}{2p}\\|g^{t+1}-\\nabla f(x^{t+1})\\|^2\\right]\\le\\mathbb{E}\\left[f(x^t)-f^*-\\frac{\\eta}{2}\\|\\nabla f(x^t)\\|^2-\\left(\\frac{1}{2\\eta}-\\frac{L}{2}\\right)\\|x^{t+1}-x^t\\|^2+\\frac{\\eta}{2}\\|g^t-\\nabla f(x^t)\\|^2\\right]+\\mathbb{E}\\left[\\frac{\\eta}{2p}\\left((1-p)\\|g^t-\\nabla f(x^t)\\|^2+\\frac{(1-p)L^2}{b'}\\|x^{t+1}-x^t\\|^2\\right)\\right].",
+              "uses": [
+                "previous_step:2",
+                "previous_step:10",
+                "Lemma3_finite_sum_PAGE_variance_recursion",
+                "Corollary2_parameter_specialization"
+              ],
+              "produces": "unit_boundary_scaled_descent_sum"
+            },
+            {
+              "step": 12,
+              "description": "Expand the scaled sum, cancel the matching estimator-error terms, and collect the displacement coefficient. This records the equality between the expanded right-hand side from the preceding Eq. (19) inequality and the collected right-hand side; it does not assert equality with the original left-hand side.",
+              "ref": "Eq. (19), p. 13",
+              "source_pdf_lines": [
+                1091,
+                1111
+              ],
+              "math": "\\mathbb{E}\\left[f(x^t)-f^*-\\frac{\\eta}{2}\\|\\nabla f(x^t)\\|^2-\\left(\\frac{1}{2\\eta}-\\frac{L}{2}\\right)\\|x^{t+1}-x^t\\|^2+\\frac{\\eta}{2}\\|g^t-\\nabla f(x^t)\\|^2\\right]+\\mathbb{E}\\left[\\frac{\\eta}{2p}\\left((1-p)\\|g^t-\\nabla f(x^t)\\|^2+\\frac{(1-p)L^2}{b'}\\|x^{t+1}-x^t\\|^2\\right)\\right]=\\mathbb{E}\\left[f(x^t)-f^*+\\frac{\\eta}{2p}\\|g^t-\\nabla f(x^t)\\|^2-\\frac{\\eta}{2}\\|\\nabla f(x^t)\\|^2-\\left(\\frac{1}{2\\eta}-\\frac{L}{2}-\\frac{(1-p)\\eta L^2}{2pb'}\\right)\\|x^{t+1}-x^t\\|^2\\right]",
+              "uses": [
+                "previous_step:11"
+              ],
+              "produces": "unit_boundary_collected_displacement_coefficient"
+            },
+            {
+              "step": 13,
+              "description": "Carry the original left-hand side inequality through the collected right-hand side from Eq. (19), retaining the displacement term and its coefficient before the source performs the final term drop.",
+              "ref": "Eq. (19), p. 13",
+              "source_pdf_lines": [
+                1112,
+                1115
+              ],
+              "math": "\\mathbb{E}\\left[f(x^{t+1})-f^*+\\frac{\\eta}{2p}\\|g^{t+1}-\\nabla f(x^{t+1})\\|^2\\right]\\le\\mathbb{E}\\left[f(x^t)-f^*+\\frac{\\eta}{2p}\\|g^t-\\nabla f(x^t)\\|^2-\\frac{\\eta}{2}\\|\\nabla f(x^t)\\|^2-\\left(\\frac{1}{2\\eta}-\\frac{L}{2}-\\frac{(1-p)\\eta L^2}{2pb'}\\right)\\|x^{t+1}-x^t\\|^2\\right].",
+              "uses": [
+                "previous_step:11",
+                "previous_step:12"
+              ],
+              "produces": "unit_boundary_collected_coefficient_inequality"
+            },
+            {
+              "step": 14,
+              "description": "Use the printed coefficient condition and Eq. (20) stepsize choice; the explicit maximal endpoint satisfies the condition, so the displacement term in the collected inequality is nonpositive and can be dropped to obtain the final inside-expectation inequality in Eq. (19).",
+              "ref": "Eq. (19)-Eq. (20), pp. 13-14",
+              "source_pdf_lines": [
+                1112,
+                1125
+              ],
+              "math": "\\frac{1}{2\\eta}-\\frac{L}{2}-\\frac{(1-p)\\eta L^2}{2pb'}\\ge 0\\quad\\text{by choosing}\\quad\\eta\\le\\frac{1}{L\\left(1+\\sqrt{\\frac{1-p}{pb'}}\\right)};\\quad\\mathbb{E}\\left[f(x^{t+1})-f^*+\\frac{\\eta}{2p}\\|g^{t+1}-\\nabla f(x^{t+1})\\|^2\\right]\\le\\mathbb{E}\\left[f(x^t)-f^*+\\frac{\\eta}{2p}\\|g^t-\\nabla f(x^t)\\|^2-\\frac{\\eta}{2}\\|\\nabla f(x^t)\\|^2\\right].",
+              "uses": [
+                "Corollary2_maximal_endpoint_input",
+                "Corollary2_parameter_specialization",
+                "Corollary2_scalar_domain_adapter",
+                "Corollary2_unit_boundary_coefficient_nonnegative",
+                "previous_step:1",
+                "previous_step:13"
+              ],
+              "produces": "unit_boundary_lyapunov_descent"
+            },
+            {
+              "step": 15,
+              "description": "Define the Lyapunov function used to package Eq. (19).",
+              "ref": "Definition immediately before Eq. (21), p. 14",
+              "source_pdf_lines": [
+                1127,
+                1129
+              ],
+              "math": "\\Phi_t:=f(x^t)-f^*+\\frac{\\eta}{2p}\\|g^t-\\nabla f(x^t)\\|^2",
+              "uses": [
+                "previous_step:14"
+              ],
+              "produces": "unit_boundary_lyapunov_definition"
+            },
+            {
+              "step": 16,
+              "description": "Rewrite Eq. (19) using the Lyapunov definition to obtain the one-step Lyapunov descent Eq. (21).",
+              "ref": "Eq. (21), p. 14",
+              "source_pdf_lines": [
+                1127,
+                1131
+              ],
+              "math": "\\mathbb{E}[\\Phi_{t+1}]\\le\\mathbb{E}[\\Phi_t]-\\frac{\\eta}{2}\\mathbb{E}[\\|\\nabla f(x^t)\\|^2].",
+              "uses": [
+                "previous_step:15",
+                "previous_step:14"
+              ],
+              "produces": "unit_boundary_one_step_lyapunov_descent"
+            },
+            {
+              "step": 17,
+              "description": "Sum Eq. (21) from t=0 to T-1 and telescope the Lyapunov terms to obtain Eq. (22).",
+              "ref": "Eq. (22), p. 14",
+              "source_pdf_lines": [
+                1132,
+                1136
+              ],
+              "math": "\\mathbb{E}[\\Phi_T]\\le\\mathbb{E}[\\Phi_0]-\\frac{\\eta}{2}\\sum_{t=0}^{T-1}\\mathbb{E}[\\|\\nabla f(x^t)\\|^2].",
+              "uses": [
+                "previous_step:16"
+              ],
+              "produces": "unit_boundary_telescoped_lyapunov_bound"
+            },
+            {
+              "step": 18,
+              "description": "Use the source full-batch condition b=n together with the named finite-sum index bridge to identify the refresh minibatch with the full component index set, so g^0=\\nabla f(x^0). The initial estimator-error term therefore vanishes; combining the named initial-gap identity with its nonnegativity consequence gives the paper's Phi_0=Delta_0 initialization without any strict b'<b schedule fact.",
+              "ref": "Text immediately before Eq. (23), p. 14",
+              "source_pdf_lines": [
+                1137,
+                1142
+              ],
+              "math": "\\Phi_0=f(x^0)-f^*+\\frac{\\eta}{2p}\\|g^0-\\nabla f(x^0)\\|^2=f(x^0)-f^*=\\Delta_0",
+              "uses": [
+                "PAGE_initial_estimator",
+                "Corollary2_parameter_specialization",
+                "Corollary2_finite_sum_index_bridge",
+                "Corollary2_initial_gap_identity",
+                "Corollary2_optimality_gap_nonnegative",
+                "previous_step:17"
+              ],
+              "produces": "unit_boundary_initial_lyapunov_equals_Delta0"
+            },
+            {
+              "step": 19,
+              "description": "Use the uniform random-output rule at the selected positive natural horizon to divide the telescoped squared-gradient sum by T_hor and obtain the Eq. (23) squared-gradient bound; the displayed source math retains the paper's generic T notation.",
+              "ref": "Eq. (23), p. 14",
+              "source_pdf_lines": [
+                1137,
+                1145
+              ],
+              "math": "\\mathbb{E}[\\|\\nabla f(\\hat{x}_T)\\|^2]\\le\\frac{2\\Delta_0}{\\eta T}.",
+              "uses": [
+                "PAGE_output",
+                "previous_step:17",
+                "previous_step:18",
+                "Corollary2_unit_boundary_horizon_adapter"
+              ],
+              "produces": "unit_boundary_squared_gradient_bound"
+            },
+            {
+              "step": 20,
+              "description": "Set the source real iteration count using Eq. (24), then substitute the Corollary 2 ratio identity and the explicit boundary endpoint. In parallel, consume the named boundary horizon adapter's positive natural T_hor and count-at-least premise for the formal output route; the displayed real T remains the paper's count.",
+              "ref": "Eq. (24), p. 14; Proof of Corollary 2, Appendix A.2, PDF lines 1198-1202",
+              "source_pdf_lines": [
+                1146,
+                1150
+              ],
+              "math": "T=\\frac{2\\Delta_0}{\\epsilon^2\\eta}\\overset{(20)}{=}\\frac{2\\Delta_0L}{\\epsilon^2}\\left(1+\\sqrt{\\frac{1-p}{pb'}}\\right).",
+              "uses": [
+                "previous_step:19",
+                "Corollary2_unit_boundary_real_count_adapter",
+                "Corollary2_unit_boundary_horizon_adapter"
+              ],
+              "produces": "unit_boundary_iteration_count_and_selected_natural_horizon"
+            },
+            {
+              "step": 21,
+              "description": "Apply Jensen's inequality to Eq. (23) at the selected positive natural horizon, using the boundary horizon adapter's NeZero and count-at-least facts, while retaining the paper's Eq. (24) real-count expression in the displayed source math.",
+              "ref": "After Eq. (24), p. 14",
+              "source_pdf_lines": [
+                1151,
+                1156
+              ],
+              "math": "\\mathbb{E}[\\|\\nabla f(\\hat{x}_T)\\|]\\le\\sqrt{\\mathbb{E}[\\|\\nabla f(\\hat{x}_T)\\|^2]}\\le\\sqrt{\\frac{2\\Delta_0}{\\eta T}}=\\epsilon.",
+              "uses": [
+                "Jensen's inequality",
+                "previous_step:19",
+                "previous_step:20",
+                "Corollary2_unit_boundary_horizon_adapter"
+              ],
+              "produces": "unit_boundary_epsilon_guarantee"
+            }
+          ]
+        },
+        {
+          "name": "theoremOneIterationCount_def",
+          "ref": "Algorithms.Unverified.PAGE.Setup.theoremOneIterationCount_def; Eq. (24), p. 14",
+          "statement_math": "T=\\frac{2\\Delta_0L}{\\epsilon^2}\\left(1+\\sqrt{\\frac{1-p}{pb'}}\\right)",
+          "role": "Inherited real-valued iteration-count definition used to construct the unit-boundary horizon without passing through the strict TheoremOneSchedule interface.",
+          "source_status": "reused formal declaration; the source-facing count expression is the right-hand side of Eq. (24)",
+          "formal_obligation": "The boundary adapter unfolds this definition directly and then applies the non-strict Corollary 2 probability, batch, ratio, and maximal-endpoint identities.",
+          "proof": []
+        },
+        {
+          "name": "Corollary2_unit_boundary_real_count_adapter",
+          "ref": "Algorithms.Unverified.PAGE.Setup.theoremOneIterationCount_def; Eq. (24), p. 14; Proof of Corollary 2, Appendix A.2, PDF lines 1196-1202",
+          "statement_math": "T=\\frac{2\\Delta_0}{\\epsilon^2\\eta}\\overset{(20)}{=}\\frac{2\\Delta_0L}{\\epsilon^2}\\left(1+\\sqrt{\\frac{1-p}{pb'}}\\right).",
+          "role": "Derives the unit-boundary real iteration count directly from the inherited count definition and the source parameter identities, without invoking the strict TheoremOneSchedule or theoremOneIterationCount_eq_eta_horizon declarations.",
+          "source_status": "non-source Lean boundary count adapter preserving the paper's displayed real-valued Eq. (24)",
+          "formal_obligation": "On the b=b'=1 branch, unfold theoremOneIterationCount_def, substitute p=b'/(b+b') and the ratio identity, then use the explicit maximal endpoint to identify the resulting count with 2 Delta_0/(epsilon^2 eta).",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Unfold the inherited real-valued count definition and identify its initial-gap factor with the paper's Delta_0 notation. This establishes the L-based count expression before any eta-horizon identity is used.",
+              "ref": "Algorithms.Unverified.PAGE.Setup.theoremOneIterationCount_def; Eq. (24), p. 14, PDF lines 1146-1150",
+              "source_pdf_lines": [
+                1146,
+                1150
+              ],
+              "math": "T=\\frac{2\\Delta_0L}{\\epsilon^2}\\left(1+\\sqrt{\\frac{1-p}{pb'}}\\right)",
+              "uses": [
+                "theoremOneIterationCount_def",
+                "Corollary2_initial_gap_identity"
+              ],
+              "produces": "unit_boundary_count_definition_expanded"
+            },
+            {
+              "step": 2,
+              "description": "Substitute the Corollary 2 probability p=b'/(b+b') and use the named scalar-domain ratio identity; then specialize the boundary facts b=b'=1. The resulting expression is the source's specialized L-based real count, and this branch-local substitution does not construct a strict schedule.",
+              "ref": "Proof of Corollary 2, Appendix A.2, PDF lines 1196-1200; Corollary 2 boundary parameter condition, p. 5",
+              "source_pdf_lines": [
+                1196,
+                1200
+              ],
+              "math": "p=\\frac{b'}{b+b'},\\quad \\sqrt{\\frac{1-p}{pb'}}=\\frac{\\sqrt{b}}{b'}",
+              "uses": [
+                "Corollary2_parameter_specialization",
+                "Corollary2_batch_boundary_adapter",
+                "Corollary2_finite_sum_index_bridge",
+                "Corollary2_scalar_domain_adapter",
+                "previous_step:1"
+              ],
+              "produces": "unit_boundary_specialized_real_count"
+            },
+            {
+              "step": 3,
+              "description": "Use the explicit maximal-endpoint input on the boundary, together with the specialized ratio and parameter values, to identify the same real count with the eta-form shown first in Eq. (24). This is a direct scalar identity and does not use theoremOneIterationCount_eq_eta_horizon or any strict cardinality prerequisite.",
+              "ref": "Eq. (24), p. 14; Proof of Corollary 2, Appendix A.2, PDF lines 1198-1202",
+              "source_pdf_lines": [
+                1146,
+                1150
+              ],
+              "math": "T=\\frac{2\\Delta_0}{\\epsilon^2\\eta}\\overset{(20)}{=}\\frac{2\\Delta_0L}{\\epsilon^2}\\left(1+\\sqrt{\\frac{1-p}{pb'}}\\right).",
+              "uses": [
+                "Corollary2_maximal_endpoint_input",
+                "Corollary2_scalar_domain_adapter",
+                "previous_step:2"
+              ],
+              "produces": "unit_boundary_real_iteration_count"
+            }
+          ]
+        },
+        {
+          "name": "Corollary2_unit_boundary_horizon_adapter",
+          "ref": "Eq. (24), p. 14",
+          "statement_math": "T=\\frac{2\\Delta_0}{\\epsilon^2\\eta}\\overset{(20)}{=}\\frac{2\\Delta_0L}{\\epsilon^2}\\left(1+\\sqrt{\\frac{1-p}{pb'}}\\right).",
+          "role": "Supplies the formal positive natural horizon required by the inherited convergence interface on the source-allowed unit-batch boundary. It preserves the paper's displayed real iteration count and separately constructs a ceiling/max horizon with the required NeZero and count-at-least facts.",
+          "source_status": "The statement_math is the paper's real-valued Eq. (24). The natural-horizon construction is a separate Lean-only adapter obligation; the paper uses a real-valued T and does not print a natural-horizon construction.",
+          "formal_obligation": "Lean-only adapter facts, not source assumptions or source statement math: choose T_hor ∈ ℕ with 0 < T_hor, provide [NeZero T_hor], and prove theoremOneIterationCount(L,p,ε) ≤ (T_hor : ℝ) so theoremOne_finiteDimensional and theoremOne_eta_horizon_bound can be applied.",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Use the separately named boundary real-count adapter, which unfolds theoremOneIterationCount_def and applies the non-strict boundary parameter identities directly. This is the real count that the formal horizon must dominate; it is not replaced by the natural horizon and does not invoke the strict eta-horizon theorem.",
+              "ref": "Algorithms.Unverified.PAGE.Setup.theoremOneIterationCount_def; Eq. (24), p. 14; Proof of Corollary 2, Appendix A.2, PDF lines 1196-1202",
+              "source_pdf_lines": [
+                1146,
+                1150
+              ],
+              "math": "T=\\frac{2\\Delta_0}{\\epsilon^2\\eta}\\overset{(20)}{=}\\frac{2\\Delta_0L}{\\epsilon^2}\\left(1+\\sqrt{\\frac{1-p}{pb'}}\\right).",
+              "uses": [
+                "Corollary2_unit_boundary_real_count_adapter",
+                "Corollary2_optimality_gap_nonnegative",
+                "Corollary2_positive_epsilon_input"
+              ],
+              "produces": "unit_boundary_real_iteration_count"
+            },
+            {
+              "step": 2,
+              "description": "Use the explicit formal positivity and gap-domain obligations to show that the inherited real iteration count is nonnegative, then choose the unit-boundary formal horizon as the maximum of 1 and a natural ceiling of that real count. The ceiling/max construction is a Lean adapter construction and is not printed in the paper.",
+              "ref": "Formal boundary horizon adapter for theoremOne_finiteDimensional; source count Eq. (24), p. 14",
+              "source_pdf_lines": [
+                1146,
+                1150
+              ],
+              "uses": [
+                "Corollary2_optimality_gap_nonnegative",
+                "Corollary2_positive_epsilon_input",
+                "previous_step:1"
+              ],
+              "produces": "unit_boundary_selected_positive_natural_horizon"
+            },
+            {
+              "step": 3,
+              "description": "The maximum-with-1 construction supplies a strictly positive natural horizon and therefore the NeZero instance required by theoremOne_eta_horizon_bound and theoremOne_finiteDimensional.",
+              "ref": "Algorithms.Unverified.PAGE.Setup.theoremOne_finiteDimensional, Lean lines 5471-5474; theoremOne_eta_horizon_bound, Lean lines 4874-4877",
+              "source_pdf_lines": [
+                1146,
+                1150
+              ],
+              "uses": [
+                "previous_step:2"
+              ],
+              "produces": "unit_boundary_horizon_nezero"
+            },
+            {
+              "step": 4,
+              "description": "Use the natural ceiling/max construction to establish theoremOneIterationCount L p epsilon <= (T_hor : R), the explicit count-at-least premise consumed by the inherited convergence theorem. This formal inequality is kept separate from the paper's displayed real-valued T.",
+              "ref": "Algorithms.Unverified.PAGE.Setup.theoremOne_finiteDimensional, Lean lines 5471-5474; theoremOne_eta_horizon_bound, Lean lines 4874-4877",
+              "source_pdf_lines": [
+                1146,
+                1150
+              ],
+              "uses": [
+                "previous_step:1",
+                "previous_step:2",
+                "previous_step:3"
+              ],
+              "produces": "unit_boundary_horizon_at_least_iteration_count"
+            }
+          ]
+        },
+        {
+          "name": "Inherited_Eq13_gradient_complexity",
+          "ref": "Eq. (13), p. 12; Algorithms.Unverified.PAGE.Setup.theoremOneGradientComplexity_def",
+          "statement_math": "\\#\\mathrm{grad}=b+T(pb+(1-p)b')",
+          "role": "Inherited total stochastic-gradient cost identity, including the initial full-minibatch cost and the expected per-iteration PAGE estimator cost.",
+          "source_status": "reused from the approved Theorem 1 model",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Reuse the approved Theorem 1 gradient-complexity identity before specializing p, b, and b'.",
+              "ref": "Eq. (13), p. 12; inherited Lean declaration",
+              "source_pdf_lines": [
+                1007,
+                1012
+              ],
+              "math": "\\#\\mathrm{grad}=b+T(pb+(1-p)b')",
+              "uses": [
+                "PAGE_initial_estimator",
+                "PAGE_gradient_estimator"
+              ],
+              "produces": "inherited_gradient_complexity_identity"
+            }
+          ]
+        },
+        {
+          "name": "Corollary2_initial_gap_nonnegative",
+          "ref": "Notation, p. 4, PDF lines 317-321; inherited initialGap_nonneg declaration",
+          "statement_math": "\\Delta_0 := f(x^0)-f^*",
+          "role": "Derived nonnegativity of the initial optimality gap, used to establish the sign of the complexity multiplier and the nonnegative iteration-count prerequisite.",
+          "source_status": "derived Lean arithmetic prerequisite; not a paper-facing assumption",
+          "formal_obligation": "The source prints only the definition \\Delta_0 := f(x^0)-f^*. The Lean adapter additionally derives the non-source consequence \\Delta_0\\ge 0 from the inherited minimum-value lower bound at x^0.",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Invoke the source initial-gap identity and the inherited minimum-value lower-bound interface at x^0 to establish Delta_0>=0.",
+              "ref": "Notation, p. 4, PDF lines 317-321; inherited initialGap_nonneg declaration",
+              "source_pdf_lines": [
+                317,
+                321
+              ],
+              "math": "\\Delta_0:=f(x^0)-f^*",
+              "uses": [
+                "Corollary2_initial_gap_identity",
+                "Corollary2_optimality_gap_nonnegative"
+              ],
+              "produces": "corollary2_initial_gap_nonnegative"
+            }
+          ]
+        },
+        {
+          "name": "Corollary2_complexity_multiplier_nonnegative",
+          "ref": "Proof of Corollary 2, Appendix A.2, PDF lines 1212-1215; Lean arithmetic adapter",
+          "role": "Derived sign fact allowing the first displayed complexity inequality to preserve the direction of the batch-cost bound.",
+          "source_status": "derived Lean arithmetic prerequisite; not a paper-facing assumption",
+          "formal_obligation": "The Lean-only fact recorded by this prerequisite is 0\\le 2\\Delta_0L/\\epsilon^2, derived from the initial-gap, smoothness, and positive-epsilon obligations. The source-facing first overall complexity inequality is recorded separately as Corollary2_complexity_first_bound.",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Carry the strict positivity facts for L and epsilon and the positive secondary batch cardinality from the scalar-domain adapter; these make epsilon^2 and b' valid positive denominators.",
+              "ref": "Lean scalar adapter; Proof of Corollary 2, Appendix A.2, PDF lines 1196-1221",
+              "source_pdf_lines": [
+                1196,
+                1221
+              ],
+              "uses": [
+                "Corollary2_scalar_domain_adapter",
+                "Corollary2_positive_epsilon_input",
+                "Corollary2_scalar_cardinality_bridge"
+              ],
+              "produces": "corollary2_L_epsilon_bprime_positive"
+            },
+            {
+              "step": 2,
+              "description": "Combine Delta_0>=0, L>0, and epsilon>0 to show the multiplier 2 Delta_0 L/epsilon^2 is nonnegative.",
+              "ref": "Lean arithmetic adapter for the first complexity inequality",
+              "source_pdf_lines": [
+                1212,
+                1215
+              ],
+              "uses": [
+                "Corollary2_initial_gap_nonnegative",
+                "previous_step:1"
+              ],
+              "produces": "corollary2_complexity_multiplier_nonnegative"
+            }
+          ]
+        },
+        {
+          "name": "Corollary2_batch_ratio_le_one",
+          "ref": "Proof of Corollary 2, Appendix A.2, PDF lines 1212-1215; Lean arithmetic adapter",
+          "role": "Derived batch-cost ratio inequality used in the first displayed complexity bound.",
+          "source_status": "derived Lean arithmetic prerequisite; not a paper-facing assumption",
+          "formal_obligation": "The Lean-only fact recorded by this prerequisite is 2bb'/(b+b')\\le 2b', obtained from the positive batch denominator and b/(b+b')\\le 1. The source prints the resulting first overall complexity inequality rather than this standalone sub-inequality; that printed inequality is recorded separately as Corollary2_complexity_first_bound.",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Use the scalar-domain and cardinality adapters to establish b>0, b'>0, and b+b'>0, so the batch-cost ratio is defined.",
+              "ref": "Lean scalar-domain and cardinality adapters; Proof of Corollary 2, Appendix A.2, PDF lines 1196-1221",
+              "source_pdf_lines": [
+                1196,
+                1221
+              ],
+              "uses": [
+                "Corollary2_scalar_domain_adapter",
+                "Corollary2_scalar_cardinality_bridge",
+                "Corollary2_finite_sum_index_bridge"
+              ],
+              "produces": "corollary2_positive_batch_cost_denominator"
+            },
+            {
+              "step": 2,
+              "description": "Establish b/(b+b')<=1 and multiply by the positive factor 2b' to obtain 2bb'/(b+b')<=2b'.",
+              "ref": "Proof of Corollary 2, Appendix A.2, PDF lines 1212-1215",
+              "source_pdf_lines": [
+                1212,
+                1215
+              ],
+              "uses": [
+                "previous_step:1"
+              ],
+              "produces": "corollary2_batch_ratio_le_one"
+            }
+          ]
+        },
+        {
+          "name": "Corollary2_sqrt_batch_factor_bound",
+          "ref": "Proof of Corollary 2, Appendix A.2, PDF lines 1216-1221; Lean arithmetic adapter",
+          "role": "Derived square-root batch factor bound used in the final displayed finite-sum complexity inequality.",
+          "source_status": "derived Lean arithmetic prerequisite; not a paper-facing assumption",
+          "formal_obligation": "The Lean-only fact recorded by this prerequisite is 2b'(1+\\sqrt{b}/b')\\le 4\\sqrt{b}, derived from b'\\le\\sqrt{b} and the positive batch-domain facts. The source prints the final overall complexity display rather than this standalone factor inequality; that printed bound is recorded in the main theorem and as the source-aligned final transition.",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Expand 2b'(1+sqrt(b)/b') as 2b'+2sqrt(b) using the positive secondary batch size.",
+              "ref": "Proof of Corollary 2, Appendix A.2, PDF lines 1216-1221",
+              "source_pdf_lines": [
+                1216,
+                1221
+              ],
+              "uses": [
+                "Corollary2_scalar_domain_adapter"
+              ],
+              "produces": "corollary2_expanded_sqrt_batch_factor"
+            },
+            {
+              "step": 2,
+              "description": "Use b'<=sqrt(b) and sqrt(b)>=0 to obtain 2b'(1+sqrt(b)/b')<=4sqrt(b).",
+              "ref": "Proof of Corollary 2, Appendix A.2, PDF lines 1216-1221",
+              "source_pdf_lines": [
+                1216,
+                1221
+              ],
+              "uses": [
+                "Corollary2_batch_range",
+                "previous_step:1"
+              ],
+              "produces": "corollary2_sqrt_batch_factor_bound"
+            }
+          ]
+        },
+        {
+          "name": "Corollary2_complexity_identity",
+          "ref": "Proof of Corollary 2, Appendix A.2, PDF lines 1206-1211",
+          "statement_math": "\\#\\mathrm{grad}=b+T(pb+(1-p)b')=b+\\frac{2\\Delta_0L}{\\epsilon^2}\\left(1+\\frac{\\sqrt{b}}{b'}\\right)\\frac{2bb'}{b+b'}",
+          "role": "Names the specialized total-cost equality consumed by the first complexity inequality, so that the complexity proof has a same-JSON dependency rather than reaching into the main-theorem proof array.",
+          "source_status": "source-aligned derived proof transition; the displayed equality is printed in the Corollary 2 proof.",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Use the strict and unit-boundary iteration-count adapters to supply the common Corollary 2 specialized real count after the probability, batch, and endpoint substitutions.",
+              "ref": "Proof of Corollary 2, Appendix A.2, PDF lines 1196-1202",
+              "source_pdf_lines": [
+                1196,
+                1202
+              ],
+              "math": "T=\\frac{2\\Delta_0L}{\\epsilon^2}\\left(1+\\frac{\\sqrt{b}}{b'}\\right)",
+              "uses": [
+                "Corollary2_strict_horizon_adapter",
+                "Corollary2_unit_boundary_horizon_adapter",
+                "Corollary2_batch_boundary_adapter",
+                "Corollary2_parameter_specialization"
+              ],
+              "produces": "corollary2_specialized_iteration_count"
+            },
+            {
+              "step": 2,
+              "description": "Start from the inherited total stochastic-gradient cost identity, retaining the initial full-batch cost and the expected per-iteration cost factor.",
+              "ref": "Eq. (13), p. 12; Proof of Corollary 2, Appendix A.2, PDF lines 1206-1207",
+              "source_pdf_lines": [
+                1007,
+                1012
+              ],
+              "math": "\\#\\mathrm{grad}=b+T(pb+(1-p)b')",
+              "uses": [
+                "Inherited_Eq13_gradient_complexity",
+                "previous_step:1"
+              ],
+              "produces": "corollary2_total_cost_before_parameter_substitution"
+            },
+            {
+              "step": 3,
+              "description": "Substitute p=b'/(b+b') into the expected per-iteration estimator cost and simplify it to the displayed batch ratio.",
+              "ref": "Proof of Corollary 2, Appendix A.2, PDF lines 1203-1204",
+              "source_pdf_lines": [
+                1203,
+                1204
+              ],
+              "math": "pb+(1-p)b'=\\frac{2bb'}{b+b'}",
+              "uses": [
+                "Corollary2_parameter_specialization",
+                "Corollary2_scalar_domain_adapter",
+                "previous_step:1"
+              ],
+              "produces": "corollary2_expected_iteration_gradient_cost"
+            },
+            {
+              "step": 4,
+              "description": "Insert the specialized iteration count and the simplified expected estimator cost into the inherited total-cost identity, obtaining the displayed Corollary 2 equality.",
+              "ref": "Proof of Corollary 2, Appendix A.2, PDF lines 1206-1211",
+              "source_pdf_lines": [
+                1206,
+                1211
+              ],
+              "math": "\\#\\mathrm{grad}=b+T(pb+(1-p)b')=b+\\frac{2\\Delta_0L}{\\epsilon^2}\\left(1+\\frac{\\sqrt{b}}{b'}\\right)\\frac{2bb'}{b+b'}",
+              "uses": [
+                "previous_step:2",
+                "previous_step:3"
+              ],
+              "produces": "corollary2_gradient_complexity_identity"
+            }
+          ]
+        },
+        {
+          "name": "Corollary2_complexity_first_bound",
+          "ref": "Proof of Corollary 2, Appendix A.2, PDF lines 1206-1215",
+          "statement_math": "\\#\\mathrm{grad}\\le b+\\frac{2\\Delta_0L}{\\epsilon^2}\\left(1+\\frac{\\sqrt{b}}{b'}\\right)2b'",
+          "role": "Source-aligned proof record for the first displayed complexity inequality, retaining the inherited total-cost equality as its input and exposing the multiplier and batch-ratio premises.",
+          "source_status": "derived source proof transition; not a paper-facing assumption",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Reuse the named Corollary 2 total-cost equality, including its substituted iteration count and expected per-iteration batch cost.",
+              "ref": "Proof of Corollary 2, Appendix A.2, PDF lines 1206-1211",
+              "source_pdf_lines": [
+                1206,
+                1211
+              ],
+              "math": "\\#\\mathrm{grad}=b+T(pb+(1-p)b')=b+\\frac{2\\Delta_0L}{\\epsilon^2}\\left(1+\\frac{\\sqrt{b}}{b'}\\right)\\frac{2bb'}{b+b'}",
+              "uses": [
+                "Corollary2_complexity_identity"
+              ],
+              "produces": "corollary2_complexity_identity_for_bound"
+            },
+            {
+              "step": 2,
+              "description": "Apply the nonnegative multiplier and the batch-ratio inequality to the equality from the preceding step, producing the first displayed complexity inequality.",
+              "ref": "Proof of Corollary 2, Appendix A.2, PDF lines 1212-1215",
+              "source_pdf_lines": [
+                1212,
+                1215
+              ],
+              "math": "\\#\\mathrm{grad}\\le b+\\frac{2\\Delta_0L}{\\epsilon^2}\\left(1+\\frac{\\sqrt{b}}{b'}\\right)2b'",
+              "uses": [
+                "Corollary2_complexity_multiplier_nonnegative",
+                "Corollary2_batch_ratio_le_one",
+                "previous_step:1"
+              ],
+              "produces": "corollary2_complexity_first_bound"
+            }
+          ]
+        },
+        {
+          "name": "Corollary2_complexity_final_bound",
+          "ref": "Corollary 2 and Eq. (26), p. 5; Proof of Corollary 2, Appendix A.2, PDF lines 1216-1221",
+          "statement_math": "\\#\\mathrm{grad}\\le n+\\frac{8\\Delta_0L\\sqrt{n}}{\\epsilon^2}",
+          "role": "Source-aligned final complexity transition applying b=n and b'\\le\\sqrt{b} to the first overall bound.",
+          "source_status": "source-aligned derived proof transition; not a paper-facing assumption",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Reuse the first displayed complexity inequality and specialize its initial batch term from b to n using the source full-batch condition b=n.",
+              "ref": "Proof of Corollary 2, Appendix A.2, PDF lines 1212-1215",
+              "source_pdf_lines": [
+                1212,
+                1215
+              ],
+              "math": "\\#\\mathrm{grad}\\le b+\\frac{2\\Delta_0L}{\\epsilon^2}\\left(1+\\frac{\\sqrt{b}}{b'}\\right)2b'",
+              "uses": [
+                "Corollary2_complexity_first_bound",
+                "Corollary2_parameter_specialization"
+              ],
+              "produces": "corollary2_first_bound_with_full_batch_substitution"
+            },
+            {
+              "step": 2,
+              "description": "Apply b'\\le\\sqrt{b} through the named square-root factor bound, preserve the inequality direction using the nonnegative complexity multiplier, and simplify b=n and 4\\sqrt{b}=4\\sqrt{n} to obtain the final source complexity bound.",
+              "ref": "Corollary 2 and Eq. (26), p. 5; Proof of Corollary 2, Appendix A.2, PDF lines 1216-1221",
+              "source_pdf_lines": [
+                1216,
+                1221
+              ],
+              "math": "\\#\\mathrm{grad}\\le n+\\frac{8\\Delta_0L\\sqrt{n}}{\\epsilon^2}",
+              "uses": [
+                "Corollary2_sqrt_batch_factor_bound",
+                "Corollary2_complexity_multiplier_nonnegative",
+                "Corollary2_batch_range",
+                "previous_step:1"
+              ],
+              "produces": "corollary2_complexity_final_bound"
+            }
+          ]
+        }
+      ],
+      "algorithm_spec": {
+        "initialization": {
+          "math": "g^0=\\frac{1}{b}\\sum_{i\\in I}\\nabla f_i(x^0)\\quad\\text{// }I\\text{ denotes random minibatch samples with }|I|=b",
+          "ref": "Algorithm 1, Line 1, p. 4"
+        },
+        "steps": [
+          {
+            "step": 1,
+            "name": "corollary2_parameter_specialization",
+            "math": "\\eta\\le \\frac{1}{L(1+\\frac{\\sqrt{b}}{b'})},\\quad b=n,\\quad b'\\le \\sqrt{b},\\quad p_t\\equiv \\frac{b'}{b+b'}",
+            "ref": "Corollary 2, p. 5"
+          }
+        ],
+        "output": {
+          "math": "\\hat{x}_T\\text{ chosen uniformly from }\\{x^t\\}_{t\\in[T]}",
+          "ref": "Algorithm 1 output, p. 4",
+          "type": "random iterate"
+        },
+        "parameters": [
+          {
+            "name": "corollary2_stepsize",
+            "math": "\\eta\\le \\frac{1}{L(1+\\frac{\\sqrt{b}}{b'})}",
+            "ref": "Corollary 2, p. 5"
+          },
+          {
+            "name": "corollary2_finite_sum_batch",
+            "math": "b=n",
+            "ref": "Corollary 2, p. 5"
+          },
+          {
+            "name": "corollary2_secondary_batch_range",
+            "math": "b'\\le \\sqrt{b}",
+            "ref": "Corollary 2, p. 5"
+          },
+          {
+            "name": "corollary2_probability",
+            "math": "p_t\\equiv \\frac{b'}{b+b'}",
+            "ref": "Corollary 2, p. 5"
+          }
+        ]
+      },
+      "main_theorem": {
+        "statement_math": "\\text{Corollary 2 (Optimal result for problem (2)) Suppose that Assumption 2 holds. Choose the stepsize }\\eta\\le \\frac{1}{L(1+\\frac{\\sqrt{b}}{b'})},\\text{ minibatch size }b=n,\\text{ secondary minibatch size }b'\\le \\sqrt{b}\\text{ and probability }p_t\\equiv \\frac{b'}{b+b'}.\\text{ Then the number of iterations performed by PAGE to find an }\\epsilon\\text{-approximate solution of the nonconvex finite-sum problem (2) can be bounded by }T=\\frac{2\\Delta_0L}{\\epsilon^2}\\left(1+\\frac{\\sqrt{b}}{b'}\\right).\\text{ Moreover, the number of stochastic gradient computations (i.e., gradient complexity) is }\\#\\mathrm{grad}\\le n+\\frac{8\\Delta_0L\\sqrt{n}}{\\epsilon^2}=O\\left(n+\\frac{\\sqrt{n}}{\\epsilon^2}\\right).",
+        "rate": "Corollary 2 specializes the finite-sum gradient complexity to O(n + sqrt(n)/epsilon^2), with the displayed bound n + 8 Delta_0 L sqrt(n)/epsilon^2 when the source constants are retained.",
+        "measure": "Expected gradient norm E[||nabla f(xhat_T)||] <= epsilon, together with the total stochastic-gradient computation count.",
+        "formal_adapter_statement": "The statement_math above is the source Corollary 2 transcription. The conditional Lean extension route is separately parameterized by the named positive-epsilon, endpoint, scalar/cardinality, full-batch-index, strict-or-unit-boundary, and selected-horizon adapter obligations below; those obligations are not being added to the paper-facing theorem statement.",
+        "ref": "Corollary 2 and Eq. (26), p. 5; Proof of Corollary 2, Appendix A.2, p. 15",
+        "source_pdf_lines": [
+          391,
+          414
+        ],
+        "proof": [
+          {
+            "step": 1,
+            "description": "Substitute the Corollary 2 probability p=b'/(b+b') and simplify the ratio in Theorem 1's stepsize and iteration expressions.",
+            "ref": "Proof of Corollary 2, Appendix A.2, p. 15",
+            "source_pdf_lines": [
+              1196,
+              1200
+            ],
+            "math": "p=\\frac{b'}{b+b'},\\quad \\sqrt{\\frac{1-p}{pb'}}=\\frac{\\sqrt{b}}{b'}",
+            "uses": [
+              "Corollary2_parameter_specialization",
+              "Theorem1_parameter_schedule",
+              "Corollary2_scalar_domain_adapter"
+            ],
+            "produces": "corollary2_ratio_simplification"
+          },
+          {
+            "step": 2,
+            "description": "Keep the paper's upper-bound statement eta<=... as written. The conditional Lean adapter separately threads the maximal-endpoint input, the scalar/cardinality and full-batch index bridges, positive epsilon, and the strict-or-unit boundary split; none of those formal inputs is inferred from the source upper bound.",
+            "ref": "Proof of Corollary 2, Appendix A.2, p. 15; inherited Lean schedule and batch-boundary adapters",
+            "source_pdf_lines": [
+              1198,
+              1202
+            ],
+            "math": "\\eta\\le \\frac{1}{L(1+\\frac{\\sqrt{b}}{b'})}",
+            "uses": [
+              "Corollary2_parameter_specialization",
+              "Corollary2_maximal_schedule_adapter",
+              "Corollary2_batch_boundary_adapter",
+              "Corollary2_maximal_endpoint_input",
+              "Corollary2_scalar_cardinality_bridge",
+              "Corollary2_finite_sum_index_bridge",
+              "Corollary2_positive_epsilon_input",
+              "previous_step:1"
+            ],
+            "produces": "corollary2_maximal_endpoint_and_batch_case_split"
+          },
+          {
+            "step": 3,
+            "description": "On the strict b'<b branch, combine the explicit endpoint choice, the strict cardinality consequence, and the full-batch index bridge to instantiate TheoremOneSchedule. Apply the inherited eta-horizon identity only after that schedule has been constructed; the ratio identity from step 1 gives the specialized L-based iteration expression.",
+            "ref": "Proof of Corollary 2, Appendix A.2, PDF lines 1198-1202; inherited Eq. (24) adapter",
+            "source_pdf_lines": [
+              1198,
+              1202
+            ],
+            "math": "T=\\frac{2\\Delta_0L}{\\epsilon^2}\\left(1+\\frac{\\sqrt{b}}{b'}\\right)",
+            "uses": [
+              "Corollary2_maximal_schedule_adapter",
+              "Corollary2_batch_boundary_adapter",
+              "Corollary2_maximal_endpoint_input",
+              "Corollary2_scalar_cardinality_bridge",
+              "Corollary2_finite_sum_index_bridge",
+              "Corollary2_positive_epsilon_input",
+              "theoremOneIterationCount_eq_eta_horizon",
+              "previous_step:1",
+              "previous_step:2"
+            ],
+            "produces": "corollary2_strict_schedule_and_iteration_count"
+          },
+          {
+            "step": 4,
+            "description": "Construct the formal natural-number horizon for the strict branch as a positive ceiling/max of the inherited real iteration count. This produces both the NeZero T premise and the theoremOneIterationCount L p epsilon <= (T : R) premise required by theoremOne_finiteDimensional; it does not replace the source's displayed real count.",
+            "ref": "Algorithms.Unverified.PAGE.Setup.theoremOne_finiteDimensional and theoremOne_eta_horizon_bound; formal strict-branch horizon adapter",
+            "source_pdf_lines": [
+              1146,
+              1150
+            ],
+            "uses": [
+              "Corollary2_strict_horizon_adapter",
+              "Corollary2_positive_epsilon_input",
+              "theoremOneIterationCount_eq_eta_horizon",
+              "previous_step:3"
+            ],
+            "produces": "corollary2_strict_horizon_nezero_and_count_lower_bound"
+          },
+          {
+            "step": 5,
+            "description": "Apply the inherited finite-dimensional convergence declaration with the strict schedule, positive epsilon, and the two explicit selected-horizon premises from step 4. This is the formal source-adapter route that supplies the expected-gradient guarantee; the source theorem head remains a transcription of Corollary 2.",
+            "ref": "Algorithms.Unverified.PAGE.Setup.theoremOne_finiteDimensional; inherited Theorem 1 output guarantee",
+            "source_pdf_lines": [
+              1146,
+              1156
+            ],
+            "uses": [
+              "Inherited_theoremOne_finiteDimensional_convergence",
+              "Corollary2_strict_horizon_adapter",
+              "Corollary2_positive_epsilon_input",
+              "Corollary2_stochastic_laws_adapter",
+              "theoremOneIterationCount_eq_eta_horizon",
+              "previous_step:3",
+              "previous_step:4"
+            ],
+            "produces": "corollary2_strict_iteration_bound_and_output_guarantee"
+          },
+          {
+            "step": 6,
+            "description": "On the separately dispatched b=b'=1 boundary, use the expanded boundary convergence route together with the named positive-natural-horizon adapter, its NeZero fact, and its count-at-least premise to establish the expected gradient-norm guarantee and the same specialized real iteration expression without invoking the strict inherited schedule interface.",
+            "ref": "Corollary 2, Appendix A.2, PDF lines 1196-1202; boundary adapter proof",
+            "source_pdf_lines": [
+              1196,
+              1202
+            ],
+            "uses": [
+              "Corollary2_batch_boundary_adapter",
+              "Corollary2_unit_batch_boundary_adapter",
+              "Corollary2_unit_boundary_horizon_adapter",
+              "Corollary2_maximal_endpoint_input",
+              "Corollary2_scalar_cardinality_bridge",
+              "Corollary2_finite_sum_index_bridge",
+              "Corollary2_positive_epsilon_input",
+              "Corollary2_stochastic_laws_adapter",
+              "previous_step:2"
+            ],
+            "produces": "corollary2_boundary_iteration_and_output_guarantee"
+          },
+          {
+            "step": 7,
+            "description": "Recombine the strict and unit-boundary branches: both branch-local routes produce the paper's displayed specialized iteration count and expected gradient-norm guarantee, while the theorem head retains the source non-strict batch condition.",
+            "ref": "Corollary 2, p. 5; Proof of Corollary 2, Appendix A.2, PDF lines 1198-1202",
+            "source_pdf_lines": [
+              1198,
+              1202
+            ],
+            "math": "T=\\frac{2\\Delta_0L}{\\epsilon^2}\\left(1+\\frac{\\sqrt{b}}{b'}\\right)",
+            "uses": [
+              "previous_step:5",
+              "previous_step:6",
+              "Corollary2_batch_boundary_adapter"
+            ],
+            "produces": "corollary2_iteration_bound"
+          },
+          {
+            "step": 8,
+            "description": "Use Line 4 of Algorithm 1 to count the expected stochastic gradients computed in one iteration and simplify the probability-weighted batch cost.",
+            "ref": "Proof of Corollary 2, Appendix A.2, p. 15",
+            "source_pdf_lines": [
+              1203,
+              1204
+            ],
+            "math": "pb+(1-p)b'=\\frac{2bb'}{b+b'}",
+            "uses": [
+              "PAGE_gradient_estimator",
+              "Corollary2_parameter_specialization",
+              "previous_step:1"
+            ],
+            "produces": "corollary2_expected_iteration_gradient_cost"
+          },
+          {
+            "step": 9,
+            "description": "Substitute the specialized iteration count and expected per-iteration cost into the inherited total-cost identity, retaining the displayed equality for #grad.",
+            "ref": "Proof of Corollary 2, Appendix A.2, p. 15",
+            "source_pdf_lines": [
+              1206,
+              1211
+            ],
+            "math": "\\#\\mathrm{grad}=b+T(pb+(1-p)b')=b+\\frac{2\\Delta_0L}{\\epsilon^2}\\left(1+\\frac{\\sqrt{b}}{b'}\\right)\\frac{2bb'}{b+b'}",
+            "uses": [
+              "PAGE_initial_estimator",
+              "Inherited_Eq13_gradient_complexity",
+              "previous_step:7",
+              "previous_step:8"
+            ],
+            "produces": "corollary2_gradient_complexity_identity"
+          },
+          {
+            "step": 10,
+            "description": "Use the named facts b/(b+b')<=1 and 0<=2 Delta_0 L/epsilon^2 to bound the expected per-iteration factor 2bb'/(b+b') by 2b' without changing the inequality direction, producing the first inequality in the source complexity chain.",
+            "ref": "Proof of Corollary 2, Appendix A.2, p. 15",
+            "source_pdf_lines": [
+              1212,
+              1215
+            ],
+            "math": "\\#\\mathrm{grad}\\le b+\\frac{2\\Delta_0L}{\\epsilon^2}\\left(1+\\frac{\\sqrt{b}}{b'}\\right)2b'",
+            "uses": [
+              "Corollary2_complexity_multiplier_nonnegative",
+              "Corollary2_batch_ratio_le_one",
+              "previous_step:9"
+            ],
+            "produces": "corollary2_complexity_first_bound"
+          },
+          {
+            "step": 11,
+            "description": "Apply the source parameter setting b=n and b'<=sqrt(b), then consume the named source-aligned final-complexity transition, whose proof uses the first bound, the square-root factor bound, and the nonnegative multiplier, to obtain the final displayed finite-sum complexity bound.",
+            "ref": "Corollary 2 and Eq. (26), p. 5; Proof of Corollary 2, Appendix A.2, PDF lines 1216-1221",
+            "source_pdf_lines": [
+              1216,
+              1221
+            ],
+            "math": "\\#\\mathrm{grad}\\le n+\\frac{8\\Delta_0L\\sqrt{n}}{\\epsilon^2}",
+            "uses": [
+              "Corollary2_parameter_specialization",
+              "Corollary2_batch_range",
+              "Corollary2_complexity_multiplier_nonnegative",
+              "Corollary2_sqrt_batch_factor_bound",
+              "Corollary2_complexity_final_bound",
+              "previous_step:10"
+            ],
+            "produces": "corollary2_complexity_bound_26"
+          }
+        ]
+      },
+      "source_gaps": [
+        {
+          "name": "Corollary2_upper_bound_vs_Theorem1_maximal_schedule",
+          "ref": "Corollary 2, p. 5; Theorem 1 Eq. (20), p. 14; existing Lean schedule correction",
+          "description": "The paper states the Corollary 2 stepsize with an upper bound eta <= 1/(L(1+sqrt(b)/b')), while the inherited Lean theoremOne public interface uses the maximal-step equality so that the displayed L-based iteration count is definitionally the eta-horizon. The extension now records that equality as an explicit maximal-endpoint choice, separate from the source upper bound, and wires it into theoremOneIterationCount_eq_eta_horizon; Phase 0 must implement this adapter and must not claim the printed count from an arbitrary smaller eta."
+        },
+        {
+          "name": "Corollary2_secondary_batch_boundary",
+          "ref": "Corollary 2, p. 5; Theorem 1, p. 12",
+          "description": "Corollary 2 prints b'<=sqrt(b), whereas the inherited Theorem 1 algorithm interface also carries b'<b. The extension now records the strict-or-unit-boundary case split: b'<b feeds the inherited interface, while equality is separately identified as b=b'=1 and sent through the named Corollary2_unit_batch_boundary_adapter route before the branches are recombined. Phase 0 must implement that dispatch without silently replacing the source non-strict inequality."
+        },
+        {
+          "name": "Corollary2_formal_interface_obligations",
+          "ref": "Corollary 2, p. 5; inherited Lean declarations theoremOneIterationCount_eq_eta_horizon and theoremOne_finiteDimensional",
+          "description": "The source corollary does not print the formal side conditions needed by the seeded Lean interfaces. The extension therefore names, rather than hides, the positive-epsilon input, the scalar-to-cardinality/nonempty-batch bridge, the full-batch index equality, the maximal-endpoint equality, the direct boundary count-definition adapter, and the selected natural horizon with NeZero and count-at-least-T premises. These records are conditional adapter inputs or constructions and are not added to the paper-facing Corollary 2 assumptions."
+        },
+        {
+          "name": "Corollary2_source_statement_vs_conditional_adapter",
+          "ref": "Corollary 2, pp. 5 and 15; inherited Lean declarations theoremOne_finiteDimensional and theoremOne_eta_horizon_bound",
+          "description": "The source theorem head remains the paper's upper-bound statement and is not silently strengthened. The Lean route is a separately identified conditional adapter theorem: it consumes the named endpoint/cardinality/domain obligations, constructs a positive natural horizon at least the inherited real iteration count, and only then applies the inherited convergence declaration."
+        }
+      ]
+    },
+    "new_obligations": [
+      "Add a named PAGE Corollary 2 parameter adapter in Algorithms.Unverified.PAGE.Setup with p=b'/(b+b'), b=n, b'<=sqrt(b), and the exact source stepsize expression 1/(L(1+sqrt(b)/b')).",
+      "Expose positive epsilon as an explicit formal interface input, separately from the paper-facing assumptions, before invoking theoremOneIterationCount_eq_eta_horizon or theoremOne_finiteDimensional.",
+      "Expose the scalar-to-cardinality identification and nonempty finite-batch facts as a named adapter obligation before deriving the strict cardinality branch or the unit-batch boundary.",
+      "Prove the finite-sum index bridge b=n=Fintype.card ι and use it with b=Fintype.card B to produce the full-batch schedule premise Fintype.card B=Fintype.card ι before applying the inherited theorem.",
+      "Expose the maximal-endpoint equality as a named formal input rather than deriving it from the source upper-bound condition.",
+      "Construct a positive natural selected horizon, with an explicit NeZero instance and theoremOneIterationCount L p epsilon <= (T : R), before invoking theoremOne_finiteDimensional.",
+      "Construct the separate unit-boundary positive natural horizon as a ceiling/max adapter, expose its NeZero instance, and thread its theoremOneIterationCount L p epsilon <= (T_hor : R) premise through the boundary Eq. (23)-Jensen output route.",
+      "Reuse the existing theoremOne convergence declaration and theoremOneIterationCount_eq_eta_horizon rather than duplicating the Theorem 1 proof; the extension theorem must remain reachable from the inherited PAGE process, stochastic-law interface, output law, and gradient-complexity definitions.",
+      "Pass the named Corollary2_stochastic_laws_adapter as S.StochasticLaws P to the inherited finite-dimensional convergence declaration before consuming its expected-gradient conclusion.",
+      "Prove the scalar identity sqrt((1-p)/(p b'))=sqrt(b)/b' with explicit positivity and nonzero-denominator obligations.",
+      "Formalize the expected per-iteration estimator cost pb+(1-p)b'=2bb'/(b+b') and the total-cost equality including the initial b gradient computations.",
+      "Formalize the two printed complexity inequalities separately: 2bb'/(b+b')<=2b', then b=n and b'<=sqrt(b) imply n+8 Delta_0 L sqrt(n)/epsilon^2.",
+      "Implement the recorded maximal-endpoint adapter for the inherited eta-horizon identity without strengthening the paper-facing corollary statement.",
+      "Implement the recorded strict-or-unit-boundary dispatch for b'<=sqrt(b) versus the inherited b'<b interface, preserving the non-strict source condition in the JSON.",
+      "Prove the separate unit-batch boundary route for b=b'=1, including the specialized maximal schedule, Lyapunov/output guarantee, and iteration expression before recombining it with the strict branch.",
+      "Expose explicit nonnegative multiplier, batch-ratio, and square-root batch-factor prerequisites for the two displayed complexity inequalities.",
+      "Populate the fully qualified Phase 0 proof root for the new corollary theorem after the adapter and arithmetic proof compile in the existing Algorithms.Unverified.PAGE module."
+    ],
+    "proof_roots": [
+      "Algorithms.Unverified.PAGE.Setup.corollaryTwo_corrected_adapter_root"
+    ]
+  },
+  "extension_audit": {
+    "baseline_reviewed": true,
+    "delta_faithful": true,
+    "reuse_justified": true,
+    "no_duplicate_model": true,
+    "no_assumption_leakage": true,
+    "proof_root_status": "corrected/non-original",
+    "evidence": "Reviewed the immutable baseline PAGE.json, PAGE.lean, and declaration index. The delta reuses Algorithms.Unverified.PAGE.Setup.theoremOne, theoremOneIterationCount_eq_eta_horizon, theoremOne_finiteDimensional, theoremOneGradientComplexity_def, AverageLSmooth, PAGE_initial_estimator, PAGE_gradient_estimator, and the inherited Lemma 1-3 proof interfaces; it adds the Corollary 2 parameter specialization, explicit conditional positive-epsilon, scalar/cardinality, full-batch-index, maximal-endpoint, and Corollary2_stochastic_laws_adapter records, the named Corollary2_initial_gap_identity, Corollary2_f_star_lower_bound, and Corollary2_optimality_gap_nonnegative prerequisites, the strict-cardinality branch, the selected positive natural horizon with NeZero and count-at-least-T premises, a separate Corollary2_unit_boundary_real_count_adapter based directly on theoremOneIterationCount_def, a separate Corollary2_unit_boundary_horizon_adapter with the same obligations for the b=b'=1 branch, and the separately expanded unit-boundary route. The main theorem head remains the printed source wording at PDF lines 391-414, while the formal Lean adapter is explicitly separated from that source transcription and is conditional on the named adapter obligations. Source math is kept to printed formulas: sqrt((1-p)/(p b'))=sqrt(b)/b', the upper-bound stepsize, T=2 Delta_0 L epsilon^{-2}(1+sqrt(b)/b'), pb+(1-p)b'=2bb'/(b+b'), the first complexity inequality, and the final n+8 Delta_0 L sqrt(n) epsilon^{-2} inequality. Endpoint equality, epsilon positivity, scalar/cardinality and full-batch index facts, denominator facts, multiplier sign, square-root batch bounds, stochastic-law input, and the natural-horizon premises are explicitly labeled non-source formal inputs or derived adapter outputs, so no hidden prerequisite is presented as a paper assumption. The strict branch still threads the full-batch/cardinality bridge, Corollary2_stochastic_laws_adapter, and the selected-horizon NeZero/count facts before consuming the inherited convergence declaration; the boundary route now uses the full-batch/index bridge for Phi_0=Delta_0 and derives its real count from theoremOneIterationCount_def and the explicit boundary identities, so it does not pass a strict TheoremOneSchedule or theoremOneIterationCount_eq_eta_horizon prerequisite through b=b'=1. The boundary proof continues to thread its own positive natural horizon, NeZero, and count-at-least facts through the Eq. (23)-Jensen output route while following Eqs. (14), (16)-(24), including the residual split, b'^{-2} rewrite, expanded Eq. (19) inequality, coefficient check, subscripted Lyapunov telescope, initialization, and full Jensen chain. No inherited statement, model, or proof step was changed. Phase 0 now registers the compiled corrected-adapter root as a corrected/non-original extension root; the remaining internal obligations are still explicit in PAGE.lean.",
+    "inherited_reference_repairs_reviewed": true,
+    "inherited_reference_repairs_evidence": "Reviewed the two inherited repairs recorded by the extension manifest: /main_theorem/proof/8/uses replaces Delta0_initial_gap with Delta0_initial_gap_identity and f_star_minimum_value with f_star_minimum_value_lower_bound, while /main_theorem/proof/9/uses replaces f_star_minimum_value with f_star_minimum_value_lower_bound. These are reference-only repairs to the named source-definition and inherited minimum-value interface records; they preserve the inherited Theorem 1 mathematics and make the proof dependencies resolve to the current JSON symbols without adding assumptions or changing any inherited statement or proof-step math."
+  }
+}

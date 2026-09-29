@@ -1,0 +1,15 @@
+.env
+.env.*
+.venv/
+.deps/
+.build/
+**/.lake/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.DS_Store
+/engine/
+/requirements.lock.txt
+.phase2f_agent_inputs/
+*.tar.gz
+*.zip

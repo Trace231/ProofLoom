@@ -1,0 +1,532 @@
+{
+  "algorithm": "RSGF",
+  "full_name": "Randomized Stochastic Gradient Free Method",
+  "source_reference": "G. Lan, First-Order and Stochastic Optimization Methods for Machine Learning, Springer 2020, Section 6.1.2.1 (Theorem 6.3)",
+  "setup": {
+    "problem": {
+      "math": "f^* := \\inf_{x\\in\\mathbb{R}^n} f(x) := \\int_{\\Xi} F(x,\\xi)dP(\\xi).",
+      "ref": "(6.1.47)",
+      "description": "Unconstrained stochastic zeroth-order optimization with f represented as an expectation."
+    },
+    "variable_space": {
+      "math": "x\\in\\mathbb{R}^n",
+      "ref": "(6.1.47)"
+    }
+  },
+  "assumptions": [
+    {
+      "name": "Objective_L_smooth_descent",
+      "math": "|f(y)-f(x)-\\langle \\nabla f(x),y-x\\rangle|\\le \\frac{L}{2}\\|y-x\\|^2,\\ \\forall x,y\\in\\mathbb{R}^n.",
+      "ref": "(6.1.2)",
+      "parameters": ["f", "L"]
+    },
+    {
+      "name": "SFO_unbiased",
+      "math": "\\mathrm{E}[G(x_k,\\xi_k)]=\\nabla f(x_k).",
+      "ref": "(6.1.5)",
+      "parameters": ["G", "x_k", "\\xi_k"]
+    },
+    {
+      "name": "SFO_variance_bound",
+      "math": "\\mathrm{E}\\|G(x_k,\\xi_k)-\\nabla f(x_k)\\|^2\\le \\sigma^2.",
+      "ref": "(6.1.6)",
+      "parameters": ["G", "x_k", "\\xi_k", "\\sigma"]
+    },
+    {
+      "name": "Sample_function_L_smooth",
+      "math": "F(x,\\xi)\\in C_L^{1,1}(\\mathbb{R}^n)\\ \\text{almost surely}",
+      "ref": "p.319 before (6.1.48)",
+      "parameters": ["F", "L", "\\xi"]
+    },
+    {
+      "name": "SZO_unbiased_function_value",
+      "math": "\\mathrm{E}[F(x_k,\\xi_k)]=f(x_k).",
+      "ref": "(6.1.48)",
+      "parameters": ["F", "f", "x_k", "\\xi_k"]
+    },
+    {
+      "name": "RSGF_finite_difference_step",
+      "math": "G_\\mu(x_k,\\xi_k,u_k)=\\frac{F(x_k+\\mu u_k,\\xi_k)-F(x_k,\\xi_k)}{\\mu}u_k.",
+      "ref": "(6.1.58)",
+      "parameters": ["G_\\mu", "F", "x_k", "\\xi_k", "u_k", "\\mu"]
+    },
+    {
+      "name": "RSGF_update_step",
+      "math": "x_{k+1}=x_k-\\gamma_k G_\\mu(x_k,\\xi_k,u_k).",
+      "ref": "(6.1.59)",
+      "parameters": ["x_k", "\\gamma_k", "G_\\mu"]
+    },
+    {
+      "name": "RSGF_probability_mass",
+      "math": "P_R(k):=\\mathrm{Prob}\\{R=k\\}=\\frac{\\gamma_k-2L(n+4)\\gamma_k^2}{\\sum_{k=1}^N[\\gamma_k-2L(n+4)\\gamma_k^2]},\\ k=1,\\ldots,N.",
+      "ref": "(6.1.61)",
+      "parameters": ["P_R", "R", "\\gamma_k", "L", "n", "N"]
+    },
+    {
+      "name": "Stepsize_upper_bound",
+      "math": "\\gamma_k<1/[2(n+4)L]",
+      "ref": "Theorem 6.3 before (6.1.61)",
+      "parameters": ["\\gamma_k", "n", "L"]
+    },
+    {
+      "name": "Df_definition",
+      "math": "D_f:=\\left[\\frac{2(f(x_1)-f^*)}{L}\\right]^{1/2}.",
+      "ref": "(6.1.13)",
+      "parameters": ["D_f", "f", "x_1", "f^*", "L"]
+    },
+    {
+      "name": "DX_definition",
+      "math": "D_X:=\\|x_1-x^*\\|.",
+      "ref": "(6.1.15)",
+      "parameters": ["D_X", "x_1", "x^*"]
+    },
+    {
+      "name": "Convex_problem_optional",
+      "math": "\\text{problem (6.1.47) is convex with an optimal solution }x^*",
+      "ref": "Theorem 6.3(b)",
+      "parameters": ["f", "x^*"]
+    }
+  ],
+  "algorithm_spec": {
+    "initialization": {
+      "math": "\\text{Input: Initial point }x_1,\\text{ iteration limit }N,\\text{ stepsizes }\\{\\gamma_k\\}_{k\\ge 1},\\text{ probability mass function }P_R(\\cdot)\\text{ supported on }\\{1,\\ldots,N\\}.\\ \\text{Step 0. Let }R\\text{ be a random variable with probability mass function }P_R.",
+      "ref": "RSGF method, p.320"
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "Gaussian_direction_generation",
+        "math": "\\text{Generate }u_k\\text{ by Gaussian random vector generator}",
+        "ref": "RSGF method, p.320"
+      },
+      {
+        "step": 2,
+        "name": "Zeroth_order_gradient",
+        "math": "G_\\mu(x_k,\\xi_k,u_k)=\\frac{F(x_k+\\mu u_k,\\xi_k)-F(x_k,\\xi_k)}{\\mu}u_k.",
+        "ref": "(6.1.58)"
+      },
+      {
+        "step": 3,
+        "name": "Gradient_free_update",
+        "math": "x_{k+1}=x_k-\\gamma_k G_\\mu(x_k,\\xi_k,u_k).",
+        "ref": "(6.1.59)"
+      }
+    ],
+    "output": {
+      "math": "x_R",
+      "ref": "RSGF method, p.320",
+      "type": "random iterate"
+    },
+    "parameters": [
+      {
+        "name": "smoothing_parameter",
+        "math": "\\mu>0",
+        "ref": "p.319 before (6.1.49)"
+      },
+      {
+        "name": "Gaussian_direction_distribution",
+        "math": "\\text{Let }u\\text{ be n-dimensional standard Gaussian random vector and }\\mu>0\\text{ be the smoothing parameter.}",
+        "ref": "p.319 before (6.1.49)"
+      },
+      {
+        "name": "Gaussian_smoothing",
+        "math": "f^\\mu(x)=\\frac{1}{(2\\pi)^{n/2}}\\int f(x+\\mu u)e^{-\\frac{1}{2}\\|u\\|^2}du=\\mathrm{E}_u[f(x+\\mu u)].",
+        "ref": "(6.1.49)"
+      },
+      {
+        "name": "RSGF_probability_mass",
+        "math": "P_R(k):=\\mathrm{Prob}\\{R=k\\}=\\frac{\\gamma_k-2L(n+4)\\gamma_k^2}{\\sum_{k=1}^N[\\gamma_k-2L(n+4)\\gamma_k^2]},\\ k=1,\\ldots,N.",
+        "ref": "(6.1.61)"
+      },
+      {
+        "name": "Df_definition",
+        "math": "D_f:=\\left[\\frac{2(f(x_1)-f^*)}{L}\\right]^{1/2}.",
+        "ref": "(6.1.13)"
+      },
+      {
+        "name": "DX_definition",
+        "math": "D_X:=\\|x_1-x^*\\|.",
+        "ref": "(6.1.15)"
+      }
+    ]
+  },
+  "main_theorem": {
+    "statement_math": "\\text{Suppose that the stepsizes }\\{\\gamma_k\\}\\text{ and the probability mass function }P_R(\\cdot)\\text{ in the RSGF method are chosen such that }\\gamma_k<1/[2(n+4)L]\\text{ and }P_R(k):=\\mathrm{Prob}\\{R=k\\}=\\frac{\\gamma_k-2L(n+4)\\gamma_k^2}{\\sum_{k=1}^N[\\gamma_k-2L(n+4)\\gamma_k^2]},\\ k=1,\\ldots,N.\\ \\text{Then, under Assumptions 13 and 15, (a) for any }N\\ge 1,\\ \\frac{1}{L}\\mathrm{E}[\\|\\nabla f(x_R)\\|^2]\\le \\frac{1}{\\sum_{k=1}^N[\\gamma_k-2L(n+4)\\gamma_k^2]}\\left(D_f^2+2\\mu^2(n+4)\\left[1+L(n+4)^2\\sum_{k=1}^N(\\gamma_k/4+L\\gamma_k^2)\\right]+2(n+4)\\sigma^2\\sum_{k=1}^N\\gamma_k^2\\right),\\ \\text{where the expectation is taken with respect to }R,\\xi_{[N]},\\text{ and }u_{[N]},\\text{ and }D_f\\text{ is defined in (6.1.13);}\\ \\text{(b) if, in addition, problem (6.1.47) is convex with an optimal solution }x^*,\\text{ then, for any }N\\ge 1,\\ \\mathrm{E}[f(x_R)-f^*]\\le \\frac{1}{2\\sum_{k=1}^N[\\gamma_k-2(n+4)L\\gamma_k^2]}\\left(D_X^2+2\\mu^2L(n+4)\\sum_{k=1}^N[\\gamma_k+L(n+4)^2\\gamma_k^2]+2(n+4)\\sigma^2\\sum_{k=1}^N\\gamma_k^2\\right),\\ \\text{where the expectation is taken with respect to }R,\\xi_{[N]},\\text{ and }u_{[N]},\\text{ and }D_X\\text{ is defined in (6.1.15).}",
+    "rate": "For the constant stepsize and smoothing choices in Corollary 6.3, the iteration complexity for an expected epsilon-stationary point is O(n/epsilon^2).",
+    "measure": "Expected squared gradient norm for the nonconvex case; expected optimality gap for the convex case.",
+    "proof": [
+      {
+        "step": 1,
+        "description": "Introduce the combined random variable and the smoothed-gradient residual used throughout the proof.",
+        "ref": "Proof of Theorem 6.3, definitions before (6.1.64)",
+        "source_pdf_lines": [18847, 18850],
+        "math": "\\zeta_k\\equiv(\\xi_k,u_k),\\ k\\ge 1,\\ \\zeta_{[N]}:=(\\zeta_1,\\ldots,\\zeta_N),\\ \\mathrm{E}_{\\zeta_{[N]}}\\text{ denote the expectation w.r.t. }\\zeta_{[N]},\\ \\Delta_k\\equiv G_\\mu(x_k,\\xi_k,u_k)-\\nabla f^\\mu(x_k)\\equiv G_\\mu(x_k,\\zeta_k)-\\nabla f^\\mu(x_k),\\ k\\ge 1.",
+        "uses": [],
+        "produces": "definitions: zeta_k, zeta_[N], E_{zeta_[N]}, Delta_k"
+      },
+      {
+        "step": 2,
+        "description": "Apply the descent inequality to f^mu, substitute the RSGF update, and rewrite G_mu as nabla f^mu plus Delta_k.",
+        "ref": "(6.1.64)",
+        "source_pdf_lines": [18850, 18855],
+        "math": "f^\\mu(x_{k+1})\\le f^\\mu(x_k)-\\gamma_k\\langle \\nabla f^\\mu(x_k),G_\\mu(x_k,\\zeta_k)\\rangle+\\frac{L}{2}\\gamma_k^2\\|G_\\mu(x_k,\\zeta_k)\\|^2=f^\\mu(x_k)-\\gamma_k\\|\\nabla f^\\mu(x_k)\\|^2-\\gamma_k\\langle\\nabla f^\\mu(x_k),\\Delta_k\\rangle+\\frac{L}{2}\\gamma_k^2\\|G_\\mu(x_k,\\zeta_k)\\|^2.",
+        "uses": ["Objective_L_smooth_descent", "GaussianSmoothingProperties", "RSGF_update_step", "previous_step:1"],
+        "produces": "one-step smoothed descent inequality"
+      },
+      {
+        "step": 3,
+        "description": "Sum the one-step inequalities, rearrange, and use f_mu^* <= f_mu(x_{N+1}).",
+        "ref": "(6.1.65)",
+        "source_pdf_lines": [18857, 18861],
+        "math": "\\sum_{k=1}^N\\gamma_k\\|\\nabla f^\\mu(x_k)\\|^2\\le f^\\mu(x_1)-f^{\\mu,*}-\\sum_{k=1}^N\\gamma_k\\langle\\nabla f^\\mu(x_k),\\Delta_k\\rangle+\\frac{L}{2}\\sum_{k=1}^N\\gamma_k^2\\|G_\\mu(x_k,\\zeta_k)\\|^2.",
+        "uses": ["previous_step:2", "SmoothedObjectiveGapComparison"],
+        "produces": "summed smoothed descent inequality"
+      },
+      {
+        "step": 4,
+        "description": "Use the unbiasedness of G_mu as an estimator of nabla f^mu to remove the residual inner product after conditioning on the past.",
+        "ref": "(6.1.66)",
+        "source_pdf_lines": [18863, 18865],
+        "math": "\\mathrm{E}[\\langle\\nabla f^\\mu(x_k),\\Delta_k\\rangle\\mid \\zeta_{[k-1]}]=0.",
+        "uses": ["ZerothOrderUnbiasedGradient", "previous_step:1"],
+        "produces": "conditional mean-zero residual inner product"
+      },
+      {
+        "step": 5,
+        "description": "Apply the fourth-moment smoothing bound to F(.,xi_k) and the finite-difference definition of G_mu to bound its conditional second moment by the stochastic gradient second moment plus the smoothing error.",
+        "ref": "first inequality in (6.1.67)",
+        "source_pdf_lines": [18867, 18876],
+        "math": "\\mathrm{E}[\\|G_\\mu(x_k,\\zeta_k)\\|^2\\mid\\zeta_{[k-1]}]\\le 2(n+4)\\mathrm{E}[\\|G(x_k,\\xi_k)\\|^2\\mid\\zeta_{[k-1]}]+\\frac{\\mu^2}{2}L^2(n+6)^3.",
+        "uses": ["Sample_function_L_smooth", "GaussianSmoothingProperties", "RSGF_finite_difference_step"],
+        "produces": "conditional second-moment bound before variance reduction"
+      },
+      {
+        "step": 6,
+        "description": "Use Assumption 13 to replace the stochastic gradient second moment by the squared true gradient plus sigma^2.",
+        "ref": "second inequality in (6.1.67)",
+        "source_pdf_lines": [18873, 18882],
+        "math": "\\mathrm{E}[\\|G_\\mu(x_k,\\zeta_k)\\|^2\\mid\\zeta_{[k-1]}]\\le 2(n+4)\\left[\\mathrm{E}[\\|\\nabla f(x_k)\\|^2\\mid\\zeta_{[k-1]}]+\\sigma^2\\right]+\\frac{\\mu^2}{2}L^2(n+6)^3.",
+        "uses": ["SFO_unbiased", "SFO_variance_bound", "previous_step:5"],
+        "produces": "conditional second-moment bound (6.1.67)"
+      },
+      {
+        "step": 7,
+        "description": "Take expectations of the summed descent inequality and substitute the two conditional observations.",
+        "ref": "display after (6.1.67)",
+        "source_pdf_lines": [18883, 18889],
+        "math": "\\sum_{k=1}^N\\gamma_k\\mathrm{E}_{\\zeta_{[N]}}[\\|\\nabla f^\\mu(x_k)\\|^2]\\le f^\\mu(x_1)-f^{\\mu,*}+\\frac{L}{2}\\sum_{k=1}^N\\gamma_k^2\\left\\{2(n+4)\\left(\\mathrm{E}_{\\zeta_{[N]}}[\\|\\nabla f(x_k)\\|^2]+\\sigma^2\\right)+\\frac{\\mu^2}{2}L^2(n+6)^3\\right\\}.",
+        "uses": ["previous_step:3", "previous_step:4", "previous_step:6"],
+        "produces": "expected smoothed-gradient inequality"
+      },
+      {
+        "step": 8,
+        "description": "Combine the expected inequality with the gradient comparison (6.1.54) and the objective-gap comparison (6.1.57).",
+        "ref": "(6.1.68)",
+        "source_pdf_lines": [18893, 18898],
+        "math": "\\sum_{k=1}^N\\gamma_k\\left[\\mathrm{E}_{\\zeta_{[N]}}[\\|\\nabla f(x_k)\\|^2]-\\frac{\\mu^2}{2}L^2(n+3)^3\\right]\\le 2[f(x_1)-f^*]+2\\mu^2Ln+2L(n+4)\\sum_{k=1}^N\\gamma_k^2\\mathrm{E}_{\\zeta_{[N]}}[\\|\\nabla f(x_k)\\|^2]+\\left(2L(n+4)\\sigma^2+\\frac{\\mu^2}{2}L^3(n+6)^3\\right)\\sum_{k=1}^N\\gamma_k^2.",
+        "uses": ["previous_step:7", "SmoothedGradientComparison", "SmoothedObjectiveGapComparison"],
+        "produces": "inequality in original gradient norms with smoothing errors"
+      },
+      {
+        "step": 9,
+        "description": "Rearrange terms so that the weighted original-gradient norms are on the left.",
+        "ref": "first inequality in (6.1.69)",
+        "source_pdf_lines": [18903, 18910],
+        "math": "\\sum_{k=1}^N[\\gamma_k-2L(n+4)\\gamma_k^2]\\mathrm{E}_{\\zeta_{[N]}}[\\|\\nabla f(x_k)\\|^2]\\le 2[f(x_1)-f^*]+2L(n+4)\\sigma^2\\sum_{k=1}^N\\gamma_k^2+2\\mu^2Ln+\\frac{\\mu^2}{2}L^2\\sum_{k=1}^N\\left[(n+3)^3\\gamma_k+L(n+6)^3\\gamma_k^2\\right].",
+        "uses": ["previous_step:8"],
+        "produces": "rearranged nonconvex gradient inequality"
+      },
+      {
+        "step": 10,
+        "description": "Simplify the constants in the smoothing-error terms.",
+        "ref": "second inequality in (6.1.69)",
+        "source_pdf_lines": [18910, 18916],
+        "math": "\\sum_{k=1}^N[\\gamma_k-2L(n+4)\\gamma_k^2]\\mathrm{E}_{\\zeta_{[N]}}[\\|\\nabla f(x_k)\\|^2]\\le 2[f(x_1)-f^*]+2L(n+4)\\sigma^2\\sum_{k=1}^N\\gamma_k^2+2\\mu^2L(n+4)\\left[1+L(n+4)^2\\sum_{k=1}^N\\left(\\frac{\\gamma_k}{4}+L\\gamma_k^2\\right)\\right].",
+        "uses": ["previous_step:9"],
+        "produces": "simplified nonconvex gradient inequality"
+      },
+      {
+        "step": 11,
+        "description": "Use the probability mass function to identify the expectation of the random output with the normalized weighted sum.",
+        "ref": "display before conclusion of (6.1.62)",
+        "source_pdf_lines": [18917, 18928],
+        "math": "\\mathrm{E}[\\|\\nabla f(x_R)\\|^2]=\\mathrm{E}_{R,\\zeta_{[N]}}[\\|\\nabla f(x_R)\\|^2]=\\frac{\\sum_{k=1}^N\\{[\\gamma_k-2L(n+4)\\gamma_k^2]\\mathrm{E}_{\\zeta_{[N]}}\\|\\nabla f(x_k)\\|^2\\}}{\\sum_{k=1}^N[\\gamma_k-2L(n+4)\\gamma_k^2]}.",
+        "uses": ["RSGF_probability_mass", "previous_step:10"],
+        "produces": "random-output expectation identity"
+      },
+      {
+        "step": 12,
+        "description": "Divide the simplified weighted inequality by the positive denominator and use the definition of D_f to obtain part (a), equation (6.1.62).",
+        "ref": "(6.1.62)",
+        "source_pdf_lines": [18824, 18833],
+        "math": "\\frac{1}{L}\\mathrm{E}[\\|\\nabla f(x_R)\\|^2]\\le \\frac{1}{\\sum_{k=1}^N[\\gamma_k-2L(n+4)\\gamma_k^2]}\\left(D_f^2+2\\mu^2(n+4)\\left[1+L(n+4)^2\\sum_{k=1}^N\\left(\\frac{\\gamma_k}{4}+L\\gamma_k^2\\right)\\right]+2(n+4)\\sigma^2\\sum_{k=1}^N\\gamma_k^2\\right).",
+        "uses": ["previous_step:10", "previous_step:11", "Df_definition", "Stepsize_upper_bound"],
+        "produces": "Theorem 6.3(a)"
+      },
+      {
+        "step": 13,
+        "description": "For the convex part, introduce the scalar distance notation used in the distance recursion.",
+        "ref": "definition before first display in proof of part (b)",
+        "source_pdf_lines": [18928, 18934],
+        "math": "\\nu_k\\equiv \\|x_k-x^*\\|.",
+        "uses": ["Convex_problem_optional"],
+        "produces": "definition: nu_k equiv ||x_k - x^*||"
+      },
+      {
+        "step": 14,
+        "description": "Expand the squared distance after one RSGF update.",
+        "ref": "first display in proof of part (b)",
+        "source_pdf_lines": [18929, 18936],
+        "math": "\\nu_{k+1}^2=\\|x_k-\\gamma_kG_\\mu(x_k,\\zeta_k)-x^*\\|^2=\\nu_k^2-2\\gamma_k\\langle\\nabla f^\\mu(x_k)+\\Delta_k,x_k-x^*\\rangle+\\gamma_k^2\\|G_\\mu(x_k,\\zeta_k)\\|^2.",
+        "uses": ["RSGF_update_step", "previous_step:1", "previous_step:13"],
+        "produces": "one-step distance identity"
+      },
+      {
+        "step": 15,
+        "description": "Sum the distance identity over k=1,...,N.",
+        "ref": "second display in proof of part (b)",
+        "source_pdf_lines": [18937, 18942],
+        "math": "\\nu_{N+1}^2=\\nu_1^2-2\\sum_{k=1}^N\\gamma_k\\langle\\nabla f^\\mu(x_k),x_k-x^*\\rangle-2\\sum_{k=1}^N\\gamma_k\\langle\\Delta_k,x_k-x^*\\rangle+\\sum_{k=1}^N\\gamma_k^2\\|G_\\mu(x_k,\\zeta_k)\\|^2.",
+        "uses": ["previous_step:14"],
+        "produces": "summed distance identity"
+      },
+      {
+        "step": 16,
+        "description": "Use the unbiasedness relation to cancel the distance residual after conditioning on the past.",
+        "ref": "text before first inequality in part (b) expectation chain",
+        "source_pdf_lines": [18943, 18944],
+        "math": "\\mathrm{E}[\\langle\\Delta_k,x_k-x^*\\rangle\\mid\\zeta_{[k-1]}]=0.",
+        "uses": ["ZerothOrderUnbiasedGradient", "previous_step:1", "previous_step:13"],
+        "produces": "conditional mean-zero distance residual"
+      },
+      {
+        "step": 17,
+        "description": "Take expectations, use the conditional mean-zero residual and the second-moment bound for G_mu.",
+        "ref": "first inequality in part (b) expectation chain",
+        "source_pdf_lines": [18943, 18952],
+        "math": "\\mathrm{E}_{\\zeta_{[N]}}[\\nu_{N+1}^2]\\le \\nu_1^2-2\\sum_{k=1}^N\\gamma_k\\mathrm{E}_{\\zeta_{[N]}}[\\langle\\nabla f^\\mu(x_k),x_k-x^*\\rangle]+2(n+4)\\sum_{k=1}^N\\gamma_k^2\\mathrm{E}_{\\zeta_{[N]}}[\\|\\nabla f(x_k)\\|^2]+\\left(2(n+4)\\sigma^2+\\frac{\\mu^2}{2}L^2(n+6)^3\\right)\\sum_{k=1}^N\\gamma_k^2.",
+        "uses": ["previous_step:15", "previous_step:16", "previous_step:6"],
+        "produces": "expected distance inequality with gradient inner product"
+      },
+      {
+        "step": 18,
+        "description": "Record the convexity substitution for the smoothed objective in the negative inner-product term: since f^mu is convex, the proof replaces \\langle\\nabla f^\\mu(x_k),x_k-x^*\\rangle by the lower bound f^\\mu(x_k)-f^\\mu(x^*).",
+        "ref": "prose explaining the second inequality in part (b)",
+        "source_pdf_lines": [18971, 18972],
+        "uses": ["Convex_problem_optional", "GaussianSmoothingProperties"],
+        "produces": "convexity lower bound for the smoothed inner product, used in the negative term of the second inequality"
+      },
+      {
+        "step": 19,
+        "description": "Record the positive gradient-square-to-objective-gap change that appears in the paper's second displayed inequality. The PDF says this second inequality follows from (6.1.20) and convexity of f^\\mu, but it does not print a coefficient-level derivation of the replacement of the positive term 2(n+4)\\sum_k\\gamma_k^2 E[\\|\\nabla f(x_k)\\|^2] by 2(n+4)L\\sum_k\\gamma_k^2 E[f(x_k)-f^*]; this step records that printed transition as asserted by the source rather than deriving it from (6.1.3).",
+        "ref": "second inequality in part (b) expectation chain and prose citing (6.1.20)",
+        "source_pdf_lines": [18947, 18972],
+        "uses": ["ConvexGradientInnerProduct", "GaussianSmoothingProperties", "Convex_problem_optional", "previous_step:17"],
+        "produces": "source-asserted positive-term component of the second printed inequality; no separate coefficient-level derivation is printed in the PDF"
+      },
+      {
+        "step": 20,
+        "description": "Apply the two prerequisites exactly as the paper states them to obtain the second printed inequality: convexity of f^\\mu handles the negative inner-product term, and the source-asserted transition recorded in the previous step accounts for the positive objective-gap term. The PDF cites only (6.1.20) and convexity of f^\\mu for this inequality and does not print the missing coefficient-level route for the positive term.",
+        "ref": "second inequality in part (b) expectation chain",
+        "source_pdf_lines": [18954, 18962],
+        "math": "\\mathrm{E}_{\\zeta_{[N]}}[\\nu_{N+1}^2]\\le \\nu_1^2-2\\sum_{k=1}^N\\gamma_k\\mathrm{E}_{\\zeta_{[N]}}[f^\\mu(x_k)-f^\\mu(x^*)]+2(n+4)L\\sum_{k=1}^N\\gamma_k^2\\mathrm{E}_{\\zeta_{[N]}}[f(x_k)-f^*]+\\left(2(n+4)\\sigma^2+\\frac{\\mu^2}{2}L^2(n+6)^3\\right)\\sum_{k=1}^N\\gamma_k^2.",
+        "uses": ["previous_step:17", "previous_step:18", "previous_step:19"],
+        "produces": "expected distance inequality with smoothed and original objective gaps"
+      },
+      {
+        "step": 21,
+        "description": "Derive the prerequisite bridge needed for the last printed convex inequality: applying the pointwise smoothing bound (6.1.51) at x_k and at x^*, and using that x^* is an optimal solution so f(x^*)=f^*, gives f^\\mu(x_k)-f^\\mu(x^*) >= f(x_k)-f^*-\\mu^2Ln. This is the source-backed bridge from f^\\mu(x^*) to f^*; the paper cites (6.1.57) for the displayed transition, but (6.1.57) itself compares against f^{\\mu,*}, not f^\\mu(x^*).",
+        "ref": "Lemma 6.2(b), (6.1.51), and Theorem 6.3(b) optimal solution clause",
+        "source_pdf_lines": [18744, 18749],
+        "uses": ["GaussianSmoothingProperties", "Convex_problem_optional"],
+        "produces": "derived bridge: f^\\mu(x_k)-f^\\mu(x^*)\\ge f(x_k)-f^*-\\mu^2Ln"
+      },
+      {
+        "step": 22,
+        "description": "Use the derived bridge from the pointwise smoothing bound to replace the smoothed objective gap f^mu(x_k)-f^mu(x^*) by the original gap minus the smoothing error in the negative weighted sum, obtaining the paper's third printed inequality.",
+        "ref": "third inequality in part (b) expectation chain",
+        "source_pdf_lines": [18963, 18967],
+        "math": "\\mathrm{E}_{\\zeta_{[N]}}[\\nu_{N+1}^2]\\le \\nu_1^2-2\\sum_{k=1}^N\\gamma_k\\mathrm{E}_{\\zeta_{[N]}}[f(x_k)-f^*-\\mu^2Ln]+2(n+4)L\\sum_{k=1}^N\\gamma_k^2\\mathrm{E}_{\\zeta_{[N]}}[f(x_k)-f^*]+\\left(2(n+4)\\sigma^2+\\frac{\\mu^2}{2}L^2(n+6)^3\\right)\\sum_{k=1}^N\\gamma_k^2.",
+        "uses": ["previous_step:20", "previous_step:21"],
+        "produces": "expected distance inequality in original objective gaps"
+      },
+      {
+        "step": 23,
+        "description": "Record the squared-distance nonnegativity used when rearranging the last convex expectation inequality.",
+        "ref": "prose before rearranged display",
+        "source_pdf_lines": [18971, 18974],
+        "uses": ["previous_step:13"],
+        "produces": "\\nu_{N+1}^2\\ge 0"
+      },
+      {
+        "step": 24,
+        "description": "Record the optimality-gap nonnegativity used in the first inequality of the rearranged display.",
+        "ref": "prose before rearranged display",
+        "source_pdf_lines": [18971, 18974],
+        "uses": ["Convex_problem_optional"],
+        "produces": "f(x_k)\\ge f^*"
+      },
+      {
+        "step": 25,
+        "description": "Use f(x_k) >= f^* to compare the two weighted objective-gap sums in the first inequality of the rearranged display.",
+        "ref": "first inequality in rearranged display after part (b) expectation chain",
+        "source_pdf_lines": [18975, 18979],
+        "math": "2\\sum_{k=1}^N(\\gamma_k-2(n+4)L\\gamma_k^2)\\mathrm{E}_{\\zeta_{[N]}}[f(x_k)-f^*]\\le 2\\sum_{k=1}^N(\\gamma_k-(n+4)L\\gamma_k^2)\\mathrm{E}_{\\zeta_{[N]}}[f(x_k)-f^*].",
+        "uses": ["previous_step:24"],
+        "produces": "coefficient comparison for weighted convex objective-gap sums"
+      },
+      {
+        "step": 26,
+        "description": "Rearrange the preceding convex inequality, use nu_{N+1}^2 >= 0, and simplify constants to upper-bound the middle weighted sum.",
+        "ref": "second inequality in rearranged display after part (b) expectation chain",
+        "source_pdf_lines": [18978, 18980],
+        "math": "2\\sum_{k=1}^N(\\gamma_k-(n+4)L\\gamma_k^2)\\mathrm{E}_{\\zeta_{[N]}}[f(x_k)-f^*]\\le \\nu_1^2+2\\mu^2L(n+4)\\sum_{k=1}^N\\gamma_k+2(n+4)[L^2\\mu^2(n+4)^2+\\sigma^2]\\sum_{k=1}^N\\gamma_k^2.",
+        "uses": ["previous_step:22", "previous_step:23"],
+        "produces": "upper bound on middle weighted convex objective-gap sum"
+      },
+      {
+        "step": 27,
+        "description": "Repeat the random-output normalization argument from part (a), now for f(x_R)-f^*, and substitute D_X.",
+        "ref": "(6.1.63)",
+        "source_pdf_lines": [18836, 18845],
+        "math": "\\mathrm{E}[f(x_R)-f^*]\\le \\frac{1}{2\\sum_{k=1}^N[\\gamma_k-2(n+4)L\\gamma_k^2]}\\left(D_X^2+2\\mu^2L(n+4)\\sum_{k=1}^N[\\gamma_k+L(n+4)^2\\gamma_k^2]+2(n+4)\\sigma^2\\sum_{k=1}^N\\gamma_k^2\\right).",
+        "uses": ["previous_step:25", "previous_step:26", "RSGF_probability_mass", "DX_definition", "Stepsize_upper_bound"],
+        "produces": "Theorem 6.3(b)"
+      }
+    ]
+  },
+  "key_lemmas": [
+    {
+      "name": "GaussianSmoothingProperties",
+      "ref": "Lemma 6.2 / (6.1.50)-(6.1.53)",
+      "statement_math": "\\text{If }f\\in C_L^{1,1}(\\mathbb{R}^n),\\text{ then (a) }f^\\mu\\text{ is also Lipschitz continuously differentiable with gradient Lipschitz constant }L_\\mu\\le L\\text{ and }\\nabla f^\\mu(x)=\\frac{1}{(2\\pi)^{n/2}}\\int \\frac{f(x+\\mu v)-f(x)}{\\mu}ve^{-\\frac{1}{2}\\|v\\|^2}dv.\\ \\text{(b) For any }x\\in\\mathbb{R}^n,\\ |f^\\mu(x)-f(x)|\\le \\frac{\\mu^2Ln}{2},\\ \\|\\nabla f^\\mu(x)-\\nabla f(x)\\|\\le \\frac{\\mu}{2}L(n+3)^{3/2},\\ \\mathrm{E}_v\\left[\\left\\|\\frac{f(x+\\mu v)-f(x)}{\\mu}v\\right\\|^2\\right]\\le 2(n+4)\\|\\nabla f(x)\\|^2+\\frac{\\mu^2L^2}{2}(n+6)^3.\\ \\text{(c) }f^\\mu\\text{ is also convex provided }f\\text{ is convex}.",
+      "role": "Supplies the smoothing derivative formula, Lipschitz preservation, approximation inequalities, fourth-moment bound, and convexity preservation used in Theorem 6.3.",
+      "proof": "cited"
+    },
+    {
+      "name": "SmoothedGradientComparison",
+      "ref": "(6.1.54)-(6.1.55)",
+      "statement_math": "\\|\\nabla f^\\mu(x)\\|^2\\le 2\\|\\nabla f(x)\\|^2+\\frac{\\mu^2}{2}L^2(n+3)^3,\\quad \\|\\nabla f(x)\\|^2\\le 2\\|\\nabla f^\\mu(x)\\|^2+\\frac{\\mu^2}{2}L^2(n+3)^3.",
+      "role": "The reverse comparison (6.1.55) is used in Theorem 6.3 step 8 to convert the expected smoothed-gradient bound into a bound on original gradients in (6.1.68).",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Apply the gradient approximation bound (6.1.52) in the forward direction printed by the paper.",
+          "ref": "(6.1.54)",
+          "source_pdf_lines": [18760, 18764],
+          "math": "\\|\\nabla f^\\mu(x)\\|^2\\le 2\\|\\nabla f(x)\\|^2+\\frac{\\mu^2}{2}L^2(n+3)^3.",
+          "uses": ["GaussianSmoothingProperties"],
+          "produces": "forward gradient comparison (6.1.54)"
+        },
+        {
+          "step": 2,
+          "description": "Apply the same gradient approximation bound (6.1.52) with the roles of \\nabla f^\\mu(x) and \\nabla f(x) interchanged in the printed reverse comparison.",
+          "ref": "(6.1.55)",
+          "source_pdf_lines": [18765, 18767],
+          "math": "\\|\\nabla f(x)\\|^2\\le 2\\|\\nabla f^\\mu(x)\\|^2+\\frac{\\mu^2}{2}L^2(n+3)^3.",
+          "uses": ["GaussianSmoothingProperties"],
+          "produces": "reverse gradient comparison (6.1.55), consumed by Theorem 6.3 proof step 8"
+        }
+      ]
+    },
+    {
+      "name": "SmoothedObjectiveGapComparison",
+      "ref": "(6.1.56)-(6.1.57)",
+      "statement_math": "f^{\\mu,*}:=\\min_{x\\in\\mathbb{R}^n}f^\\mu(x),\\quad -\\mu^2Ln\\le [f^\\mu(x)-f^{\\mu,*}]-[f(x)-f^*]\\le \\mu^2Ln.",
+      "role": "Used in (6.1.68) and in the convex part of Theorem 6.3 to transfer smoothed objective gaps back to the original objective.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Define f^{mu,*} as the minimum of the smoothed objective.",
+          "ref": "(6.1.56)",
+          "source_pdf_lines": [18769, 18771],
+          "math": "f^{\\mu,*}:=\\min_{x\\in\\mathbb{R}^n}f^\\mu(x).",
+          "uses": [],
+          "produces": "definition of f^{mu,*}"
+        },
+        {
+          "step": 2,
+          "description": "Use the approximation bound on f^mu and the definition of f^{mu,*} to obtain the intermediate absolute-value comparison between the smoothed and original optimal values.",
+          "ref": "text before (6.1.57)",
+          "source_pdf_lines": [18772, 18773],
+          "math": "|f^{\\mu,*}-f^*|\\le \\mu^2Ln/2",
+          "uses": ["GaussianSmoothingProperties", "previous_step:1"],
+          "produces": "|f^{\\mu,*}-f^*|\\le \\mu^2Ln/2"
+        },
+        {
+          "step": 3,
+          "description": "Combine the pointwise approximation bound from Lemma 6.2(b) with the optimal-value comparison to conclude the two-sided smoothed-original gap comparison.",
+          "ref": "(6.1.57)",
+          "source_pdf_lines": [18773, 18775],
+          "math": "-\\mu^2Ln\\le [f^\\mu(x)-f^{\\mu,*}]-[f(x)-f^*]\\le \\mu^2Ln.",
+          "uses": ["GaussianSmoothingProperties", "previous_step:2"],
+          "produces": "smoothed-original objective gap comparison"
+        }
+      ]
+    },
+    {
+      "name": "ZerothOrderUnbiasedGradient",
+      "ref": "(6.1.60)",
+      "statement_math": "\\mathrm{E}_{\\xi,u}[G_\\mu(x,\\xi,u)]=\\mathrm{E}_u\\{\\mathrm{E}_\\xi[G_\\mu(x,\\xi,u)\\mid u]\\}=\\nabla f^\\mu(x).",
+      "role": "Provides the conditional mean-zero residual (6.1.66) used to eliminate the stochastic inner-product term in Theorem 6.3.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Use the Gaussian smoothing gradient formula and the unbiased zeroth-order function-value oracle.",
+          "ref": "(6.1.60)",
+          "source_pdf_lines": [18793, 18797],
+          "math": "\\mathrm{E}_{\\xi,u}[G_\\mu(x,\\xi,u)]=\\mathrm{E}_u\\{\\mathrm{E}_\\xi[G_\\mu(x,\\xi,u)\\mid u]\\}=\\nabla f^\\mu(x).",
+          "uses": ["GaussianSmoothingProperties", "SZO_unbiased_function_value", "RSGF_finite_difference_step"],
+          "produces": "unbiased estimator of nabla f^mu"
+        }
+      ]
+    },
+    {
+      "name": "ConvexSmoothFunctionGapLowerBound",
+      "ref": "(6.1.3)",
+      "statement_math": "\\text{If, in addition, }f(\\cdot)\\text{ is convex, then }f(y)-f(x)-\\langle\\nabla f(x),y-x\\rangle\\ge \\frac{1}{2L}\\|\\nabla f(y)-\\nabla f(x)\\|^2.",
+      "role": "Provides the source convex smoothness gap inequality used to control gradient-square terms by objective gaps in the convex part of Theorem 6.3.",
+      "proof": "cited"
+    },
+    {
+      "name": "ConvexSmoothGradientMonotonicity",
+      "ref": "(6.1.4)",
+      "statement_math": "\\text{If, in addition, }f(\\cdot)\\text{ is convex, then }\\langle\\nabla f(y)-\\nabla f(x),y-x\\rangle\\ge \\frac{1}{L}\\|\\nabla f(y)-\\nabla f(x)\\|^2,\\ \\forall x,y\\in\\mathbb{R}^n.",
+      "role": "This is the exact source inequality cited in the derivation of (6.1.20).",
+      "proof": "cited"
+    },
+    {
+      "name": "ConvexOptimalityCondition",
+      "ref": "text before (6.1.20)",
+      "statement_math": "\\nabla f(x^*)=0",
+      "role": "Used with (6.1.4) to specialize the convex gradient monotonicity inequality at the optimal solution x^*.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "The paper explicitly records this as the optimality fact used before displaying (6.1.20).",
+          "ref": "text before (6.1.20)",
+          "source_pdf_lines": [18246, 18248],
+          "uses": ["Convex_problem_optional"],
+          "produces": "\\nabla f(x^*)=0"
+        }
+      ]
+    },
+    {
+      "name": "ConvexGradientInnerProduct",
+      "ref": "(6.1.20)",
+      "statement_math": "\\frac{1}{L}\\|\\nabla f(x_k)\\|^2\\le \\langle\\nabla f(x_k),x_k-x^*\\rangle.",
+      "role": "In the convex part of Theorem 6.3, this source-cited inequality is part of the transition that replaces the positive original-gradient second-moment term by an objective-gap term.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Specialize the source inequality (6.1.4) with y=x_k and x=x^*, then use the paper's optimality condition \\nabla f(x^*)=0.",
+          "ref": "text before (6.1.20)",
+          "source_pdf_lines": [18246, 18249],
+          "math": "\\frac{1}{L}\\|\\nabla f(x_k)\\|^2\\le \\langle\\nabla f(x_k),x_k-x^*\\rangle.",
+          "uses": ["Convex_problem_optional", "ConvexSmoothGradientMonotonicity", "ConvexOptimalityCondition"],
+          "produces": "convex gradient inner-product lower bound"
+        }
+      ]
+    }
+  ]
+}

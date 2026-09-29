@@ -1,0 +1,334 @@
+{
+  "algorithm": "NonconvexStochasticMirrorDescent",
+  "full_name": "Two-Phase Randomized Stochastic Mirror Descent (2-RSMD) for Nonconvex Stochastic Composite Optimization",
+  "source_reference": "Lan, First-order and Stochastic Optimization Methods for Machine Learning, Springer 2020 (Theorem 6.7)",
+  "setup": {
+    "problem": {
+      "math": "\\Psi^* := \\min_{x \\in X} \\{\\Psi(x) := f(x) + h(x)\\}",
+      "ref": "Eq. (6.2.1)",
+      "description": "Nonconvex stochastic composite optimization over a closed convex set"
+    },
+    "variable_space": {
+      "math": "X \\subseteq \\mathbb{R}^n \\text{ closed convex}; \\; f : X \\to \\mathbb{R} \\text{ continuously differentiable, possibly nonconvex}; \\; h : X \\to \\mathbb{R} \\text{ simple convex, possibly nonsmooth}",
+      "ref": "Section 6.2"
+    }
+  },
+  "assumptions": [
+    {
+      "name": "L-smoothness",
+      "math": "\\|\\nabla f(y) - \\nabla f(x)\\| \\le L \\|y - x\\|, \\quad \\forall x, y \\in X",
+      "ref": "Eq. (6.2.2)",
+      "parameters": ["L > 0"]
+    },
+    {
+      "name": "Assumption 13(a) (Unbiased oracle)",
+      "math": "\\mathbb{E}[G(x_k, \\xi_k)] = \\nabla f(x_k), \\quad \\forall k \\ge 1",
+      "ref": "Eq. (6.1.5)",
+      "parameters": []
+    },
+    {
+      "name": "Assumption 13(b) (Bounded variance)",
+      "math": "\\mathbb{E}\\left[\\|G(x_k, \\xi_k) - \\nabla f(x_k)\\|^2\\right] \\le \\sigma^2, \\quad \\forall k \\ge 1",
+      "ref": "Eq. (6.1.6)",
+      "parameters": ["\\sigma \\ge 0"]
+    },
+    {
+      "name": "Distance generating function",
+      "math": "\\nu : X \\to \\mathbb{R} \\text{ is continuously differentiable and strongly convex with modulus 1 w.r.t. } \\|\\cdot\\|: \\; \\langle x - z, \\nabla \\nu(x) - \\nabla \\nu(z) \\rangle \\ge \\|x - z\\|^2, \\; \\forall x, z \\in X",
+      "ref": "Eq. (6.2.4)",
+      "parameters": []
+    },
+    {
+      "name": "Prox-function (Bregman divergence)",
+      "math": "V(z, x) = \\nu(x) - [\\nu(z) + \\langle \\nabla \\nu(z), x - z \\rangle]",
+      "ref": "Eq. (6.2.5)",
+      "parameters": []
+    },
+    {
+      "name": "Euclidean norm",
+      "math": "\\|\\cdot\\| \\text{ is associated with the inner product } \\langle \\cdot, \\cdot \\rangle; \\text{ Section 6.2.3.2 assumes the standard Euclidean norm}",
+      "ref": "Section 6.2.3.2",
+      "parameters": []
+    }
+  ],
+  "algorithm_spec": {
+    "ref": "2-RSMD Algorithm (Section 6.2.3.2, p.342)",
+    "initialization": {
+      "math": "x_1 \\in X, \\; S \\text{ (number of runs)}, \\; \\bar{N} \\text{ (total SFO calls per run)}, \\; T \\text{ (post-optimization sample size)}",
+      "ref": "2-RSMD Algorithm, Input"
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "Optimization phase (S independent RSMD runs)",
+        "math": "\\text{For } s = 1, \\ldots, S: \\text{ call the RSMD algorithm with } N = \\lfloor \\bar{N}/m \\rfloor, \\; \\gamma_k = 1/(2L), \\; m_k = m, \\; P_R \\text{ as (6.2.30)}. \\; \\text{Let } \\bar{x}_s = x_{R_s}.",
+        "ref": "2-RSMD Algorithm, Optimization phase"
+      },
+      {
+        "step": 2,
+        "name": "RSMD inner update (mini-batch mirror descent)",
+        "math": "G_k = \\frac{1}{m_k} \\sum_{i=1}^{m_k} G(x_k, \\xi_{k,i}), \\quad x_{k+1} = \\operatorname{argmin}_{u \\in X} \\left\\{ \\langle G_k, u \\rangle + \\frac{1}{\\gamma_k} V(x_k, u) + h(u) \\right\\}",
+        "ref": "Eq. (6.2.28)-(6.2.29)"
+      },
+      {
+        "step": 3,
+        "name": "Randomized stopping distribution",
+        "math": "P_R(k) := \\operatorname{Prob}\\{R = k\\} = \\frac{\\gamma_k - L \\gamma_k^2}{\\sum_{k=1}^N (\\gamma_k - L \\gamma_k^2)}",
+        "ref": "Eq. (6.2.30)"
+      },
+      {
+        "step": 4,
+        "name": "Post-optimization phase (selection by empirical projected gradient)",
+        "math": "\\|\\bar{g}_X(\\bar{x}^*)\\| = \\min_{s=1,\\ldots,S} \\|\\bar{g}_X(\\bar{x}_s)\\|, \\quad \\bar{g}_X(\\bar{x}_s) := P_X(\\bar{x}_s, \\bar{G}_T(\\bar{x}_s), \\gamma_{R_s}), \\quad \\bar{G}_T(x) = \\frac{1}{T} \\sum_{k=1}^T G(x, \\xi_k)",
+        "ref": "Eq. (6.2.55)"
+      }
+    ],
+    "output": {
+      "math": "\\bar{x}^*",
+      "ref": "Eq. (6.2.55)",
+      "type": "best_iterate"
+    },
+    "parameters": [
+      {
+        "name": "m",
+        "math": "m = \\left\\lceil \\min\\left\\{ \\max\\left\\{1, \\frac{\\sigma \\sqrt{6\\bar{N}}}{4L\\tilde{D}} \\right\\}, \\bar{N} \\right\\} \\right\\rceil",
+        "ref": "Eq. (6.2.46)"
+      },
+      {
+        "name": "P_X",
+        "math": "P_X(x, g, \\gamma) = \\frac{1}{\\gamma}(x - x^+), \\quad x^+ = \\operatorname{argmin}_{u \\in X} \\left\\{ \\langle g, u \\rangle + \\frac{1}{\\gamma} V(x, u) + h(u) \\right\\}",
+        "ref": "Eq. (6.2.6)-(6.2.7)"
+      },
+      {
+        "name": "D_\\Psi",
+        "math": "D_\\Psi := \\left[ \\frac{\\Psi(x_1) - \\Psi^*}{L} \\right]^{1/2}",
+        "ref": "Eq. (6.2.22)"
+      },
+      {
+        "name": "\\tilde{D}",
+        "math": "\\tilde{D} > 0 \\text{ (free parameter for balancing batch size)}",
+        "ref": "Corollary 6.7"
+      }
+    ]
+  },
+  "main_theorem": {
+    "ref": "Theorem 6.7",
+    "statement_math": "\\text{(a) Let } \\mathscr{B}_{\\bar{N}} \\text{ be defined in (6.2.47). Then, for all } \\lambda > 0, \\quad \\operatorname{Prob}\\left\\{ \\|g_X(\\bar{x}^*)\\|^2 \\ge 2\\left(4L \\mathscr{B}_{\\bar{N}} + \\frac{3\\lambda \\sigma^2}{T}\\right) \\right\\} \\le \\frac{S}{\\lambda} + 2^{-S}. \\quad \\text{(b) Let } \\epsilon > 0, \\; \\Lambda \\in (0,1). \\text{ Set } S(\\Lambda) = \\lceil \\log_2(2/\\Lambda) \\rceil, \\; \\bar{N}(\\epsilon) = \\left\\lceil \\max\\left\\{ \\frac{512 L^2 D_\\Psi^2}{\\epsilon}, \\left[\\left(\\tilde{D} + \\frac{D_\\Psi^2}{\\tilde{D}}\\right) \\frac{128\\sqrt{6} L \\sigma}{\\epsilon}\\right]^2, \\frac{3\\sigma^2}{8L^2 \\tilde{D}^2} \\right\\} \\right\\rceil, \\; T(\\epsilon, \\Lambda) = \\left\\lceil \\frac{24 S(\\Lambda) \\sigma^2}{\\Lambda \\epsilon} \\right\\rceil. \\text{ Then 2-RSMD computes an } (\\epsilon, \\Lambda)\\text{-solution after at most } S(\\Lambda)[\\bar{N}(\\epsilon) + T(\\epsilon, \\Lambda)] \\text{ SFO calls.}",
+    "rate": "\\mathcal{O}\\left\\{ \\frac{1}{\\epsilon} \\log_2 \\frac{1}{\\Lambda} + \\frac{\\sigma^2}{\\epsilon^2} \\log_2 \\frac{1}{\\Lambda} + \\frac{\\sigma^2}{\\Lambda \\epsilon} \\log_2^2 \\frac{1}{\\Lambda} \\right\\}",
+    "measure": "high probability bound",
+    "proof": [
+      {
+        "step": 1,
+        "description": "Apply the deterministic norm decomposition to the selected candidate: split the true projected gradient into optimization error (min over runs) and post-optimization estimation error (max over runs)",
+        "math": "\\|g_X(\\bar{x}^*)\\|^2 \\le 4 \\min_{s=1,\\ldots,S} \\|g_X(\\bar{x}_s)\\|^2 + 6 \\max_{s=1,\\ldots,S} \\|\\bar{g}_X(\\bar{x}_s) - g_X(\\bar{x}_s)\\|^2",
+        "uses": ["Deterministic decomposition (Eq. 6.2.61)"]
+      },
+      {
+        "step": 2,
+        "description": "Bound the optimization term using independence of the S runs and the one-run Markov tail bound with lambda=2",
+        "math": "\\operatorname{Prob}\\left\\{ \\min_{s=1,\\ldots,S} \\|g_X(\\bar{x}_s)\\|^2 \\ge 2L \\mathscr{B}_{\\bar{N}} \\right\\} = \\prod_{s=1}^S \\operatorname{Prob}\\{\\|g_X(\\bar{x}_s)\\|^2 \\ge 2L \\mathscr{B}_{\\bar{N}}\\} \\le 2^{-S}",
+        "uses": ["Independent-run tail bound (Eq. 6.2.62)", "One-run Markov bound (Eq. 6.2.53)"]
+      },
+      {
+        "step": 3,
+        "description": "Bound the post-optimization estimation error using Proposition 6.1, Lemma 6.1(a), and a union bound over all S candidates",
+        "math": "\\operatorname{Prob}\\left\\{ \\max_{s=1,\\ldots,S} \\|\\bar{g}_X(\\bar{x}_s) - g_X(\\bar{x}_s)\\|^2 \\ge \\frac{\\lambda \\sigma^2}{T} \\right\\} \\le \\frac{S}{\\lambda}",
+        "uses": ["Empirical projected-gradient error bound (Eq. 6.2.63-6.2.64)"]
+      },
+      {
+        "step": 4,
+        "description": "Combine steps 1-3 to obtain the tail probability bound (6.2.56)",
+        "math": "\\operatorname{Prob}\\left\\{ \\|g_X(\\bar{x}^*)\\|^2 \\ge 2\\left(4L \\mathscr{B}_{\\bar{N}} + \\frac{3\\lambda \\sigma^2}{T}\\right) \\right\\} \\le \\frac{S}{\\lambda} + 2^{-S}",
+        "uses": []
+      },
+      {
+        "step": 5,
+        "description": "Substitute the parameter choices S(Lambda), N_bar(epsilon), T(epsilon,Lambda) and verify that the resulting bound yields an (epsilon,Lambda)-solution with the stated oracle complexity",
+        "math": "S(\\Lambda)[\\bar{N}(\\epsilon) + T(\\epsilon, \\Lambda)] = \\mathcal{O}\\left\\{ \\frac{1}{\\epsilon} \\log_2 \\frac{1}{\\Lambda} + \\frac{\\sigma^2}{\\epsilon^2} \\log_2 \\frac{1}{\\Lambda} + \\frac{\\sigma^2}{\\Lambda \\epsilon} \\log_2^2 \\frac{1}{\\Lambda} \\right\\}",
+        "uses": ["Budgeted RSMD bound (Corollary 6.7)"]
+      }
+    ]
+  },
+  "key_lemmas": [
+    {
+      "name": "Lemma 6.4 (Prox descent inequality)",
+      "ref": "Lemma 6.4",
+      "statement_math": "\\text{Let } x^+ \\text{ be given in (6.2.6). For any } x \\in X, \\; g \\in \\mathbb{R}^n, \\; \\gamma > 0, \\quad \\langle g, P_X(x, g, \\gamma) \\rangle \\ge \\|P_X(x, g, \\gamma)\\|^2 + \\frac{1}{\\gamma}[h(x^+) - h(x)]",
+      "role": "Provides the per-step prox descent bound relating the gradient inner product to the projected gradient norm and the h-difference",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Write the optimality condition of the prox problem (6.2.6) and the definition of V",
+          "math": "\\langle g + \\frac{1}{\\gamma}[\\nabla \\nu(x^+) - \\nabla \\nu(x)] + p, u - x^+ \\rangle \\ge 0, \\quad \\forall u \\in X, \\; p \\in \\partial h(x^+)",
+          "uses": []
+        },
+        {
+          "step": 2,
+          "description": "Set u = x, use strong convexity of nu and convexity of h to derive the descent inequality",
+          "math": "\\langle g, x - x^+ \\rangle \\ge \\frac{1}{\\gamma} \\|x^+ - x\\|^2 + h(x^+) - h(x)",
+          "uses": []
+        },
+        {
+          "step": 3,
+          "description": "Divide by gamma and use P_X(x,g,gamma) = (x - x^+)/gamma",
+          "math": "\\langle g, P_X(x, g, \\gamma) \\rangle \\ge \\|P_X(x, g, \\gamma)\\|^2 + \\frac{1}{\\gamma}[h(x^+) - h(x)]",
+          "uses": []
+        }
+      ]
+    },
+    {
+      "name": "Proposition 6.1 (Lipschitz continuity of projected gradient)",
+      "ref": "Proposition 6.1",
+      "statement_math": "\\text{For any } g_1, g_2 \\in \\mathbb{R}^n, \\quad \\|P_X(x, g_1, \\gamma) - P_X(x, g_2, \\gamma)\\| \\le \\|g_1 - g_2\\|",
+      "role": "Bounds the difference between stochastic and exact projected gradients, enabling transfer from noisy to true gradient norms",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Write the optimality conditions for the prox problems with g_1 and g_2, and add the two resulting inequalities",
+          "math": "\\|g_1 - g_2\\| \\|x_2^+ - x_1^+\\| \\ge \\langle g_1 - g_2, x_2^+ - x_1^+ \\rangle \\ge \\frac{1}{\\gamma} \\|x_2^+ - x_1^+\\|^2",
+          "uses": []
+        },
+        {
+          "step": 2,
+          "description": "Use Lemma 6.5 to conclude",
+          "math": "\\|x_2^+ - x_1^+\\| \\le \\gamma \\|g_2 - g_1\\|, \\text{ hence } \\|P_X(x, g_1, \\gamma) - P_X(x, g_2, \\gamma)\\| = \\frac{1}{\\gamma}\\|x_1^+ - x_2^+\\| \\le \\|g_1 - g_2\\|",
+          "uses": []
+        }
+      ]
+    },
+    {
+      "name": "RSMD expected projected-gradient bound (Theorem 6.6a)",
+      "ref": "Theorem 6.6(a)",
+      "statement_math": "\\mathbb{E}[\\|\\tilde{g}_{X,R}\\|^2] \\le \\frac{L D_\\Psi^2 + \\sigma^2 \\sum_{k=1}^N (\\gamma_k / m_k)}{\\sum_{k=1}^N (\\gamma_k - L \\gamma_k^2)}, \\quad \\tilde{g}_{X,k} := P_X(x_k, G_k, \\gamma_k)",
+      "role": "Provides the fundamental expected stationarity bound for a single RSMD run with general stepsizes and batch sizes",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Use smoothness (6.2.3), the RSMD update (6.2.29), and the definition of the stochastic projected gradient to derive the one-step recursion",
+          "math": "\\Psi(x_{k+1}) \\le \\Psi(x_k) - (\\gamma_k - \\frac{L}{2} \\gamma_k^2) \\|\\tilde{g}_{X,k}\\|^2 + \\gamma_k \\langle \\delta_k, g_{X,k} \\rangle + \\gamma_k \\|\\delta_k\\|^2",
+          "uses": ["Lemma 6.4 (Prox descent inequality)", "Proposition 6.1 (Lipschitz continuity of projected gradient)"]
+        },
+        {
+          "step": 2,
+          "description": "Sum over k = 1,...,N, take expectations using E[<delta_k, g_{X,k}> | xi_{[k-1]}] = 0 and E[||delta_k||^2] <= sigma^2/m_k",
+          "math": "\\sum_{k=1}^N (\\gamma_k - L \\gamma_k^2) \\mathbb{E}[\\|\\tilde{g}_{X,k}\\|^2] \\le \\Psi(x_1) - \\Psi^* + \\sigma^2 \\sum_{k=1}^N (\\gamma_k / m_k)",
+          "uses": []
+        },
+        {
+          "step": 3,
+          "description": "Normalize by the randomized-output weights P_R(k) from (6.2.30)",
+          "math": "\\mathbb{E}[\\|\\tilde{g}_{X,R}\\|^2] = \\frac{\\sum_{k=1}^N (\\gamma_k - L\\gamma_k^2) \\mathbb{E}[\\|\\tilde{g}_{X,k}\\|^2]}{\\sum_{k=1}^N (\\gamma_k - L\\gamma_k^2)} \\le \\frac{L D_\\Psi^2 + \\sigma^2 \\sum_{k=1}^N (\\gamma_k / m_k)}{\\sum_{k=1}^N (\\gamma_k - L\\gamma_k^2)}",
+          "uses": []
+        }
+      ]
+    },
+    {
+      "name": "Constant-step RSMD specialization (Corollary 6.6)",
+      "ref": "Corollary 6.6",
+      "statement_math": "\\text{With } \\gamma_k = 1/(2L), \\; m_k = m: \\quad \\mathbb{E}[\\|g_{X,R}\\|^2] \\le \\frac{8L^2 D_\\Psi^2}{N} + \\frac{6\\sigma^2}{m}, \\quad \\mathbb{E}[\\|\\tilde{g}_{X,R}\\|^2] \\le \\frac{4L^2 D_\\Psi^2}{N} + \\frac{2\\sigma^2}{m}",
+      "role": "Specializes the generic RSMD bound to constant stepsizes and batch sizes, producing the explicit error decomposition used by the budgeted corollary",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Substitute gamma_k = 1/(2L) and m_k = m into Theorem 6.6(a) to get the tilde-g bound",
+          "math": "\\mathbb{E}[\\|\\tilde{g}_{X,R}\\|^2] \\le \\frac{4L^2 D_\\Psi^2}{N} + \\frac{2\\sigma^2}{m}",
+          "uses": ["RSMD expected projected-gradient bound (Theorem 6.6a)"]
+        },
+        {
+          "step": 2,
+          "description": "Use Proposition 6.1 together with (6.2.40) to pass from tilde-g to g",
+          "math": "\\mathbb{E}[\\|g_{X,R}\\|^2] \\le 2\\mathbb{E}[\\|\\tilde{g}_{X,R}\\|^2] + 2\\mathbb{E}[\\|g_{X,R} - \\tilde{g}_{X,R}\\|^2] \\le \\frac{8L^2 D_\\Psi^2}{N} + \\frac{6\\sigma^2}{m}",
+          "uses": ["Proposition 6.1 (Lipschitz continuity of projected gradient)"]
+        }
+      ]
+    },
+    {
+      "name": "Budgeted RSMD bound (Corollary 6.7)",
+      "ref": "Corollary 6.7",
+      "statement_math": "\\text{With } m \\text{ as in (6.2.46)}: \\quad \\frac{1}{L} \\mathbb{E}[\\|g_{X,R}\\|^2] \\le \\mathscr{B}_{\\bar{N}} := \\frac{16L D_\\Psi^2}{\\bar{N}} + \\frac{4\\sqrt{6} \\sigma}{\\sqrt{\\bar{N}}} \\left( \\frac{D_\\Psi^2}{\\tilde{D}} + \\tilde{D} \\max\\left\\{1, \\frac{\\sqrt{6}\\sigma}{4L \\tilde{D} \\sqrt{\\bar{N}}}\\right\\} \\right)",
+      "role": "Converts the per-iteration bound into a total-SFO-budget bound by balancing batch size against iteration count",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Use the total-budget relation N >= N_bar/(2m) together with (6.2.44) to write the error as a sum of a term proportional to m/N_bar and a term proportional to 1/m",
+          "math": "\\mathbb{E}[\\|g_{X,R}\\|^2] \\le \\frac{16m L^2 D_\\Psi^2}{\\bar{N}} + \\frac{6\\sigma^2}{m}",
+          "uses": ["Constant-step RSMD specialization (Corollary 6.6)"]
+        },
+        {
+          "step": 2,
+          "description": "Choose m as in (6.2.46) and simplify the resulting bound",
+          "math": "\\frac{1}{L} \\mathbb{E}[\\|g_{X,R}\\|^2] \\le \\frac{16L D_\\Psi^2}{\\bar{N}} + \\frac{4\\sqrt{6} \\sigma}{\\sqrt{\\bar{N}}} \\left( \\frac{D_\\Psi^2}{\\tilde{D}} + \\tilde{D} \\max\\left\\{1, \\frac{\\sqrt{6}\\sigma}{4L \\tilde{D} \\sqrt{\\bar{N}}}\\right\\} \\right)",
+          "uses": []
+        }
+      ]
+    },
+    {
+      "name": "One-run Markov bound (Eq. 6.2.53)",
+      "ref": "Eq. (6.2.53)",
+      "statement_math": "\\operatorname{Prob}\\{\\|g_{X,R}\\|^2 \\ge \\lambda L \\mathscr{B}_{\\bar{N}}\\} \\le \\frac{1}{\\lambda}, \\quad \\forall \\lambda > 0",
+      "role": "Converts the expected RSMD bound into a one-run large-deviation estimate via Markov's inequality",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Apply Markov's inequality to ||g_{X,R}||^2 and insert the expectation bound from Corollary 6.7",
+          "math": "\\operatorname{Prob}\\{\\|g_{X,R}\\|^2 \\ge \\lambda L \\mathscr{B}_{\\bar{N}}\\} \\le \\frac{\\mathbb{E}[\\|g_{X,R}\\|^2]}{\\lambda L \\mathscr{B}_{\\bar{N}}} \\le \\frac{1}{\\lambda}",
+          "uses": ["Budgeted RSMD bound (Corollary 6.7)"]
+        }
+      ]
+    },
+    {
+      "name": "Deterministic decomposition (Eq. 6.2.61)",
+      "ref": "Eq. (6.2.61)",
+      "statement_math": "\\|g_X(\\bar{x}^*)\\|^2 \\le 4 \\min_{s=1,\\ldots,S} \\|g_X(\\bar{x}_s)\\|^2 + 6 \\max_{s=1,\\ldots,S} \\|\\bar{g}_X(\\bar{x}_s) - g_X(\\bar{x}_s)\\|^2",
+      "role": "Separates the squared projected gradient of the selected candidate into optimization error and post-optimization estimation error",
+      "proof": [
+        {
+          "step": 1,
+          "description": "From the selector definition, use ||a+b||^2 <= 2||a||^2 + 2||b||^2 to separate g_X and (bar-g_X - g_X)",
+          "math": "\\|\\bar{g}_X(\\bar{x}^*)\\|^2 \\le 2 \\min_{s} \\|g_X(\\bar{x}_s)\\|^2 + 2 \\max_{s} \\|\\bar{g}_X(\\bar{x}_s) - g_X(\\bar{x}_s)\\|^2",
+          "uses": []
+        },
+        {
+          "step": 2,
+          "description": "Apply the triangle inequality to ||g_X(x^*)||^2 <= 2||bar-g_X(x^*)||^2 + 2||nabla f(x^*) - bar-g_X(x^*)||^2 and combine",
+          "math": "\\|g_X(\\bar{x}^*)\\|^2 \\le 4 \\min_{s} \\|g_X(\\bar{x}_s)\\|^2 + 6 \\max_{s} \\|\\bar{g}_X(\\bar{x}_s) - g_X(\\bar{x}_s)\\|^2",
+          "uses": []
+        }
+      ]
+    },
+    {
+      "name": "Independent-run tail bound (Eq. 6.2.62)",
+      "ref": "Eq. (6.2.62)",
+      "statement_math": "\\operatorname{Prob}\\left\\{ \\min_{s \\in \\{1,\\ldots,S\\}} \\|g_X(\\bar{x}_s)\\|^2 \\ge 2L \\mathscr{B}_{\\bar{N}} \\right\\} = \\prod_{s=1}^S \\operatorname{Prob}\\{\\|g_X(\\bar{x}_s)\\|^2 \\ge 2L \\mathscr{B}_{\\bar{N}}\\} \\le 2^{-S}",
+      "role": "Controls the optimization-phase error probability by exploiting independence of the S RSMD runs",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Use independence of the optimization-phase outputs and apply (6.2.53) with lambda = 2 to each run",
+          "math": "\\prod_{s=1}^S \\operatorname{Prob}\\{\\|g_X(\\bar{x}_s)\\|^2 \\ge 2L \\mathscr{B}_{\\bar{N}}\\} \\le \\prod_{s=1}^S \\frac{1}{2} = 2^{-S}",
+          "uses": ["One-run Markov bound (Eq. 6.2.53)"]
+        }
+      ]
+    },
+    {
+      "name": "Empirical projected-gradient error bound (Eq. 6.2.63-6.2.64)",
+      "ref": "Eq. (6.2.63)-(6.2.64)",
+      "statement_math": "\\|\\bar{g}_X(\\bar{x}_s) - g_X(\\bar{x}_s)\\| \\le \\left\\|\\sum_{k=1}^T \\delta_{s,k} / T\\right\\|, \\quad \\operatorname{Prob}\\left\\{ \\max_{s=1,\\ldots,S} \\|\\bar{g}_X(\\bar{x}_s) - g_X(\\bar{x}_s)\\|^2 \\ge \\frac{\\lambda \\sigma^2}{T} \\right\\} \\le \\frac{S}{\\lambda}",
+      "role": "Bounds the post-optimization estimation error using Lipschitz continuity of the projected gradient and a martingale second-moment inequality with union bound",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Apply Proposition 6.1 with x = x_bar_s, g_1 = G_bar_T, g_2 = nabla f(x_bar_s) to get (6.2.63)",
+          "math": "\\|\\bar{g}_X(\\bar{x}_s) - g_X(\\bar{x}_s)\\| = \\|P_X(\\bar{x}_s, \\bar{G}_T, \\gamma_{R_s}) - P_X(\\bar{x}_s, \\nabla f(\\bar{x}_s), \\gamma_{R_s})\\| \\le \\|\\bar{G}_T(\\bar{x}_s) - \\nabla f(\\bar{x}_s)\\| = \\left\\|\\frac{1}{T}\\sum_{k=1}^T \\delta_{s,k}\\right\\|",
+          "uses": ["Proposition 6.1 (Lipschitz continuity of projected gradient)"]
+        },
+        {
+          "step": 2,
+          "description": "Apply Lemma 6.1(a) to the average of delta_{s,k}, use Markov's inequality, and take a union bound over s = 1,...,S",
+          "math": "\\operatorname{Prob}\\left\\{ \\max_s \\|\\bar{g}_X(\\bar{x}_s) - g_X(\\bar{x}_s)\\|^2 \\ge \\frac{\\lambda \\sigma^2}{T} \\right\\} \\le \\frac{S}{\\lambda}",
+          "uses": []
+        }
+      ]
+    }
+  ]
+}

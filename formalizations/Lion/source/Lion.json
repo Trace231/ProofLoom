@@ -1,0 +1,2434 @@
+{
+  "algorithm": "CentralizedOriginalLion",
+  "full_name": "Centralized Lion optimizer, original version (Algorithm 1 v1)",
+  "source_reference": "Wei Jiang and Lijun Zhang, Convergence Analysis of the Lion Optimizer in Centralized and Distributed Settings, arXiv:2508.12327v1 (2025), Algorithm 1 (v1), Lemma 1, Theorem 1",
+  "setup": {
+    "problem": {
+      "math": "\\min_{x\\in\\mathbb{R}^d} f(x)",
+      "ref": "Eq. (1), p.1",
+      "description": "The paper studies unconstrained stochastic optimization of a smooth non-convex objective."
+    },
+    "variable_space": {
+      "math": "f : \\mathbb{R}^d \\to \\mathbb{R}",
+      "ref": "p.1, lines 49-51"
+    },
+    "stochastic_oracle": {
+      "math": "\\mathbb{E}[\\nabla f(x;\\xi)] = \\nabla f(x)",
+      "ref": "p.1, lines 49-51",
+      "description": "Only noisy gradient estimates are available, with \\xi drawn from a stochastic oracle."
+    }
+  },
+  "assumptions": [
+    {
+      "name": "Assumption_1_Smoothness",
+      "math": "\\|\\nabla f(x)-\\nabla f(y)\\| \\le L\\|x-y\\| .",
+      "ref": "Assumption 1, p.4",
+      "parameters": [
+        "L",
+        "x",
+        "y"
+      ]
+    },
+    {
+      "name": "Assumption_3_UnbiasedBoundedNoise",
+      "math": "\\mathbb{E}_{\\xi}[\\nabla f(x;\\xi)] = \\nabla f(x),\\quad \\mathbb{E}_{\\xi}\\left[\\|\\nabla f(x;\\xi)-\\nabla f(x)\\|^2\\right] \\le \\sigma^2 .",
+      "ref": "Assumption 3, p.5",
+      "parameters": [
+        "\\sigma",
+        "x",
+        "\\xi"
+      ]
+    },
+    {
+      "name": "Assumption_4_InitialGap",
+      "math": "f_* = \\inf_x f(x) \\ge -\\infty \\text{ and } f(x_1)-f_* \\le \\Delta_f \\text{ for the initial solution } x_1 .",
+      "ref": "Assumption 4, p.5",
+      "parameters": [
+        "f_*",
+        "\\Delta_f",
+        "x_1"
+      ]
+    },
+    {
+      "name": "Theorem1_MomentumOrder",
+      "math": "\\beta_2^2 \\le \\beta_1 \\le \\sqrt{\\beta_2}",
+      "ref": "Theorem 1, p.5",
+      "parameters": [
+        "\\beta_1",
+        "\\beta_2"
+      ]
+    },
+    {
+      "name": "Theorem1_Beta2Schedule",
+      "math": "\\beta_2 = O(T^{-1/2})",
+      "ref": "Theorem 1, p.5; Appendix B, p.16",
+      "parameters": [
+        "\\beta_2",
+        "T"
+      ]
+    },
+    {
+      "name": "Theorem1_EtaSchedule",
+      "math": "\\eta = O(d^{-1/2}T^{-3/4})",
+      "ref": "Theorem 1, p.5; Appendix B, p.16",
+      "parameters": [
+        "\\eta",
+        "d",
+        "T"
+      ]
+    },
+    {
+      "name": "Theorem1_WeightDecayBound",
+      "math": "\\lambda \\le \\frac{1}{2\\eta T}",
+      "ref": "Theorem 1, p.5; Lemma 1, p.5; Appendix A, p.14",
+      "parameters": [
+        "\\lambda",
+        "\\eta",
+        "T"
+      ]
+    },
+    {
+      "name": "Theorem1_InitialInfinityBound",
+      "math": "\\|x_1\\|_{\\infty} \\le \\eta",
+      "ref": "Theorem 1, p.5; Lemma 1, p.5; Appendix A, p.14",
+      "parameters": [
+        "x_1",
+        "\\eta"
+      ]
+    }
+  ],
+  "algorithm_spec": {
+    "initialization": {
+      "math": "v_1=m_1=\\nabla f(x_1;\\xi_1)",
+      "ref": "p.5, lines 266-268"
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "time_loop",
+        "math": "\\text{for time step } t=1 \\text{ to } T \\text{ do}",
+        "ref": "Algorithm 1, line 2"
+      },
+      {
+        "step": 2,
+        "name": "lookahead_momentum_v",
+        "math": "v_t=(1-\\beta_1)m_{t-1}+\\beta_1\\nabla f(x_t;\\xi_t)",
+        "ref": "Algorithm 1, line 3"
+      },
+      {
+        "step": 3,
+        "name": "original_momentum_m",
+        "math": "m_t=(1-\\beta_2)m_{t-1}+\\beta_2\\nabla f(x_t;\\xi_t)",
+        "ref": "Algorithm 1, line 4 (v1)"
+      },
+      {
+        "step": 4,
+        "name": "sign_weight_decay_update",
+        "math": "x_{t+1}=x_t-\\eta(\\operatorname{sign}(v_t)+\\lambda x_t)",
+        "ref": "Algorithm 1, line 6"
+      }
+    ],
+    "output": {
+      "math": "\\text{Algorithm 1 has no explicit output line.}",
+      "ref": "Algorithm 1, lines 1-7, p.5",
+      "type": "no explicit algorithm output"
+    },
+    "parameters": [
+      {
+        "name": "shared_sample_within_iteration",
+        "math": "v_t=(1-\\beta_1)m_{t-1}+\\beta_1\\nabla f(x_t;\\xi_t),\\quad m_t=(1-\\beta_2)m_{t-1}+\\beta_2\\nabla f(x_t;\\xi_t)",
+        "ref": "Algorithm 1, lines 3-4"
+      },
+      {
+        "name": "momentum_parameter_order",
+        "math": "\\beta_2^2 \\le \\beta_1 \\le \\sqrt{\\beta_2}",
+        "ref": "Theorem 1, p.5"
+      },
+      {
+        "name": "beta2_schedule",
+        "math": "\\beta_2 = O(T^{-1/2})",
+        "ref": "Theorem 1, p.5"
+      },
+      {
+        "name": "learning_rate_schedule",
+        "math": "\\eta = O(d^{-1/2}T^{-3/4})",
+        "ref": "Theorem 1, p.5"
+      },
+      {
+        "name": "weight_decay_bound",
+        "math": "\\lambda \\le \\frac{1}{2\\eta T}",
+        "ref": "Theorem 1, p.5"
+      }
+    ]
+  },
+  "main_theorem": {
+    "statement_math": "\\text{Under Assumptions 1, 3 and 4, by setting } \\beta_2^2 \\le \\beta_1 \\le \\sqrt{\\beta_2},\\ \\beta_2=O(T^{-1/2}),\\ \\eta=O(d^{-1/2}T^{-3/4}),\\ \\lambda \\le \\frac{1}{2\\eta T}\\text{ and }\\|x_1\\|_{\\infty}\\le\\eta,\\ \\text{the Lion optimizer (v1) ensures that }\\frac{1}{T}\\sum_{t=1}^{T}\\mathbb{E}[\\|\\nabla f(x_t)\\|_1]\\le O\\left(\\frac{d^{1/2}}{T^{1/4}}\\right).",
+    "rate": "O(d^{1/2} T^{-1/4})",
+    "measure": "finite-horizon average expected l1 norm of the true gradient",
+    "proof": [
+      {
+        "step": 1,
+        "description": "Apply Assumption 1 smoothness to f(x_{t+1}) before using the Lion update.",
+        "ref": "Appendix B, Eq. (4), smoothness line",
+        "source_pdf_lines": [
+          794,
+          799
+        ],
+        "math": "f(x_{t+1}) \\le f(x_t)+\\langle\\nabla f(x_t),x_{t+1}-x_t\\rangle+\\frac{L}{2}\\|x_{t+1}-x_t\\|^2",
+        "uses": [
+          "Assumption_1_Smoothness"
+        ],
+        "produces": "smoothness_descent_before_update_substitution"
+      },
+      {
+        "step": 2,
+        "description": "Substitute x_{t+1}-x_t = -\\eta(\\operatorname{Sign}(v_t)+\\lambda x_t) from Algorithm 1 into the linear smoothness term. The paper does not print this intermediate formula separately before bounding the quadratic term.",
+        "ref": "Appendix B, Eq. (4), transition from smoothness line to line with update terms",
+        "source_pdf_lines": [
+          797,
+          800
+        ],
+        "uses": [
+          "previous_step:1",
+          "Algorithm_1_SignWeightDecayUpdate"
+        ],
+        "produces": "derived_descent_after_update_substitution_before_quadratic_bound"
+      },
+      {
+        "step": 3,
+        "description": "Use Lemma 1's update-step bound ||x_{t+1}-x_t||^2 <= 4 eta^2 d to bound the smoothness quadratic by 2 eta^2 L d. The source prints this endpoint with an equality sign, but it is used as an upper-bound transition.",
+        "ref": "Appendix B, Eq. (4), line 800",
+        "source_pdf_lines": [
+          797,
+          800
+        ],
+        "math": "= f(x_t)-\\eta\\langle\\nabla f(x_t),\\operatorname{Sign}(v_t)\\rangle-\\eta\\lambda\\langle\\nabla f(x_t),x_t\\rangle+2\\eta^2Ld",
+        "uses": [
+          "previous_step:2",
+          "Lemma_1_IterateAndStepBounds",
+          "Lemma_1_Eq4BoundTransitionPrerequisite"
+        ],
+        "produces": "one_step_descent_after_quadratic_bound"
+      },
+      {
+        "step": 4,
+        "description": "Insert and subtract Sign(nabla f(x_t)) inside the sign inner product.",
+        "ref": "Appendix B, Eq. (4)",
+        "source_pdf_lines": [
+          800,
+          802
+        ],
+        "math": "\\le f(x_t)+\\eta\\langle\\nabla f(x_t),\\operatorname{Sign}(\\nabla f(x_t))-\\operatorname{Sign}(v_t)\\rangle-\\eta\\langle\\nabla f(x_t),\\operatorname{Sign}(\\nabla f(x_t))\\rangle\n-\\eta\\lambda\\langle\\nabla f(x_t),x_t\\rangle+2\\eta^2Ld",
+        "uses": [
+          "previous_step:3"
+        ],
+        "produces": "descent_with_true_sign_inserted"
+      },
+      {
+        "step": 5,
+        "description": "Use the sign identity for the true gradient and bound the weight-decay inner product by l1 times l-infinity. The source prints this transition with an equality sign while replacing -eta lambda <nabla f(x_t), x_t> by the dual-norm upper bound +eta lambda ||nabla f(x_t)||_1 ||x_t||_infty.",
+        "ref": "Appendix B, Eq. (4)",
+        "source_pdf_lines": [
+          803,
+          804
+        ],
+        "math": "= f(x_t)+\\eta\\langle\\nabla f(x_t),\\operatorname{Sign}(\\nabla f(x_t))-\\operatorname{Sign}(v_t)\\rangle-\\eta\\|\\nabla f(x_t)\\|_1\n+\\eta\\lambda\\|\\nabla f(x_t)\\|_1\\|x_t\\|_{\\infty}+2\\eta^2Ld",
+        "uses": [
+          "previous_step:4",
+          "Lemma_1_Eq4BoundTransitionPrerequisite"
+        ],
+        "produces": "descent_with_l1_norm_and_weight_decay_dual_norm_bound"
+      },
+      {
+        "step": 6,
+        "description": "Use Lemma 1, the horizon bound t <= T, and lambda <= 1/(2 eta T) to absorb the weight-decay term into half of the l1 descent term, then expand the remaining sign-disagreement inner product coordinatewise. The source prints this absorption as an equality-shaped transition; this JSON records the bound dependency explicitly.",
+        "ref": "Appendix B, Eq. (4)",
+        "source_pdf_lines": [
+          805,
+          809
+        ],
+        "math": "= f(x_t)+\\eta\\sum_{i=1}^{d}\\langle[\\nabla f(x_t)]_i,\\operatorname{Sign}([\\nabla f(x_t)]_i)-\\operatorname{Sign}([v_t]_i)\\rangle-\\frac{\\eta}{2}\\|\\nabla f(x_t)\\|_1+2\\eta^2Ld",
+        "uses": [
+          "previous_step:5",
+          "Algorithm_1_TimeLoopHorizon",
+          "Lemma_1_IterateAndStepBounds",
+          "Theorem1_WeightDecayBound",
+          "Lemma_1_Eq4BoundTransitionPrerequisite"
+        ],
+        "produces": "coordinatewise_sign_gap_with_half_l1_descent_after_weight_decay_absorption"
+      },
+      {
+        "step": 7,
+        "description": "Bound each coordinatewise sign-disagreement inner product by twice the absolute gradient coordinate times the disagreement indicator.",
+        "ref": "Appendix B, Eq. (4)",
+        "source_pdf_lines": [
+          810,
+          815
+        ],
+        "math": "\\le f(x_t)+\\eta\\sum_{i=1}^{d}2|[\\nabla f(x_t)]_i|\\cdot I(\\operatorname{Sign}([\\nabla f(x_t)]_i)\\ne\\operatorname{Sign}([v_t]_i))\n-\\frac{\\eta}{2}\\|\\nabla f(x_t)\\|_1+2\\eta^2Ld",
+        "uses": [
+          "previous_step:6"
+        ],
+        "produces": "indicator_bound_with_true_gradient_magnitude"
+      },
+      {
+        "step": 8,
+        "description": "On the sign-disagreement event, replace the true-gradient coordinate magnitude by the coordinate estimation error magnitude.",
+        "ref": "Appendix B, Eq. (4)",
+        "source_pdf_lines": [
+          816,
+          822
+        ],
+        "math": "\\le f(x_t)+\\eta\\sum_{i=1}^{d}2|[\\nabla f(x_t)]_i-[v_t]_i|\\cdot I(\\operatorname{Sign}([\\nabla f(x_t)]_i)\\ne\\operatorname{Sign}([v_t]_i))\n-\\frac{\\eta}{2}\\|\\nabla f(x_t)\\|_1+2\\eta^2Ld",
+        "uses": [
+          "previous_step:7"
+        ],
+        "produces": "indicator_bound_with_coordinate_estimation_error"
+      },
+      {
+        "step": 9,
+        "description": "Drop the disagreement indicator and identify the l1 norm of the estimator error.",
+        "ref": "Appendix B, Eq. (4)",
+        "source_pdf_lines": [
+          823,
+          830
+        ],
+        "math": "\\le f(x_t)+\\eta\\sum_{i=1}^{d}2|[\\nabla f(x_t)]_i-[v_t]_i|-\\frac{\\eta}{2}\\|\\nabla f(x_t)\\|_1+2\\eta^2Ld\n= f(x_t)+2\\eta\\|\\nabla f(x_t)-v_t\\|_1-\\frac{\\eta}{2}\\|\\nabla f(x_t)\\|_1+2\\eta^2Ld",
+        "uses": [
+          "previous_step:8"
+        ],
+        "produces": "one_step_descent_with_l1_estimator_error"
+      },
+      {
+        "step": 10,
+        "description": "Convert the l1 estimator error to an l2 estimator error with the dimension factor sqrt(d), giving the printed inequality (4).",
+        "ref": "Appendix B, Eq. (4)",
+        "source_pdf_lines": [
+          831,
+          834
+        ],
+        "math": "\\le f(x_t)+2\\eta\\sqrt{d}\\|\\nabla f(x_t)-v_t\\|-\\frac{\\eta}{2}\\|\\nabla f(x_t)\\|_1+2\\eta^2Ld.",
+        "uses": [
+          "previous_step:9"
+        ],
+        "produces": "equation_4_one_step_descent"
+      },
+      {
+        "step": 11,
+        "description": "Sum inequality (4) over t=1,...,T, rearrange, take expectation, and telescope the objective terms.",
+        "ref": "Appendix B, Eq. (5), first inequality",
+        "source_pdf_lines": [
+          835,
+          847
+        ],
+        "math": "\\mathbb{E}\\left[\\frac{1}{T}\\sum_{t=1}^{T}\\|\\nabla f(x_t)\\|_1\\right]\n\\le \\frac{2(f(x_1)-f(x_{T+1}))}{\\eta T}+4\\sqrt{d}\\cdot\\mathbb{E}\\left[\\frac{1}{T}\\sum_{t=1}^{T}\\|\\nabla f(x_t)-v_t\\|\\right]+4\\eta Ld",
+        "uses": [
+          "previous_step:10"
+        ],
+        "produces": "equation_5_first_inequality"
+      },
+      {
+        "step": 12,
+        "description": "Use f(x_1)-f_* <= Delta_f and Jensen's inequality to replace the average l2 estimator error by the square root of the averaged squared estimator error.",
+        "ref": "Appendix B, Eq. (5), second inequality and following prose",
+        "source_pdf_lines": [
+          849,
+          861
+        ],
+        "math": "\\le \\frac{2\\Delta_f}{\\eta T}+4\\sqrt{d}\\cdot\\sqrt{\\mathbb{E}\\left[\\frac{1}{T}\\sum_{t=1}^{T}\\|\\nabla f(x_t)-v_t\\|^2\\right]}+4\\eta Ld.",
+        "uses": [
+          "previous_step:11",
+          "Assumption_4_InitialGap",
+          "Jensen's Inequality"
+        ],
+        "produces": "equation_5_jensen_bound"
+      },
+      {
+        "step": 13,
+        "description": "Start the estimator-error recursion by expanding v_{t+1} according to the v1 Lion momentum convention.",
+        "ref": "Appendix B, Eq. (6), first equality",
+        "source_pdf_lines": [
+          868,
+          874
+        ],
+        "math": "\\mathbb{E}\\left[\\|\\nabla f(x_{t+1})-v_{t+1}\\|^2\\right]\n=\\mathbb{E}\\left[\\|(1-\\beta_1)m_t+\\beta_1\\nabla f(x_{t+1};\\xi_{t+1})-\\nabla f(x_{t+1})\\|^2\\right]",
+        "uses": [
+          "Algorithm_1_LookaheadMomentumUpdate"
+        ],
+        "produces": "vt_error_expanded_from_algorithm"
+      },
+      {
+        "step": 14,
+        "description": "Recenter the expansion at nabla f(x_t), splitting the momentum error, stochastic-gradient noise, and gradient-drift terms.",
+        "ref": "Appendix B, Eq. (6), second equality",
+        "source_pdf_lines": [
+          875,
+          877
+        ],
+        "math": "=\\mathbb{E}\\left[\\|(1-\\beta_1)(m_t-\\nabla f(x_t))+\\beta_1(\\nabla f(x_{t+1};\\xi_{t+1})-\\nabla f(x_{t+1}))\n+(1-\\beta_1)(\\nabla f(x_t)-\\nabla f(x_{t+1}))\\|^2\\right]",
+        "uses": [
+          "previous_step:13"
+        ],
+        "produces": "vt_error_recentered"
+      },
+      {
+        "step": 15,
+        "description": "Use the zero-mean stochastic-gradient noise to remove the cross term in the third equality.",
+        "ref": "Appendix B, Eq. (6), third equality and following prose",
+        "source_pdf_lines": [
+          878,
+          895
+        ],
+        "math": "=(1-\\beta_1)^2\\mathbb{E}\\left[\\|m_t-\\nabla f(x_t)+\\nabla f(x_t)-\\nabla f(x_{t+1})\\|^2\\right]\n+\\beta_1^2\\mathbb{E}\\left[\\|\\nabla f(x_{t+1};\\xi_{t+1})-\\nabla f(x_{t+1})\\|^2\\right]",
+        "uses": [
+          "previous_step:14",
+          "Assumption_3_UnbiasedBoundedNoise"
+        ],
+        "produces": "vt_error_cross_term_removed"
+      },
+      {
+        "step": 16,
+        "description": "Apply the printed two-term norm inequality with parameters beta_1 and 1/beta_1, and use the bounded noise part of Assumption 3.",
+        "ref": "Appendix B, Eq. (6)",
+        "source_pdf_lines": [
+          883,
+          886
+        ],
+        "math": "\\le (1-\\beta_1)^2(1+\\beta_1)\\mathbb{E}\\left[\\|m_t-\\nabla f(x_t)\\|^2\\right]\n+(1-\\beta_1)^2\\left(1+\\frac{1}{\\beta_1}\\right)\\mathbb{E}\\left[\\|\\nabla f(x_t)-\\nabla f(x_{t+1})\\|^2\\right]+\\beta_1^2\\sigma^2",
+        "uses": [
+          "previous_step:15",
+          "Two_Term_Squared_Norm_Inequality",
+          "Assumption_3_UnbiasedBoundedNoise"
+        ],
+        "produces": "vt_error_young_noise_bound"
+      },
+      {
+        "step": 17,
+        "description": "Use smoothness to bound the gradient drift and simplify the beta coefficients to the printed recurrence; the coefficient simplification also depends on the theorem's beta ordering together with the paper's implicit beta range/positivity convention flagged in source_gaps.",
+        "ref": "Appendix B, Eq. (6)",
+        "source_pdf_lines": [
+          887,
+          890
+        ],
+        "math": "\\le (1-\\beta_1)\\mathbb{E}\\left[\\|m_t-\\nabla f(x_t)\\|^2\\right]+\\frac{2L^2}{\\beta_1}\\|x_{t+1}-x_t\\|^2+\\beta_1^2\\sigma^2",
+        "uses": [
+          "previous_step:16",
+          "Assumption_1_Smoothness",
+          "Theorem1_MomentumOrder",
+          "Centralized_MomentumParameterDomainPrerequisite"
+        ],
+        "produces": "vt_error_recurrence_before_step_bound"
+      },
+      {
+        "step": 18,
+        "description": "Use Lemma 1's update-step bound to finish the displayed estimator recurrence (6).",
+        "ref": "Appendix B, Eq. (6)",
+        "source_pdf_lines": [
+          891,
+          894
+        ],
+        "math": "\\le (1-\\beta_1)\\mathbb{E}\\left[\\|m_t-\\nabla f(x_t)\\|^2\\right]+\\frac{8\\eta^2L^2d}{\\beta_1}+\\beta_1^2\\sigma^2,",
+        "uses": [
+          "previous_step:17",
+          "Lemma_1_IterateAndStepBounds"
+        ],
+        "produces": "equation_6_vt_error_recurrence"
+      },
+      {
+        "step": 19,
+        "description": "Start the analogous m_{t+1} estimator-error recursion by expanding m_{t+1} from the original Lion v1 momentum update.",
+        "ref": "Appendix B, displayed recurrence before Eq. (7), first equality",
+        "source_pdf_lines": [
+          896,
+          900
+        ],
+        "math": "\\mathbb{E}\\left[\\|\\nabla f(x_{t+1})-m_{t+1}\\|^2\\right]\n=\\mathbb{E}\\left[\\|(1-\\beta_2)m_t+\\beta_2\\nabla f(x_{t+1};\\xi_{t+1})-\\nabla f(x_{t+1})\\|^2\\right]",
+        "uses": [
+          "Algorithm_1_OriginalMomentumUpdate"
+        ],
+        "produces": "mt_error_expanded_from_algorithm"
+      },
+      {
+        "step": 20,
+        "description": "Following the same recentering used in Eq. (6), split the m_{t+1} error into the derived momentum-error, stochastic-gradient noise, and gradient-drift terms with beta_2 in place of beta_1; the paper signals this route by 'Very similarly' and does not print this intermediate formula.",
+        "ref": "Appendix B, prose before displayed m_{t+1} recurrence",
+        "source_pdf_lines": [
+          896,
+          900
+        ],
+        "uses": [
+          "previous_step:19"
+        ],
+        "produces": "derived_mt_error_recentered"
+      },
+      {
+        "step": 21,
+        "description": "Use the same zero-mean stochastic-gradient-noise cancellation as the third equality in Eq. (6), now for the beta_2 expansion of m_{t+1}; this is an unprinted intermediate step in the paper's 'Very similarly' argument.",
+        "ref": "Appendix B, prose before displayed m_{t+1} recurrence; Eq. (6) zero-mean explanation",
+        "source_pdf_lines": [
+          896,
+          904
+        ],
+        "uses": [
+          "previous_step:20",
+          "Assumption_3_UnbiasedBoundedNoise"
+        ],
+        "produces": "derived_mt_error_cross_term_removed"
+      },
+      {
+        "step": 22,
+        "description": "Apply the same two-term squared-norm/Young bound as Eq. (6), with beta_2 substituted for beta_1, and use the bounded-noise part of Assumption 3; this beta_2 intermediate inequality is not printed separately by the paper.",
+        "ref": "Appendix B, prose 'Very similarly' after Eq. (6); analogous to Eq. (6) Young/noise step",
+        "source_pdf_lines": [
+          896,
+          904
+        ],
+        "uses": [
+          "previous_step:21",
+          "Two_Term_Squared_Norm_Inequality",
+          "Assumption_3_UnbiasedBoundedNoise"
+        ],
+        "produces": "derived_mt_error_young_noise_bound"
+      },
+      {
+        "step": 23,
+        "description": "Use Assumption 1 to bound the beta_2 gradient-drift term by the iterate displacement and simplify the beta coefficients as in the beta_1 recurrence; this beta_2 intermediate inequality is not printed separately by the paper, and the coefficient simplification relies on the same implicit beta range/positivity convention flagged in source_gaps.",
+        "ref": "Appendix B, prose 'Very similarly' after Eq. (6); analogous to Eq. (6) smoothness/coefficient step",
+        "source_pdf_lines": [
+          896,
+          904
+        ],
+        "uses": [
+          "previous_step:22",
+          "Assumption_1_Smoothness",
+          "Theorem1_MomentumOrder",
+          "Centralized_MomentumParameterDomainPrerequisite"
+        ],
+        "produces": "derived_mt_error_recurrence_before_step_bound"
+      },
+      {
+        "step": 24,
+        "description": "Use Lemma 1's update-step bound in the beta_2 recurrence to reach the printed m_{t+1} estimator-error endpoint.",
+        "ref": "Appendix B, displayed recurrence before Eq. (7), final inequality",
+        "source_pdf_lines": [
+          900,
+          904
+        ],
+        "math": "\\le (1-\\beta_2)\\mathbb{E}\\left[\\|m_t-\\nabla f(x_t)\\|^2\\right]+\\frac{8\\eta^2L^2d}{\\beta_2}+\\beta_2^2\\sigma^2.",
+        "uses": [
+          "previous_step:23",
+          "Lemma_1_IterateAndStepBounds"
+        ],
+        "produces": "mt_error_recurrence"
+      },
+      {
+        "step": 25,
+        "description": "Sum the m_t error recurrence over the horizon and rearrange to obtain the first finite-horizon bound in (7).",
+        "ref": "Appendix B, Eq. (7), first inequality",
+        "source_pdf_lines": [
+          905,
+          912
+        ],
+        "math": "\\mathbb{E}\\left[\\frac{1}{T}\\sum_{t=1}^{T}\\|m_t-\\nabla f(x_t)\\|^2\\right]\n\\le \\frac{\\mathbb{E}\\left[\\|m_1-\\nabla f(x_1)\\|^2\\right]}{\\beta_2T}+\\frac{8\\eta^2L^2d}{\\beta_2^2}+\\beta_2\\sigma^2",
+        "uses": [
+          "previous_step:24",
+          "Centralized_MomentumParameterDomainPrerequisite"
+        ],
+        "produces": "equation_7_first_mt_average_bound"
+      },
+      {
+        "step": 26,
+        "description": "Use the first-step initialization m_1 = nabla f(x_1;xi_1) and the variance bound to replace the initial estimator error by sigma^2.",
+        "ref": "Appendix B, Eq. (7), second inequality",
+        "source_pdf_lines": [
+          913,
+          915
+        ],
+        "math": "\\le \\frac{\\sigma^2}{\\beta_2T}+\\frac{8\\eta^2L^2d}{\\beta_2^2}+\\beta_2\\sigma^2.",
+        "uses": [
+          "previous_step:25",
+          "Algorithm_1_FirstStepInitialization",
+          "Assumption_3_UnbiasedBoundedNoise"
+        ],
+        "produces": "equation_7_mt_average_bound"
+      },
+      {
+        "step": 27,
+        "description": "Average the v_t estimator recurrence, including the initial v_1 stochastic-gradient error term, to get the first displayed v_t-average inequality.",
+        "ref": "Appendix B, after Eq. (7)",
+        "source_pdf_lines": [
+          917,
+          923
+        ],
+        "math": "\\mathbb{E}\\left[\\frac{1}{T}\\sum_{t=1}^{T}\\|v_t-\\nabla f(x_t)\\|^2\\right]\n\\le \\frac{\\sigma^2}{T}+(1-\\beta_1)\\mathbb{E}\\left[\\frac{1}{T}\\sum_{t=1}^{T-1}\\|m_t-\\nabla f(x_t)\\|^2\\right]+\\frac{8\\eta^2L^2d}{\\beta_1}+\\beta_1^2\\sigma^2",
+        "uses": [
+          "previous_step:18",
+          "Algorithm_1_FirstStepInitialization",
+          "Assumption_3_UnbiasedBoundedNoise"
+        ],
+        "produces": "vt_average_bound_before_mt_substitution"
+      },
+      {
+        "step": 28,
+        "description": "Substitute the m_t finite-horizon bound (7) into the averaged v_t inequality.",
+        "ref": "Appendix B, after Eq. (7), second displayed inequality",
+        "source_pdf_lines": [
+          924,
+          926
+        ],
+        "math": "\\le \\frac{\\sigma^2}{T}+\\frac{\\sigma^2}{\\beta_2T}+\\frac{8\\eta^2L^2d}{\\beta_2^2}+\\beta_2\\sigma^2+\\frac{8\\eta^2L^2d}{\\beta_1}+\\beta_1^2\\sigma^2",
+        "uses": [
+          "previous_step:27",
+          "previous_step:26"
+        ],
+        "produces": "vt_average_bound_after_mt_substitution"
+      },
+      {
+        "step": 29,
+        "description": "Use beta_2^2 <= beta_1 <= sqrt(beta_2) to simplify the sigma and smoothness terms into the final finite-horizon v_t error bound; the division by beta_2 and beta_2^2, and the comparison sigma^2/T <= sigma^2/(beta_2 T), rely on the paper's implicit beta_2 positivity/range convention flagged in source_gaps.",
+        "ref": "Appendix B, after Eq. (7), final displayed inequality",
+        "source_pdf_lines": [
+          927,
+          929
+        ],
+        "math": "\\le \\frac{2\\sigma^2}{\\beta_2T}+\\frac{16\\eta^2L^2d}{\\beta_2^2}+2\\beta_2\\sigma^2.",
+        "uses": [
+          "previous_step:28",
+          "Theorem1_MomentumOrder",
+          "Centralized_MomentumParameterDomainPrerequisite"
+        ],
+        "produces": "finite_horizon_vt_average_error_bound"
+      },
+      {
+        "step": 30,
+        "description": "Insert the finite-horizon v_t error bound into the Jensen descent bound (5).",
+        "ref": "Appendix B, final displayed calculation",
+        "source_pdf_lines": [
+          937,
+          955
+        ],
+        "math": "\\mathbb{E}\\left[\\frac{1}{T}\\sum_{t=1}^{T}\\|\\nabla f(x_t)\\|_1\\right]\n\\le \\frac{2\\Delta_f}{\\eta T}+4\\sqrt{d}\\cdot\\sqrt{\\mathbb{E}\\left[\\frac{1}{T}\\sum_{t=1}^{T}\\|\\nabla f(x_t)-v_t\\|^2\\right]}+4\\eta Ld\n\\le \\frac{2\\Delta_f}{\\eta T}+4\\sqrt{d}\\cdot\\sqrt{\\frac{2\\sigma^2}{\\beta_2T}+\\frac{16\\eta^2L^2d}{\\beta_2^2}+2\\beta_2\\sigma^2}+4\\eta Ld",
+        "uses": [
+          "previous_step:12",
+          "previous_step:29"
+        ],
+        "produces": "finite_horizon_gradient_average_bound"
+      },
+      {
+        "step": 31,
+        "description": "Apply the printed horizon-dependent choices beta_2 = O(T^{-1/2}) and eta = O(d^{-1/2}T^{-3/4}) to the finite-horizon bound.",
+        "ref": "Appendix B, final displayed calculation",
+        "source_pdf_lines": [
+          932,
+          959
+        ],
+        "math": "=O\\left(\\frac{(1+\\Delta_f+\\sigma+L)d^{1/2}}{T^{1/4}}\\right)",
+        "uses": [
+          "previous_step:30",
+          "Theorem1_Beta2Schedule",
+          "Theorem1_EtaSchedule"
+        ],
+        "produces": "rate_with_problem_constants"
+      },
+      {
+        "step": 32,
+        "description": "Suppress problem-dependent constants in big-O notation to obtain Theorem 1's rate.",
+        "ref": "Appendix B, final displayed calculation",
+        "source_pdf_lines": [
+          960,
+          966
+        ],
+        "math": "=O\\left(\\frac{d^{1/2}}{T^{1/4}}\\right),",
+        "uses": [
+          "previous_step:31"
+        ],
+        "produces": "Theorem_1_rate"
+      }
+    ]
+  },
+  "key_lemmas": [
+    {
+      "name": "Algorithm_1_TimeLoopHorizon",
+      "ref": "Algorithm 1, line 2, p.5",
+      "statement_math": "\\text{for time step } t=1 \\text{ to } T \\text{ do}",
+      "role": "Provides the finite-horizon loop fact t <= T used when absorbing weight decay in Theorem 1 and when replacing t^2 by T^2 in Lemma 1.",
+      "proof": "cited"
+    },
+    {
+      "name": "Algorithm_1_LookaheadMomentumUpdate",
+      "ref": "Algorithm 1, line 3, p.5",
+      "statement_math": "v_t=(1-\\beta_1)m_{t-1}+\\beta_1\\nabla f(x_t;\\xi_t)",
+      "role": "Provides the v_t update, shifted to t+1, for the first equality in the v_{t+1} estimator-error recursion.",
+      "proof": "cited"
+    },
+    {
+      "name": "Algorithm_1_FirstStepInitialization",
+      "ref": "p.5, lines 266-267",
+      "statement_math": "v_1 = m_1 = \\nabla f(x_1 ; \\xi_1 )",
+      "role": "Provides the special first-step initialization used to identify the initial m_1 and v_1 estimator errors with stochastic-gradient noise terms.",
+      "proof": "cited"
+    },
+    {
+      "name": "Algorithm_1_OriginalMomentumUpdate",
+      "ref": "Algorithm 1, line 4 (v1), p.5",
+      "statement_math": "m_t=(1-\\beta_2)m_{t-1}+\\beta_2\\nabla f(x_t;\\xi_t)",
+      "role": "Provides the original Lion m_t update, shifted to t+1, for the analogous m_{t+1} estimator-error recursion.",
+      "proof": "cited"
+    },
+    {
+      "name": "Algorithm_1_SignWeightDecayUpdate",
+      "ref": "Algorithm 1, line 6, p.5",
+      "statement_math": "x_{t+1}=x_t-\\eta(\\operatorname{sign}(v_t)+\\lambda x_t)",
+      "role": "Provides the update rule used in Lemma 1 and in Theorem 1's descent expansion.",
+      "proof": "cited"
+    },
+    {
+      "name": "Two_Term_Squared_Norm_Inequality",
+      "ref": "Appendix B, Eq. (6), p.16, lines 879-886",
+      "statement_math": "\\le (1-\\beta_1)^2(1+\\beta_1)\\mathbb{E}\\left[\\|m_t-\\nabla f(x_t)\\|^2\\right]\n+(1-\\beta_1)^2\\left(1+\\frac{1}{\\beta_1}\\right)\\mathbb{E}\\left[\\|\\nabla f(x_t)-\\nabla f(x_{t+1})\\|^2\\right]+\\beta_1^2\\sigma^2",
+      "role": "Records the instantiated Young/two-term squared-norm transition printed in Eq. (6), separating the momentum-error and gradient-drift terms.",
+      "proof": "cited"
+    },
+    {
+      "name": "Lemma_1_IterateAndStepBounds",
+      "ref": "Lemma 1, p.5; Appendix A, p.14",
+      "statement_math": "\\text{For the update }x_{t+1}=x_t-\\eta(\\operatorname{sign}(v_t)+\\lambda x_t),\\text{ as long as the initial point satisfies }\\|x_1\\|_{\\infty}\\le\\eta,\\text{ we can ensure that each }x_t\\text{ is bounded such that }\\|x_t\\|_{\\infty}\\le\\eta t,\\quad \\|x_t\\|^2\\le 2\\eta^2t^2d.\\ \\text{Additionally, by setting }\\lambda\\le\\frac{1}{2\\eta T},\\text{ we can show that the update step is also bounded, i.e., }\\|x_{t+1}-x_t\\|^2\\le4\\eta^2d.",
+      "role": "Provides the iterate infinity-norm control needed to absorb weight decay and the update-step bound used in the smoothness and estimator-error recurrences.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Rewrite x_t using the update rule one step back and take the l-infinity norm; the displayed coefficient (1-eta lambda) rather than |1-eta lambda| uses the paper's implicit nonnegative-contraction parameter domain flagged in source_gaps.",
+          "ref": "Appendix A, first displayed chain",
+          "source_pdf_lines": [
+            747,
+            753
+          ],
+          "math": "\\|x_t\\|_{\\infty}\n=\\|(1-\\eta\\lambda)x_{t-1}-\\eta\\operatorname{sign}(v_{t-1})\\|_{\\infty}\n\\le (1-\\eta\\lambda)\\|x_{t-1}\\|_{\\infty}+\\eta\\|\\operatorname{sign}(v_{t-1})\\|_{\\infty}",
+          "uses": [
+            "Algorithm_1_SignWeightDecayUpdate",
+            "Centralized_EtaLambdaHorizonDomainPrerequisite"
+          ],
+          "produces": "linfty_one_step_recursion"
+        },
+        {
+          "step": 2,
+          "description": "Unroll the l-infinity recursion over previous iterates and express the sign contribution by a maximum over i=1,...,t-1; this requires the same implicit nonnegative contraction 0 <= 1-eta lambda <= 1.",
+          "ref": "Appendix A, first displayed chain",
+          "source_pdf_lines": [
+            754,
+            755
+          ],
+          "math": "\\le (1-\\eta\\lambda)^{t-1}\\|x_1\\|_{\\infty}+\\eta(t-1)\\max_{i\\in\\{1,\\cdots,t-1\\}}\\{\\|\\operatorname{sign}(v_i)\\|_{\\infty}\\}",
+          "uses": [
+            "previous_step:1",
+            "Centralized_EtaLambdaHorizonDomainPrerequisite"
+          ],
+          "produces": "linfty_unrolled_with_sign_max"
+        },
+        {
+          "step": 3,
+          "description": "Use ||sign(v_i)||_infty <= 1, drop the contraction factor, and use the initial-point condition to obtain ||x_t||_infty <= eta t; dropping the factor relies on the implicit nonnegative-contraction domain.",
+          "ref": "Appendix A, first displayed chain",
+          "source_pdf_lines": [
+            757,
+            758
+          ],
+          "math": "\\le \\|x_1\\|_{\\infty}+\\eta(t-1)\n\\le \\eta t.",
+          "uses": [
+            "previous_step:2",
+            "Theorem1_InitialInfinityBound",
+            "Centralized_EtaLambdaHorizonDomainPrerequisite"
+          ],
+          "produces": "iterate_linf_bound"
+        },
+        {
+          "step": 4,
+          "description": "Repeat the update-rule and triangle-inequality argument in the Euclidean norm, using ||sign(v_{t-1})|| <= sqrt(d), and unroll with the same implicit nonnegative-contraction domain.",
+          "ref": "Appendix A, second displayed chain",
+          "source_pdf_lines": [
+            760,
+            769
+          ],
+          "math": "\\|x_t\\|\n=\\|(1-\\eta\\lambda)x_{t-1}-\\eta\\operatorname{sign}(v_{t-1})\\|\n\\le (1-\\eta\\lambda)\\|x_{t-1}\\|+\\eta\\|\\operatorname{sign}(v_{t-1})\\|\n\\le (1-\\eta\\lambda)\\|x_{t-1}\\|+\\eta\\sqrt{d}\n\\le (1-\\eta\\lambda)^{t-1}\\|x_1\\|+\\eta(t-1)\\sqrt{d},",
+          "uses": [
+            "Algorithm_1_SignWeightDecayUpdate",
+            "Centralized_EtaLambdaHorizonDomainPrerequisite"
+          ],
+          "produces": "euclidean_norm_unrolled_bound"
+        },
+        {
+          "step": 5,
+          "description": "Square the Euclidean bound, split the square into the initial and accumulated sign terms, and drop the contraction power using the implicit 0 <= 1-eta lambda <= 1 domain.",
+          "ref": "Appendix A, third displayed chain",
+          "source_pdf_lines": [
+            770,
+            774
+          ],
+          "math": "\\|x_t\\|^2\n\\le 2(1-\\eta\\lambda)^{2(t-1)}\\|x_1\\|^2+2\\eta^2(t-1)^2d\n\\le 2\\|x_1\\|^2+2\\eta^2(t-1)^2d",
+          "uses": [
+            "previous_step:4",
+            "Centralized_EtaLambdaHorizonDomainPrerequisite"
+          ],
+          "produces": "squared_euclidean_bound_before_initial_linf"
+        },
+        {
+          "step": 6,
+          "description": "Convert ||x_1||^2 to ||x_1||_infty^2 d and use ||x_1||_infty <= eta to get the stated ||x_t||^2 bound.",
+          "ref": "Appendix A, third displayed chain",
+          "source_pdf_lines": [
+            775,
+            776
+          ],
+          "math": "\\le 2\\|x_1\\|_{\\infty}^2d+2\\eta^2(t-1)^2d\n\\le 2\\eta^2t^2d.",
+          "uses": [
+            "previous_step:5",
+            "Theorem1_InitialInfinityBound",
+            "Centralized_EtaLambdaHorizonDomainPrerequisite"
+          ],
+          "produces": "iterate_l2_squared_bound"
+        },
+        {
+          "step": 7,
+          "description": "Write the update displacement and split its square into the weight-decay part and sign part.",
+          "ref": "Appendix A, update-step displayed chain",
+          "source_pdf_lines": [
+            779,
+            784
+          ],
+          "math": "\\|x_{t+1}-x_t\\|^2\n=\\|\\eta\\lambda x_t+\\eta\\operatorname{sign}(v_t)\\|^2\n\\le 2\\eta^2\\lambda^2\\|x_t\\|^2+2\\eta^2\\|\\operatorname{sign}(v_t)\\|^2\n\\le 2\\eta^2\\lambda^2\\|x_t\\|^2+2\\eta^2d",
+          "uses": [
+            "Algorithm_1_SignWeightDecayUpdate",
+            "Centralized_EtaLambdaHorizonDomainPrerequisite"
+          ],
+          "produces": "update_displacement_before_iterate_bound"
+        },
+        {
+          "step": 8,
+          "description": "Substitute the iterate l2-squared bound ||x_t||^2 <= 2 eta^2 t^2 d into the update-displacement estimate.",
+          "ref": "Appendix A, update-step displayed chain",
+          "source_pdf_lines": [
+            785,
+            785
+          ],
+          "math": "\\le 2\\eta^2\\lambda^2\\cdot 2\\eta^2t^2d+2\\eta^2d",
+          "uses": [
+            "previous_step:6",
+            "previous_step:7",
+            "Centralized_EtaLambdaHorizonDomainPrerequisite"
+          ],
+          "produces": "update_displacement_after_iterate_bound_substitution"
+        },
+        {
+          "step": 9,
+          "description": "Use Algorithm 1's finite horizon t <= T to replace t^2 by T^2 in the displayed chain.",
+          "ref": "Appendix A, update-step displayed chain",
+          "source_pdf_lines": [
+            786,
+            786
+          ],
+          "math": "\\le 2\\eta^2d(2\\eta^2\\lambda^2T^2+1)",
+          "uses": [
+            "previous_step:8",
+            "Algorithm_1_TimeLoopHorizon",
+            "Centralized_EtaLambdaHorizonDomainPrerequisite"
+          ],
+          "produces": "update_displacement_after_horizon_bound"
+        },
+        {
+          "step": 10,
+          "description": "Apply lambda <= 1/(2 eta T) to the horizon-bounded expression to conclude the stated update-step bound.",
+          "ref": "Appendix A, update-step displayed chain",
+          "source_pdf_lines": [
+            787,
+            789
+          ],
+          "math": "\\le 4\\eta^2d,",
+          "uses": [
+            "previous_step:9",
+            "Theorem1_WeightDecayBound",
+            "Centralized_EtaLambdaHorizonDomainPrerequisite"
+          ],
+          "produces": "update_step_squared_bound"
+        }
+      ]
+    },
+    {
+      "name": "Centralized_MomentumParameterDomainPrerequisite",
+      "ref": "Algorithm 1 line 1, Theorem 1 p.5, Appendix B Eq. (6) p.16 (formal prerequisite not stated separately)",
+      "statement_math": "\\beta_2^2 \\le \\beta_1 \\le \\sqrt{\\beta_2}",
+      "formal_prerequisite_math": "0<\\beta_2,\\quad \\beta_2\\le1,\\quad 0<\\beta_1,\\quad \\beta_1\\le1",
+      "formal_prerequisite_ref": "Derived domain/range prerequisite for denominators, contractions, and beta-order simplifications; not printed in the paper.",
+      "source_status": "statement_math is the paper-printed Theorem 1 beta-order condition. formal_prerequisite_math records the extra positivity/range facts needed for 1/\\beta_1 and 1/\\beta_2, contraction factors, beta_1^2\\le\\beta_2, and the finite-horizon comparisons; these domain facts are not stated separately in the PDF.",
+      "role": "Makes explicit the hidden momentum-domain prerequisites behind the centralized estimator-error recurrences, their telescoping divisions, and the final beta-dependent simplification without changing the paper's printed theorem statement.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Record the paper's printed beta-order condition from Theorem 1 and the fact that Algorithm 1 treats beta_1 and beta_2 as momentum parameters.",
+          "ref": "Algorithm 1 line 1; Theorem 1, p.5",
+          "source_pdf_lines": [
+            266,
+            279
+          ],
+          "math": "\\beta_2^2 \\le \\beta_1 \\le \\sqrt{\\beta_2}",
+          "uses": [
+            "Theorem1_MomentumOrder"
+          ],
+          "produces": "paper_beta_order_condition_without_explicit_domain"
+        },
+        {
+          "step": 2,
+          "description": "Expose the additional positivity and upper-bound conditions required by the printed 1/beta terms, contraction factors, and coefficient comparisons; these are derived formal prerequisites, not paper assumptions.",
+          "ref": "Appendix B, Eq. (6), p.16; source gap SourceGap_ImplicitMomentumParameterDomain",
+          "source_pdf_lines": [
+            868,
+            929
+          ],
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "centralized_beta_positive_range_prerequisite"
+        }
+      ]
+    },
+    {
+      "name": "Centralized_EtaLambdaHorizonDomainPrerequisite",
+      "ref": "Appendix A, p.14; Lemma 1 p.5 (formal prerequisite not stated separately)",
+      "statement_math": "\\lambda \\le \\frac{1}{2\\eta T}",
+      "formal_prerequisite_math": "\\eta>0,\\quad T>0,\\quad 0\\le\\lambda,\\quad 0\\le1-\\eta\\lambda\\le1",
+      "formal_prerequisite_ref": "Derived contraction/domain prerequisite for the Appendix A iterate and step bounds; not printed separately in the paper.",
+      "source_status": "statement_math is the paper-printed weight-decay condition. formal_prerequisite_math records the extra eta, lambda, and horizon-domain facts needed to replace absolute values by 1-eta lambda, unroll and drop contraction powers, and justify the final lambda^2 estimate; these facts are not stated separately in the PDF.",
+      "role": "Makes explicit the hidden eta-lambda-horizon domain used by the centralized Lemma 1 proof while preserving the paper's one-sided weight-decay condition and initial-point restriction as separate entries.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Record the paper's finite-horizon weight-decay condition and the loop range used in Appendix A.",
+          "ref": "Theorem 1, p.5; Appendix A, p.14",
+          "source_pdf_lines": [
+            747,
+            789
+          ],
+          "math": "\\lambda \\le \\frac{1}{2\\eta T}",
+          "uses": [
+            "Theorem1_WeightDecayBound",
+            "Algorithm_1_TimeLoopHorizon"
+          ],
+          "produces": "paper_weight_decay_and_horizon_conditions"
+        },
+        {
+          "step": 2,
+          "description": "Expose the additional positivity and contraction facts required by the displayed Appendix A chains; these are derived formal prerequisites, not silently added paper assumptions.",
+          "ref": "Appendix A, p.14; source gap SourceGap_ImplicitEtaLambdaHorizonDomain",
+          "source_pdf_lines": [
+            747,
+            776
+          ],
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "centralized_eta_lambda_horizon_domain_prerequisite"
+        }
+      ]
+    },
+    {
+      "name": "Lemma_1_Eq4BoundTransitionPrerequisite",
+      "ref": "Appendix B, Eq. (4), p.15 (formal evidence record for printed equality-shaped bounds)",
+      "statement_math": "\\|x_{t+1}-x_t\\|^2\\le4\\eta^2d,\\quad \\|x_t\\|_{\\infty}\\le\\eta t,\\quad t\\le T,\\quad \\lambda\\le\\frac{1}{2\\eta T}",
+      "source_status": "This key lemma records the load-bearing prerequisites for the equality-shaped upper-bound transitions printed in Eq. (4). The source-correction evidence remains in source_gaps.SourceGap_Eq4EqualityPrintedBoundTransitions; the displayed transitions are not asserted to be literal equalities.",
+      "role": "Names the source-correction boundary used when the centralized descent proof replaces the smoothness quadratic, bounds the weight-decay inner product, and absorbs the residual into half of the l1 descent term.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Collect the paper-printed iterate, step, horizon, and weight-decay prerequisites that Eq. (4) uses in its equality-shaped transitions.",
+          "ref": "Appendix A, p.14; Appendix B, Eq. (4), p.15",
+          "source_pdf_lines": [
+            779,
+            809
+          ],
+          "uses": [
+            "Lemma_1_IterateAndStepBounds",
+            "Algorithm_1_TimeLoopHorizon",
+            "Theorem1_WeightDecayBound"
+          ],
+          "produces": "centralized_eq4_bound_prerequisites"
+        },
+        {
+          "step": 2,
+          "description": "Preserve the source-correction boundary: the PDF prints equality signs where the formal route uses upper bounds and dual-norm inequalities.",
+          "ref": "Appendix B, Eq. (4), p.15; source gap SourceGap_Eq4EqualityPrintedBoundTransitions",
+          "source_pdf_lines": [
+            797,
+            809
+          ],
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "centralized_eq4_printed_equality_correction_evidence"
+        }
+      ]
+    }
+  ],
+  "cited_theorems": [
+    {
+      "name_in_source": "Jensen's Inequality",
+      "ref": "Appendix B, p.15, line 861",
+      "role": "Used for the second inequality in equation (5).",
+      "proof_in_source": "cited"
+    }
+  ],
+  "source_gaps": [
+    {
+      "name": "SourceGap_AsymptoticScheduleConstants",
+      "ref": "Theorem 1 and Appendix B final display",
+      "description": "The paper states beta_2 and eta only with big-O schedules, so Appendix B's final asymptotic step suppresses unspecified absolute constants."
+    },
+    {
+      "name": "SourceGap_Eq4EqualityPrintedBoundTransitions",
+      "ref": "Appendix B, Eq. (4), p.15, lines 797-804 and 805-809",
+      "description": "Appendix B Eq. (4) prints equality signs for transitions that are upper bounds: replacing the smoothness quadratic by 2 eta^2 L d using Lemma 1, replacing -eta lambda <nabla f(x_t), x_t> by +eta lambda ||nabla f(x_t)||_1 ||x_t||_infty via a dual-norm upper bound, and absorbing the weight-decay term into the half-descent term using Lemma 1, t <= T, and lambda <= 1/(2 eta T)."
+    },
+    {
+      "name": "SourceGap_Eq6TypographicalParenthesis",
+      "ref": "Appendix B, Eq. (6), p.16",
+      "description": "The PDF text has a likely typographical extra right parenthesis in ||m_t-\\nabla f(x_t))||^2; the JSON normalizes this to ||m_t-\\nabla f(x_t)||^2 in the proof trace."
+    },
+    {
+      "name": "SourceGap_ImplicitMomentumParameterDomain",
+      "ref": "Algorithm 1 line 1, Theorem 1 p.5, Appendix B Eq. (6) p.16",
+      "description": "The coefficient simplifications from (1-\\beta_1)^2(1+\\beta_1) to (1-\\beta_1), from (1-\\beta_1)^2(1+1/\\beta_1) to 2/\\beta_1, and the analogous beta_2 simplifications use implicit momentum-parameter range/positivity facts not stated as formal hypotheses; Algorithm 1 only names beta_1, beta_2 as momentum parameters, while Theorem 1 states beta_2^2 <= beta_1 <= sqrt(beta_2)."
+    },
+    {
+      "name": "SourceGap_ImplicitEtaLambdaHorizonDomain",
+      "ref": "Appendix A, p.14, lines 751-776; Lemma 1 p.5",
+      "description": "Appendix A uses (1-eta lambda) as a nonnegative contraction, unrolls powers of (1-eta lambda), and then drops those powers. The paper states lambda <= 1/(2 eta T) and ||x_1||_infty <= eta, but does not separately spell out eta > 0, lambda >= 0, T >= 1, or 0 <= eta lambda <= 1 as formal parameter-domain hypotheses."
+    },
+    {
+      "name": "SourceGap_DistributedCrossNodeNoiseOrthogonality",
+      "ref": "Assumption 7, p.7, lines 375-377; Appendix D, Eq. (9), p.19, lines 1118-1139",
+      "description": "Assumption 7 states only per-node unbiasedness and a bounded second moment. Appendix D then prints the stochastic contribution in Eq. (9) as an individual-node variance sum with a 1/n^2 factor, which requires an additional conditional mean-zero/measurability and cross-node orthogonality or independence contract to cancel mixed state-noise and off-diagonal node-noise terms. The JSON records that contract as a formal prerequisite, not as a consequence proved from Assumption 7."
+    },
+    {
+      "name": "SourceGap_NodewiseFirstStepInitialization",
+      "ref": "Section 4.2, p.7, lines 381-385; Appendix D, Eq. (10), p.20, lines 1180-1211",
+      "description": "Section 4.2 prints the first-step initialization without node superscripts as m_1 = v_1 = nabla f(x_1; xi_1). Appendix D later uses indexed m_1^j and v_t^j quantities, so the nodewise interpretation m_1^j = v_1^j = nabla f_j(x_1; xi_1^j) is a derived adapter/source gap rather than verbatim paper statement text."
+    }
+  ],
+  "extension": {
+    "base_id": "87ddce751e3bfb5fde0a9bc4b03a78a5ab7a32964443679c90efeaf0e7878906",
+    "request": "Extend the existing centralized Lion project IN THE SAME Lion.lean and Lion.json with Algorithm 2 (v1), Theorem 3, Assumptions 5/7/8 and Appendix D. Reuse the existing centralized definitions and proofs; automatically identify adapters and genuinely new distributed obligations. Preserve the centralized statement-correction evidence. Explicitly justify sum versus average under sign, cross-node independence/noise cancellation, the 1/n variance improvement, and n/d/T-dependent schedules without silently adding source assumptions. Keep both centralized and distributed results in the same Lean file. Do not create another standalone distributed Setup or new Lean module unnecessarily. The earlier distributed JSON at /workspace/artifact/LionDistributed.json is read-only supplementary PDF extraction, not the base implementation or an approved Lean model. Exclude Algorithm 2 v2 and Algorithm 3.",
+    "reuse": [
+      {
+        "base_json_pointer": "/key_lemmas/4",
+        "base_symbols": [
+          "Algorithms.Unverified.Lion.nextX"
+        ],
+        "target_json_pointer": "/extension/additions/algorithm_spec/steps/5",
+        "method": "reuse",
+        "reason": "Algorithm 2 v1 uses the same coordinatewise sign plus weight-decay update as centralized Algorithm 1; only the source of the server direction is adapted. The target pointer is zero-based and resolves to the algorithm_spec object whose printed step field is 6, shared_sign_weight_decay_update."
+      },
+      {
+        "base_json_pointer": "/key_lemmas/6",
+        "base_symbols": [
+          "Algorithms.Unverified.Lion.lemma_one_iterate_and_step_bounds_correctedDomain"
+        ],
+        "target_json_pointer": "/extension/additions/main_theorem/proof/0",
+        "method": "adapt",
+        "reason": "The iterate and step bounds depend only on the shared x-update, so the centralized proof is reused after replacing the centralized direction by the distributed summed/averaged direction and carrying the same corrected eta-lambda domain."
+      },
+      {
+        "base_json_pointer": "/main_theorem/proof/11",
+        "base_symbols": [
+          "_private.Algorithms.Unverified.Lion.0.Algorithms.Unverified.Lion.finite_horizon_gradient_average_descent_pre_bound_correctedDomain",
+          "Algorithms.Unverified.Lion.finite_horizon_gradient_average_bound_correctedDomain"
+        ],
+        "target_json_pointer": "/extension/additions/key_lemmas/11",
+        "method": "adapt",
+        "reason": "Appendix D explicitly says the centralized descent analysis is valid through Eq. (5); the adapter changes the true gradient to the average objective and the estimator-error route to the distinct averaged estimator bar v_t, while the sign update is transported from the distributed server sum via positive scaling."
+      },
+      {
+        "base_json_pointer": "/algorithm_spec/steps/1",
+        "base_symbols": [
+          "Algorithms.Unverified.Lion.v_succ_eq_lookahead_momentum"
+        ],
+        "target_json_pointer": "/extension/additions/algorithm_spec/steps/2",
+        "method": "adapt",
+        "reason": "The distributed node v update is the centralized lookahead-momentum recurrence applied independently at each node; averaging worker errors and proving the 1/n noise reduction remain new obligations."
+      },
+      {
+        "base_json_pointer": "/algorithm_spec/steps/2",
+        "base_symbols": [
+          "Algorithms.Unverified.Lion.m_succ_eq_original_momentum"
+        ],
+        "target_json_pointer": "/extension/additions/algorithm_spec/steps/3",
+        "method": "adapt",
+        "reason": "The distributed node m update is the centralized original-momentum recurrence applied independently at each node; the distributed averaging and cross-node variance argument are new obligations."
+      }
+    ],
+    "additions": {
+      "algorithm": "DistributedOriginalLion",
+      "full_name": "Distributed Lion optimizer, original version (Algorithm 2 v1 / Dis-Lion)",
+      "source_reference": "Wei Jiang and Lijun Zhang, Convergence Analysis of the Lion Optimizer in Centralized and Distributed Settings, arXiv:2508.12327v1 (2025), Section 4, Algorithm 2 (v1), Theorem 3, Appendix D",
+      "setup": {
+        "problem": {
+          "math": "\\min_{x\\in\\mathbb{R}^d} f(x) := \\frac{1}{n}\\sum_{j=1}^{n} f_j(x),\\quad f_j(x)=\\mathbb{E}_{\\xi_j\\sim\\mathcal{D}_j}\\left[f_j(x;\\xi^j)\\right]",
+          "ref": "Eq. (2), p.6",
+          "description": "Distributed heterogeneous stochastic optimization: node j has distribution \\mathcal{D}_j and loss f_j, and the global objective is their average."
+        },
+        "variable_space": {
+          "math": "x\\in\\mathbb{R}^d",
+          "ref": "Eq. (2), p.6"
+        },
+        "global_gradient": {
+          "math": "\\nabla f(x)=\\frac{1}{n}\\sum_{j=1}^{n}\\nabla f_j(x)",
+          "ref": "Appendix D, p.19",
+          "description": "Appendix D explicitly uses this identity when averaging node estimator errors."
+        },
+        "derived_estimators": {
+          "server_sum": {
+            "math": "v_t^{\\mathrm{sum}}:=\\sum_{j=1}^{n}v_t^j",
+            "ref": "Derived notation from Algorithm 2, line 8, p.8",
+            "description": "This is the estimator transmitted by Algorithm 2 and used inside the actual sign update."
+          },
+          "appendix_average": {
+            "math": "\\bar v_t:=\\frac{1}{n}\\sum_{j=1}^{n}v_t^j=\\frac{1}{n}v_t^{\\mathrm{sum}}",
+            "ref": "Derived notation from Appendix D, p.19 and Algorithm 2, line 8, p.8",
+            "description": "This is the distinct averaged estimator used for the Appendix D error recurrences. It is not identified with the server sum in squared-error expressions."
+          }
+        },
+        "node_count_domain": {
+          "math": "n\\ge 1",
+          "ref": "Derived formal domain obligation; not stated separately in the paper",
+          "description": "The objective average, the positive-scaling sign bridge, and the 1/n variance calculations require a nonempty node set."
+        },
+        "sampling_note": {
+          "math": "\\xi_t^j",
+          "ref": "Algorithm 2, lines 4-7, p.8; Appendix D, p.19",
+          "description": "The paper indexes stochastic samples by node and time, but does not explicitly state independence across nodes or across times. Appendix D uses cross-node noise cancellation in Eq. (9), which should be recorded as a source gap if formalized."
+        }
+      },
+      "assumptions": [
+        {
+          "name": "Assumption_5_Smoothness",
+          "math": "\\|\\nabla f_j(x)-\\nabla f_j(y)\\| \\le L\\|x-y\\| .",
+          "ref": "Assumption 5, p.7",
+          "parameters": [
+            "L",
+            "j",
+            "x",
+            "y"
+          ]
+        },
+        {
+          "name": "Assumption_7_UnbiasedBoundedNoise",
+          "math": "\\mathbb{E}_{\\xi}[\\nabla f_j(x;\\xi)] = \\nabla f_j(x),\\quad \\mathbb{E}_{\\xi}\\left[\\|\\nabla f_j(x;\\xi)-\\nabla f_j(x)\\|^2\\right] \\le \\sigma^2 .",
+          "ref": "Assumption 7, p.7",
+          "parameters": [
+            "\\sigma",
+            "j",
+            "x",
+            "\\xi"
+          ]
+        },
+        {
+          "name": "Assumption_8_InitialGap",
+          "math": "f_* = \\inf_x f(x) \\ge -\\infty \\text{ and } f(x_1)-f_* \\le \\Delta_f \\text{ for the initial solution } x_1 .",
+          "ref": "Assumption 8, p.7",
+          "parameters": [
+            "f_*",
+            "\\Delta_f",
+            "x_1"
+          ]
+        },
+        {
+          "name": "Theorem_3_MomentumOrder",
+          "math": "\\beta_2^2 \\le \\beta_1 \\le \\sqrt{\\beta_2}",
+          "ref": "Theorem 3, p.7; Appendix D, p.20",
+          "parameters": [
+            "\\beta_1",
+            "\\beta_2"
+          ]
+        },
+        {
+          "name": "Theorem_3_Beta2Schedule",
+          "math": "\\beta_2 = O(n^{1/2}T^{-1/2})",
+          "ref": "Theorem 3, p.7; Appendix D, p.20",
+          "parameters": [
+            "\\beta_2",
+            "n",
+            "T"
+          ]
+        },
+        {
+          "name": "Theorem_3_EtaSchedule",
+          "math": "\\eta = O(n^{1/4}d^{-1/2}T^{-3/4})",
+          "ref": "Theorem 3, p.7; Appendix D, p.20",
+          "parameters": [
+            "\\eta",
+            "n",
+            "d",
+            "T"
+          ]
+        },
+        {
+          "name": "Theorem_3_WeightDecayBound",
+          "math": "\\lambda \\le \\frac{1}{2\\eta T}",
+          "ref": "Theorem 3, p.7; Lemma 1, p.5",
+          "parameters": [
+            "\\lambda",
+            "\\eta",
+            "T"
+          ]
+        },
+        {
+          "name": "Theorem_3_HorizonLowerBound",
+          "math": "T \\ge n",
+          "ref": "Theorem 3, p.7; Appendix D, p.20",
+          "parameters": [
+            "T",
+            "n"
+          ]
+        },
+        {
+          "name": "Theorem_3_InitialInfinityBound",
+          "math": "\\|x_1\\|_{\\infty} \\le \\eta",
+          "ref": "Theorem 3, p.7; Lemma 1, p.5",
+          "parameters": [
+            "x_1",
+            "\\eta"
+          ]
+        }
+      ],
+      "algorithm_spec": {
+        "initialization": {
+          "math": "m_1 = v_1 = \\nabla f(x_1;\\xi_1)",
+          "ref": "Section 4.2, p.7",
+          "description": "The prose prints the centralized-looking initialization without node superscripts. Algorithm 2 and Appendix D then use node estimators m_t^j and v_t^j; a formal model should index the first-step initialization per node."
+        },
+        "steps": [
+          {
+            "step": 1,
+            "name": "time_loop",
+            "math": "\\text{for time step } t=1 \\text{ to } T \\text{ do}",
+            "ref": "Algorithm 2, line 2, p.8"
+          },
+          {
+            "step": 2,
+            "name": "node_loop",
+            "math": "\\text{for node } j=1 \\text{ to } n \\text{ do}",
+            "ref": "Algorithm 2, line 3, p.8"
+          },
+          {
+            "step": 3,
+            "name": "v1_node_v_update",
+            "math": "\\mathbf{v}_t^j=(1-\\beta_1)\\mathbf{m}_{t-1}^j+\\beta_1\\nabla f_j(\\mathbf{x}_t;\\xi_t^j)",
+            "ref": "Algorithm 2, line 4 (v1), p.8"
+          },
+          {
+            "step": 4,
+            "name": "v1_node_m_update",
+            "math": "\\mathbf{m}_t^j=(1-\\beta_2)\\mathbf{m}_{t-1}^j+\\beta_2\\nabla f_j(\\mathbf{x}_t;\\xi_t^j)",
+            "ref": "Algorithm 2, line 5 (v1), p.8"
+          },
+          {
+            "step": 5,
+            "name": "server_sum",
+            "math": "\\mathbf{v}_t=\\sum_{j=1}^{n}\\mathbf{v}_t^j",
+            "ref": "Algorithm 2, line 8, p.8"
+          },
+          {
+            "step": 6,
+            "name": "shared_sign_weight_decay_update",
+            "math": "\\mathbf{x}_{t+1}=\\mathbf{x}_t-\\eta(\\operatorname{sign}(\\mathbf{v}_t)+\\lambda\\mathbf{x}_t)",
+            "ref": "Algorithm 2, line 9, p.8"
+          }
+        ],
+        "output": {
+          "math": "\\text{Algorithm 2 has no explicit output line.}",
+          "ref": "Algorithm 2, lines 1-11, p.8",
+          "type": "no explicit algorithm output; theorem bounds the uniform average over iterates t=1,\\ldots,T",
+          "description": "Algorithm 2 prints inputs, the time loop, node loop, node updates, server aggregation, and the shared iterate update, but no output line."
+        },
+        "parameters": [
+          {
+            "name": "momentum_parameters",
+            "math": "\\beta_1,\\beta_2",
+            "ref": "Algorithm 2, line 1, p.8"
+          },
+          {
+            "name": "learning_rate",
+            "math": "\\eta",
+            "ref": "Algorithm 2, line 1, p.8"
+          },
+          {
+            "name": "weight_decay",
+            "math": "\\lambda",
+            "ref": "Algorithm 2, line 1, p.8"
+          },
+          {
+            "name": "sum_estimator_in_algorithm",
+            "math": "\\mathbf{v}_t=\\sum_{j=1}^{n}\\mathbf{v}_t^j",
+            "ref": "Algorithm 2, line 8, p.8"
+          },
+          {
+            "name": "average_estimator_in_appendix_D",
+            "math": "\\frac{1}{n}\\sum_{j=1}^{n}\\mathbf{v}_t^j",
+            "ref": "Appendix D, p.19"
+          }
+        ]
+      },
+      "main_theorem": {
+        "statement_math": "\\text{Under Assumptions 5, 7 and 8, by setting } \\beta_2^2 \\le \\beta_1 \\le \\sqrt{\\beta_2},\\ \\beta_2 = O(n^{1/2}T^{-1/2}),\\ \\eta = O(n^{1/4}d^{-1/2}T^{-3/4}),\\ \\lambda \\le \\frac{1}{2\\eta T},\\ T \\ge n,\\ \\text{and } \\|x_1\\|_{\\infty} \\le \\eta,\\ \\text{the distributed Lion optimizer (v1) ensures that }\\frac{1}{T}\\sum_{t=1}^{T}\\mathbb{E}[\\|\\nabla f(x_t)\\|_1]\\le O\\left(\\frac{d^{1/2}}{n^{1/4}T^{1/4}}\\right).",
+        "rate": "O(d^{1/2}(nT)^{-1/4})",
+        "measure": "finite-horizon average expected l1 norm of the global objective gradient",
+        "formal_status": "The theorem head and final Big-O display are preserved as the paper's printed claim. The proof trace establishes the finite-horizon bound immediately before the final schedule substitution; the asymptotic rate is recorded as a paper claim under the one-sided schedule notation, while a formally closed rate must additionally consume the derived corrected schedule contract TwoSidedSchedulePrerequisiteForRate.",
+        "corrected_rate_contract": {
+          "name": "CorrectedDistributedRateScheduleContract",
+          "key_lemma": "TwoSidedSchedulePrerequisiteForRate",
+          "status": "derived formal boundary, not a paper assumption",
+          "reason": "The finite-horizon expression contains 1/eta, 1/beta_2, and 1/beta_2^2, so one-sided upper Big-O statements do not by themselves justify the displayed rate."
+        },
+        "proof": [
+          {
+            "step": 1,
+            "description": "Appendix D reuses the Theorem 1 descent analysis through Eq. (5), now for the global distributed objective f. The displayed source formula overloads v_t; the formal adapter keeps Algorithm 2's server sum v_t^{\\mathrm{sum}} separate and instantiates the reused descent bound with the averaged estimator \\bar v_t. This instantiation relies on the positive-scaling sign bridge between the server sum and the averaged estimator, without equating their squared estimator errors. Phase 0 must instantiate the inherited corrected-domain declaration Algorithms.Unverified.Lion.lemma_one_iterate_and_step_bounds_correctedDomain, represented here by the inherited key lemma Lemma_1_IterateAndStepBounds together with the explicit eta-lambda domain obligation.",
+            "ref": "Appendix D, p.18",
+            "source_pdf_lines": [
+              1068,
+              1079
+            ],
+            "math": "\\mathbb{E}\\left[\\frac{1}{T}\\sum_{t=1}^{T}\\|\\nabla f(x_t)\\|_1\\right]\\le \\frac{2\\Delta_f}{\\eta T}+4\\sqrt{d}\\cdot\\sqrt{\\mathbb{E}\\left[\\frac{1}{T}\\sum_{t=1}^{T}\\|\\nabla f(x_t)-v_t\\|^2\\right]}+4\\eta Ld.",
+            "uses": [
+              "Assumption_5_Smoothness",
+              "Assumption_8_InitialGap",
+              "Theorem_3_WeightDecayBound",
+              "Theorem_3_InitialInfinityBound",
+              "Lemma_1_IterateAndStepBounds",
+              "Lemma_1_EtaLambdaPositivityPrerequisites",
+              "Algorithm_2_TimeLoopHorizon",
+              "Lemma_1_Eq4BoundTransitionPrerequisite",
+              "NodeCountPositivePrerequisite",
+              "Equation_5_DescentReduction",
+              "DistributedSumAverageEstimatorDefinitions",
+              "PositiveScalingSignIdentity"
+            ],
+            "produces": "distributed_descent_reduced_to_averaged_estimator_error; paper_formula_uses_overloaded_v"
+          },
+          {
+            "step": 2,
+            "description": "The PDF writes an equality with the symbol v_t on the left and (1/n) sum_j v_t^j on the right. This is a source inconsistency, not an equality between the squared errors of the server sum and the average. The formal route introduces v_t^{\\mathrm{sum}} and \\bar v_t=(1/n)v_t^{\\mathrm{sum}}, uses the positive-scaling sign identity only to preserve the actual sign update, and replaces the estimator-error argument in the reused Eq. (5) adapter by \\bar v_t. No statement of the form ||\\nabla f-v_t^{\\mathrm{sum}}||^2=||\\nabla f-\\bar v_t||^2 is made.",
+            "ref": "Appendix D, p.19; Algorithm 2, line 8, p.8",
+            "source_pdf_lines": [
+              1083,
+              1088
+            ],
+            "math": "\\mathbb{E}\\left[\\frac{1}{T}\\sum_{t=1}^{T}\\|\\nabla f(x_t)-v_t\\|^2\\right]=\\mathbb{E}\\left[\\frac{1}{T}\\sum_{t=1}^{T}\\left\\|\\frac{1}{n}\\sum_{j=1}^{n}v_t^j-\\nabla f(x_t)\\right\\|^2\\right]",
+            "uses": [
+              "Algorithm_2_V1_Definitions",
+              "DistributedSumAverageEstimatorDefinitions",
+              "PositiveScalingSignIdentity",
+              "NodeCountPositivePrerequisite"
+            ],
+            "produces": "paper_overloaded_average_estimator_display; formal_estimator_error_target_is_bar_v"
+          },
+          {
+            "step": 3,
+            "description": "For each worker, expand the next v-estimator error according to the v_t^j definition.",
+            "ref": "Appendix D, p.19",
+            "source_pdf_lines": [
+              1088,
+              1095
+            ],
+            "math": "v_{t+1}^j-\\nabla f_j(x_{t+1})=(1-\\beta_1)\\left(m_t^j-\\nabla f_j(x_t)\\right)+\\beta_1\\left(\\nabla f_j(x_{t+1};\\xi_{t+1}^j)-\\nabla f_j(x_{t+1})\\right)+(1-\\beta_1)\\left(\\nabla f_j(x_t)-\\nabla f_j(x_{t+1})\\right).",
+            "uses": [
+              "Algorithm_2_V1_Definitions"
+            ],
+            "produces": "per_worker_v_error_expansion"
+          },
+          {
+            "step": 4,
+            "description": "Average the per-worker expansion and use the global-gradient average identity.",
+            "ref": "Appendix D, p.19",
+            "source_pdf_lines": [
+              1096,
+              1115
+            ],
+            "math": "\\frac{1}{n}\\sum_{j=1}^{n}v_{t+1}^j-\\nabla f(x_{t+1})=\\frac{1}{n}\\sum_{j=1}^{n}\\left(v_{t+1}^j-\\nabla f_j(x_{t+1})\\right)=(1-\\beta_1)\\frac{1}{n}\\sum_{j=1}^{n}\\left(m_t^j-\\nabla f_j(x_t)\\right)+\\beta_1\\frac{1}{n}\\sum_{j=1}^{n}\\left(\\nabla f_j(x_{t+1};\\xi_{t+1}^j)-\\nabla f_j(x_{t+1})\\right)+(1-\\beta_1)\\frac{1}{n}\\sum_{j=1}^{n}\\left(\\nabla f_j(x_t)-\\nabla f_j(x_{t+1})\\right).",
+            "uses": [
+              "previous_step:3",
+              "DistributedObjectiveAverageGradient"
+            ],
+            "produces": "averaged_v_error_decomposition"
+          },
+          {
+            "step": 5,
+            "description": "Square the averaged v-error decomposition. The paper's first displayed Eq. (9) inequality separates the previous averaged m-error, the stochastic contribution already written as a sum of individual node-noise second moments, and the node-gradient drift. The passage from the averaged decomposition to this printed individual-variance term consumes the explicit cross-node cancellation prerequisite before the displayed source boundary; no summed-noise residual is carried forward. The 1/beta_1 Young-inequality coefficient also requires beta_1>0, which the PDF does not state separately from the momentum-order condition.",
+            "ref": "Appendix D, Eq. (9), p.19",
+            "source_pdf_lines": [
+              1118,
+              1139
+            ],
+            "math": "\\mathbb{E}\\left[\\left\\|\\frac{1}{n}\\sum_{j=1}^{n}v_{t+1}^j-\\nabla f(x_{t+1})\\right\\|^2\\right]\\le (1-\\beta_1)\\mathbb{E}\\left[\\left\\|\\frac{1}{n}\\sum_{j=1}^{n}\\left(m_t^j-\\nabla f_j(x_t)\\right)\\right\\|^2\\right]+\\beta_1^2\\frac{1}{n^2}\\sum_{j=1}^{n}\\mathbb{E}\\left[\\left\\|\\nabla f_j(x_{t+1};\\xi_{t+1}^j)-\\nabla f_j(x_{t+1})\\right\\|^2\\right]+\\frac{2}{\\beta_1 n}\\sum_{j=1}^{n}\\mathbb{E}\\left[\\left\\|\\nabla f_j(x_{t+1})-\\nabla f_j(x_t)\\right\\|^2\\right]",
+            "uses": [
+              "previous_step:4",
+              "CrossNodeNoiseCancellationPrerequisite",
+              "MomentumParameterDomainPrerequisite",
+              "Two_Term_Squared_Norm_Inequality"
+            ],
+            "produces": "averaged_v_error_pre_smoothness_bound_with_printed_individual_node_variances"
+          },
+          {
+            "step": 6,
+            "description": "Apply Assumption 7 to the printed individual node-noise second moments and Assumption 5 to the node gradient drift, obtaining the next displayed Eq. (9) inequality. The retained 1/beta_1 denominator uses the unstated positive-domain prerequisite for beta_1.",
+            "ref": "Appendix D, Eq. (9), p.19",
+            "source_pdf_lines": [
+              1140,
+              1145
+            ],
+            "math": "\\le (1-\\beta_1)\\mathbb{E}\\left[\\left\\|\\frac{1}{n}\\sum_{j=1}^{n}\\left(m_t^j-\\nabla f_j(x_t)\\right)\\right\\|^2\\right]+\\frac{\\beta_1^2\\sigma^2}{n}+\\frac{2L^2}{\\beta_1}\\|x_{t+1}-x_t\\|^2",
+            "uses": [
+              "previous_step:5",
+              "Assumption_5_Smoothness",
+              "Assumption_7_UnbiasedBoundedNoise",
+              "MomentumParameterDomainPrerequisite"
+            ],
+            "produces": "averaged_v_error_with_noise_and_smoothness"
+          },
+          {
+            "step": 7,
+            "description": "Use Lemma 1's step bound to replace ||x_{t+1}-x_t||^2 by 4 eta^2 d, and use the global-gradient average identity to write the m-error against \\nabla f(x_t). The Lemma 1 displacement substitution is instantiated on the Algorithm 2 horizon and consumes the explicit eta/lambda positivity-domain prerequisite; the beta_1 denominator is justified only under the momentum positive-domain prerequisite.",
+            "ref": "Appendix D, Eq. (9), p.19",
+            "source_pdf_lines": [
+              1147,
+              1155
+            ],
+            "math": "\\le (1-\\beta_1)\\mathbb{E}\\left[\\left\\|\\frac{1}{n}\\sum_{j=1}^{n}m_t^j-\\nabla f(x_t)\\right\\|^2\\right]+\\frac{\\beta_1^2\\sigma^2}{n}+\\frac{8L^2\\eta^2d}{\\beta_1}.",
+            "uses": [
+              "previous_step:6",
+              "DistributedObjectiveAverageGradient",
+              "Algorithm_2_TimeLoopHorizon",
+              "Lemma_1_IterateAndStepBounds",
+              "Lemma_1_EtaLambdaPositivityPrerequisites",
+              "MomentumParameterDomainPrerequisite"
+            ],
+            "produces": "equation_9_final_v_recursion_using_corrected_domain_displacement_bound"
+          },
+          {
+            "step": 8,
+            "description": "The same calculation with beta_2 and m_{t+1}^j gives the averaged m-error recursion, again instantiating Lemma 1's corrected-domain displacement bound over the Algorithm 2 horizon. As in Eq. (9), the displayed beta_2^2 sigma^2/n term uses cross-node noise cancellation not explicitly stated beyond Assumption 7, and the 1/beta_2 coefficient needs beta_2>0.",
+            "ref": "Appendix D, p.19",
+            "source_pdf_lines": [
+              1157,
+              1166
+            ],
+            "math": "\\mathbb{E}\\left[\\left\\|\\frac{1}{n}\\sum_{j=1}^{n}m_{t+1}^j-\\nabla f(x_{t+1})\\right\\|^2\\right]\\le (1-\\beta_2)\\mathbb{E}\\left[\\left\\|\\frac{1}{n}\\sum_{j=1}^{n}m_t^j-\\nabla f(x_t)\\right\\|^2\\right]+\\frac{\\beta_2^2\\sigma^2}{n}+\\frac{8L^2\\eta^2d}{\\beta_2}.",
+            "uses": [
+              "previous_step:7",
+              "Algorithm_2_V1_Definitions",
+              "Assumption_5_Smoothness",
+              "Assumption_7_UnbiasedBoundedNoise",
+              "CrossNodeNoiseCancellationPrerequisite",
+              "DistributedObjectiveAverageGradient",
+              "Algorithm_2_TimeLoopHorizon",
+              "Lemma_1_IterateAndStepBounds",
+              "Lemma_1_EtaLambdaPositivityPrerequisites",
+              "MomentumParameterDomainPrerequisite"
+            ],
+            "produces": "averaged_m_error_recursion_using_corrected_domain_displacement_bound"
+          },
+          {
+            "step": 9,
+            "description": "Sum and rearrange the averaged m-error recursion over the Algorithm 2 horizon t=1,...,T to telescope the contraction, then divide by beta_2 T. The division uses the implicit beta_2 positive-domain prerequisite and the explicit loop/horizon adapter; T>0 follows from the node-count and horizon prerequisites.",
+            "ref": "Appendix D, Eq. (10), p.20",
+            "source_pdf_lines": [
+              1176,
+              1188
+            ],
+            "math": "\\mathbb{E}\\left[\\frac{1}{T}\\sum_{t=1}^{T}\\left\\|\\frac{1}{n}\\sum_{j=1}^{n}m_t^j-\\nabla f(x_t)\\right\\|^2\\right]\\le \\frac{\\mathbb{E}\\left[\\left\\|\\frac{1}{n}\\sum_{j=1}^{n}m_1^j-\\nabla f(x_1)\\right\\|^2\\right]}{\\beta_2T}+\\frac{\\beta_2\\sigma^2}{n}+\\frac{8L^2\\eta^2d}{\\beta_2^2}",
+            "uses": [
+              "previous_step:8",
+              "MomentumParameterDomainPrerequisite",
+              "Algorithm_2_TimeLoopHorizon",
+              "Theorem_3_HorizonLowerBound",
+              "NodeCountPositivePrerequisite"
+            ],
+            "produces": "equation_10_before_initial_error_bound"
+          },
+          {
+            "step": 10,
+            "description": "Bound the first-iteration averaged stochastic-gradient error by sigma^2/n, giving the second line of Eq. (10). The paper's Section 4.2 initialization is printed without node superscripts; the named nodewise first-step adapter supplies the m_1^j interpretation required by Appendix D, and cross-node cancellation remains an explicit formal prerequisite beyond Assumption 7.",
+            "ref": "Appendix D, Eq. (10), p.20",
+            "source_pdf_lines": [
+              1189,
+              1191
+            ],
+            "math": "\\le \\frac{\\sigma^2}{n\\beta_2T}+\\frac{\\sigma^2\\beta_2}{n}+\\frac{8L^2\\eta^2d}{\\beta_2^2}.",
+            "uses": [
+              "previous_step:9",
+              "Section_4_2_FirstStepInitialization",
+              "Nodewise_FirstStepInitialization_Adapter",
+              "Assumption_7_UnbiasedBoundedNoise",
+              "CrossNodeNoiseCancellationPrerequisite",
+              "DistributedObjectiveAverageGradient"
+            ],
+            "produces": "equation_10_final_m_error_average"
+          },
+          {
+            "step": 11,
+            "description": "Under beta_2^2 <= beta_1 <= sqrt(beta_2), apply the v-recursion across the Algorithm 2 horizon, isolate the first stochastic v_1 error, and sum the remaining m-error terms through T-1. The sigma^2/(nT) initial term uses the named nodewise first-step adapter for the printed unsuperscripted initialization and the same explicit cross-node cancellation requirement. The finite averages and divisions use the loop/horizon and positive node-count prerequisites, while the contraction and 1/beta_1 terms also rely on the unstated beta-domain prerequisite.",
+            "ref": "Appendix D, p.20",
+            "source_pdf_lines": [
+              1193,
+              1211
+            ],
+            "math": "\\mathbb{E}\\left[\\frac{1}{T}\\sum_{t=1}^{T}\\left\\|\\frac{1}{n}\\sum_{j=1}^{n}v_t^j-\\nabla f(x_t)\\right\\|^2\\right]\\le \\frac{\\sigma^2}{nT}+(1-\\beta_1)\\mathbb{E}\\left[\\frac{1}{T}\\sum_{t=1}^{T-1}\\left\\|\\frac{1}{n}\\sum_{j=1}^{n}m_t^j-\\nabla f(x_t)\\right\\|^2\\right]+\\frac{\\beta_1^2\\sigma^2}{n}+\\frac{8L^2\\eta^2d}{\\beta_1}",
+            "uses": [
+              "previous_step:7",
+              "Theorem_3_MomentumOrder",
+              "Section_4_2_FirstStepInitialization",
+              "Nodewise_FirstStepInitialization_Adapter",
+              "Assumption_7_UnbiasedBoundedNoise",
+              "CrossNodeNoiseCancellationPrerequisite",
+              "DistributedObjectiveAverageGradient",
+              "MomentumParameterDomainPrerequisite",
+              "Algorithm_2_TimeLoopHorizon",
+              "Theorem_3_HorizonLowerBound",
+              "NodeCountPositivePrerequisite"
+            ],
+            "produces": "v_error_average_before_eq10_substitution"
+          },
+          {
+            "step": 12,
+            "description": "Substitute the Eq. (10) m-error average into the v-error bound. The PDF moves from the T-1 m-error sum multiplied by (1-beta_1) to the T-sum bound in Eq. (10); formally this uses 0<=1-beta_1<=1 from the momentum-domain prerequisite and nonnegativity of the squared m-error terms before applying the Eq. (10) estimate.",
+            "ref": "Appendix D, p.20",
+            "source_pdf_lines": [
+              1213,
+              1215
+            ],
+            "math": "\\le \\frac{\\sigma^2}{nT}+\\frac{\\sigma^2}{n\\beta_2T}+\\frac{\\sigma^2\\beta_2}{n}+\\frac{8L^2\\eta^2d}{\\beta_2^2}+\\frac{\\beta_1^2\\sigma^2}{n}+\\frac{8L^2\\eta^2d}{\\beta_1}",
+            "uses": [
+              "previous_step:10",
+              "previous_step:11",
+              "MomentumParameterDomainPrerequisite"
+            ],
+            "produces": "v_error_average_after_eq10_substitution"
+          },
+          {
+            "step": 13,
+            "description": "Use beta_2^2 <= beta_1 <= sqrt(beta_2) to simplify the beta-dependent terms. Formally this simplification also requires 0<beta_2<=1, giving beta_1^2<=beta_2, beta_2<=1 for sigma^2/(nT) <= sigma^2/(beta_2 nT), and beta_2^2<=beta_1 for 1/beta_1 <= 1/beta_2^2; the paper does not state this domain separately.",
+            "ref": "Appendix D, p.20",
+            "source_pdf_lines": [
+              1216,
+              1218
+            ],
+            "math": "\\le \\frac{2\\sigma^2}{\\beta_2 nT}+\\frac{16\\eta^2L^2d}{\\beta_2^2}+\\frac{2\\beta_2\\sigma^2}{n}",
+            "uses": [
+              "previous_step:12",
+              "Theorem_3_MomentumOrder",
+              "MomentumParameterDomainPrerequisite"
+            ],
+            "produces": "final_v_error_average_bound"
+          },
+          {
+            "step": 14,
+            "description": "Transport the final averaged-node v-error bound for \\bar v_t through the sign-preserving sum/average update adapter and substitute it into the descent reduction. No equality between the squared errors of v_t^{\\mathrm{sum}} and \\bar v_t is asserted.",
+            "ref": "Appendix D, p.20",
+            "source_pdf_lines": [
+              1221,
+              1232
+            ],
+            "math": "\\mathbb{E}\\left[\\frac{1}{T}\\sum_{t=1}^{T}\\|\\nabla f(x_t)\\|_1\\right]\\le \\frac{2\\Delta_f}{\\eta T}+4\\sqrt{d}\\cdot\\sqrt{\\frac{2\\sigma^2}{\\beta_2 nT}+\\frac{16\\eta^2L^2d}{\\beta_2^2}+\\frac{2\\beta_2\\sigma^2}{n}}+4\\eta Ld",
+            "uses": [
+              "previous_step:1",
+              "previous_step:2",
+              "previous_step:13",
+              "DistributedSumAverageEstimatorDefinitions",
+              "PositiveScalingSignIdentity",
+              "NodeCountPositivePrerequisite"
+            ],
+            "produces": "finite_horizon_bound_before_schedule"
+          },
+          {
+            "step": 15,
+            "description": "The paper now applies the printed beta_2=O(n^{1/2}T^{-1/2}), eta=O(n^{1/4}d^{-1/2}T^{-3/4}), and T>=n schedules and prints the rate. Since the preceding bound contains 1/beta_2 and 1/beta_2^2, this final line is recorded as the paper's claim and is not treated as formally derived from the one-sided theorem hypotheses.",
+            "ref": "Appendix D, p.20",
+            "source_pdf_lines": [
+              1221,
+              1236
+            ],
+            "math": "\\le O\\left(\\frac{d^{1/2}}{(nT)^{1/4}}\\right)",
+            "uses": [
+              "previous_step:14",
+              "Theorem_3_Beta2Schedule",
+              "Theorem_3_EtaSchedule",
+              "Theorem_3_HorizonLowerBound"
+            ],
+            "produces": "paper_claimed_Theorem_3_rate_unproved_under_printed_schedule_contract"
+          },
+          {
+            "step": 16,
+            "description": "Formal proof boundary: if the explicit corrected two-sided schedule contract is supplied, its lower and upper constants control the reciprocal beta_2 terms, the eta-dependent descent terms, and the horizon threshold, yielding a corrected distributed rate with the same n,d,T exponents. This is a corrected theorem route, not an additional source assumption silently inserted into Theorem 3.",
+            "ref": "Derived formal boundary from Appendix D, p.20; not printed in the paper",
+            "source_pdf_lines": [
+              1221,
+              1236
+            ],
+            "uses": [
+              "previous_step:14",
+              "TwoSidedSchedulePrerequisiteForRate",
+              "Lemma_1_EtaLambdaPositivityPrerequisites",
+              "NodeCountPositivePrerequisite"
+            ],
+            "produces": "corrected_distributed_rate_bound_requires_explicit_schedule_contract"
+          }
+        ]
+      },
+      "key_lemmas": [
+        {
+          "name": "Algorithm_2_V1_Definitions",
+          "ref": "Algorithm 2 (v1), p.8",
+          "statement_math": "\\mathbf{v}_t^j=(1-\\beta_1)\\mathbf{m}_{t-1}^j+\\beta_1\\nabla f_j(\\mathbf{x}_t;\\xi_t^j),\\quad \\mathbf{m}_t^j=(1-\\beta_2)\\mathbf{m}_{t-1}^j+\\beta_2\\nabla f_j(\\mathbf{x}_t;\\xi_t^j),\\quad \\mathbf{v}_t=\\sum_{j=1}^{n}\\mathbf{v}_t^j,\\quad \\mathbf{x}_{t+1}=\\mathbf{x}_t-\\eta(\\operatorname{sign}(\\mathbf{v}_t)+\\lambda\\mathbf{x}_t)",
+          "role": "Supplies the node momentum recurrences, server aggregation, and shared global iterate update used throughout Appendix D.",
+          "proof": [
+            {
+              "step": 1,
+              "description": "These are the printed v1 lines of Algorithm 2.",
+              "ref": "Algorithm 2, lines 4-9, p.8",
+              "source_pdf_lines": [
+                417,
+                429
+              ],
+              "math": "\\mathbf{v}_t^j=(1-\\beta_1)\\mathbf{m}_{t-1}^j+\\beta_1\\nabla f_j(\\mathbf{x}_t;\\xi_t^j),\\quad \\mathbf{m}_t^j=(1-\\beta_2)\\mathbf{m}_{t-1}^j+\\beta_2\\nabla f_j(\\mathbf{x}_t;\\xi_t^j),\\quad \\mathbf{v}_t=\\sum_{j=1}^{n}\\mathbf{v}_t^j,\\quad \\mathbf{x}_{t+1}=\\mathbf{x}_t-\\eta(\\operatorname{sign}(\\mathbf{v}_t)+\\lambda\\mathbf{x}_t)",
+              "uses": [],
+              "produces": "algorithm_2_v1_definitions"
+            }
+          ]
+        },
+        {
+          "name": "Algorithm_2_TimeLoopHorizon",
+          "ref": "Algorithm 2, line 2, p.8; Theorem 3, p.7 (formal prerequisite not stated separately)",
+          "statement_math": "\\text{for time step } t=1 \\text{ to } T \\text{ do}",
+          "formal_prerequisite_math": "t\\in\\{1,\\ldots,T\\},\\quad 1\\le t\\le T,\\quad T\\ge n",
+          "formal_prerequisite_ref": "Derived loop-index and horizon adapter required by Appendix D's reuse of Lemma 1 and Eq. (4); the loop is printed in Algorithm 2 and T\\ge n is printed in Theorem 3.",
+          "source_status": "The time loop is printed by Algorithm 2 and the horizon condition T\\ge n is printed by Theorem 3. The explicit indexed form is a formal adapter, not an additional source assumption.",
+          "role": "Supplies the distributed loop and the t\\le T fact needed to transport the centralized iterate bound and absorb the weight-decay residual in the reused Eq. (4) descent step.",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Algorithm 2 iterates over time steps t=1,...,T. Together with Theorem 3's T\\ge n condition, the formal adapter exposes the indexed horizon facts 1\\le t\\le T used by the shared iterate and descent bounds.",
+              "ref": "Algorithm 2, line 2, p.8; Theorem 3, p.7",
+              "source_pdf_lines": [
+                419,
+                428
+              ],
+              "math": "\\text{for time step } t=1 \\text{ to } T \\text{ do}",
+              "uses": [
+                "Algorithm_2_V1_Definitions",
+                "Theorem_3_HorizonLowerBound"
+              ],
+              "produces": "distributed_time_loop_and_t_le_T_horizon_fact"
+            }
+          ]
+        },
+        {
+          "name": "DistributedSumAverageEstimatorDefinitions",
+          "ref": "Algorithm 2, line 8, p.8; Appendix D, p.19 (derived notation)",
+          "statement_math": "\\mathbf{v}_t=\\sum_{j=1}^{n}\\mathbf{v}_t^j",
+          "formal_bridge_math": "\\mathbf{v}_t^{\\mathrm{sum}}:=\\sum_{j=1}^{n}\\mathbf{v}_t^j,\\quad \\bar{\\mathbf{v}}_t:=\\frac{1}{n}\\sum_{j=1}^{n}\\mathbf{v}_t^j=\\frac{1}{n}\\mathbf{v}_t^{\\mathrm{sum}}",
+          "formal_bridge_ref": "Derived notation from Algorithm 2, line 8, p.8 and Appendix D, p.19; not printed under these distinct names.",
+          "role": "Separates the estimator used by Algorithm 2's sign update from the averaged estimator used in Appendix D's squared-error recurrences.",
+          "formal_status": "The sum is printed by Algorithm 2 and the average is printed in Appendix D; the superscript and bar notation are derived labels introduced to prevent the paper's overloaded v_t from becoming a false squared-error equality.",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Algorithm 2 prints the transmitted server estimator as the sum of node estimators; this is named v_t^{\\mathrm{sum}} in the formal route.",
+              "ref": "Algorithm 2, line 8, p.8",
+              "source_pdf_lines": [
+                425,
+                428
+              ],
+              "math": "\\mathbf{v}_t=\\sum_{j=1}^{n}\\mathbf{v}_t^j",
+              "uses": [
+                "Algorithm_2_V1_Definitions"
+              ],
+              "produces": "v_sum_definition"
+            },
+            {
+              "step": 2,
+              "description": "Appendix D prints the averaged node estimator inside its estimator-error display; this is named \\bar{\\mathbf{v}}_t in the formal route.",
+              "ref": "Appendix D, p.19",
+              "source_pdf_lines": [
+                1083,
+                1088
+              ],
+              "math": "\\frac{1}{n}\\sum_{j=1}^{n}\\mathbf{v}_t^j",
+              "uses": [
+                "previous_step:1",
+                "NodeCountPositivePrerequisite"
+              ],
+              "produces": "bar_v_definition"
+            },
+            {
+              "step": 3,
+              "description": "By the definitions, \\bar{\\mathbf{v}}_t=(1/n)\\mathbf{v}_t^{\\mathrm{sum}}. This is a scaling relation only; it does not identify the squared errors against \\nabla f(x_t).",
+              "ref": "Derived from Algorithm 2, line 8, p.8 and Appendix D, p.19",
+              "source_pdf_lines": [
+                425,
+                428
+              ],
+              "uses": [
+                "previous_step:1",
+                "previous_step:2",
+                "NodeCountPositivePrerequisite"
+              ],
+              "produces": "sum_average_scaling_relation_without_error_equality"
+            }
+          ]
+        },
+        {
+          "name": "NodeCountPositivePrerequisite",
+          "ref": "Eq. (2), p.6; Algorithm 2, p.8 (derived formal prerequisite not stated separately)",
+          "statement_math": "f(x) := \\frac{1}{n}\\sum_{j=1}^{n} f_j(x)",
+          "formal_prerequisite_math": "n\\in\\mathbb{N},\\quad 1\\le n",
+          "formal_prerequisite_ref": "Derived domain obligation required by 1/n, positive scaling, and node averaging; not printed as a separate assumption.",
+          "source_status": "The paper uses 1/n and loops over nodes j=1,...,n but does not state n>=1 as an independent theorem hypothesis.",
+          "role": "Supplies the nonempty-node and positive-denominator fact used by the objective average, the sum/average sign identity, and the 1/n variance calculation.",
+          "proof": [
+            {
+              "step": 1,
+              "description": "The distributed objective and Algorithm 2 are written with a node average and a loop over j=1,...,n, so formalization must expose n>=1 before interpreting 1/n and a nonempty node family.",
+              "ref": "Eq. (2), p.6; Algorithm 2, p.8",
+              "source_pdf_lines": [
+                348,
+                355
+              ],
+              "math": "\\frac{1}{n}\\sum_{j=1}^{n} f_j(x)",
+              "uses": [],
+              "produces": "positive_node_count_required"
+            }
+          ]
+        },
+        {
+          "name": "Section_4_2_FirstStepInitialization",
+          "ref": "Section 4.2, p.7",
+          "statement_math": "m_1 = v_1 = \\nabla f(x_1 ; \\xi_1)",
+          "role": "Records the paper's printed first-step initialization used when Appendix D later bounds the initial averaged m_1^j and v_1^j errors.",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Section 4.2 prints the first-step initialization without node superscripts immediately after saying the distributed setting computes momentum estimators v_t^j and m_t^j on each node j. Appendix D's Eq. (10) uses m_1^j and the subsequent v-error bound uses v_1^j, so a formal proof must choose the node-indexed interpretation and record this mismatch as source_gaps.first_step_node_initialization.",
+              "ref": "Section 4.2, p.7",
+              "source_pdf_lines": [
+                381,
+                385
+              ],
+              "math": "m_1 = v_1 = \\nabla f(x_1 ; \\xi_1)",
+              "uses": [
+                "Algorithm_2_V1_Definitions"
+              ],
+              "produces": "first_step_initialization_printed_without_node_superscripts"
+            }
+          ]
+        },
+        {
+          "name": "DistributedObjectiveAverageGradient",
+          "ref": "Eq. (2), p.6; Appendix D, p.19",
+          "statement_math": "f(x) := \\frac{1}{n}\\sum_{j=1}^{n} f_j(x),\\quad \\nabla f(x)=\\frac{1}{n}\\sum_{j=1}^{n}\\nabla f_j(x)",
+          "role": "Converts averages of node gradients into the global gradient in Appendix D.",
+          "formal_adapter": "The finite-sum gradient rule is treated as the differentiability adapter for the printed L-smooth node objectives: Assumption_5_Smoothness supplies the node gradients and their common smoothness constant, while NodeCountPositivePrerequisite supplies the nonzero denominator. No stronger differentiability assumption is added to the paper's assumptions.",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Eq. (2) defines the distributed objective as the average of the node objectives.",
+              "ref": "Eq. (2), p.6",
+              "source_pdf_lines": [
+                348,
+                355
+              ],
+              "math": "f(x) := \\frac{1}{n}\\sum_{j=1}^{n} f_j(x)",
+              "uses": [
+                "NodeCountPositivePrerequisite"
+              ],
+              "produces": "distributed_objective_average"
+            },
+            {
+              "step": 2,
+              "description": "Appendix D explicitly notes the gradient average identity before averaging the worker recurrences. In the formal adapter, differentiability of each f_j is the meaning already presupposed by the printed gradient-based Assumption 5; the finite-sum gradient rule then gives the global identity without adding a separate smoothness class assumption.",
+              "ref": "Appendix D, p.19",
+              "source_pdf_lines": [
+                1096,
+                1097
+              ],
+              "math": "\\nabla f(x)=\\frac{1}{n}\\sum_{j=1}^{n}\\nabla f_j(x)",
+              "uses": [
+                "previous_step:1",
+                "Assumption_5_Smoothness",
+                "NodeCountPositivePrerequisite"
+              ],
+              "produces": "global_gradient_average_identity"
+            }
+          ]
+        },
+        {
+          "name": "PositiveScalingSignIdentity",
+          "ref": "Algorithm 2, line 8, p.8; Appendix D, p.19 (formal bridge not printed as a lemma)",
+          "statement_math": "\\mathbf{v}_t=\\sum_{j=1}^{n}\\mathbf{v}_t^j",
+          "formal_bridge_math": "\\operatorname{sign}\\left(\\sum_{j=1}^{n}v_t^j\\right)=\\operatorname{sign}\\left(\\frac{1}{n}\\sum_{j=1}^{n}v_t^j\\right)\\quad (n>0)",
+          "formal_bridge_ref": "Derived from positive scalar sign invariance; not printed in the paper. Source facts are Algorithm 2, line 8, p.8 and Appendix D, p.19.",
+          "source_status": "statement_math is the paper-printed Algorithm 2 aggregation line. formal_bridge_math is a derived Lean bridge and is not printed in the paper.",
+          "role": "Connects Algorithm 2's summed estimator to Appendix D's averaged-estimator analysis without silently equating sum and average; the sign identity is a derived positive-scaling bridge, not a source lemma.",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Algorithm 2 defines the server estimator as the sum of node estimators.",
+              "ref": "Algorithm 2, line 8, p.8",
+              "source_pdf_lines": [
+                425,
+                428
+              ],
+              "math": "\\mathbf{v}_t=\\sum_{j=1}^{n}\\mathbf{v}_t^j",
+              "uses": [],
+              "produces": "algorithm_2_server_sum"
+            },
+            {
+              "step": 2,
+              "description": "Appendix D displays an estimator-error expression using the averaged node estimator while retaining the symbol v_t. The display is preserved verbatim as evidence of the source overload; it is not read as an equality between the squared errors of v_t^{\\mathrm{sum}} and \\bar v_t.",
+              "ref": "Appendix D, p.19",
+              "source_pdf_lines": [
+                1083,
+                1088
+              ],
+              "math": "\\mathbb{E}\\left[\\frac{1}{T}\\sum_{t=1}^{T}\\|\\nabla f(x_t)-v_t\\|^2\\right]=\\mathbb{E}\\left[\\frac{1}{T}\\sum_{t=1}^{T}\\left\\|\\frac{1}{n}\\sum_{j=1}^{n}v_t^j-\\nabla f(x_t)\\right\\|^2\\right]",
+              "uses": [
+                "previous_step:1",
+                "DistributedSumAverageEstimatorDefinitions"
+              ],
+              "produces": "appendix_D_average_estimator_error_display_with_overloaded_v"
+            },
+            {
+              "step": 3,
+              "description": "Derived formal bridge: because 1/n is positive for n>0, coordinatewise sign is invariant under multiplying its argument by 1/n. This is required to move from Algorithm 2's summed update to Appendix D's averaged-estimator descent analysis, but the identity itself is not printed in the PDF.",
+              "ref": "Algorithm 2, line 8, p.8; Appendix D, p.19",
+              "source_pdf_lines": [
+                425,
+                428
+              ],
+              "uses": [
+                "previous_step:1",
+                "previous_step:2",
+                "NodeCountPositivePrerequisite"
+              ],
+              "produces": "sign_sum_equals_sign_average_for_positive_n"
+            }
+          ]
+        },
+        {
+          "name": "CrossNodeNoiseCancellationPrerequisite",
+          "ref": "Assumption 7, p.7; Appendix D, Eq. (9), p.19 (formal prerequisite not stated separately)",
+          "statement_math": "\\beta_1^2\\frac{1}{n^2}\\sum_{j=1}^{n}\\mathbb{E}\\left[\\left\\|\\nabla f_j(x_{t+1};\\xi_{t+1}^j)-\\nabla f_j(x_{t+1})\\right\\|^2\\right]",
+          "formal_bridge_math": "\\varepsilon_{t+1}^j:=\\nabla f_j(x_{t+1};\\xi_{t+1}^j)-\\nabla f_j(x_{t+1}),\\quad \\forall t\\ge0,\\ \\forall j\\in\\{1,\\ldots,n\\}:\\ \\mathbb{E}[\\left.\\varepsilon_{t+1}^j\\right|\\mathcal{F}_t]=0,\\quad \\mathbb{E}\\left[\\left.\\|\\varepsilon_{t+1}^j\\|^2\\right|\\mathcal{F}_t\\right]\\le\\sigma^2,\\quad \\mathcal{F}_t\\text{-measurable }x_t,x_{t+1},m_t^j,\\ m_t^j-\\nabla f_j(x_t),\\ \\nabla f_j(x_t)-\\nabla f_j(x_{t+1}),\\quad \\forall j,k\\in\\{1,\\ldots,n\\},\\ j\\ne k:\\ \\mathbb{E}\\left[\\left.\\langle\\varepsilon_{t+1}^j,\\varepsilon_{t+1}^k\\rangle\\right|\\mathcal{F}_t\\right]=0",
+          "formal_bridge_ref": "Derived conditional mean-zero, conditional per-node second-moment, state-measurability, and pairwise-zero-cross-covariance contract; not printed in the paper. Consumed in Appendix D Eq. (9), the analogous m recursion, Eq. (10), and the first-step averaged-error bound.",
+          "source_status": "statement_math is the paper-printed Eq. (9) individual-node variance contribution. formal_bridge_math is an explicit unstated prerequisite/source gap, not a lemma proved from Assumption 7: it cancels noise against the \\mathcal{F}_t-measurable prior-error/drift terms and cancels cross-node noise products so the paper may write the stochastic contribution directly as a 1/n^2 sum of individual node second moments.",
+          "role": "Makes explicit the hidden prerequisite behind the paper's direct individual-node variance term in Eq. (9), the analogous m-recursion, and the first-step averaged error bounds.",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Record, without deriving it from the paper's stated assumptions, the hidden node-noise prerequisite used before the printed Eq. (9) inequality: conditional mean-zero noise, per-node conditional second-moment bounds, \\mathcal{F}_t-measurability of x_t, x_{t+1}, m_t^j and hence the prior-error/drift terms, and pairwise zero cross-covariances. Assumption 7 only supplies per-node unbiasedness and a bounded second moment, so this step is a source-gap boundary that Phase 0/2 must model explicitly rather than treating as proved.",
+              "ref": "SourceGap_DistributedCrossNodeNoiseOrthogonality; Appendix D, Eq. (9), p.19; not printed in the paper",
+              "source_pdf_lines": [
+                1118,
+                1155
+              ],
+              "math": null,
+              "uses": [],
+              "produces": "explicit_unstated_node_noise_residual_and_conditional_cross_node_contract_for_printed_individual_variance_sum"
+            },
+            {
+              "step": 2,
+              "description": "Eq. (9)'s first displayed inequality contains the stochastic contribution as a 1/n^2 sum of individual node-noise second moments. The paper prints this term directly; the formal bridge in the previous step records the hidden cancellation/orthogonality contract needed before this source boundary.",
+              "ref": "Appendix D, Eq. (9), p.19",
+              "source_pdf_lines": [
+                1118,
+                1139
+              ],
+              "math": "\\beta_1^2\\frac{1}{n^2}\\sum_{j=1}^{n}\\mathbb{E}\\left[\\left\\|\\nabla f_j(x_{t+1};\\xi_{t+1}^j)-\\nabla f_j(x_{t+1})\\right\\|^2\\right]",
+              "uses": [
+                "previous_step:1",
+                "Assumption_7_UnbiasedBoundedNoise",
+                "NodeCountPositivePrerequisite"
+              ],
+              "produces": "paper_printed_individual_node_variance_sum"
+            },
+            {
+              "step": 3,
+              "description": "Assumption 7 supplies the per-node unbiasedness and bounded second moments used to bound the individual variance terms.",
+              "ref": "Assumption 7, p.7",
+              "source_pdf_lines": [
+                375,
+                377
+              ],
+              "math": "\\mathbb{E}_{\\xi}[\\nabla f_j(x;\\xi)] = \\nabla f_j(x),\\quad \\mathbb{E}_{\\xi}\\left[\\|\\nabla f_j(x;\\xi)-\\nabla f_j(x)\\|^2\\right] \\le \\sigma^2 .",
+              "uses": [
+                "Assumption_7_UnbiasedBoundedNoise"
+              ],
+              "produces": "assumption_7_per_node_unbiased_bounded_noise"
+            },
+            {
+              "step": 4,
+              "description": "Apply the cancellation result and the Assumption 7 variance bound to the noise term, and apply Assumption 5 to the node-gradient drift, obtaining the next displayed Eq. (9) inequality. The 1/beta_1 coefficient still requires the explicit positive-domain prerequisite.",
+              "ref": "Appendix D, Eq. (9), p.19",
+              "source_pdf_lines": [
+                1140,
+                1145
+              ],
+              "math": "\\le (1-\\beta_1)\\mathbb{E}\\left[\\left\\|\\frac{1}{n}\\sum_{j=1}^{n}\\left(m_t^j-\\nabla f_j(x_t)\\right)\\right\\|^2\\right]+\\frac{\\beta_1^2\\sigma^2}{n}+\\frac{2L^2}{\\beta_1}\\|x_{t+1}-x_t\\|^2",
+              "uses": [
+                "previous_step:1",
+                "previous_step:2",
+                "previous_step:3",
+                "Assumption_5_Smoothness",
+                "Assumption_7_UnbiasedBoundedNoise",
+                "MomentumParameterDomainPrerequisite"
+              ],
+              "produces": "averaged_v_error_with_noise_and_smoothness"
+            },
+            {
+              "step": 5,
+              "description": "Use Lemma 1's corrected-domain step bound to replace ||x_{t+1}-x_t||^2 by 4 eta^2 d on the Algorithm 2 horizon, and use the global-gradient average identity to rewrite the averaged node m-error against \\nabla f(x_t), yielding the final displayed Eq. (9) recursion.",
+              "ref": "Appendix D, Eq. (9), p.19",
+              "source_pdf_lines": [
+                1147,
+                1155
+              ],
+              "math": "\\le (1-\\beta_1)\\mathbb{E}\\left[\\left\\|\\frac{1}{n}\\sum_{j=1}^{n}m_t^j-\\nabla f(x_t)\\right\\|^2\\right]+\\frac{\\beta_1^2\\sigma^2}{n}+\\frac{8L^2\\eta^2d}{\\beta_1}.",
+              "uses": [
+                "previous_step:4",
+                "DistributedObjectiveAverageGradient",
+                "Algorithm_2_TimeLoopHorizon",
+                "Lemma_1_IterateAndStepBounds",
+                "Lemma_1_EtaLambdaPositivityPrerequisites",
+                "MomentumParameterDomainPrerequisite"
+              ],
+              "produces": "equation_9_final_v_recursion_using_corrected_domain_displacement_bound"
+            }
+          ]
+        },
+        {
+          "name": "MomentumParameterDomainPrerequisite",
+          "ref": "Algorithm 2, line 1, p.8; Theorem 3, p.7; Appendix D, Eq. (9), p.19 and p.20 (formal prerequisite not stated separately)",
+          "statement_math": "\\beta_2^2 \\le \\beta_1 \\le \\sqrt{\\beta_2}",
+          "formal_prerequisite_math": "0<\\beta_2,\\quad \\beta_2\\le1,\\quad 0<\\beta_1,\\quad \\beta_1\\le1",
+          "formal_prerequisite_ref": "Derived domain/range prerequisite for denominators, contractions, and beta-order simplifications; not printed in the paper. Source facts are Algorithm 2's input line, Theorem 3's beta-order condition, and Appendix D's 1/beta terms and final beta simplification.",
+          "source_status": "statement_math is the paper-printed Theorem 3/Appendix D beta-order condition. formal_prerequisite_math records the extra positivity/range facts needed to justify 1/beta denominators, contraction telescopes, beta_1^2 <= beta_2, sigma^2/(nT) <= sigma^2/(beta_2 nT), and 1/beta_1 <= 1/beta_2^2; these domain facts are not stated separately in the PDF.",
+          "role": "Makes explicit the hidden beta-domain prerequisites behind Eq. (9)'s 1/beta_1 term, the m-recursion 1/beta_2 term, telescoping divisions by beta_2, and Appendix D's final beta-dependent simplification.",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Algorithm 2 lists beta_1 and beta_2 only as momentum parameters, without printing a domain such as (0,1).",
+              "ref": "Algorithm 2, line 1, p.8",
+              "source_pdf_lines": [
+                417,
+                418
+              ],
+              "math": "\\beta_1,\\beta_2",
+              "uses": [],
+              "produces": "paper_declares_beta_parameters_without_domain"
+            },
+            {
+              "step": 2,
+              "description": "Theorem 3 and Appendix D print the beta-order condition used in the distributed proof.",
+              "ref": "Theorem 3, p.7; Appendix D, p.20",
+              "source_pdf_lines": [
+                1193,
+                1195
+              ],
+              "math": "\\beta_2^2 \\le \\beta_1 \\le \\sqrt{\\beta_2}",
+              "uses": [
+                "Theorem_3_MomentumOrder"
+              ],
+              "produces": "paper_beta_order_condition"
+            },
+            {
+              "step": 3,
+              "description": "Eq. (9), the analogous m-recursion, and the telescoped Eq. (10) contain 1/beta_1, 1/beta_2, and contraction factors 1-beta_1 and 1-beta_2. A Lean proof therefore needs positivity of beta_1 and beta_2 and range control of the contraction factors, but the PDF does not state these facts separately.",
+              "ref": "Appendix D, Eq. (9), p.19; Eq. (10), p.20",
+              "source_pdf_lines": [
+                1118,
+                1188
+              ],
+              "uses": [
+                "previous_step:1",
+                "previous_step:2"
+              ],
+              "produces": "beta_positive_range_prerequisite_for_denominators_and_contractions"
+            },
+            {
+              "step": 4,
+              "description": "The final simplification in Appendix D also needs beta_2<=1 and beta_2>0 in addition to the printed beta-order condition, in order to compare the sigma and eta terms with the displayed endpoint.",
+              "ref": "Appendix D, p.20",
+              "source_pdf_lines": [
+                1213,
+                1218
+              ],
+              "uses": [
+                "previous_step:2",
+                "previous_step:3"
+              ],
+              "produces": "beta_domain_needed_for_final_simplification"
+            }
+          ]
+        },
+        {
+          "name": "TwoSidedSchedulePrerequisiteForRate",
+          "formal_contract_name": "CorrectedDistributedRateScheduleContract",
+          "ref": "Theorem 3, p.7; Appendix D, p.20 (formal prerequisite not stated separately)",
+          "statement_math": "\\beta_2 = O(n^{1/2}T^{-1/2}),\\quad \\eta = O(n^{1/4}d^{-1/2}T^{-3/4}),\\quad T \\ge n",
+          "formal_prerequisite_math": "\\exists c_{\\beta,-},c_{\\beta,+},c_{\\eta,-},c_{\\eta,+}>0,\\ \\exists T_0\\in\\mathbb{N},\\ \\exists\\beta_1,\\beta_2,\\eta:\\mathbb{N}^3\\to\\mathbb{R},\\ \\forall n,d,T\\in\\mathbb{N},\\ 1\\le n\\land1\\le d\\land T_0\\le T\\land n\\le T\\Rightarrow c_{\\beta,-}\\sqrt{n/T}\\le\\beta_2(n,d,T)\\le c_{\\beta,+}\\sqrt{n/T}\\land c_{\\eta,-}n^{1/4}d^{-1/2}T^{-3/4}\\le\\eta(n,d,T)\\le c_{\\eta,+}n^{1/4}d^{-1/2}T^{-3/4}\\land0<\\beta_2(n,d,T)\\le1\\land0<\\beta_1(n,d,T)\\le1\\land\\beta_2(n,d,T)^2\\le\\beta_1(n,d,T)\\le\\sqrt{\\beta_2(n,d,T)}\\land\\eta(n,d,T)>0",
+          "formal_prerequisite_ref": "Derived corrected schedule contract with explicit positive constants and horizon threshold; not printed in the paper. It is the contract needed to bound both reciprocal and direct schedule terms in Appendix D's final rate substitution.",
+          "source_status": "statement_math is the paper-printed one-sided schedule and horizon condition. formal_prerequisite_math is a separate corrected theorem contract, not a silent strengthening of Theorem 3; the PDF does not provide its constants, threshold, lower bounds, or two-sided eta control.",
+          "role": "Makes explicit the hidden schedule-strengthening behind Appendix D's final transition from the finite-horizon bound with reciprocal beta_2 terms to the O(d^{1/2}/(nT)^{1/4}) rate.",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Theorem 3 and Appendix D print the schedule and horizon conditions used in the final rate line.",
+              "ref": "Theorem 3, p.7; Appendix D, p.20",
+              "source_pdf_lines": [
+                1221,
+                1221
+              ],
+              "math": "\\beta_2 = O(n^{1/2}T^{-1/2}),\\quad \\eta = O(n^{1/4}d^{-1/2}T^{-3/4}),\\quad T \\ge n",
+              "uses": [
+                "Theorem_3_Beta2Schedule",
+                "Theorem_3_EtaSchedule",
+                "Theorem_3_HorizonLowerBound"
+              ],
+              "produces": "paper_one_sided_schedule_claim"
+            },
+            {
+              "step": 2,
+              "description": "The finite-horizon bound immediately before the final Big-O line contains reciprocal beta_2 terms, so an upper bound on beta_2 alone cannot upper-bound every displayed term.",
+              "ref": "Appendix D, p.20",
+              "source_pdf_lines": [
+                1225,
+                1232
+              ],
+              "math": "\\frac{2\\Delta_f}{\\eta T}+4\\sqrt{d}\\cdot\\sqrt{\\frac{2\\sigma^2}{\\beta_2 nT}+\\frac{16\\eta^2L^2d}{\\beta_2^2}+\\frac{2\\beta_2\\sigma^2}{n}}+4\\eta Ld",
+              "uses": [
+                "previous_step:1",
+                "MomentumParameterDomainPrerequisite"
+              ],
+              "produces": "reciprocal_beta_terms_need_lower_schedule_control"
+            },
+            {
+              "step": 3,
+              "description": "The corrected formal contract quantifies positive constants c_{\\beta,-}, c_{\\beta,+}, c_{\\eta,-}, c_{\\eta,+}, a horizon threshold T_0, and schedule functions beta_1(n,d,T), beta_2(n,d,T), eta(n,d,T), then imposes the ranges 1<=n, 1<=d, T_0<=T, n<=T. It imposes two-sided beta_2 and eta bounds, 0<beta_1<=1, 0<beta_2<=1, and the printed beta-order condition; the lower beta_2 bound controls 1/beta_2 and 1/beta_2^2 while the lower eta bound controls the leading descent term.",
+              "ref": "Derived corrected theorem contract from Appendix D, p.20; not printed in the paper",
+              "source_pdf_lines": [
+                1221,
+                1232
+              ],
+              "uses": [
+                "previous_step:1",
+                "previous_step:2",
+                "MomentumParameterDomainPrerequisite",
+                "NodeCountPositivePrerequisite"
+              ],
+              "produces": "explicit_two_sided_schedule_contract_with_constants_and_threshold"
+            },
+            {
+              "step": 4,
+              "description": "The PDF nevertheless concludes the displayed rate after the schedule substitution. In the JSON this remains a paper claim under the printed one-sided schedule; the corrected formal rate is allowed to consume the explicit contract from step 3.",
+              "ref": "Appendix D, p.20",
+              "source_pdf_lines": [
+                1233,
+                1236
+              ],
+              "math": "\\le O\\left(\\frac{d^{1/2}}{(nT)^{1/4}}\\right)",
+              "uses": [
+                "previous_step:1",
+                "previous_step:2",
+                "previous_step:3"
+              ],
+              "produces": "paper_rate_claim_or_corrected_rate_under_explicit_schedule_contract"
+            }
+          ]
+        },
+        {
+          "name": "Lemma_1_EtaLambdaPositivityPrerequisites",
+          "ref": "Appendix A, p.14; Theorem 3, p.7 (formal prerequisite not stated separately)",
+          "statement_math": "\\lambda \\le \\frac{1}{2\\eta T}",
+          "formal_prerequisite_math": "\\eta>0,\\quad T>0,\\quad 0\\le\\lambda,\\quad 0\\le1-\\eta\\lambda\\le1\\quad\\text{or alternatively}\\quad |\\lambda|\\le\\frac{1}{2\\eta T}\\text{ with } |1-\\eta\\lambda|\\le1",
+          "formal_prerequisite_ref": "Derived prerequisite for contraction-factor uses and for squaring a one-sided inequality; not printed in the paper. Source facts are Appendix A, p.14 and Theorem 3, p.7.",
+          "source_status": "statement_math is the paper-printed weight-decay condition. formal_prerequisite_math records the extra positivity/absolute-value control needed to justify replacing |1-eta lambda| by 1-eta lambda, unrolling with a nonnegative contraction, dropping powers of 1-eta lambda, and squaring the one-sided lambda bound; it is not printed in the paper.",
+          "role": "Prevents Lemma 1's contraction-factor steps and final squared weight-decay step from being justified by the one-sided printed lambda bound alone.",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Appendix A writes triangle-inequality bounds with coefficient (1-eta lambda), unrolls powers of this coefficient, and later drops these powers. Formally, these transitions require 0 <= 1-eta lambda <= 1, or an equivalent absolute-value contraction bound, but the PDF does not state this separately.",
+              "ref": "Appendix A, p.14",
+              "source_pdf_lines": [
+                751,
+                774
+              ],
+              "math": "\\le(1-\\eta\\lambda) \\|x_{t-1}\\|_{\\infty}+\\eta \\|\\operatorname{sign}(v_{t-1})\\|_{\\infty}",
+              "uses": [],
+              "produces": "paper_claim_contraction_factor_treated_as_nonnegative_at_most_one"
+            },
+            {
+              "step": 2,
+              "description": "Appendix A moves from 2 eta^2 d(2 eta^2 lambda^2 T^2+1) to 4 eta^2 d using the printed lambda <= 1/(2 eta T) condition.",
+              "ref": "Appendix A, p.14",
+              "source_pdf_lines": [
+                778,
+                787
+              ],
+              "math": "\\le2\\eta^2d(2\\eta^2\\lambda^2T^2+1)\\le4\\eta^2d,",
+              "uses": [
+                "Theorem_3_WeightDecayBound"
+              ],
+              "produces": "paper_claim_lambda_square_control"
+            },
+            {
+              "step": 3,
+              "description": "For formalization, the contraction and squared bounds require positivity/absolute-value information not supplied by the one-sided displayed condition alone. Without eta > 0, T > 0, lambda >= 0, and 0 <= 1-eta lambda <= 1, or equivalent absolute-value bounds, the printed lambda <= 1/(2 eta T) condition does not justify all Appendix A transitions.",
+              "ref": "Appendix A, p.14; Theorem 3, p.7",
+              "source_pdf_lines": [
+                751,
+                787
+              ],
+              "uses": [
+                "previous_step:1",
+                "previous_step:2"
+              ],
+              "produces": "lemma1_contraction_and_square_steps_need_eta_T_lambda_sign_or_absolute_bounds"
+            }
+          ]
+        },
+        {
+          "name": "Equation_5_DescentReduction",
+          "ref": "Appendix B, Eq. (5), p.15; reused in Appendix D, p.18",
+          "statement_math": "\\mathbb{E}\\left[\\frac{1}{T}\\sum_{t=1}^{T}\\|\\nabla f(x_t)\\|_1\\right]\\le\\frac{2\\Delta_f}{\\eta T}+4\\sqrt{d}\\cdot\\sqrt{\\mathbb{E}\\left[\\frac{1}{T}\\sum_{t=1}^{T}\\|\\nabla f(x_t)-v_t\\|^2\\right]}+4\\eta Ld.",
+          "formal_adapter_math": "\\mathbb{E}\\left[\\frac{1}{T}\\sum_{t=1}^{T}\\|\\nabla f(x_t)\\|_1\\right]\\le\\frac{2\\Delta_f}{\\eta T}+4\\sqrt{d}\\cdot\\sqrt{\\mathbb{E}\\left[\\frac{1}{T}\\sum_{t=1}^{T}\\|\\nabla f(x_t)-\\bar v_t\\|^2\\right]}+4\\eta Ld",
+          "formal_adapter_ref": "Derived distributed adapter from Appendix D, p.18-20; the paper's v_t symbol is overloaded between the server sum and the averaged estimator.",
+          "role": "Reduces the distributed theorem to the average tracking error of the distinct estimator \\bar v_t; the sign update remains valid because v_t^{\\mathrm{sum}} and \\bar v_t have the same coordinatewise sign for n>=1.",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Apply L-smoothness to f at x_t and x_{t+1}. In the distributed proof, Assumption 5 gives L-smoothness of the averaged objective f by averaging node smoothness inequalities.",
+              "ref": "Appendix B, Eq. (4), p.15",
+              "source_pdf_lines": [
+                794,
+                799
+              ],
+              "math": "f(x_{t+1}) \\le f(x_t)+\\langle\\nabla f(x_t),x_{t+1}-x_t\\rangle+\\frac{L}{2}\\|x_{t+1}-x_t\\|^2",
+              "uses": [
+                "Assumption_5_Smoothness",
+                "DistributedObjectiveAverageGradient"
+              ],
+              "produces": "smoothness_descent_start"
+            },
+            {
+              "step": 2,
+              "description": "Substitute the Lion sign/weight-decay update and use Lemma 1's step bound to produce the line with +2 eta^2 L d.",
+              "ref": "Appendix B, Eq. (4), p.15",
+              "source_pdf_lines": [
+                797,
+                800
+              ],
+              "math": "= f(x_t)-\\eta\\langle\\nabla f(x_t),\\operatorname{Sign}(v_t)\\rangle-\\eta\\lambda\\langle\\nabla f(x_t),x_t\\rangle+2\\eta^2Ld",
+              "uses": [
+                "previous_step:1",
+                "Algorithm_2_V1_Definitions",
+                "Lemma_1_IterateAndStepBounds",
+                "Lemma_1_EtaLambdaPositivityPrerequisites",
+                "DistributedSumAverageEstimatorDefinitions",
+                "PositiveScalingSignIdentity",
+                "NodeCountPositivePrerequisite"
+              ],
+              "produces": "descent_after_update_substitution"
+            },
+            {
+              "step": 3,
+              "description": "Insert and subtract Sign(nabla f(x_t)) to isolate the true sign descent.",
+              "ref": "Appendix B, Eq. (4), p.15",
+              "source_pdf_lines": [
+                800,
+                802
+              ],
+              "math": "\\le f(x_t)+\\eta\\langle\\nabla f(x_t),\\operatorname{Sign}(\\nabla f(x_t))-\\operatorname{Sign}(v_t)\\rangle-\\eta\\langle\\nabla f(x_t),\\operatorname{Sign}(\\nabla f(x_t))\\rangle-\\eta\\lambda\\langle\\nabla f(x_t),x_t\\rangle+2\\eta^2Ld",
+              "uses": [
+                "previous_step:2",
+                "PositiveScalingSignIdentity",
+                "DistributedSumAverageEstimatorDefinitions",
+                "NodeCountPositivePrerequisite"
+              ],
+              "produces": "true_sign_descent_isolated"
+            },
+            {
+              "step": 4,
+              "description": "Use <g,Sign(g)>=||g||_1 and bound the weight-decay term by the dual norms ||grad f(x_t)||_1 and ||x_t||_infty, keeping the residual + eta lambda ||grad f(x_t)||_1 ||x_t||_infty printed by the paper.",
+              "ref": "Appendix B, Eq. (4), p.15",
+              "source_pdf_lines": [
+                803,
+                804
+              ],
+              "math": "= f(x_t)+\\eta\\langle\\nabla f(x_t),\\operatorname{Sign}(\\nabla f(x_t))-\\operatorname{Sign}(v_t)\\rangle-\\eta\\|\\nabla f(x_t)\\|_1+\\eta\\lambda\\|\\nabla f(x_t)\\|_1\\|x_t\\|_{\\infty}+2\\eta^2Ld",
+              "uses": [
+                "previous_step:3"
+              ],
+              "produces": "weight_decay_residual_before_absorption"
+            },
+            {
+              "step": 5,
+              "description": "Use Lemma 1's corrected-domain ||x_t||_infty <= eta t bound together with lambda <= 1/(2 eta T) and t <= T to absorb the weight-decay residual into half of the l1 descent, then expand the remaining sign gap coordinatewise.",
+              "ref": "Appendix B, Eq. (4), p.15",
+              "source_pdf_lines": [
+                805,
+                809
+              ],
+              "math": "= f(x_t)+\\eta\\sum_{i=1}^{d}\\langle[\\nabla f(x_t)]_i,\\operatorname{Sign}([\\nabla f(x_t)]_i)-\\operatorname{Sign}([v_t]_i)\\rangle-\\frac{\\eta}{2}\\|\\nabla f(x_t)\\|_1+2\\eta^2Ld",
+              "uses": [
+                "previous_step:4",
+                "Lemma_1_IterateAndStepBounds",
+                "Lemma_1_EtaLambdaPositivityPrerequisites",
+                "Theorem_3_WeightDecayBound",
+                "Algorithm_2_TimeLoopHorizon",
+                "Lemma_1_Eq4BoundTransitionPrerequisite"
+              ],
+              "produces": "coordinate_sign_gap_and_half_descent"
+            },
+            {
+              "step": 6,
+              "description": "Bound the coordinate sign-gap contribution by twice the coordinate magnitude times the indicator of sign disagreement.",
+              "ref": "Appendix B, Eq. (4), p.15",
+              "source_pdf_lines": [
+                810,
+                815
+              ],
+              "math": "\\le f(x_t)+\\eta\\sum_{i=1}^{d}2|[\\nabla f(x_t)]_i|\\cdot I(\\operatorname{Sign}([\\nabla f(x_t)]_i)\\ne\\operatorname{Sign}([v_t]_i))-\\frac{\\eta}{2}\\|\\nabla f(x_t)\\|_1+2\\eta^2Ld",
+              "uses": [
+                "previous_step:5"
+              ],
+              "produces": "indicator_sign_disagreement_bound"
+            },
+            {
+              "step": 7,
+              "description": "On the sign-disagreement event, replace |[grad f(x_t)]_i| by |[grad f(x_t)]_i-[v_t]_i| as printed in the next displayed inequality.",
+              "ref": "Appendix B, Eq. (4), p.15",
+              "source_pdf_lines": [
+                816,
+                822
+              ],
+              "math": "\\le f(x_t)+\\eta\\sum_{i=1}^{d}2|[\\nabla f(x_t)]_i-[v_t]_i|\\cdot I(\\operatorname{Sign}([\\nabla f(x_t)]_i)\\ne\\operatorname{Sign}([v_t]_i))-\\frac{\\eta}{2}\\|\\nabla f(x_t)\\|_1+2\\eta^2Ld",
+              "uses": [
+                "previous_step:6"
+              ],
+              "produces": "indicator_error_magnitude_bound"
+            },
+            {
+              "step": 8,
+              "description": "Drop the indicator to bound the sum by the full coordinatewise absolute error.",
+              "ref": "Appendix B, Eq. (4), p.15",
+              "source_pdf_lines": [
+                823,
+                827
+              ],
+              "math": "\\le f(x_t)+\\eta\\sum_{i=1}^{d}2|[\\nabla f(x_t)]_i-[v_t]_i|-\\frac{\\eta}{2}\\|\\nabla f(x_t)\\|_1+2\\eta^2Ld",
+              "uses": [
+                "previous_step:7"
+              ],
+              "produces": "coordinate_error_without_indicator"
+            },
+            {
+              "step": 9,
+              "description": "Convert the coordinatewise absolute-error sum to an l1 norm.",
+              "ref": "Appendix B, Eq. (4), p.15",
+              "source_pdf_lines": [
+                828,
+                830
+              ],
+              "math": "= f(x_t)+2\\eta\\|\\nabla f(x_t)-v_t\\|_1-\\frac{\\eta}{2}\\|\\nabla f(x_t)\\|_1+2\\eta^2Ld",
+              "uses": [
+                "previous_step:8"
+              ],
+              "produces": "l1_error_descent_bound"
+            },
+            {
+              "step": 10,
+              "description": "Apply ||z||_1 <= sqrt(d)||z|| to obtain the final displayed Eq. (4) descent inequality.",
+              "ref": "Appendix B, Eq. (4), p.15",
+              "source_pdf_lines": [
+                831,
+                834
+              ],
+              "math": "\\le f(x_t)+2\\eta\\sqrt{d}\\|\\nabla f(x_t)-v_t\\|-\\frac{\\eta}{2}\\|\\nabla f(x_t)\\|_1+2\\eta^2Ld.",
+              "uses": [
+                "previous_step:9"
+              ],
+              "produces": "equation_4_final_descent"
+            },
+            {
+              "step": 11,
+              "description": "Sum Eq. (4) over t, rearrange terms, take expectation, and divide by T.",
+              "ref": "Appendix B, Eq. (5), p.15",
+              "source_pdf_lines": [
+                835,
+                848
+              ],
+              "math": "\\mathbb{E}\\left[\\frac{1}{T}\\sum_{t=1}^{T}\\|\\nabla f(x_t)\\|_1\\right]\\le\\frac{2(f(x_1)-f(x_{T+1}))}{\\eta T}+4\\sqrt{d}\\cdot\\mathbb{E}\\left[\\frac{1}{T}\\sum_{t=1}^{T}\\|\\nabla f(x_t)-v_t\\|\\right]+4\\eta Ld",
+              "uses": [
+                "previous_step:10",
+                "Algorithm_2_TimeLoopHorizon",
+                "Theorem_3_HorizonLowerBound",
+                "NodeCountPositivePrerequisite"
+              ],
+              "produces": "summed_descent_before_gap_and_jensen"
+            },
+            {
+              "step": 12,
+              "description": "Use f(x_1)-f_* <= Delta_f and Jensen's inequality to obtain the displayed Eq. (5) endpoint.",
+              "ref": "Appendix B, Eq. (5), p.15",
+              "source_pdf_lines": [
+                849,
+                861
+              ],
+              "math": "\\le\\frac{2\\Delta_f}{\\eta T}+4\\sqrt{d}\\cdot\\sqrt{\\mathbb{E}\\left[\\frac{1}{T}\\sum_{t=1}^{T}\\|\\nabla f(x_t)-v_t\\|^2\\right]}+4\\eta Ld.",
+              "uses": [
+                "previous_step:11",
+                "Assumption_8_InitialGap",
+                "Jensen's Inequality"
+              ],
+              "produces": "equation_5_descent_reduction"
+            },
+            {
+              "step": 13,
+              "description": "Derived distributed adapter: instantiate the centralized Eq. (5) descent reduction for the averaged objective and the distinct averaged estimator \\bar v_t. The actual Algorithm 2 update uses v_t^{\\mathrm{sum}}, but PositiveScalingSignIdentity transports its coordinatewise sign to \\bar v_t; no equality of the two squared estimator errors is asserted.",
+              "ref": "Derived adapter from Appendix D, p.18-20; not printed as a separate equation",
+              "source_pdf_lines": [
+                1068,
+                1232
+              ],
+              "math": null,
+              "uses": [
+                "previous_step:12",
+                "DistributedSumAverageEstimatorDefinitions",
+                "PositiveScalingSignIdentity",
+                "NodeCountPositivePrerequisite",
+                "Lemma_1_IterateAndStepBounds",
+                "Lemma_1_EtaLambdaPositivityPrerequisites",
+                "Algorithm_2_TimeLoopHorizon",
+                "Lemma_1_Eq4BoundTransitionPrerequisite"
+              ],
+              "produces": "distributed_equation_5_adapter_with_bar_v"
+            }
+          ]
+        },
+        {
+          "name": "Nodewise_FirstStepInitialization_Adapter",
+          "ref": "Derived source-gap adapter from Section 4.2, p.7, and Appendix D, Eq. (10), p.20",
+          "statement_math": "m_1 = v_1 = \\nabla f(x_1 ; \\xi_1)",
+          "formal_bridge_math": "m_1^j = v_1^j = \\nabla f_j(x_1 ; \\xi_1^j)",
+          "formal_bridge_ref": "Derived nodewise interpretation; not printed in Section 4.2. Appendix D later uses indexed m_1^j and v_t^j quantities in Eq. (10) and the subsequent v-recursion.",
+          "source_status": "statement_math is the paper's unsuperscripted Section 4.2 initialization. formal_bridge_math is the derived nodewise interpretation required by Algorithm 2 and Appendix D; it is recorded as SourceGap_NodewiseFirstStepInitialization rather than as verbatim paper text.",
+          "role": "Supplies the indexed first-step initialization needed to bound the initial averaged m-error in Eq. (10) and the isolated initial v-error term in the subsequent Appendix D recursion.",
+          "proof": [
+            {
+              "step": 1,
+              "description": "Record the paper-printed first-step initialization exactly as Section 4.2 states it, without node superscripts.",
+              "ref": "Section 4.2, p.7",
+              "source_pdf_lines": [
+                381,
+                385
+              ],
+              "math": "m_1 = v_1 = \\nabla f(x_1 ; \\xi_1)",
+              "uses": [],
+              "produces": "paper_printed_unsuperscripted_first_step_initialization"
+            },
+            {
+              "step": 2,
+              "description": "Introduce the nodewise indexed interpretation needed for Algorithm 2 and for Appendix D's later indexed initial-error terms. This interpretation is not printed as a formula in the paper and is therefore a source-gap adapter, not a verbatim theorem statement.",
+              "ref": "SourceGap_NodewiseFirstStepInitialization; Section 4.2, p.7; Appendix D, Eq. (10), p.20",
+              "source_pdf_lines": [
+                1180,
+                1211
+              ],
+              "math": null,
+              "uses": [
+                "previous_step:1",
+                "Algorithm_2_V1_Definitions"
+              ],
+              "produces": "nodewise_first_step_initialization_for_m1j_and_v1j"
+            }
+          ]
+        }
+      ],
+      "source_gaps": [
+        {
+          "name": "sum_vs_average_estimator",
+          "ref": "Algorithm 2, line 8, p.8; Appendix D, p.19",
+          "description": "Algorithm 2 defines v_t^{\\mathrm{sum}} as the sum of node estimators, while Appendix D analyzes the distinct averaged estimator \\bar v_t=(1/n) sum_j v_t^j. The sign update is unchanged by positive scaling when n>=1, but this identity is not printed in the paper and does not imply equality of the squared errors against the global gradient."
+        },
+        {
+          "name": "cross_node_independence",
+          "ref": "Assumption 7, p.7; Appendix D, Eq. (9), p.19",
+          "description": "Assumption 7 states unbiasedness and a second-moment noise bound per node. Eq. (9) uses the variance of an average with a 1/n factor and cancels noise against state-dependent prior-error and drift terms, which requires conditional mean-zero noise, conditional per-node second-moment bounds, F_t-measurability of those state terms, and conditional pairwise zero cross-covariances for j != k, or a stronger joint-independence condition that implies them. The complete formal dependency is recorded as key_lemmas.CrossNodeNoiseCancellationPrerequisite."
+        },
+        {
+          "name": "distributed_loop_horizon_adapter",
+          "ref": "Algorithm 2, line 2, p.8; Theorem 3, p.7; Appendix B, Eq. (4), p.15",
+          "description": "The centralized Eq. (4) proof uses t <= T when absorbing the weight-decay residual. The distributed reuse must explicitly transport Algorithm 2's t=1,...,T loop and Theorem 3's T>=n horizon condition; this adapter is recorded as key_lemmas.Algorithm_2_TimeLoopHorizon."
+        },
+        {
+          "name": "lemma1_weight_decay_contraction_and_square_prerequisites",
+          "ref": "Appendix A, p.14; Theorem 3, p.7",
+          "description": "Appendix A treats 1-eta lambda as a nonnegative contraction, drops powers of that factor, and uses lambda <= 1/(2 eta T) to control lambda^2 in the final step of Lemma 1. These transitions formally require eta > 0, T > 0, nonnegative lambda with 0 <= 1-eta lambda <= 1, or equivalent absolute-value bounds. The formal dependency is recorded as key_lemmas.Lemma_1_EtaLambdaPositivityPrerequisites."
+        },
+        {
+          "name": "momentum_parameter_domain_prerequisites",
+          "ref": "Algorithm 2, line 1, p.8; Theorem 3, p.7; Appendix D, Eq. (9), p.19 and p.20",
+          "description": "Algorithm 2 lists beta_1 and beta_2 as momentum parameters and Theorem 3 states beta_2^2 <= beta_1 <= sqrt(beta_2), but the PDF does not separately state beta_2>0, beta_2<=1, or the induced beta_1 positivity/range. Appendix D uses 1/beta_1, 1/beta_2, contraction telescopes, beta_1^2<=beta_2, and comparisons with 1/beta_2 and 1/beta_2^2. The formal dependency is recorded as key_lemmas.MomentumParameterDomainPrerequisite."
+        },
+        {
+          "name": "first_step_node_initialization",
+          "ref": "Section 4.2, p.7; Algorithm 2, p.8",
+          "description": "The prose says m_1=v_1=nabla f(x_1;xi_1) without node superscripts, but Algorithm 2 and Appendix D use m_t^j and v_t^j. Formalization should choose the node-indexed initialization that Eq. (10) requires and record the correction."
+        },
+        {
+          "name": "one_sided_big_o_schedules",
+          "ref": "Theorem 3, p.7; Appendix D, p.20",
+          "description": "The theorem states beta_2 and eta with one-sided Big-O schedule notation. Appendix D substitutes these schedules into a bound containing 1/beta_2, 1/beta_2^2, and 1/eta as if beta_2 and eta had balancing two-sided orders. A corrected Lean theorem therefore needs explicit positive constants c_{beta,-}, c_{beta,+}, c_{eta,-}, c_{eta,+}, a threshold T_0, and the beta-domain conditions recorded in key_lemmas.TwoSidedSchedulePrerequisiteForRate; the printed theorem claim remains separate."
+        },
+        {
+          "name": "node_count_domain",
+          "ref": "Eq. (2), p.6; Algorithm 2, p.8",
+          "description": "The paper uses 1/n, node averages, and a node loop but does not state n>=1 as a separate hypothesis. The formal objective-average, positive-scaling sign bridge, and 1/n variance route consume key_lemmas.NodeCountPositivePrerequisite."
+        }
+      ]
+    },
+    "new_obligations": [
+      "Define the heterogeneous distributed objective f(x)=1/n sum_j f_j(x) and prove that its gradient is the average of node gradients under the node smoothness hypotheses.",
+      "Formalize Algorithm 2 v1 nodewise initialization and both momentum recurrences while excluding Algorithm 2 v2 and Algorithm 3.",
+      "Expose the nonempty-node obligation n>=1 before interpreting the objective average, positive scaling, or 1/n variance terms.",
+      "Bridge the algorithmic server sum v_t^{sum} to Appendix D's distinct analyzed average bar v_t=(1/n) sum_j v_t^j by proving coordinatewise sign(v_t^{sum})=sign(bar v_t) for n>=1, without equating their squared estimator errors.",
+      "Derive the averaged v and m estimator recurrences from the nodewise recurrences without swapping beta_1 and beta_2.",
+      "Justify the cross-node noise cancellation/orthogonality needed for the displayed 1/n variance improvement; do not infer it silently from per-node bounded noise alone.",
+      "Reuse the centralized Lemma 1 update bounds and Eq. (5) descent reduction through an explicit adapter rather than duplicating a second standalone setup.",
+      "Transport the distributed Algorithm 2 time loop and T>=n horizon into the reused Lemma 1/Eq. (4) descent proof so every t<=T absorption step has an explicit prerequisite.",
+      "Preserve the paper's first-step initialization, shared sample within each node iteration, coordinatewise sign, weight decay, and initial-point restriction.",
+      "Expose the unstated positivity/range conditions for eta, lambda, T, beta_1, and beta_2 needed by denominators, contractions, telescoping, and beta-order simplifications.",
+      "Expose the quantified lower/two-sided beta_2 and eta schedule control, with positive constants and a horizon threshold, required to turn the finite-horizon reciprocal-beta bound into the claimed n,d,T-dependent asymptotic rate."
+    ],
+    "proof_roots": [
+      "Algorithms.Unverified.Lion.theorem_three_distributed_original",
+      "Algorithms.Unverified.Lion.distributed_finite_horizon_gradient_average_bound"
+    ]
+  },
+  "extension_audit": {
+    "baseline_reviewed": true,
+    "delta_faithful": true,
+    "reuse_justified": true,
+    "no_duplicate_model": true,
+    "no_assumption_leakage": true,
+    "inherited_reference_repairs_reviewed": true,
+    "evidence": "Reviewed the seeded centralized setup, Algorithm 1 declarations, corrected-domain Lemma 1 route, finite_horizon_gradient_average_bound_correctedDomain, theorem_one_centralized_correctedRate, and statement-correction record. The distributed delta reuses nextX, the corrected-domain iterate/step theorem, both centralized momentum recurrences, and the Eq. (5) descent adapter; it adds only Algorithm 2 v1 node/aggregation adapters, the explicit Algorithm_2_TimeLoopHorizon loop/horizon adapter, Assumptions 5/7/8, distinct v_t^{sum}/bar v_t objects, the n>=1 domain, averaged v/m recurrences, and a quantified corrected schedule contract. The two places where Appendix D needs more than the printed assumptions are now explicit source-gap/formal-prerequisite records: CrossNodeNoiseCancellationPrerequisite records the conditional measurability/orthogonality contract consumed at Eq. (9) without deriving it from Assumption 7, and Nodewise_FirstStepInitialization_Adapter keeps statement_math as the unsuperscripted Section 4.2 formula while putting the indexed nodewise interpretation only in formal_bridge_math. It excludes v2/Algorithm 3 and keeps all unstated domains, source overload, and schedule strengthening as explicit source gaps rather than inherited theorem assumptions.",
+    "inherited_reference_repairs_evidence": "The repaired inherited uses replace only illegal SourceGap_* labels with the named centralized prerequisite key lemmas Centralized_MomentumParameterDomainPrerequisite, Centralized_EtaLambdaHorizonDomainPrerequisite, and Lemma_1_Eq4BoundTransitionPrerequisite; they preserve the printed source-gap descriptions and do not add those gaps as theorem assumptions. The corrected reuse pointers resolve v_succ_eq_lookahead_momentum to the zero-based centralized entry /algorithm_spec/steps/1 (printed Algorithm 1 line 3) and m_succ_eq_original_momentum to /algorithm_spec/steps/2 (printed Algorithm 1 line 4)."
+  }
+}

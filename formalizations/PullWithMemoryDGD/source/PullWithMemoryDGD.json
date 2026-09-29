@@ -1,0 +1,1920 @@
+{
+  "algorithm": "PULM_DGD",
+  "full_name": "PULM-based Decentralized Gradient Descent (PULM-DGD)",
+  "source_reference": "Liang, Song, and Yuan, Decentralized Optimization over Time-Varying Row-Stochastic Digraphs, arXiv:2512.24483v1 (Theorem 2)",
+  "setup": {
+    "problem": {
+      "math": "\\min_{x\\in\\mathbb{R}^d} f(x) := \\frac{1}{n}\\sum_{i=1}^n f_i(x).",
+      "ref": "Equation (1), lines 36 and 615-627",
+      "description": "Decentralized optimization over a time-varying broadcast network; each objective function f_i is accessible only by node i."
+    },
+    "variable_space": {
+      "math": "x\\in\\mathbb{R}^d",
+      "ref": "Equation (1), line 36"
+    }
+  },
+  "assumptions": [
+    {
+      "name": "B_tilde_strongly_connected_graph_sequence",
+      "math": "\\{G^{(k)}=(V,E^{(k)})\\}_{k\\ge 0}\\text{ satisfies the following: there exists an integer }\\tilde B>0\\text{ such that for any }k\\ge 0,\\text{ the }\\tilde B\\text{-step accumulated graph }G_k^{\\tilde B}:=\\left(V,\\bigcup_{l=k}^{k+\\tilde B-1}E^{(l)}\\right)\\text{ is strongly connected. Additionally, each graph }G^{(k)}\\text{ contains a self-loop at every node.}",
+      "ref": "Assumption 1, lines 274-282",
+      "parameters": [
+        "\\tilde B",
+        "G^{(k)}",
+        "E^{(k)}",
+        "V"
+      ]
+    },
+    {
+      "name": "rapidly_changing_broadcast_network",
+      "math": "\\text{For each }k\\ge 0\\text{ and }i\\in[n],\\text{ node }i\\text{ does not know its out-degree }d_i^{\\mathrm{out},(k)}\\text{ in graph }G^{(k)}.\\text{ Additionally, for each }k\\ge 0,\\text{ the mixing matrix generated from }G^{(k)}\\text{ can only be used once.}",
+      "ref": "Assumption 2, lines 284-287",
+      "parameters": [
+        "d_i^{\\mathrm{out},(k)}",
+        "G^{(k)}",
+        "A^{(k)}"
+      ]
+    },
+    {
+      "name": "compatible_row_stochastic_mixing",
+      "math": "a_{ij}>0\\text{ if }(j\\to i)\\in E,\\text{ and }a_{ij}=0\\text{ otherwise.}\\quad A1_n=1_n.",
+      "ref": "Definition 1, lines 294-298",
+      "parameters": [
+        "A",
+        "G",
+        "a_{ij}"
+      ]
+    },
+    {
+      "name": "lower_bounded_entries",
+      "math": "\\text{Suppose that for each }k\\ge 0,\\text{ we have a mixing matrix }A^{(k)}\\text{ that is compatible with }G^{(k)}.\\text{ There exists a scalar }\\tau>0\\text{ such that all nonzero entries of }A^{(k)}\\text{ satisfy }a_{ij}^{(k)}\\ge \\tau\\text{ for all }k\\ge 0.",
+      "ref": "Assumption 3, lines 302-305",
+      "parameters": [
+        "A^{(k)}",
+        "G^{(k)}",
+        "\\tau",
+        "a_{ij}^{(k)}"
+      ]
+    },
+    {
+      "name": "smoothness",
+      "math": "\\text{There exist constants }L,\\Delta\\ge 0\\text{ such that for all }i\\in[n]\\text{ and all }x,y\\in\\mathbb{R}^d,\\quad \\|\\nabla f_i(x)-\\nabla f_i(y)\\|\\le L\\|x-y\\|,\\quad\\text{and}\\quad f_i(x^{(0)})-\\inf_{x\\in\\mathbb{R}^d} f_i(x)\\le \\Delta.",
+      "ref": "Assumption 4, lines 322-325",
+      "parameters": [
+        "L",
+        "\\Delta",
+        "f_i",
+        "x^{(0)}"
+      ]
+    },
+    {
+      "name": "problem_average_objective_definition",
+      "math": "\\min_{x\\in\\mathbb{R}^d} f(x) := \\frac{1}{n}\\sum_{i=1}^n f_i(x).",
+      "ref": "Equation (1), lines 33-37",
+      "parameters": [
+        "f",
+        "f_i",
+        "n"
+      ]
+    },
+    {
+      "name": "appendix_D_f_star_definition",
+      "math": "f^*:=n^{-1}\\sum_{i=1}^n f_i^*.",
+      "ref": "Appendix D.1, lines 1740-1746",
+      "parameters": [
+        "f^*",
+        "f_i^*"
+      ]
+    },
+    {
+      "name": "theorem2_uniform_PULM_mixing_rate",
+      "math": "\\text{there exists }C_W>0\\text{ and }0\\le \\beta_W<1\\text{ such that }\\|W^{(k,r)}-n^{-1}1_n1_n^\\top\\|_2\\le C_W\\beta_W^r\\text{ for all }k\\text{ and }r.",
+      "ref": "Theorem 2, lines 615-620",
+      "parameters": [
+        "C_W",
+        "\\beta_W",
+        "W^{(k,r)}"
+      ]
+    },
+    {
+      "name": "notation_average_matrix_En",
+      "math": "\\text{We denote }E_n:=\\frac1n1_n1_n^\\top.",
+      "ref": "Notations, lines 230-232",
+      "parameters": [
+        "E_n",
+        "1_n"
+      ]
+    },
+    {
+      "name": "notation_stacked_iterate_and_gradient",
+      "math": "x^{(k)}:=[(x_1^{(k)})^\\top;(x_2^{(k)})^\\top;\\cdots;(x_n^{(k)})^\\top],\\quad g^{(k)}:=[\\nabla F_1(x_1^{(k)};\\xi_1^{(k)})^\\top;\\cdots;\\nabla F_n(x_n^{(k)};\\xi_n^{(k)})^\\top],\\quad \\nabla f(x^{(k)}):=[\\nabla f_1(x_1^{(k)})^\\top;\\cdots;\\nabla f_n(x_n^{(k)})^\\top]",
+      "ref": "Notations, lines 238-249",
+      "parameters": [
+        "x^{(k)}",
+        "g^{(k)}",
+        "\\nabla f(x^{(k)})"
+      ]
+    },
+    {
+      "name": "theorem2_mean_iterate_notation",
+      "math": "\\bar x^{(k)}=\\frac1n\\sum_{i=1}^n x_i^{(k)}",
+      "ref": "Theorem 2, lines 624-627",
+      "parameters": [
+        "\\bar x^{(k)}",
+        "x_i^{(k)}"
+      ]
+    },
+    {
+      "name": "appendix_D_mean_gradient_notation",
+      "math": "\\bar g^{(k)}=n^{-1}1_n^\\top g^{(k)}",
+      "ref": "Appendix D.1, lines 1524-1532",
+      "parameters": [
+        "\\bar g^{(k)}",
+        "g^{(k)}",
+        "1_n"
+      ]
+    },
+    {
+      "name": "appendix_D_consensus_error_definition",
+      "math": "\\Delta_x^{(k)}:=x^{(k)}-E_nx^{(k)}",
+      "ref": "Lemma 4, lines 1510-1511",
+      "parameters": [
+        "\\Delta_x^{(k)}",
+        "x^{(k)}",
+        "E_n"
+      ]
+    },
+    {
+      "name": "lemma1_local_row_stochastic_sequence",
+      "math": "\\text{For a sequence of row-stochastic matrices }\\tilde A^{(1)},\\tilde A^{(2)},\\cdots\\in\\mathbb{R}^{n\\times n}",
+      "ref": "Lemma 1, lines 995-997",
+      "parameters": [
+        "\\tilde A^{(t)}"
+      ]
+    },
+    {
+      "name": "lemma1_local_entrywise_eta_lower_bound",
+      "math": "\\tilde A_{i,j}^{(t)}\\ge \\eta>0,\\forall i,j\\in[n],\\forall t=1,2,\\ldots",
+      "ref": "Lemma 1, lines 996-997",
+      "parameters": [
+        "\\tilde A_{i,j}^{(t)}",
+        "\\eta"
+      ]
+    },
+    {
+      "name": "lemma2_local_row_stochastic_nonnegative_hypothesis",
+      "math": "\\text{For any }S\\text{ row-stochastic matrices }A^{(1)},\\ldots,A^{(S)}\\in\\mathbb{R}^{n\\times n}",
+      "ref": "Lemma 2, lines 1265-1265",
+      "parameters": [
+        "S",
+        "A^{(s)}",
+        "n"
+      ]
+    },
+    {
+      "name": "appendix_D_CA_CM_schedule_prerequisite",
+      "math": "R_k\\ge\\max\\left\\{\\frac{\\ln(C_A)}{1-\\beta_A},\\frac{\\ln(C_M)}{1-\\beta_M}\\right\\}",
+      "ref": "Lemma 4, lines 1511-1512",
+      "parameters": [
+        "C_A",
+        "\\beta_A",
+        "C_M",
+        "\\beta_M",
+        "R_k"
+      ]
+    },
+    {
+      "name": "appendix_D1_delta1_proof_stepsize_prerequisite",
+      "math": "\\gamma\\le\\frac{1}{6L}",
+      "ref": "Appendix D.1, line 1594",
+      "parameters": [
+        "\\gamma",
+        "L"
+      ]
+    },
+    {
+      "name": "appendix_D1_final_simplification_stepsize_prerequisite",
+      "math": "\\gamma\\le\\frac{1}{3L}",
+      "ref": "Appendix D.1, lines 1705-1706",
+      "parameters": [
+        "\\gamma",
+        "L"
+      ]
+    },
+    {
+      "name": "appendix_D_lemma5_schedule_stepsize_prerequisite",
+      "math": "R_k\\ge\\frac{\\ln(C_M)}{1-\\beta_M}\\text{ and }\\gamma\\le\\frac{1}{6L}",
+      "ref": "Lemma 5, lines 1763-1764",
+      "parameters": [
+        "C_M",
+        "\\beta_M",
+        "R_k",
+        "\\gamma",
+        "L"
+      ]
+    },
+    {
+      "name": "appendix_D3_lemma6_schedule_stepsize_prerequisite",
+      "math": "\\gamma\\le\\frac{1}{3c}\\text{ and }R_k\\ge\\frac{\\ln(k)}{1-\\beta}",
+      "ref": "Lemma 6, lines 1829-1831",
+      "parameters": [
+        "\\gamma",
+        "c",
+        "R_k",
+        "k",
+        "\\beta"
+      ]
+    },
+    {
+      "name": "lemma6_one_step_recursion_hypothesis",
+      "math": "S_k\\le(1+c\\gamma\\beta^{2R_k})\\Delta_k-\\Delta_{k+1}+F_k,\\quad\\forall k\\ge0",
+      "ref": "Lemma 6, lines 1825-1827",
+      "parameters": [
+        "\\Delta_k",
+        "S_k",
+        "F_k",
+        "c",
+        "R_k",
+        "\\beta",
+        "\\gamma"
+      ]
+    },
+    {
+      "name": "appendix_D3_instantiated_lemma6_side_conditions",
+      "math": "\\gamma\\le\\frac{1}{24nC_M^2L}\\text{ and }R_k\\ge\\frac{\\ln(k)}{1-\\beta_M}",
+      "ref": "Appendix D.3, lines 1892-1895",
+      "parameters": [
+        "\\gamma",
+        "n",
+        "C_M",
+        "L",
+        "R_k",
+        "k",
+        "\\beta_M"
+      ]
+    },
+    {
+      "name": "appendix_D_matrix_update_notation",
+      "math": "x^{(k+1)}=A^{(k)}x^{(k)}-\\gamma M^{(k)}g^{(k)}.",
+      "ref": "Appendix D.2 equation (19), lines 1773-1775",
+      "parameters": [
+        "A^{(k)}",
+        "M^{(k)}",
+        "g^{(k)}",
+        "\\gamma"
+      ]
+    },
+    {
+      "name": "algorithm3_consensual_initialization",
+      "math": "x_i^{(0)}=x^{(0)}",
+      "ref": "Algorithm 3, line 551; Appendix D.3, lines 1907-1908",
+      "parameters": [
+        "x_i^{(0)}",
+        "x^{(0)}",
+        "\\Delta_x^{(0)}"
+      ]
+    },
+    {
+      "name": "algorithm1_initialization_and_diagonal_anchor",
+      "math": "W^{(0)}=I_n.\\quad W^{(k+\\frac12)}=A^{(k)}W^{(k)};\\quad \\text{Replace the diagonal entries of }W^{(k+\\frac12)}\\text{ by }\\frac1n\\text{, and name it }W^{(k+1)};",
+      "ref": "Algorithm 1, lines 423-429",
+      "parameters": [
+        "W^{(0)}",
+        "I_n",
+        "W^{(k+\\frac12)}",
+        "W^{(k+1)}"
+      ]
+    },
+    {
+      "name": "theorem2_chosen_stepsize_and_schedule",
+      "math": "\\gamma=\\frac{1}{24nC_W^2L}\\text{ and }R_k=\\max\\left\\{\\frac{\\ln(C_W)}{1-\\beta_W},\\frac{\\ln(k)}{1-\\beta_W}\\right\\}\\text{ for all }k\\ge0",
+      "ref": "Theorem 2, lines 631-632",
+      "parameters": [
+        "\\gamma",
+        "C_W",
+        "L",
+        "R_k",
+        "\\beta_W",
+        "k"
+      ]
+    }
+  ],
+  "algorithm_spec": {
+    "initialization": {
+      "math": "x_i^{(0)}=x^{(0)},\\quad z_i^{(k,0)}=x_i^{(k)}-\\gamma g_i^{(k)},\\quad w_i^{(k,0)}=e_i",
+      "ref": "Algorithm 3, lines 550-556"
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "local_gradient",
+        "math": "g_i^{(k)}=\\nabla f_i(x_i^{(k)})",
+        "ref": "Algorithm 3 line 5, lines 553-554"
+      },
+      {
+        "step": 2,
+        "name": "PULM_inner_gossip",
+        "math": "z_i^{(k,r+\\frac12)}=\\sum_{j=1}^n a_{ij}^{(k,r)}z_j^{(k,r)},\\quad w_i^{(k,r+\\frac12)}=\\sum_{j=1}^n a_{ij}^{(k,r)}w_j^{(k,r)}",
+        "ref": "Algorithm 3 line 8, lines 557-559"
+      },
+      {
+        "step": 3,
+        "name": "PULM_inner_adjust",
+        "math": "d_i^{(k,r)}=[w_i^{(k,r+\\frac12)}]_i-\\frac1n",
+        "ref": "Algorithm 3 line 9, lines 560-561"
+      },
+      {
+        "step": 4,
+        "name": "PULM_inner_update",
+        "math": "z_i^{(k,r+1)}=z_i^{(k,r+\\frac12)}-d_i^{(k,r)}g_i^{(k)},\\quad w_i^{(k,r+1)}=w_i^{(k,r+\\frac12)}-d_i^{(k,r)}e_i",
+        "ref": "Algorithm 3 line 10, lines 562-563"
+      },
+      {
+        "step": 5,
+        "name": "outer_update",
+        "math": "x_i^{(k+1)}=z_i^{(k,R_k)}",
+        "ref": "Algorithm 3 line 12, lines 565-566"
+      }
+    ],
+    "output": {
+      "math": "x_i^{(K)}\\text{ at each node }i\\in[n]",
+      "ref": "Algorithm 3 line 15, lines 569-570",
+      "type": "local iterates after K outer iterations"
+    },
+    "parameters": [
+      {
+        "name": "gamma",
+        "math": "\\gamma>0",
+        "ref": "Algorithm 3 line 1, line 547"
+      },
+      {
+        "name": "inner_iterations",
+        "math": "\\{R_k\\}_{k\\ge 0}",
+        "ref": "Algorithm 3 line 1, line 547"
+      },
+      {
+        "name": "theorem2_stepsize_and_schedule",
+        "math": "\\gamma\\le \\frac{1}{24nC_W^2L}\\quad\\text{and}\\quad R_k\\ge \\max\\left\\{\\frac{\\ln(C_W)}{1-\\beta_W},\\frac{\\ln(k)}{1-\\beta_W}\\right\\}",
+        "ref": "Theorem 2, lines 619-620"
+      }
+    ]
+  },
+  "main_theorem": {
+    "ref": "Theorem 2, lines 615-651",
+    "statement_math": "\\text{Suppose Assumption 1, 2 and 3 hold. To simplify the notations, in Algorithm 3 we further assume that there exists }C_W>0\\text{ and }0\\le\\beta_W<1\\text{ such that }\\|W^{(k,r)}-n^{-1}1_n1_n^\\top\\|_2\\le C_W\\beta_W^r\\text{ for all }k\\text{ and }r.\\text{ When }\\gamma\\le \\frac{1}{24nC_W^2L}\\text{ and }R_k\\ge\\max\\left\\{\\frac{\\ln(C_W)}{1-\\beta_W},\\frac{\\ln(k)}{1-\\beta_W}\\right\\},\\text{ we have }\\frac1K\\sum_{k=0}^{K-1}\\|\\nabla f(\\bar x^{(k)})\\|^2\\le \\frac{18\\Delta}{\\gamma K},\\quad \\text{where }\\bar x^{(k)}=\\frac1n\\sum_{i=1}^n x_i^{(k)}.\\text{ By choosing }\\gamma=\\frac{1}{24nC_W^2L}\\text{ and }R_k=\\max\\left\\{\\frac{\\ln(C_W)}{1-\\beta_W},\\frac{\\ln(k)}{1-\\beta_W}\\right\\}\\text{ for all }k\\ge0,\\text{ we have }\\frac1K\\sum_{k=0}^{K-1}\\|\\nabla f(\\bar x^{(k)})\\|^2\\le \\frac{432nC_W^2L\\Delta}{K}.\\text{ and the total number of communication rounds equals to }\\sum_{k=0}^{K-1}R_k\\le \\max\\left\\{\\sum_{k=1}^{K-1}\\frac{\\ln(k)}{1-\\beta_W},\\sum_{k=1}^{K-1}\\frac{\\ln(C_W)}{1-\\beta_W}\\right\\}=\\frac{\\max\\{K\\ln(K),K\\ln(C_W)\\}}{1-\\beta_W}.\\text{ In Theorem 2, when we define the total number of communication rounds }T=\\sum_{k=0}^{K-1}R_k,\\text{ we obtain }K=O(T/\\ln(T)).\\text{ Plugging this into (5) results in an overall convergence rate of }O\\left(\\frac{\\ln(T)}{T}\\right).",
+    "rate": "O(ln(T)/T) in total communication rounds T, via K=O(T/ln(T)) and the O(1/K) averaged stationarity bound.",
+    "measure": "Averaged squared norm of the centralized gradient at the network mean iterate, \\frac1K\\sum_{k=0}^{K-1}\\|\\nabla f(\\bar x^{(k)})\\|^2.",
+    "proof": [
+      {
+        "step": 1,
+        "description": "Appendix D states the transition instruction: left-multiply inequality (18) by 24/gamma and add the result to inequality (14). This step records only that printed instruction, before auditing the displayed coefficients in (21).",
+        "ref": "Appendix D.2, equation (21), lines 1808-1819",
+        "source_pdf_lines": [
+          1808,
+          1819
+        ],
+        "uses": [
+          "descent_lemma_for_PULM_DGD",
+          "consensus_error_lemma"
+        ],
+        "produces": "paper_instruction_multiply_18_by_24_over_gamma_and_add_to_14"
+      },
+      {
+        "step": 2,
+        "description": "Source boundary for equation (21): direct addition of the printed Lemma 4 and Lemma 5 statements does not itself explain the printed objective factor (1+40n gamma L C_M^2 beta_M^{2R_k}), and the printed 12/gamma consensus coefficient relies on the proof-side Lemma 4 line with 4/gamma rather than the Lemma 4 statement's 4/(n gamma). That proof-side Lemma 4 line also depends on the stronger gamma <= 1/(6L) prerequisite introduced at line 1594. The JSON therefore records (21) as the paper's asserted displayed continuation, not as a fully checked consequence of the two lemma statements.",
+        "ref": "Appendix D.2, equation (21), lines 1811-1819",
+        "source_pdf_lines": [
+          1811,
+          1819
+        ],
+        "math": "\\frac{\\gamma}{4}\\|\\bar g^{(k)}\\|^2+\\frac{\\gamma}{6}\\|\\nabla f(\\bar x^{(k)})\\|^2+\\frac{24}{\\gamma}\\|\\Delta_x^{(k+1)}\\|_F^2\\le (1+40n\\gamma LC_M^2\\beta_M^{2R_k})(f(\\bar x^{(k)})-f^*)-(f(\\bar x^{(k+1)})-f^*)+\\frac{12}{\\gamma}\\|\\Delta_x^{(k)}\\|_F^2",
+        "uses": [
+          "appendix_D1_delta1_proof_stepsize_prerequisite",
+          "previous_step:1"
+        ],
+        "produces": "paper_asserted_combined_inequality_21_with_unprinted_coefficient_bridge"
+      },
+      {
+        "step": 3,
+        "description": "To absorb the extra objective-error factor, the proof prints the variables chosen for Lemma 6. These printed choices have 24/(n gamma) and 8/(n gamma), while equation (21) has 24/gamma and 12/gamma; the chosen c=8nC_M^2L also does not match the 40nC_M^2L coefficient visible in (21).",
+        "ref": "Appendix D.3, lines 1885-1896",
+        "source_pdf_lines": [
+          1885,
+          1896
+        ],
+        "math": "S_k=\\frac{\\gamma}{6}\\|\\nabla f(\\bar x^{(k)})\\|^2+\\frac{\\gamma}{6}\\|\\bar g^{(k)}\\|^2+\\frac{24}{n\\gamma}\\|\\Delta_x^{(k+1)}\\|_F^2,\\quad \\Delta_k=f(\\bar x^{(k)})-f^*,\\quad F_k=\\frac{8}{n\\gamma}\\|\\Delta_x^{(k)}\\|_F^2,\\quad R_k=R_k,\\quad \\beta=\\beta_M,\\quad c=8nC_M^2L.",
+        "uses": [
+          "previous_step:2"
+        ],
+        "produces": "printed_lemma6_substitution_with_coefficient_mismatch"
+      },
+      {
+        "step": 4,
+        "description": "After the substitution c=8nC_M^2L and beta=beta_M, the proof prints the side conditions needed for the Lemma 6 application.",
+        "ref": "Appendix D.3, lines 1892-1895",
+        "source_pdf_lines": [
+          1892,
+          1895
+        ],
+        "math": "\\gamma\\le\\frac{1}{24nC_M^2L}\\text{ and }R_k\\ge\\frac{\\ln(k)}{1-\\beta_M}",
+        "uses": [
+          "appendix_D3_lemma6_schedule_stepsize_prerequisite",
+          "appendix_D3_instantiated_lemma6_side_conditions",
+          "previous_step:3"
+        ],
+        "produces": "instantiated_lemma6_side_conditions_for_main_application"
+      },
+      {
+        "step": 5,
+        "description": "Source boundary for the attempted Lemma 6 application: the PDF does not print an algebraic rescaling or correction that turns equation (21) into Lemma 6's hypothesis under the variables chosen in the preceding step. The needed Lemma 6 hypothesis is therefore left unverified from (21); this step records the failed prerequisite bridge only and produces no summed inequality.",
+        "ref": "Appendix D.3, lines 1885-1899",
+        "source_pdf_lines": [
+          1885,
+          1899
+        ],
+        "uses": [
+          "absorbing_extra_errors_lemma",
+          "previous_step:2",
+          "previous_step:3",
+          "previous_step:4"
+        ],
+        "produces": "unverified_lemma6_coefficient_bridge_gap_no_checked_mathematical_conclusion"
+      },
+      {
+        "step": 6,
+        "description": "Unresolved source jump after the attempted Lemma 6 application: the PDF prints the following summed display, but the preceding coefficient mismatch prevents the JSON from treating it as a checked consequence of equation (21) and Lemma 6. This entry is a quote-only source assertion; later steps may cite it only as the PDF-printed source display for the paper's next simplification, not as a checked mathematical bound.",
+        "ref": "Appendix D.3, lines 1899-1905",
+        "source_pdf_lines": [
+          1899,
+          1905
+        ],
+        "math": "\\frac{\\gamma}{6}\\sum_{k=0}^K\\|\\nabla f(\\bar x^{(k)})\\|^2+\\frac{\\gamma}{6}\\sum_{k=0}^T\\|\\bar g^{(k)}\\|^2+\\frac{24}{\\gamma}\\sum_{k=0}^K\\|\\Delta_x^{(k+1)}\\|_F^2\\le 3\\Delta+\\frac{24}{\\gamma}\\sum_{k=0}^K\\|\\Delta_x^{(k)}\\|_F^2",
+        "uses": [
+          "absorbing_extra_errors_lemma",
+          "appendix_D3_lemma6_schedule_stepsize_prerequisite",
+          "appendix_D3_instantiated_lemma6_side_conditions",
+          "previous_step:2",
+          "previous_step:3",
+          "previous_step:4",
+          "previous_step:5"
+        ],
+        "produces": "unresolved_source_assertion_line_1899_not_a_checked_or_consumable_summed_bound"
+      },
+      {
+        "step": 7,
+        "description": "The PDF next notes consensual initialization, so Delta_x^(0)=0, and simplifies the line-1899 summed display to equation (23). The cancellation from the source display in step 6 still depends on the unresolved coefficient bridge recorded in step 5; therefore the JSON records equation (23) only as the paper's printed assertion after that unresolved bridge, not as an established checked proof product.",
+        "ref": "Appendix D.3, equation (23), lines 1907-1913",
+        "source_pdf_lines": [
+          1907,
+          1913
+        ],
+        "math": "\\frac{\\gamma}{6}\\sum_{k=0}^K\\|\\nabla f(\\bar x^{(k)})\\|^2+\\frac{\\gamma}{6}\\sum_{k=0}^T\\|\\bar g^{(k)}\\|^2\\le 3\\Delta.",
+        "uses": [
+          "algorithm3_consensual_initialization",
+          "appendix_D_consensus_error_definition",
+          "previous_step:5",
+          "previous_step:6"
+        ],
+        "produces": "paper_printed_equation_23_after_unresolved_source_gap_not_a_checked_bound"
+      },
+      {
+        "step": 8,
+        "description": "Appendix Theorem 3 states the averaged stationarity bound (24). The PDF phrase 'Finally, we conclude our results' relies on the preceding equation (23); because (23) was only recorded after an unresolved Lemma 6 bridge, this step quotes (24) as a paper-printed theorem statement rather than as a checked consequence.",
+        "ref": "Appendix D.3, equation (24), lines 1917-1926",
+        "source_pdf_lines": [
+          1917,
+          1926
+        ],
+        "math": "\\frac{1}{K+1}\\sum_{k=0}^{K}\\|\\nabla f(\\bar x^{(k)})\\|^2\\le \\frac{18\\Delta}{\\gamma(K+1)}.",
+        "uses": [
+          "previous_step:7"
+        ],
+        "produces": "paper_printed_appendix_theorem3_bound_24_after_unresolved_source_gap_not_checked"
+      },
+      {
+        "step": 9,
+        "description": "Appendix Theorem 3 then substitutes the printed constant stepsize and logarithmic inner-loop schedule in the Appendix-D M-constant notation. Because the bound being specialized is the paper-printed (24) after an unresolved bridge, the specialization is also recorded as paper-printed rather than verified.",
+        "ref": "Appendix D.3, lines 1928-1936",
+        "source_pdf_lines": [
+          1928,
+          1936
+        ],
+        "math": "\\gamma=\\frac{1}{24nC_M^2L},\\quad R_k=\\max\\left\\{\\frac{\\ln(C_M)}{1-\\beta_M},\\frac{\\ln(k)}{1-\\beta_M}\\right\\}.\\quad \\frac{1}{K+1}\\sum_{k=0}^{K}\\|\\nabla f(\\bar x^{(k)})\\|^2\\le \\frac{432nC_M^2L\\Delta}{K+1}",
+        "uses": [
+          "previous_step:8"
+        ],
+        "produces": "paper_printed_appendix_constant_stepsize_bound_after_unresolved_source_gap_not_checked"
+      },
+      {
+        "step": 10,
+        "description": "Source boundary from Appendix Theorem 3 to the first displayed inequality in Section 4 Theorem 2: the Section 4 theorem states the W-constant version with index range k=0,...,K-1, denominator K, and the mean-iterate notation. This quote-only step records the printed Theorem 2 target; the PDF does not print a separate derivation of the C_M-to-C_W renaming, K+1-to-K denominator change, or K-to-K-1 index change from Appendix equation (24).",
+        "ref": "Theorem 2, lines 624-627",
+        "source_pdf_lines": [
+          624,
+          627
+        ],
+        "math": "\\frac1K\\sum_{k=0}^{K-1}\\|\\nabla f(\\bar x^{(k)})\\|^2\\le \\frac{18\\Delta}{\\gamma K},\\quad \\text{where }\\bar x^{(k)}=\\frac1n\\sum_{i=1}^n x_i^{(k)}.",
+        "uses": [
+          "theorem2_uniform_PULM_mixing_rate",
+          "theorem2_stepsize_and_schedule",
+          "theorem2_mean_iterate_notation",
+          "previous_step:8"
+        ],
+        "produces": "paper_printed_theorem2_general_W_stationarity_claim_after_unresolved_appendix_gap_not_checked"
+      },
+      {
+        "step": 11,
+        "description": "Theorem 2 next prints the W-constant stepsize and exact per-outer-iteration communication schedule. This is the Section 4 schedule statement corresponding to the Appendix-D specialization in step 9, with C_M and beta_M replaced by C_W and beta_W; the PDF does not print a separate schedule-transfer proof.",
+        "ref": "Theorem 2, lines 631-632",
+        "source_pdf_lines": [
+          631,
+          632
+        ],
+        "math": "\\gamma=\\frac{1}{24nC_W^2L},\\quad R_k=\\max\\left\\{\\frac{\\ln(C_W)}{1-\\beta_W},\\frac{\\ln(k)}{1-\\beta_W}\\right\\}\\text{ for all }k\\ge0",
+        "uses": [
+          "theorem2_chosen_stepsize_and_schedule",
+          "previous_step:9"
+        ],
+        "produces": "theorem2_printed_W_schedule_for_communication_count"
+      },
+      {
+        "step": 12,
+        "description": "After the schedule choice, Theorem 2 prints equation (5), the W-constant chosen-stepsize stationarity bound. This quote-only step depends on the printed general W-bound and the printed schedule, and it keeps the Appendix-to-Section source boundary explicit because the paper does not print the C_M-to-C_W renaming, K+1-to-K reindexing, or schedule-transfer algebra.",
+        "ref": "Theorem 2, equation (5), lines 636-638",
+        "source_pdf_lines": [
+          636,
+          638
+        ],
+        "math": "\\frac1K\\sum_{k=0}^{K-1}\\|\\nabla f(\\bar x^{(k)})\\|^2\\le \\frac{432nC_W^2L\\Delta}{K}.",
+        "uses": [
+          "theorem2_uniform_PULM_mixing_rate",
+          "previous_step:9",
+          "previous_step:10",
+          "previous_step:11"
+        ],
+        "produces": "paper_printed_theorem2_equation_5_after_unresolved_appendix_gap_not_checked"
+      },
+      {
+        "step": 13,
+        "description": "Source boundary for the communication summation display: the paper prints this as the total-communication bound after choosing the per-k maximum schedule. The transition from a sum of per-k maxima to a maximum of two sums, and the displayed equality replacing the logarithm sum by K ln(K), are recorded as the paper's asserted summation step rather than as consequences supplied by the schedule alone.",
+        "ref": "Theorem 2, lines 642-647",
+        "source_pdf_lines": [
+          642,
+          647
+        ],
+        "math": "\\sum_{k=0}^{K-1}R_k\\le \\max\\left\\{\\sum_{k=1}^{K-1}\\frac{\\ln(k)}{1-\\beta_W},\\sum_{k=1}^{K-1}\\frac{\\ln(C_W)}{1-\\beta_W}\\right\\}=\\frac{\\max\\{K\\ln(K),K\\ln(C_W)\\}}{1-\\beta_W}.",
+        "uses": [
+          "previous_step:11"
+        ],
+        "produces": "paper_asserted_theorem2_communication_summation_boundary"
+      },
+      {
+        "step": 14,
+        "description": "The theorem text defines the total communication count, translates the preceding printed communication assertion into K=O(T/ln(T)), and plugs that relation into the printed stationarity estimate (5) to state the overall communication-rate conclusion. Because the stationarity estimate is only a paper-printed claim after the unresolved Appendix D.3 bridge, this final rate is recorded as the paper's stated consequence rather than a checked proof endpoint.",
+        "ref": "Theorem 2 discussion, lines 648-651",
+        "source_pdf_lines": [
+          648,
+          651
+        ],
+        "math": "T=\\sum_{k=0}^{K-1}R_k,\\quad K=O(T/\\ln(T)),\\quad O\\left(\\frac{\\ln(T)}{T}\\right).",
+        "uses": [
+          "previous_step:12",
+          "previous_step:13"
+        ],
+        "produces": "paper_stated_overall_communication_rate_after_unresolved_stationarity_gap"
+      }
+    ]
+  },
+  "key_lemmas": [
+    {
+      "name": "uniform_B_step_mixing",
+      "ref": "Proposition 1, lines 310-315",
+      "statement_math": "\\text{Suppose Assumptions 1 and 3 hold. Then there exist an integer }0<B<n\\tilde B\\text{ and a scalar }\\eta\\in[\\tau^B,1)\\text{ such that }\\Phi(k+B,k):=\\prod_{l=0}^{B-1}A^{(k+l)}\\ge \\eta,\\quad \\forall k\\ge0.",
+      "role": "Provides the uniform positive B-window mixing constant used in Proposition 2 and Theorem 1.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Fix starting time k and nodes s,e. If s=e the self-loop gives a trivial trajectory; otherwise initialize the searched set V_ominus={s} and introduce path and timed-transition notation.",
+          "ref": "Appendix B.1, lines 949-957",
+          "source_pdf_lines": [
+            949,
+            957
+          ],
+          "math": "V_\\ominus=\\{s\\}",
+          "uses": [
+            "B_tilde_strongly_connected_graph_sequence"
+          ],
+          "produces": "search_initialization"
+        },
+        {
+          "step": 2,
+          "description": "Using Assumption 1 over the first tilde-B interval, choose a shortest path s -> v_1 -> ... -> e and a time t_1 in [k,k+tilde B-1] with (s,v_1) in E^(t_1), then construct a transition trajectory staying at s until t_1 and moving to v_1.",
+          "ref": "Appendix B.1, lines 959-967",
+          "source_pdf_lines": [
+            959,
+            967
+          ],
+          "math": "s\\xrightarrow{k}s\\xrightarrow{k+1}\\cdots s\\xrightarrow{t_1-1}s\\xrightarrow{t_1}v_1",
+          "uses": [
+            "B_tilde_strongly_connected_graph_sequence",
+            "previous_step:1"
+          ],
+          "produces": "first_new_node_transition"
+        },
+        {
+          "step": 3,
+          "description": "Repeat from the new node and next time. If the next shortest-path node is already searched, retrace to the last searched node v_+ and wait until a time t_* when an edge to the first new node v_* appears.",
+          "ref": "Appendix B.1, lines 969-986",
+          "source_pdf_lines": [
+            969,
+            986
+          ],
+          "math": "s\\xrightarrow{k}s\\xrightarrow{k+1}\\cdots\\xrightarrow{t_+}v_+\\xrightarrow{t_++1}\\cdots v_+\\xrightarrow{t_*}v_*",
+          "uses": [
+            "B_tilde_strongly_connected_graph_sequence",
+            "previous_step:2"
+          ],
+          "produces": "iterated_new_node_transition"
+        },
+        {
+          "step": 4,
+          "description": "The repetition adds a new node each time and therefore takes no more than n repetitions; Assumption 3 lower bounds the transition probability by tau^{n tilde B}, producing B and eta independent of k and node indices.",
+          "ref": "Appendix B.1, lines 987-991",
+          "source_pdf_lines": [
+            987,
+            991
+          ],
+          "math": "B\\le n\\tilde B,\\quad \\eta\\ge \\tau^{n\\tilde B}",
+          "uses": [
+            "lower_bounded_entries",
+            "previous_step:3"
+          ],
+          "produces": "existence_of_uniform_B_and_eta"
+        }
+      ]
+    },
+    {
+      "name": "linear_convergence_row_stochastic_products",
+      "ref": "Lemma 1, lines 995-1012",
+      "statement_math": "\\text{For a sequence of row-stochastic matrices }\\tilde A^{(1)},\\tilde A^{(2)},\\cdots\\in\\mathbb{R}^{n\\times n},\\text{ assuming }\\tilde A_{i,j}^{(t)}\\ge \\eta>0,\\forall i,j\\in[n],\\forall t=1,2,\\ldots,\\text{ we have: }\\tilde A_\\infty:=\\prod_{t=1}^{+\\infty}\\tilde A^{(t)}\\text{ exists, }\\tilde A_\\infty=1_n\\pi^\\top,\\text{ and }\\max\\left|\\prod_{t=1}^{T}\\tilde A^{(t)}-\\tilde A_\\infty\\right|\\le \\frac{1+\\eta}{\\eta}(1-\\eta)^T.",
+      "role": "Converts uniform entrywise positivity into an identical-row product limit with an exponential deviation bound.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "For an arbitrary vector x^(0) in R^n, introduce the local product iterate x^(t):=\\tilde A^(t)\\cdots\\tilde A^(1)x^(0), then decompose x^(t) into a consensus scalar p^(t) and a nonnegative surplus z^(t) as equation (8).",
+          "ref": "Appendix B.2, equation (8), lines 1016-1029",
+          "source_pdf_lines": [
+            1016,
+            1029
+          ],
+          "math": "x^{(t)}=p^{(t)}1_n+z^{(t)},\\quad z^{(t)}\\ge0,\\quad p^{(0)}=\\min_{1\\le i\\le n}\\{x_i^{(0)}\\},\\quad z^{(0)}=x^{(0)}-\\min_{1\\le i\\le n}\\{x_i^{(0)}\\}1_n.",
+          "uses": [
+            "lemma1_local_row_stochastic_sequence"
+          ],
+          "produces": "x^{(t)}:=\\tilde A^{(t)}\\cdots\\tilde A^{(1)}x^{(0)} and consensus_surplus_decomposition_8"
+        },
+        {
+          "step": 2,
+          "description": "Expand the recursion through a row-stochastic matrix and define the minimizing index i_* used to update p and z.",
+          "ref": "Appendix B.2, lines 1032-1049",
+          "source_pdf_lines": [
+            1032,
+            1049
+          ],
+          "math": "x^{(t+1)}=\\tilde A^{(t+1)}x^{(t)}=\\tilde A^{(t+1)}(p^{(t)}1_n+z^{(t)})=p^{(t)}1_n+\\tilde A^{(t+1)}z^{(t)}.\\quad i_*:=\\arg\\min_{1\\le i\\le n}\\tilde A_{i,\\cdot}^{(t+1)}z^{(t)},\\quad z^{(t+1)}=\\tilde A^{(t+1)}z^{(t)}-\\tilde A_{i_*,\\cdot}^{(t+1)}z^{(t)}1_n,\\quad p^{(t+1)}=p^{(t)}+\\tilde A_{i_*,\\cdot}^{(t+1)}z^{(t)}.",
+          "uses": [
+            "lemma1_local_row_stochastic_sequence",
+            "previous_step:1"
+          ],
+          "produces": "recursion_for_p_and_z"
+        },
+        {
+          "step": 3,
+          "description": "For a fixed entry i, split the column indices into nonnegative and negative row-difference subsets.",
+          "ref": "Appendix B.2, lines 1060-1064",
+          "source_pdf_lines": [
+            1060,
+            1064
+          ],
+          "math": "J^+:=\\{j\\mid \\tilde A_{i,j}^{(t+1)}-\\tilde A_{i_*,j}^{(t+1)}\\ge0\\},\\quad J^-:=\\{j\\mid \\tilde A_{i,j}^{(t+1)}-\\tilde A_{i_*,j}^{(t+1)}<0\\}.",
+          "uses": [
+            "previous_step:2"
+          ],
+          "produces": "row_difference_sign_partition"
+        },
+        {
+          "step": 4,
+          "description": "Using the definition of z^(t+1), expand the i-th entry as a row-difference sum over all columns.",
+          "ref": "Appendix B.2, lines 1065-1070",
+          "source_pdf_lines": [
+            1065,
+            1070
+          ],
+          "math": "0\\le z_i^{(t+1)}=\\tilde A_{i,\\cdot}^{(t+1)}z^{(t)}-\\tilde A_{i_*,\\cdot}^{(t+1)}z^{(t)}=\\sum_{1\\le j\\le n}(\\tilde A_{i,j}^{(t+1)}-\\tilde A_{i_*,j}^{(t+1)})z_j^{(t)}.",
+          "uses": [
+            "previous_step:2",
+            "previous_step:3"
+          ],
+          "produces": "entry_row_difference_expansion"
+        },
+        {
+          "step": 5,
+          "description": "Restrict the all-column sum to the positive subset J^+, dropping the negative row-difference terms.",
+          "ref": "Appendix B.2, lines 1071-1074",
+          "source_pdf_lines": [
+            1071,
+            1074
+          ],
+          "math": "\\sum_{1\\le j\\le n}(\\tilde A_{i,j}^{(t+1)}-\\tilde A_{i_*,j}^{(t+1)})z_j^{(t)}\\le\\sum_{j\\in J^+}(\\tilde A_{i,j}^{(t+1)}-\\tilde A_{i_*,j}^{(t+1)})z_j^{(t)}.",
+          "uses": [
+            "previous_step:3",
+            "previous_step:4"
+          ],
+          "produces": "positive_subset_restriction"
+        },
+        {
+          "step": 6,
+          "description": "Bound each nonnegative z_j^(t) in the J^+ sum by the infinity norm of z^(t).",
+          "ref": "Appendix B.2, lines 1072-1074",
+          "source_pdf_lines": [
+            1072,
+            1074
+          ],
+          "math": "\\sum_{j\\in J^+}(\\tilde A_{i,j}^{(t+1)}-\\tilde A_{i_*,j}^{(t+1)})z_j^{(t)}\\le\\|z^{(t)}\\|_\\infty\\sum_{j\\in J^+}(\\tilde A_{i,j}^{(t+1)}-\\tilde A_{i_*,j}^{(t+1)}).",
+          "uses": [
+            "previous_step:1",
+            "previous_step:3",
+            "previous_step:5"
+          ],
+          "produces": "positive_sum_infinity_norm_bound"
+        },
+        {
+          "step": 7,
+          "description": "Rewrite the positive row-difference sum as the difference of two row partial sums and use row-stochasticity with the eta lower bound to get the contraction coefficient.",
+          "ref": "Appendix B.2, lines 1075-1081",
+          "source_pdf_lines": [
+            1075,
+            1081
+          ],
+          "math": "\\|z^{(t)}\\|_\\infty\\sum_{j\\in J^+}(\\tilde A_{i,j}^{(t+1)}-\\tilde A_{i_*,j}^{(t+1)})=\\|z^{(t)}\\|_\\infty\\left(\\sum_{j\\in J^+}\\tilde A_{i,j}^{(t+1)}-\\sum_{j\\in J^+}\\tilde A_{i_*,j}^{(t+1)}\\right)\\le(1-\\eta)\\|z^{(t)}\\|_\\infty.",
+          "uses": [
+            "lemma1_local_row_stochastic_sequence",
+            "lemma1_local_entrywise_eta_lower_bound",
+            "previous_step:6"
+          ],
+          "produces": "entrywise_surplus_contraction"
+        },
+        {
+          "step": 8,
+          "description": "Take the maximum over entries to obtain the one-step infinity-norm contraction.",
+          "ref": "Appendix B.2, line 1083",
+          "source_pdf_lines": [
+            1083,
+            1083
+          ],
+          "math": "\\|z^{(t+1)}\\|_\\infty\\le(1-\\eta)\\|z^{(t)}\\|_\\infty,\\quad\\forall t=0,1,\\ldots,",
+          "uses": [
+            "previous_step:7"
+          ],
+          "produces": "one_step_infinity_norm_contraction"
+        },
+        {
+          "step": 9,
+          "description": "Iterate the one-step contraction to get the T-step geometric decay of the surplus.",
+          "ref": "Appendix B.2, lines 1085-1087",
+          "source_pdf_lines": [
+            1085,
+            1087
+          ],
+          "math": "\\|z^{(T)}\\|_\\infty\\le(1-\\eta)^T\\|z^{(0)}\\|_\\infty.",
+          "uses": [
+            "previous_step:8"
+          ],
+          "produces": "geometric_surplus_decay"
+        },
+        {
+          "step": 10,
+          "description": "Bound the increment of p^(t) by the current surplus norm and then by the geometric surplus decay; this is the displayed inequality labeled (9).",
+          "ref": "Appendix B.2, equation (9), lines 1090-1099",
+          "source_pdf_lines": [
+            1090,
+            1099
+          ],
+          "math": "0\\le p^{(t+1)}-p^{(t)}=\\tilde A_{i_*,\\cdot}^{(t+1)}z^{(t)}\\le\\|z^{(t)}\\|_\\infty\\le(1-\\eta)^t\\|z^{(0)}\\|_\\infty.",
+          "uses": [
+            "lemma1_local_row_stochastic_sequence",
+            "previous_step:2",
+            "previous_step:9"
+          ],
+          "produces": "p_increment_bound_9"
+        },
+        {
+          "step": 11,
+          "description": "Telescope the p-increments from 0 to t and sum the geometric series to prove boundedness of p^(t).",
+          "ref": "Appendix B.2, lines 1100-1109",
+          "source_pdf_lines": [
+            1100,
+            1109
+          ],
+          "math": "p^{(t)}=p^{(t)}-p^{(t-1)}+p^{(t-1)}-p^{(t-2)}+\\cdots+p^{(1)}-p^{(0)}+p^{(0)}\\le\\sum_{i=0}^{t-1}(1-\\eta)^i\\|z^{(0)}\\|_\\infty+p^{(0)}=\\frac{1-(1-\\eta)^t}{\\eta}\\|z^{(0)}\\|_\\infty+p^{(0)}\\le\\frac1\\eta\\|z^{(0)}\\|_\\infty+p^{(0)}.",
+          "uses": [
+            "previous_step:10"
+          ],
+          "produces": "p_telescope_boundedness"
+        },
+        {
+          "step": 12,
+          "description": "Use z^(t)->0 from the geometric surplus decay and p^(t)->p_tilde from monotone boundedness, then apply this convergence to unit-vector initial data to obtain the product limit with identical rows.",
+          "ref": "Appendix B.2, lines 1114-1130",
+          "source_pdf_lines": [
+            1114,
+            1130
+          ],
+          "math": "\\prod_{t=1}^{+\\infty}\\tilde A^{(t)}=\\lim_{t\\to+\\infty}\\tilde A^{(t)}\\cdots\\tilde A^{(1)}(e_1,\\ldots,e_n)=(\\tilde p_1 1_n,\\ldots,\\tilde p_n1_n),\\quad \\tilde A_\\infty=1_n\\pi^\\top.",
+          "uses": [
+            "lemma1_local_row_stochastic_sequence",
+            "previous_step:9",
+            "previous_step:10",
+            "previous_step:11"
+          ],
+          "produces": "identical_row_limit_using_z_to_zero_and_p_to_p_tilde"
+        },
+        {
+          "step": 13,
+          "description": "For the convergence rate, rewrite the product error using the decomposition and the identical-row limit.",
+          "ref": "Appendix B.2, equation (10), lines 1132-1135",
+          "source_pdf_lines": [
+            1132,
+            1135
+          ],
+          "math": "(\\tilde A^{(t)}\\cdots\\tilde A^{(1)})x^{(0)}-\\tilde A_\\infty x^{(0)}=x^{(t)}-\\tilde p1_n=z^{(t)}+(p^{(t)}-\\tilde p)1_n.",
+          "uses": [
+            "previous_step:1",
+            "previous_step:12"
+          ],
+          "produces": "product_error_decomposition_10"
+        },
+        {
+          "step": 14,
+          "description": "Bound the tail coefficient \\tilde p-p^(t) by summing the p-increment estimate (9) from s=t to infinity.",
+          "ref": "Appendix B.2, lines 1136-1143",
+          "source_pdf_lines": [
+            1136,
+            1143
+          ],
+          "math": "0\\le\\tilde p-p^{(t)}=\\lim_{T\\to+\\infty}p^{(T)}-p^{(t)}\\le\\lim_{T\\to+\\infty}\\sum_{s=t}^{T-1}(1-\\eta)^s\\|z^{(0)}\\|_\\infty=\\frac{(1-\\eta)^t}{\\eta}\\|z^{(0)}\\|_\\infty.",
+          "uses": [
+            "previous_step:10",
+            "previous_step:11"
+          ],
+          "produces": "p_tilde_minus_p_tail_bound"
+        },
+        {
+          "step": 15,
+          "description": "Combine equation (10), the surplus decay, and the p-tail bound to control the infinite norm of the product error for arbitrary x^(0).",
+          "ref": "Appendix B.2, lines 1144-1149",
+          "source_pdf_lines": [
+            1144,
+            1149
+          ],
+          "math": "\\|(\\tilde A^{(t)}\\cdots\\tilde A^{(1)})x^{(0)}-\\tilde A_\\infty x^{(0)}\\|_\\infty\\le\\|z^{(t)}\\|_\\infty+(\\tilde p-p^{(t)})\\le(1-\\eta)^t\\|z^{(0)}\\|_\\infty+\\frac{(1-\\eta)^t}{\\eta}\\|z^{(0)}\\|_\\infty=\\frac{1+\\eta}{\\eta}(1-\\eta)^t\\|z^{(0)}\\|_\\infty.",
+          "uses": [
+            "previous_step:9",
+            "previous_step:13",
+            "previous_step:14"
+          ],
+          "produces": "product_error_for_arbitrary_x0"
+        },
+        {
+          "step": 16,
+          "description": "Substitute unit vectors e_j and use ||z^(0)||_infty=1 to get the stated columnwise maximum-deviation bound.",
+          "ref": "Appendix B.2, lines 1150-1156",
+          "source_pdf_lines": [
+            1150,
+            1156
+          ],
+          "math": "\\|(\\tilde A^{(t)}\\cdots\\tilde A^{(1)})_{\\cdot,j}-\\tilde p_j1_n\\|_\\infty\\le\\frac{1+\\eta}{\\eta}(1-\\eta)^t.",
+          "uses": [
+            "previous_step:15"
+          ],
+          "produces": "lemma1_geometric_rate"
+        }
+      ]
+    },
+    {
+      "name": "limiting_property",
+      "ref": "Proposition 2, lines 377-382",
+      "statement_math": "\\text{For }\\{G^{(k)},A^{(k)}\\}_{k\\ge0}\\text{ satisfying Assumptions 1--3, define }\\Phi(k+B,k)=\\prod_{i=0}^{B-1}A^{(k+i)}.\\text{ It follows that }\\lim_{k\\to\\infty}\\Phi(k+B,k)=1_n\\pi_k^\\top,\\forall,\\text{ where }\\pi_k\\in\\mathbb{R}^n\\text{ is determined by the sequence }\\{A^{(t)}\\}_{t\\ge k}.\\text{ Moreover, the convergence occurs at an exponential rate.}",
+      "role": "Explains why ordinary row-stochastic gossip has a future-dependent biased limit, motivating the memory correction.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Group the original row-stochastic sequence into B-factor blocks using Proposition 1 so every block has entries at least eta.",
+          "ref": "Appendix B.3, lines 1161-1179",
+          "source_pdf_lines": [
+            1161,
+            1179
+          ],
+          "math": "\\tilde A^{(t)}\\cdots\\tilde A^{(1)}:=\\left(\\prod_{i=(t-1)B}^{tB-1}A^{(i)}\\right)\\cdots\\left(\\prod_{i=0}^{B-1}A^{(i)}\\right),\\quad t=1,2,\\ldots",
+          "uses": [
+            "uniform_B_step_mixing"
+          ],
+          "produces": "B_blocked_sequence"
+        },
+        {
+          "step": 2,
+          "description": "Use Lemma 1 on the blocked sequence to obtain a limit with identical rows.",
+          "ref": "Appendix B.3, lines 1174-1179",
+          "source_pdf_lines": [
+            1174,
+            1179
+          ],
+          "math": "\\tilde A_\\infty:=\\lim_{t\\to\\infty}\\tilde A^{(t)}\\cdots\\tilde A^{(1)}=1_n\\pi^\\top.",
+          "uses": [
+            "linear_convergence_row_stochastic_products",
+            "previous_step:1"
+          ],
+          "produces": "blocked_identical_row_limit"
+        },
+        {
+          "step": 3,
+          "description": "For arbitrary k, decompose the product into a leftover factor and T=floor(k/B) full B-blocks.",
+          "ref": "Appendix B.3, equation (11), lines 1183-1193",
+          "source_pdf_lines": [
+            1183,
+            1193
+          ],
+          "math": "\\prod_{i=0}^{k-1}A^{(i)}=\\left(\\prod_{i=TB}^{k-1}A^{(i)}\\right)\\left(\\prod_{i=(T-1)B}^{TB-1}A^{(i)}\\right)\\cdots\\left(\\prod_{i=0}^{B-1}A^{(i)}\\right):=\\tilde A^{(-1)}\\tilde A^{(T)}\\cdots\\tilde A^{(1)},\\quad T=\\lfloor k/B\\rfloor.",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "product_decomposition_11"
+        },
+        {
+          "step": 4,
+          "description": "Apply Lemma 1's exponential bound to the full blocks.",
+          "ref": "Appendix B.3, lines 1194-1199",
+          "source_pdf_lines": [
+            1194,
+            1199
+          ],
+          "math": "\\max\\left|\\prod_{t=1}^{T}\\tilde A^{(t)}-\\tilde A_\\infty\\right|\\le\\frac{1+\\eta}{\\eta}(1-\\eta)^T.",
+          "uses": [
+            "linear_convergence_row_stochastic_products",
+            "previous_step:3"
+          ],
+          "produces": "blocked_exponential_deviation"
+        },
+        {
+          "step": 5,
+          "description": "Bound the total deviation by the leftover factor norm and the full-block deviation.",
+          "ref": "Appendix B.3, lines 1201-1217",
+          "source_pdf_lines": [
+            1201,
+            1217
+          ],
+          "math": "\\left\\|\\prod_{i=0}^{k-1}A^{(i)}-\\tilde A_\\infty\\right\\|_F\\le \\|\\tilde A^{(-1)}\\|_2\\left\\|\\prod_{t=1}^{T}\\tilde A^{(t)}-\\tilde A_\\infty\\right\\|_F\\le n^{3/2}\\frac{1+\\eta}{\\eta}(1-\\eta)^T.",
+          "uses": [
+            "previous_step:4"
+          ],
+          "produces": "total_product_deviation"
+        },
+        {
+          "step": 6,
+          "description": "Use T=floor(k/B)>=k/B-1 to rewrite the rate as an exponential in k and conclude the original product has the same limit.",
+          "ref": "Appendix B.3, lines 1219-1234",
+          "source_pdf_lines": [
+            1219,
+            1234
+          ],
+          "math": "\\left\\|\\prod_{i=0}^{k-1}A^{(i)}-\\tilde A_\\infty\\right\\|_F\\le n^{3/2}\\frac{1+\\eta}{\\eta(1-\\eta)}\\left(\\sqrt[B]{1-\\eta}\\right)^k.",
+          "uses": [
+            "previous_step:5"
+          ],
+          "produces": "original_sequence_exponential_convergence"
+        },
+        {
+          "step": 7,
+          "description": "The proof then shows unpredictability: after any finite prefix, the future product can have arbitrary limit vector pi_k, and the original limit vector is pi_k^T times the prefix product.",
+          "ref": "Appendix B.3, lines 1239-1257",
+          "source_pdf_lines": [
+            1239,
+            1257
+          ],
+          "math": "1_n\\pi^\\top=\\prod_{i=0}^{\\infty}A^{(i)}=\\prod_{i=k}^{\\infty}A^{(i)}\\prod_{i=0}^{k-1}A^{(i)}=1_n\\pi_k^\\top\\prod_{i=0}^{k-1}A^{(i)},\\quad \\pi^\\top=\\pi_k^\\top\\prod_{i=0}^{k-1}A^{(i)}.",
+          "uses": [
+            "previous_step:6"
+          ],
+          "produces": "future_dependent_limiting_vector"
+        }
+      ]
+    },
+    {
+      "name": "submatrix_product_inequality",
+      "ref": "Lemma 2, lines 1265-1276",
+      "statement_math": "\\text{For any }S\\text{ row-stochastic matrices }A^{(1)},\\ldots,A^{(S)}\\in\\mathbb{R}^{n\\times n},\\text{ we have }0\\le\\prod_{s=1}^S A_{-\\ell,-\\ell}^{(s)}\\le\\left(\\prod_{s=1}^S A^{(s)}\\right)_{-\\ell,-\\ell},\\text{ where }M_{-\\ell,-\\ell}\\text{ represents the }(n-1)\\times(n-1)\\text{ matrix obtained by removing the }\\ell\\text{-th row and the }\\ell\\text{-th column of }M\\in\\mathbb{R}^{n\\times n}.",
+      "role": "Allows Theorem 1 to compare products of submatrices with submatrices of products.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "The left inequality follows because nonnegative combinations cannot produce negative elements.",
+          "ref": "Lemma 2 statement, lines 1265-1272; proof explanation at Appendix B.4, lines 1278-1279",
+          "source_pdf_lines": [
+            1265,
+            1279
+          ],
+          "math": "0\\le\\prod_{s=1}^S A_{-\\ell,-\\ell}^{(s)}",
+          "uses": [
+            "lemma2_local_row_stochastic_nonnegative_hypothesis"
+          ],
+          "produces": "left_inequality"
+        },
+        {
+          "step": 2,
+          "description": "It suffices to prove the right inequality for S=2 and then use induction; set ell=1 without loss of generality and block-partition the product.",
+          "ref": "Appendix B.4, lines 1279-1287",
+          "source_pdf_lines": [
+            1279,
+            1287
+          ],
+          "math": "A^{(1)}A^{(2)}=\\begin{bmatrix}A_{1,1}^{(1)}&A_{1,-1}^{(1)}\\\\ A_{-1,1}^{(1)}&A_{-1,-1}^{(1)}\\end{bmatrix}\\begin{bmatrix}A_{1,1}^{(2)}&A_{1,-1}^{(2)}\\\\ A_{-1,1}^{(2)}&A_{-1,-1}^{(2)}\\end{bmatrix}.",
+          "uses": [
+            "lemma2_local_row_stochastic_nonnegative_hypothesis"
+          ],
+          "produces": "block_partition_for_S2"
+        },
+        {
+          "step": 3,
+          "description": "Expand the lower-right block; the rank-one cross term is entrywise nonnegative, giving the desired inequality.",
+          "ref": "Appendix B.4, lines 1288-1298",
+          "source_pdf_lines": [
+            1288,
+            1298
+          ],
+          "math": "(A^{(1)}A^{(2)})_{-1,-1}=A_{-1,1}^{(1)}A_{1,-1}^{(2)}+A_{-1,-1}^{(1)}A_{-1,-1}^{(2)},\\quad A_{-1,1}^{(1)}A_{1,-1}^{(2)}\\ge0.",
+          "uses": [
+            "lemma2_local_row_stochastic_nonnegative_hypothesis",
+            "previous_step:2"
+          ],
+          "produces": "right_inequality_for_S2_and_induction"
+        }
+      ]
+    },
+    {
+      "name": "PULM_average_consensus",
+      "ref": "Theorem 1, lines 511-533",
+      "statement_math": "\\text{For }\\{G^{(k)}\\}_{k\\ge0}\\text{ satisfying Assumptions 1 and 2, and }\\{A^{(k)}\\}_{k\\ge0}\\text{ satisfying Assumption 3, the following statements hold: }1.\\ \\text{In Algorithm 1, the sequence }\\{\\max_{i,j}|[W^{(k)}]_{ij}-n^{-1}|\\}_{k\\ge0}\\text{ is non-increasing. }2.\\ \\text{In both Algorithms 1 and 2, }\\|W^{(K)}-n^{-1}1_n1_n^\\top\\|_F\\le\\frac{n}{1-\\eta}(1-\\eta)^{K/B}.\\ 3.\\ \\text{In Algorithm 2, }\\|z^{(K)}-n^{-1}1_n1_n^\\top x^{(0)}\\|_F\\le\\frac{n}{1-\\eta}(1-\\eta)^{K/B}\\|x^{(0)}\\|_F.\\ \\text{Here, the constants }B>0\\text{ and }\\eta\\in(0,1)\\text{ are defined in Proposition 1.}",
+      "role": "Supplies the average-consensus guarantee for PULM that underlies the theorem's assumed W-rate.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "For column ell of W, the diagonal anchor gives W_{ell,ell}^{(k)}=1/n, and row stochasticity rewrites each off-diagonal error as a convex sum over non-ell terms.",
+          "ref": "Appendix C.1, lines 1308-1323",
+          "source_pdf_lines": [
+            1308,
+            1323
+          ],
+          "math": "W_{i,\\ell}^{(k+1)}-1/n=\\sum_{j=1}^n A_{i,j}^{(k)}W_{j,\\ell}^{(k)}-\\frac1n=\\sum_{j=1,j\\ne \\ell}^n A_{i,j}^{(k)}(W_{j,\\ell}^{(k)}-1/n).",
+          "uses": [
+            "algorithm1_initialization_and_diagonal_anchor",
+            "compatible_row_stochastic_mixing"
+          ],
+          "produces": "off_diagonal_column_error"
+        },
+        {
+          "step": 2,
+          "description": "Stacking all rows except ell gives the submatrix recurrence labeled (12).",
+          "ref": "Appendix C.1, equation (12), lines 1329-1342",
+          "source_pdf_lines": [
+            1329,
+            1342
+          ],
+          "math": "W_{-\\ell,\\ell}^{(k+1)}-n^{-1}1_{n-1}=A_{-\\ell,-\\ell}^{(k)}(W_{-\\ell,\\ell}^{(k)}-n^{-1}1_{n-1}).",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "column_submatrix_recurrence_12"
+        },
+        {
+          "step": 3,
+          "description": "Taking infinity norms and using ||A_{-ell,-ell}^(k)||_infty<=1 shows the maximum column deviation is nonincreasing; then taking all columns gives monotonicity of max |W^(k)-E_n|.",
+          "ref": "Appendix C.1, lines 1343-1364",
+          "source_pdf_lines": [
+            1343,
+            1364
+          ],
+          "math": "\\|W_{-\\ell,\\ell}^{(k+1)}-n^{-1}1_{n-1}\\|_\\infty\\le \\|A_{-\\ell,-\\ell}^{(k)}\\|_\\infty\\|W_{-\\ell,\\ell}^{(k)}-n^{-1}1_{n-1}\\|_\\infty.\\quad \\max|W^{(k+1)}-E_n|\\le\\max|W^{(k)}-E_n|.",
+          "uses": [
+            "algorithm1_initialization_and_diagonal_anchor",
+            "compatible_row_stochastic_mixing",
+            "previous_step:2"
+          ],
+          "produces": "monotonicity_statement"
+        },
+        {
+          "step": 4,
+          "description": "Iterating (12) recurrently from Algorithm 1's W^(0)=I_n gives W_{-ell,ell}^{(0)}=0, hence the displayed product representation with initial vector -n^{-1}1_{n-1}.",
+          "ref": "Appendix C.1, lines 1365-1371",
+          "source_pdf_lines": [
+            1365,
+            1371
+          ],
+          "math": "W_{-\\ell,\\ell}^{(k)}-n^{-1}1_{n-1}=\\left(\\prod_{i=0}^{k-1}A_{-\\ell,-\\ell}^{(i)}\\right)(-n^{-1}1_{n-1}).",
+          "uses": [
+            "algorithm1_initialization_and_diagonal_anchor",
+            "previous_step:2"
+          ],
+          "produces": "submatrix_product_representation"
+        },
+        {
+          "step": 5,
+          "description": "Taking the Euclidean norm of the product representation gives the first printed inequality in (13), with the operator norm of the matrix product multiplying the vector norm.",
+          "ref": "Appendix C.1, equation (13), lines 1373-1379",
+          "source_pdf_lines": [
+            1373,
+            1379
+          ],
+          "math": "\\|W_{-\\ell,\\ell}^{(k)}-n^{-1}1_{n-1}\\|_2\\le\\left\\|\\prod_{i=0}^{k-1}A_{-\\ell,-\\ell}^{(i)}\\right\\|_2\\cdot\\|n^{-1}1_{n-1}\\|_2.",
+          "uses": [
+            "previous_step:4"
+          ],
+          "produces": "operator_norm_product_bound_13_first_line"
+        },
+        {
+          "step": 6,
+          "description": "Equation (13) continues by evaluating the vector norm factor as 1/sqrt(n) and then bounding the operator norm by the Frobenius norm.",
+          "ref": "Appendix C.1, equation (13), lines 1380-1383",
+          "source_pdf_lines": [
+            1380,
+            1383
+          ],
+          "math": "\\|W_{-\\ell,\\ell}^{(k)}-n^{-1}1_{n-1}\\|_2\\le\\frac1{\\sqrt n}\\left\\|\\prod_{i=0}^{k-1}A_{-\\ell,-\\ell}^{(i)}\\right\\|_2\\le\\frac1{\\sqrt n}\\left\\|\\prod_{i=0}^{k-1}A_{-\\ell,-\\ell}^{(i)}\\right\\|_F.",
+          "uses": [
+            "previous_step:5"
+          ],
+          "produces": "submatrix_product_bound_13"
+        },
+        {
+          "step": 7,
+          "description": "For k>B and T=floor(k/B), decompose the product into full B-blocks and a leftover factor; Lemma 2 compares submatrix products with submatrices of full products.",
+          "ref": "Appendix C.1, lines 1384-1405",
+          "source_pdf_lines": [
+            1384,
+            1405
+          ],
+          "math": "\\prod_{i=0}^{k-1}A_{-\\ell,-\\ell}^{(i)}\\le\\left(\\prod_{i=TB}^{k-1}A^{(i)}\\right)_{-\\ell,-\\ell}\\left(\\prod_{i=(T-1)B}^{TB-1}A^{(i)}\\right)_{-\\ell,-\\ell}\\cdots\\left(\\prod_{i=0}^{B-1}A^{(i)}\\right)_{-\\ell,-\\ell}=\\tilde A_{-\\ell,-\\ell}^{(-1)}\\tilde A_{-\\ell,-\\ell}^{T}\\cdots\\tilde A_{-\\ell,-\\ell}^{1}.",
+          "uses": [
+            "submatrix_product_inequality",
+            "previous_step:6"
+          ],
+          "produces": "blocked_submatrix_comparison"
+        },
+        {
+          "step": 8,
+          "description": "Proposition 1 makes each block entry at least eta, so each block submatrix row sum is at most 1-eta; the proof derives a recursive maximum-entry contraction.",
+          "ref": "Appendix C.1, lines 1405-1418",
+          "source_pdf_lines": [
+            1405,
+            1418
+          ],
+          "math": "\\max|\\tilde A_{-\\ell,-\\ell}^{(t+1)}\\tilde A_{-\\ell,-\\ell}^{(t)}\\cdots\\tilde A_{-\\ell,-\\ell}^{(1)}|\\le(1-\\eta)\\max|\\tilde A_{-\\ell,-\\ell}^{(t)}\\cdots\\tilde A_{-\\ell,-\\ell}^{(1)}|,\\quad t=1,\\ldots,T-1.",
+          "uses": [
+            "uniform_B_step_mixing",
+            "previous_step:7"
+          ],
+          "produces": "recursive_submatrix_contraction"
+        },
+        {
+          "step": 9,
+          "description": "Multiplying the recursive inequalities and handling the leftover factor gives max product bounded by (1-eta)^T.",
+          "ref": "Appendix C.1, lines 1419-1435",
+          "source_pdf_lines": [
+            1419,
+            1435
+          ],
+          "math": "\\max\\prod_{t=1}^{T}\\tilde A_{-\\ell,-\\ell}^{(t)}\\le(1-\\eta)^T.\\quad \\max \\tilde A_{-\\ell,-\\ell}^{(-1)}\\prod_{t=1}^{T}\\tilde A_{-\\ell,-\\ell}^{(t)}\\le\\max\\prod_{t=1}^{T}\\tilde A_{-\\ell,-\\ell}^{(t)}\\le(1-\\eta)^T.",
+          "uses": [
+            "previous_step:8"
+          ],
+          "produces": "blocked_product_entry_bound"
+        },
+        {
+          "step": 10,
+          "description": "Continue (13), convert Frobenius norm to maximum entry, and obtain the column error bound.",
+          "ref": "Appendix C.1, lines 1437-1446",
+          "source_pdf_lines": [
+            1437,
+            1446
+          ],
+          "math": "\\|W_{-\\ell,\\ell}^{(k)}-n^{-1}1_{n-1}\\|_2\\le\\frac1{\\sqrt n}\\left\\|\\prod_{i=0}^{k-1}A_{-\\ell,-\\ell}^{(i)}\\right\\|_F\\le\\sqrt n\\max\\prod_{i=1}^{k-1}A_{-\\ell,-\\ell}^{(i)}\\le\\sqrt n\\max \\tilde A_{-\\ell,-\\ell}^{(-1)}\\prod_{t=1}^T\\tilde A_{-\\ell,-\\ell}^{(t)}\\le\\sqrt n(1-\\eta)^T.",
+          "uses": [
+            "previous_step:6",
+            "previous_step:9"
+          ],
+          "produces": "column_l2_error_bound"
+        },
+        {
+          "step": 11,
+          "description": "Since the diagonal column error is identically zero, taking all columns gives the Frobenius W-error bound.",
+          "ref": "Appendix C.1, lines 1448-1459",
+          "source_pdf_lines": [
+            1448,
+            1459
+          ],
+          "math": "\\|W^{(k)}-E_n\\|_F\\le n(1-\\eta)^T.\\quad \\|W^{(k)}-E_n\\|_F\\le\\frac{n}{1-\\eta}(\\sqrt[B]{1-\\eta})^k.",
+          "uses": [
+            "algorithm1_initialization_and_diagonal_anchor",
+            "previous_step:10"
+          ],
+          "produces": "PULM_matrix_error_bound"
+        },
+        {
+          "step": 12,
+          "description": "Define D^(k) from the diagonal of the half-step matrix and rewrite Algorithm 1 in compact matrix form.",
+          "ref": "Appendix C.1, lines 1460-1468",
+          "source_pdf_lines": [
+            1460,
+            1468
+          ],
+          "math": "W^{(k+\\frac12)}=A^{(k)}W^{(k)},\\quad D^{(k)}=\\operatorname{Diag}\\{W^{(k+\\frac12)}\\}-I_n,\\quad W^{(k+1)}=W^{(k+\\frac12)}-D^{(k)}.",
+          "uses": [
+            "algorithm1_initialization_and_diagonal_anchor"
+          ],
+          "produces": "compact_W_iteration"
+        },
+        {
+          "step": 13,
+          "description": "Write the corresponding z-iteration and subtract W^(k+1)x to show the z-Wx error propagates linearly.",
+          "ref": "Appendix C.1, lines 1473-1487",
+          "source_pdf_lines": [
+            1473,
+            1487
+          ],
+          "math": "z^{(k+\\frac12)}=A^{(k)}z^{(k)},\\quad z^{(k+1)}=z^{(k+\\frac12)}-D^{(k)}x.\\quad z^{(k+1)}-W^{(k+1)}x=A^{(k)}(z^{(k)}-W^{(k)}x).",
+          "uses": [
+            "previous_step:12"
+          ],
+          "produces": "z_minus_Wx_recursion"
+        },
+        {
+          "step": 14,
+          "description": "Consecutive multiplication and the initialization z_i^(0)=x_i, W^(0)=I_n give z^(k)=W^(k)x; combining with the W-error bound gives the PULM consensus error.",
+          "ref": "Appendix C.1, lines 1488-1500",
+          "source_pdf_lines": [
+            1488,
+            1500
+          ],
+          "math": "z^{(k)}-W^{(k)}x=\\prod_{i=0}^{k-1}A^{(i)}(z^{(0)}-W^{(0)}x)=0.\\quad \\|z^{(k)}-E_nx\\|_F=\\|W^{(k)}x-E_nx\\|_F\\le\\|W^{(k)}-E_n\\|_F\\|x\\|_F\\le\\frac{n}{1-\\eta}(\\sqrt[B]{1-\\eta})^k\\|x\\|_F.",
+          "uses": [
+            "algorithm1_initialization_and_diagonal_anchor",
+            "previous_step:11",
+            "previous_step:13"
+          ],
+          "produces": "PULM_state_consensus_error_bound"
+        }
+      ]
+    },
+    {
+      "name": "descent_lemma_for_PULM_DGD",
+      "ref": "Lemma 4, lines 1511-1522",
+      "statement_math": "\\text{Define }\\Delta_x^{(k)}:=x^{(k)}-E_nx^{(k)}.\\text{ When }\\gamma\\le\\frac{1}{3L}\\text{ and }R_k\\ge\\max\\left\\{\\frac{\\ln(C_A)}{1-\\beta_A},\\frac{\\ln(C_M)}{1-\\beta_M}\\right\\},\\text{ for any }k\\ge0\\text{ we have }\\frac{\\gamma}{4}\\|\\bar g^{(k)}\\|^2+\\frac{\\gamma}{6}\\|\\nabla f(\\bar x^{(k)})\\|^2\\le(1+8\\gamma LC_M^2\\beta_M^{2R_k})(f(\\bar x^{(k)})-f^*)-(f(\\bar x^{(k+1)})-f^*)+\\frac{4}{n\\gamma}\\|\\Delta_x^{(k)}\\|_F^2.",
+      "role": "One-step descent inequality used in the main theorem proof.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Rewrite the mean update as a centralized gradient step plus a parameter consensus error and a descent deviation.",
+          "ref": "Appendix D.1, lines 1524-1542",
+          "source_pdf_lines": [
+            1524,
+            1542
+          ],
+          "math": "\\bar x^{(k+1)}=n^{-1}1_n^\\top A^{(k)}x^{(k)}-\\frac{\\gamma}{n}1_n^\\top M^{(k)}g^{(k)}=\\bar x^{(k)}-\\gamma\\bar g^{(k)}+n^{-1}1_n^\\top(A^{(k)}-E_n)\\Delta_x^{(k)}-\\frac{\\gamma}{n}1_n^\\top(M^{(k)}-E_n)g^{(k)}.",
+          "uses": [
+            "appendix_D_matrix_update_notation",
+            "notation_average_matrix_En",
+            "notation_stacked_iterate_and_gradient",
+            "theorem2_mean_iterate_notation",
+            "appendix_D_mean_gradient_notation",
+            "appendix_D_consensus_error_definition",
+            "compatible_row_stochastic_mixing"
+          ],
+          "produces": "mean_update_decomposition"
+        },
+        {
+          "step": 2,
+          "description": "Apply the L-smooth inequality to f at bar x^(k+1) and bar x^(k), using a three-term quadratic split to get equation (16).",
+          "ref": "Appendix D.1, equation (16), lines 1544-1567",
+          "source_pdf_lines": [
+            1544,
+            1567
+          ],
+          "math": "f(\\bar x^{(k+1)})\\le f(\\bar x^{(k)})-\\gamma\\langle\\bar g^{(k)},\\nabla f(\\bar x^{(k)})\\rangle+\\langle n^{-1}1_n^\\top(A^{(k)}-E_n)\\Delta_x^{(k)},\\nabla f(\\bar x^{(k)})\\rangle-n^{-1}\\gamma\\langle1_n^\\top(M^{(k)}-E_n)g^{(k)},\\nabla f(\\bar x^{(k)})\\rangle+\\frac{3\\gamma^2L}{2}\\|\\bar g^{(k)}\\|^2+\\frac{3L}{2n^2}\\|1_n^\\top(A^{(k)}-E_n)\\Delta_x^{(k)}\\|^2+\\frac{3\\gamma^2L}{2n}\\|(M^{(k)}-E_n)g^{(k)}\\|^2.",
+          "uses": [
+            "smoothness",
+            "previous_step:1"
+          ],
+          "produces": "smooth_descent_16"
+        },
+        {
+          "step": 3,
+          "description": "Split the right-hand side of (16) into five named terms Delta_1 through Delta_5.",
+          "ref": "Appendix D.1, lines 1569-1592",
+          "source_pdf_lines": [
+            1569,
+            1592
+          ],
+          "math": "\\Delta_1^{(k)}:=-\\gamma\\langle\\bar g^{(k)},\\nabla f(\\bar x^{(k)})\\rangle+\\frac{3\\gamma^2L}{2}\\|\\bar g^{(k)}\\|^2,\\quad \\Delta_2^{(k)}:=n^{-1}\\langle1_n^\\top(A^{(k)}-E_n)\\Delta_x^{(k)},\\nabla f(\\bar x^{(k)})\\rangle,\\quad \\Delta_3^{(k)}:=-n^{-1}\\gamma\\langle1_n^\\top(M^{(k)}-E_n)g^{(k)},\\nabla f(\\bar x^{(k)})\\rangle,\\quad \\Delta_4^{(k)}:=\\frac{3L}{2n^2}\\|1_n^\\top(A^{(k)}-E_n)\\Delta_x^{(k)}\\|^2,\\quad \\Delta_5^{(k)}:=\\frac{3\\gamma^2L}{2n}\\|(M^{(k)}-E_n)g^{(k)}\\|^2.",
+          "uses": [
+            "previous_step:2"
+          ],
+          "produces": "five_delta_terms"
+        },
+        {
+          "step": 4,
+          "description": "For gamma <= 1/(6L), bound Delta_1 by completing the square and using smoothness to control the difference between bar g and grad f(bar x). This is a source-boundary prerequisite mismatch: the proof-derived route from this point forward is under gamma <= 1/(6L), which is stronger than the gamma <= 1/(3L) condition printed in Lemma 4's statement.",
+          "ref": "Appendix D.1, lines 1593-1604",
+          "source_pdf_lines": [
+            1593,
+            1604
+          ],
+          "math": "\\Delta_1^{(k)}=-\\frac{\\gamma-3\\gamma^2L}{2}\\|\\bar g^{(k)}\\|^2-\\frac{\\gamma}{2}\\|\\nabla f(\\bar x^{(k)})\\|^2+\\frac{\\gamma}{2}\\|\\bar g^{(k)}-\\nabla f(\\bar x^{(k)})\\|^2\\le-\\frac{\\gamma}{4}\\|\\bar g^{(k)}\\|^2-\\frac{\\gamma}{2}\\|\\nabla f(\\bar x^{(k)})\\|^2+\\frac{\\gamma L^2}{2n}\\|\\Delta_x^{(k)}\\|_F^2.",
+          "uses": [
+            "smoothness",
+            "appendix_D1_delta1_proof_stepsize_prerequisite",
+            "previous_step:3"
+          ],
+          "produces": "delta1_bound_under_proof_side_gamma_le_1_over_6L_and_lemma4_statement_prerequisite_mismatch"
+        },
+        {
+          "step": 5,
+          "description": "Use Cauchy-Schwarz and the row-stochastic averaging inequality for any w to bound Delta_2 with a free parameter p_k.",
+          "ref": "Appendix D.1, lines 1606-1640",
+          "source_pdf_lines": [
+            1606,
+            1640
+          ],
+          "math": "\\Delta_2^{(k)}\\le n^{-1}\\|1_n^\\top(A^{(k)}-E_n)\\Delta_x^{(k)}\\|\\cdot\\|\\nabla f(\\bar x^{(k)})\\|\\le\\|\\Delta_x^{(k)}\\|_F\\cdot\\|\\nabla f(\\bar x^{(k)})\\|\\le\\frac{p_k}{2}\\|\\Delta_x^{(k)}\\|_F^2+\\frac{1}{2p_k}\\|\\nabla f(\\bar x^{(k)})\\|^2.",
+          "uses": [
+            "compatible_row_stochastic_mixing",
+            "previous_step:3"
+          ],
+          "produces": "delta2_bound"
+        },
+        {
+          "step": 6,
+          "description": "Similarly, apply Cauchy-Schwarz to the Delta_3 term before invoking any geometric M-rate.",
+          "ref": "Appendix D.1, lines 1642-1648",
+          "source_pdf_lines": [
+            1642,
+            1648
+          ],
+          "math": "\\Delta_3^{(k)}\\le \\gamma n^{-1}\\|1_n^\\top(M^{(k)}-E_n)\\|_F\\|g^{(k)}\\|_F\\cdot\\|\\nabla f(\\bar x^{(k)})\\|",
+          "uses": [
+            "previous_step:3"
+          ],
+          "produces": "delta3_cauchy_schwarz_bound"
+        },
+        {
+          "step": 7,
+          "description": "Unsupported local source assertion for the D.1 M-rate substitution: the next printed Delta_3 line replaces the unprinted operator factor n^{-1}||1_n^T(M^(k)-E_n)||_F by C_M beta_M^{R_k}/sqrt(n) and then applies Young's inequality with q_k. The PDF does not print a theorem statement identifying C_M,beta_M with this operator bound, so this display is recorded as the exact paper-asserted rate replacement from the immediately preceding Cauchy-Schwarz line rather than as a consequence of Theorem 1.",
+          "ref": "Appendix D.1, lines 1649-1654",
+          "source_pdf_lines": [
+            1649,
+            1654
+          ],
+          "math": "\\Delta_3^{(k)}\\le\\gamma\\frac{C_M\\beta_M^{R_k}}{\\sqrt n}\\left(\\frac{q_k}{2}\\|g^{(k)}\\|_F^2+\\frac{1}{2q_k}\\|\\nabla f(\\bar x^{(k)})\\|^2\\right)",
+          "uses": [
+            "previous_step:6"
+          ],
+          "produces": "unsupported_local_source_assertion_D1_delta3_replaces_n_inverse_oneT_M_minus_En_factor_by_C_M_beta_M_Rk_over_sqrt_n_and_young_bound"
+        },
+        {
+          "step": 8,
+          "description": "The proof explicitly introduces q_k as a constant to be determined after the Delta_3 display.",
+          "ref": "Appendix D.1, lines 1649-1654",
+          "source_pdf_lines": [
+            1649,
+            1654
+          ],
+          "uses": [
+            "previous_step:7"
+          ],
+          "produces": "qk_free_parameter_for_delta3_young_bound"
+        },
+        {
+          "step": 9,
+          "description": "Unsupported local source assertion for the D.1 fourth- and fifth-term rate substitutions: the proof next prints that these terms are smaller than beta-weighted C_M bounds. The PDF does not print the missing instantiation from Proposition 2 or Theorem 1 to the Appendix-D C_M,beta_M operator inequalities used here, so this display is recorded as the exact paper-asserted replacement from the Delta_4 and Delta_5 term definitions.",
+          "ref": "Appendix D.1, lines 1655-1658",
+          "source_pdf_lines": [
+            1655,
+            1658
+          ],
+          "math": "\\Delta_4^{(k)}\\le\\frac{3LC_M^2\\beta_M^{2R_k}}{2n}\\|\\Delta_x^{(k)}\\|_F^2,\\quad \\Delta_5^{(k)}\\le\\frac{3C_M^2\\gamma^2L\\beta_M^{2R_k}}{2n}\\|g^{(k)}\\|_F^2.",
+          "uses": [
+            "previous_step:3"
+          ],
+          "produces": "unsupported_local_source_assertion_D1_delta4_delta5_replaced_by_exact_printed_C_M_squared_beta_bounds"
+        },
+        {
+          "step": 10,
+          "description": "Isolate the fourth-term portion of the printed Delta_4/Delta_5 display for later combination.",
+          "ref": "Appendix D.1, lines 1655-1657",
+          "source_pdf_lines": [
+            1655,
+            1657
+          ],
+          "math": "\\Delta_4^{(k)}\\le\\frac{3LC_M^2\\beta_M^{2R_k}}{2n}\\|\\Delta_x^{(k)}\\|_F^2.",
+          "uses": [
+            "previous_step:9"
+          ],
+          "produces": "delta4_bound_with_unprinted_rate_boundary"
+        },
+        {
+          "step": 11,
+          "description": "Isolate the fifth-term portion of the printed Delta_4/Delta_5 display for later combination.",
+          "ref": "Appendix D.1, lines 1655-1657",
+          "source_pdf_lines": [
+            1655,
+            1657
+          ],
+          "math": "\\Delta_5^{(k)}\\le\\frac{3C_M^2\\gamma^2L\\beta_M^{2R_k}}{2n}\\|g^{(k)}\\|_F^2.",
+          "uses": [
+            "previous_step:9"
+          ],
+          "produces": "delta5_bound_with_unprinted_rate_boundary"
+        },
+        {
+          "step": 12,
+          "description": "Combine the Delta_1, Delta_2, Delta_3, Delta_4, and Delta_5 estimates and plug them into (16), using the unsupported local D.1 source assertions for the Delta_3, Delta_4, and Delta_5 rate replacements, producing the pre-parameter-selection inequality.",
+          "ref": "Appendix D.1, lines 1658-1674",
+          "source_pdf_lines": [
+            1658,
+            1674
+          ],
+          "math": "\\frac{\\gamma}{4}\\|\\bar g^{(k)}\\|^2+\\left(\\frac{\\gamma}{2}-\\frac{1}{2p_k}-\\frac{C_M\\beta_M^{R_k}\\gamma}{2q_k}\\right)\\|\\nabla f(\\bar x^{(k)})\\|^2\\le f(\\bar x^{(k)})-f(\\bar x^{(k+1)})+\\left(\\frac{\\gamma L^2}{2n}+\\frac{p_k}{2}+\\frac{3LC_M^2\\beta_M^{2R_k}}{2n}\\right)\\|\\Delta_x^{(k)}\\|_F^2+\\left(\\frac{\\gamma C_M\\beta_M^{R_k}q_k}{2\\sqrt n}+\\frac{3C_M^2\\gamma^2L\\beta_M^{2R_k}}{2n}\\right)\\|g^{(k)}\\|_F^2.",
+          "uses": [
+            "previous_step:4",
+            "previous_step:5",
+            "previous_step:7",
+            "previous_step:8",
+            "previous_step:10",
+            "previous_step:11"
+          ],
+          "produces": "combined_delta_bound_before_parameter_choice"
+        },
+        {
+          "step": 13,
+          "description": "Select q_k=3C_M beta_M^{R_k}/sqrt(n) and p_k=3/gamma to get the simplified intermediate inequality.",
+          "ref": "Appendix D.1, lines 1675-1693",
+          "source_pdf_lines": [
+            1675,
+            1693
+          ],
+          "math": "\\frac{\\gamma}{4}\\|\\bar g^{(k)}\\|^2+\\frac{\\gamma}{6}\\|\\nabla f(\\bar x^{(k)})\\|^2\\le f(\\bar x^{(k)})-f(\\bar x^{(k+1)})+\\left(\\frac{\\gamma L^2}{2n}+\\frac{3}{2\\gamma}+\\frac{3LC_M^2\\beta_M^{2R_k}}{2n}\\right)\\|\\Delta_x^{(k)}\\|_F^2+\\left(\\frac{3\\gamma C_M^2\\beta_M^{2R_k}}{2n}+\\frac{3C_M^2\\gamma^2L\\beta_M^{2R_k}}{2n}\\right)\\|g^{(k)}\\|_F^2.",
+          "uses": [
+            "previous_step:12"
+          ],
+          "produces": "intermediate_descent_after_pk_qk"
+        },
+        {
+          "step": 14,
+          "description": "Use the R_k lower bound to simplify the beta-dependent coefficients, yielding the intermediate printed inequality before the final gamma simplification.",
+          "ref": "Appendix D.1, lines 1694-1704",
+          "source_pdf_lines": [
+            1694,
+            1704
+          ],
+          "math": "\\frac{\\gamma}{4}\\|\\bar g^{(k)}\\|^2+\\frac{\\gamma}{6}\\|\\nabla f(\\bar x^{(k)})\\|^2\\le f(\\bar x^{(k)})-f(\\bar x^{(k+1)})+\\frac{3\\gamma(1+\\gamma L)C_M^2\\beta_M^{2R_k}}{2n}\\|g^{(k)}\\|_F^2+\\left(\\frac{\\gamma L^2}{2n}+\\frac{3}{\\gamma}+\\frac{3L}{5n}\\right)\\|\\Delta_x^{(k)}\\|_F^2.",
+          "uses": [
+            "appendix_D_CA_CM_schedule_prerequisite",
+            "previous_step:13"
+          ],
+          "produces": "descent_after_Rk_coefficient_simplification"
+        },
+        {
+          "step": 15,
+          "description": "By taking gamma <= 1/(3L), simplify the intermediate coefficients to the final stacked-gradient and consensus-error coefficients printed before equation (17).",
+          "ref": "Appendix D.1, lines 1705-1714",
+          "source_pdf_lines": [
+            1705,
+            1714
+          ],
+          "math": "\\frac{\\gamma}{4}\\|\\bar g^{(k)}\\|^2+\\frac{\\gamma}{6}\\|\\nabla f(\\bar x^{(k)})\\|^2\\le f(\\bar x^{(k)})-f(\\bar x^{(k+1)})+\\frac{2\\gamma C_M^2\\beta_M^{2R_k}}{n}\\|g^{(k)}\\|_F^2+\\frac{7}{2\\gamma}\\|\\Delta_x^{(k)}\\|_F^2.",
+          "uses": [
+            "appendix_D1_final_simplification_stepsize_prerequisite",
+            "previous_step:14"
+          ],
+          "produces": "descent_with_stacked_gradient_term"
+        },
+        {
+          "step": 16,
+          "description": "Source-boundary setup before equation (17): the proof applies L-smoothness for all x,y in R^d and i in [n], then takes y=x-(1/L)grad f_i(x). The displayed bound is recorded exactly as printed; it contains ||grad f(x)||^2 without the subscript i, although the surrounding sentence and the next lines use the component f_i.",
+          "ref": "Appendix D.1, lines 1715-1724",
+          "source_pdf_lines": [
+            1715,
+            1724
+          ],
+          "math": "f_i(y)\\le f_i(x)+\\langle\\nabla f_i(x),y-x\\rangle+\\frac{L}{2}\\|y-x\\|^2.\\quad \\frac{1}{2L}\\|\\nabla f(x)\\|^2\\le f_i(x)-f_i(y)\\le f_i(x)-f_i^*.",
+          "uses": [
+            "smoothness"
+          ],
+          "produces": "printed_gradient_gap_line_with_unindexed_gradient"
+        },
+        {
+          "step": 17,
+          "description": "Source-boundary correction for the next use of the preceding display: equation (17) later needs the indexed componentwise estimate (1/(2L))||grad f_i(x)||^2 <= f_i(x)-f_i^*. This indexed version is not printed literally at line 1723; it is the intended componentwise reading of the smoothness substitution with f_i, so no source math field is attached here.",
+          "ref": "Appendix D.1, lines 1721-1723 and equation (17), lines 1734-1738",
+          "source_pdf_lines": [
+            1721,
+            1738
+          ],
+          "uses": [
+            "smoothness",
+            "previous_step:16"
+          ],
+          "produces": "intended_indexed_individual_gradient_gap_bound_for_equation_17"
+        },
+        {
+          "step": 18,
+          "description": "Equation (17) first splits the stacked deterministic gradient norm into a disagreement part and a stacked average-gradient part.",
+          "ref": "Appendix D.1, equation (17), lines 1727-1729",
+          "source_pdf_lines": [
+            1727,
+            1729
+          ],
+          "math": "\\|\\nabla f(x^{(k)})\\|_F^2\\le 2\\|\\nabla f(x^{(k)})-\\nabla f(\\bar x^{(k)})\\|_F^2+2\\|\\nabla f(\\bar x^{(k)})\\|_F^2",
+          "uses": [
+            "notation_stacked_iterate_and_gradient",
+            "theorem2_mean_iterate_notation"
+          ],
+          "produces": "stacked_gradient_norm_split_17"
+        },
+        {
+          "step": 19,
+          "description": "The next printed line uses L-smoothness to bound the disagreement part and expands the stacked average-gradient norm as a sum over i.",
+          "ref": "Appendix D.1, equation (17), lines 1730-1733",
+          "source_pdf_lines": [
+            1730,
+            1733
+          ],
+          "math": "\\|\\nabla f(x^{(k)})\\|_F^2\\le 2L^2\\|\\Delta_x^{(k)}\\|_F^2+2\\sum_{i=1}^n\\|\\nabla f_i(\\bar x^{(k)})\\|^2",
+          "uses": [
+            "smoothness",
+            "appendix_D_consensus_error_definition",
+            "previous_step:18"
+          ],
+          "produces": "stacked_gradient_smoothness_sum_bound_17"
+        },
+        {
+          "step": 20,
+          "description": "The proof substitutes the intended indexed individual gradient-gap estimate into the summed average-gradient term, producing the printed objective-gap sum in equation (17).",
+          "ref": "Appendix D.1, equation (17), lines 1734-1738",
+          "source_pdf_lines": [
+            1734,
+            1738
+          ],
+          "math": "\\|\\nabla f(x^{(k)})\\|_F^2\\le 2L^2\\|\\Delta_x^{(k)}\\|_F^2+4L\\sum_{i=1}^n(f_i(\\bar x^{(k)})-f_i^*)",
+          "uses": [
+            "previous_step:17",
+            "previous_step:19"
+          ],
+          "produces": "stacked_gradient_objective_sum_bound_17"
+        },
+        {
+          "step": 21,
+          "description": "Using the problem definition f(x)=n^{-1}sum_i f_i(x) and the printed definition of f^*, the final line of (17) rewrites the individual objective gaps as n times the average objective gap.",
+          "ref": "Appendix D.1, equation (17), lines 1740-1746",
+          "source_pdf_lines": [
+            1740,
+            1746
+          ],
+          "math": "\\|\\nabla f(x^{(k)})\\|_F^2\\le 2L^2\\|\\Delta_x^{(k)}\\|_F^2+4nL(f(\\bar x^{(k)})-f^*),\\quad f^*:=n^{-1}\\sum_{i=1}^n f_i^*.",
+          "uses": [
+            "problem_average_objective_definition",
+            "appendix_D_f_star_definition",
+            "previous_step:20"
+          ],
+          "produces": "stacked_gradient_bound_17"
+        },
+        {
+          "step": 22,
+          "description": "In the deterministic case g^(k)=nabla f(x^(k)); substitute (17) into the previous descent inequality. The displayed proof conclusion inherits the proof-side gamma <= 1/(6L) prerequisite from the Delta_1 step and has the consensus term 4/gamma, not the 4/(n gamma) term stated in Lemma 4.",
+          "ref": "Appendix D.1, lines 1744-1758",
+          "source_pdf_lines": [
+            1744,
+            1758
+          ],
+          "math": "\\frac{\\gamma}{4}\\|\\bar g^{(k)}\\|^2+\\frac{\\gamma}{6}\\|\\nabla f(\\bar x^{(k)})\\|^2\\le(1+8\\gamma LC_M^2\\beta_M^{2R_k})(f(\\bar x^{(k)})-f^*)-(f(\\bar x^{(k+1)})-f^*)+\\frac{4}{\\gamma}\\|\\Delta_x^{(k)}\\|_F^2.",
+          "uses": [
+            "previous_step:15",
+            "previous_step:21"
+          ],
+          "produces": "descent_proof_printed_conclusion_4_over_gamma"
+        },
+      {
+        "step": 23,
+        "description": "Quote-only source boundary for Lemma 4's stated conclusion: the lemma statement printed before the proof assumes only gamma <= 1/(3L), while the proof-derived route to the preceding display used gamma <= 1/(6L). The lemma statement also contains +4/(n gamma)||Delta_x^(k)||_F^2, while the proof's final displayed line contains +4/gamma||Delta_x^(k)||_F^2. The PDF does not print an algebraic bridge from the stronger-prerequisite proof conclusion to the stated n-normalized term, so this step records the printed statement as a source assertion rather than a derived consequence of step 22.",
+          "ref": "Lemma 4 statement, lines 1515-1522; Appendix D.1, lines 1751-1758",
+          "source_pdf_lines": [
+            1515,
+            1758
+          ],
+          "math": "\\frac{\\gamma}{4}\\|\\bar g^{(k)}\\|^2+\\frac{\\gamma}{6}\\|\\nabla f(\\bar x^{(k)})\\|^2\\le(1+8\\gamma LC_M^2\\beta_M^{2R_k})(f(\\bar x^{(k)})-f^*)-(f(\\bar x^{(k+1)})-f^*)+\\frac{4}{n\\gamma}\\|\\Delta_x^{(k)}\\|_F^2.",
+        "uses": [],
+        "produces": "quoted_stated_descent_lemma_conclusion_not_derived_from_proof_final_display_or_statement_stepsize"
+      }
+      ]
+    },
+    {
+      "name": "stacked_gradient_bound_equation_17",
+      "ref": "Appendix D.1, equation (17), lines 1715-1746",
+      "statement_math": "\\|\\nabla f(x^{(k)})\\|_F^2\\le 2L^2\\|\\Delta_x^{(k)}\\|_F^2+4nL(f(\\bar x^{(k)})-f^*),\\quad f^*:=n^{-1}\\sum_{i=1}^n f_i^*.",
+      "role": "Exports equation (17) as a reusable dependency for the consensus-error proof in Appendix D.2.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Source-boundary setup before equation (17): the proof applies L-smoothness for all x,y in R^d and i in [n], then takes y=x-(1/L)grad f_i(x). The displayed bound is recorded exactly as printed; it contains ||grad f(x)||^2 without the subscript i, although the surrounding sentence and the next lines use the component f_i.",
+          "ref": "Appendix D.1, lines 1715-1724",
+          "source_pdf_lines": [
+            1715,
+            1724
+          ],
+          "math": "f_i(y)\\le f_i(x)+\\langle\\nabla f_i(x),y-x\\rangle+\\frac{L}{2}\\|y-x\\|^2.\\quad \\frac{1}{2L}\\|\\nabla f(x)\\|^2\\le f_i(x)-f_i(y)\\le f_i(x)-f_i^*.",
+          "uses": [
+            "smoothness"
+          ],
+          "produces": "equation_17_printed_gradient_gap_line_with_unindexed_gradient"
+        },
+        {
+          "step": 2,
+          "description": "Source-boundary correction for the next use of the preceding display: equation (17) later needs the indexed componentwise estimate (1/(2L))||grad f_i(x)||^2 <= f_i(x)-f_i^*. This indexed version is not printed literally at line 1723; it is the intended componentwise reading of the smoothness substitution with f_i, so no source math field is attached here.",
+          "ref": "Appendix D.1, lines 1721-1723 and equation (17), lines 1734-1738",
+          "source_pdf_lines": [
+            1721,
+            1738
+          ],
+          "uses": [
+            "smoothness",
+            "previous_step:1"
+          ],
+          "produces": "equation_17_intended_indexed_individual_gradient_gap_bound_for_equation_17"
+        },
+        {
+          "step": 3,
+          "description": "Equation (17) first splits the stacked deterministic gradient norm into a disagreement part and a stacked average-gradient part.",
+          "ref": "Appendix D.1, equation (17), lines 1727-1729",
+          "source_pdf_lines": [
+            1727,
+            1729
+          ],
+          "math": "\\|\\nabla f(x^{(k)})\\|_F^2\\le 2\\|\\nabla f(x^{(k)})-\\nabla f(\\bar x^{(k)})\\|_F^2+2\\|\\nabla f(\\bar x^{(k)})\\|_F^2",
+          "uses": [
+            "notation_stacked_iterate_and_gradient",
+            "theorem2_mean_iterate_notation"
+          ],
+          "produces": "equation_17_stacked_gradient_norm_split"
+        },
+        {
+          "step": 4,
+          "description": "The next printed line uses L-smoothness to bound the disagreement part and expands the stacked average-gradient norm as a sum over i.",
+          "ref": "Appendix D.1, equation (17), lines 1730-1733",
+          "source_pdf_lines": [
+            1730,
+            1733
+          ],
+          "math": "\\|\\nabla f(x^{(k)})\\|_F^2\\le 2L^2\\|\\Delta_x^{(k)}\\|_F^2+2\\sum_{i=1}^n\\|\\nabla f_i(\\bar x^{(k)})\\|^2",
+          "uses": [
+            "smoothness",
+            "appendix_D_consensus_error_definition",
+            "previous_step:3"
+          ],
+          "produces": "equation_17_stacked_gradient_smoothness_sum_bound"
+        },
+        {
+          "step": 5,
+          "description": "The proof substitutes the intended indexed individual gradient-gap estimate into the summed average-gradient term, producing the printed objective-gap sum in equation (17).",
+          "ref": "Appendix D.1, equation (17), lines 1734-1738",
+          "source_pdf_lines": [
+            1734,
+            1738
+          ],
+          "math": "\\|\\nabla f(x^{(k)})\\|_F^2\\le 2L^2\\|\\Delta_x^{(k)}\\|_F^2+4L\\sum_{i=1}^n(f_i(\\bar x^{(k)})-f_i^*)",
+          "uses": [
+            "previous_step:2",
+            "previous_step:4"
+          ],
+          "produces": "equation_17_stacked_gradient_objective_sum_bound"
+        },
+        {
+          "step": 6,
+          "description": "Using the problem definition f(x)=n^{-1}sum_i f_i(x) and the printed definition of f^*, the final line of (17) rewrites the individual objective gaps as n times the average objective gap.",
+          "ref": "Appendix D.1, equation (17), lines 1740-1746",
+          "source_pdf_lines": [
+            1740,
+            1746
+          ],
+          "math": "\\|\\nabla f(x^{(k)})\\|_F^2\\le 2L^2\\|\\Delta_x^{(k)}\\|_F^2+4nL(f(\\bar x^{(k)})-f^*),\\quad f^*:=n^{-1}\\sum_{i=1}^n f_i^*.",
+          "uses": [
+            "problem_average_objective_definition",
+            "appendix_D_f_star_definition",
+            "previous_step:5"
+          ],
+          "produces": "stacked_gradient_bound_17_exported"
+        }
+      ]
+    },
+    {
+      "name": "consensus_error_lemma",
+      "ref": "Lemma 5, lines 1763-1771",
+      "statement_math": "\\text{When }R_k\\ge\\frac{\\ln(C_M)}{1-\\beta_M}\\text{ and }\\gamma\\le\\frac{1}{6L},\\text{ we have }\\|\\Delta_x^{(k+1)}\\|_F^2\\le\\frac13\\|\\Delta_x^{(k)}\\|_F^2+8n\\gamma^2C_M^2\\beta_M^{2R_k}L(f(\\bar x^{(k)})-f^*).",
+      "role": "Bounds the next consensus error so the main proof can combine it with descent.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Write the Algorithm 3 parameter update at matrix level.",
+          "ref": "Appendix D.2, equation (19), lines 1773-1775",
+          "source_pdf_lines": [
+            1773,
+            1775
+          ],
+          "math": "x^{(k+1)}=A^{(k)}x^{(k)}-\\gamma M^{(k)}g^{(k)}.",
+          "uses": [
+            "appendix_D_matrix_update_notation"
+          ],
+          "produces": "parameter_update_19"
+        },
+        {
+          "step": 2,
+          "description": "Left-multiply by I-E_n and use the limiting consensus component A_infty^(k) to isolate the contracting parameter-mixing term and the PULM gradient-mixing error. Source boundary: this proof window does not separately define A_infty^(k); the JSON links it to the paper's earlier limiting-property statement for row-stochastic products and to the En/Delta definitions needed for the insertion and cancellation.",
+          "ref": "Appendix D.2, equation (20), lines 1777-1783",
+          "source_pdf_lines": [
+            1777,
+            1783
+          ],
+          "math": "\\Delta_x^{(k+1)}=(I-E_n)(A^{(k)}-A_\\infty^{(k)})\\Delta_x^{(k)}-\\gamma(I-E_n)(M^{(k)}-E_n)g^{(k)}.",
+          "uses": [
+            "appendix_D_consensus_error_definition",
+            "notation_average_matrix_En",
+            "compatible_row_stochastic_mixing",
+            "limiting_property",
+            "previous_step:1"
+          ],
+          "produces": "consensus_error_recursion_20"
+        },
+        {
+          "step": 3,
+          "description": "Apply Cauchy-Schwarz to (20), giving the two-term consensus-error bound before rate substitutions.",
+          "ref": "Appendix D.2, lines 1785-1791",
+          "source_pdf_lines": [
+            1785,
+            1791
+          ],
+          "math": "\\|\\Delta_x^{(k+1)}\\|_F^2\\le2\\|(I-E_n)(A^{(k)}-A_\\infty^{(k)})\\Delta_x^{(k)}\\|_F^2+2\\gamma^2\\|(I-E_n)(M^{(k)}-E_n)g^{(k)}\\|_F^2",
+          "uses": [
+            "previous_step:2"
+          ],
+          "produces": "consensus_error_cauchy_schwarz_bound"
+        },
+        {
+          "step": 4,
+          "description": "Invoke the exported equation (17) stacked-gradient bound, which Appendix D.2 explicitly references above the next inequality in the consensus-error proof.",
+          "ref": "Appendix D.1, equation (17), lines 1728-1746; Appendix D.2, line 1792",
+          "source_pdf_lines": [
+            1728,
+            1746
+          ],
+          "math": "\\|\\nabla f(x^{(k)})\\|_F^2\\le2L^2\\|\\Delta_x^{(k)}\\|_F^2+4nL(f(\\bar x^{(k)})-f^*),\\quad f^*:=n^{-1}\\sum_{i=1}^n f_i^*.",
+          "uses": [
+            "stacked_gradient_bound_equation_17"
+          ],
+          "produces": "consensus_imported_stacked_gradient_bound_17"
+        },
+        {
+          "step": 5,
+          "description": "Unsupported local source assertion for the D.2 A-rate part of the next display: the proof replaces the parameter-mixing term 2||(I-E_n)(A^(k)-A_infty^(k))Delta_x^(k)||_F^2 by the exact coefficient 2 C_A^2 beta_A^{2R_k}||Delta_x^(k)||_F^2. The PDF does not print a theorem statement defining C_A,beta_A as the operator rate for (I-E_n)(A^(k)-A_infty^(k)), so this is recorded as a paper-asserted operator-rate replacement from the preceding Cauchy-Schwarz inequality.",
+          "ref": "Appendix D.2, lines 1792-1795",
+          "source_pdf_lines": [
+            1792,
+            1795
+          ],
+          "uses": [
+            "previous_step:3"
+          ],
+          "produces": "unsupported_local_source_assertion_D2_A_rate_replaces_parameter_mixing_term_by_2_C_A_squared_beta_A_2Rk_Delta_bound"
+        },
+        {
+          "step": 6,
+          "description": "Unsupported local source assertion for the D.2 M-rate part of the next display: the proof replaces the gradient-mixing term 2 gamma^2||(I-E_n)(M^(k)-E_n)g^(k)||_F^2 by a C_M beta_M^{R_k} bound and then uses equation (17), producing the exact printed contributions 4 gamma^2 L^2 C_M^2 beta_M^{2R_k}||Delta_x^(k)||_F^2 and 8n gamma^2 C_M^2 beta_M^{2R_k}L(f(bar x^(k))-f^*). The PDF does not print a theorem statement defining C_M,beta_M as the operator rate for (I-E_n)(M^(k)-E_n), so this is recorded as a paper-asserted operator-rate replacement from the preceding Cauchy-Schwarz inequality and imported equation (17).",
+          "ref": "Appendix D.2, lines 1792-1798",
+          "source_pdf_lines": [
+            1792,
+            1798
+          ],
+          "uses": [
+            "previous_step:3",
+            "previous_step:4"
+          ],
+          "produces": "unsupported_local_source_assertion_D2_M_rate_replaces_gradient_mixing_term_by_exact_printed_C_M_squared_beta_contributions"
+        },
+        {
+          "step": 7,
+          "description": "Apply equation (17) together with the two unsupported local source assertions for the A- and M-rate substitutions to the Cauchy-Schwarz bound, yielding the printed intermediate consensus-error inequality.",
+          "ref": "Appendix D.2, lines 1792-1798",
+          "source_pdf_lines": [
+            1792,
+            1798
+          ],
+          "math": "\\|\\Delta_x^{(k+1)}\\|_F^2\\le(2C_A^2\\beta_A^{2R_k}+4\\gamma^2L^2C_M^2\\beta_M^{2R_k})\\|\\Delta_x^{(k)}\\|_F^2+8n\\gamma^2C_M^2\\beta_M^{2R_k}L(f(\\bar x^{(k)})-f^*)",
+          "uses": [
+            "previous_step:3",
+            "previous_step:4",
+            "previous_step:5",
+            "previous_step:6"
+          ],
+          "produces": "paper_asserted_consensus_rate_substitution_with_unprinted_A_M_rate_prerequisites"
+        },
+        {
+          "step": 8,
+          "description": "Use the stated lower bound on R_k and gamma <= 1/(6L) to make the coefficient of ||Delta_x^(k)||^2 at most 1/3.",
+          "ref": "Appendix D.2, lines 1799-1804",
+          "source_pdf_lines": [
+            1799,
+            1804
+          ],
+          "math": "\\|\\Delta_x^{(k+1)}\\|_F^2\\le\\frac13\\|\\Delta_x^{(k)}\\|_F^2+8n\\gamma^2C_M^2\\beta_M^{2R_k}L(f(\\bar x^{(k)})-f^*).",
+          "uses": [
+            "appendix_D_lemma5_schedule_stepsize_prerequisite",
+            "previous_step:7"
+          ],
+          "produces": "consensus_error_lemma_conclusion"
+        }
+      ]
+    },
+    {
+      "name": "absorbing_extra_errors_lemma",
+      "ref": "Lemma 6, lines 1825-1837",
+      "statement_math": "\\text{Suppose that there exists }\\Delta_k,S_k,F_k,c,R_k\\in\\mathbb{R}_+,\\beta\\in[0,1),\\text{ satisfying }S_k\\le(1+c\\gamma\\beta^{2R_k})\\Delta_k-\\Delta_{k+1}+F_k,\\quad\\forall k\\ge0,\\text{ then, by selecting }\\gamma\\le\\frac1{3c}\\text{ and }R_k\\ge\\frac{\\ln(k)}{1-\\beta},\\text{ we can prove that }\\sum_{k=0}^{K}S_k\\le3\\Delta_0+3\\sum_{k=0}^{K}F_k.",
+      "role": "Absorbs the multiplicative objective-error factor in the summed main descent recursion.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Define the product weights U_k as printed and multiply the assumed one-step recursion by U_k^{-1}, so the Delta terms telescope with inverse weights. Source boundary: the printed U_k definition uses beta^{R_i}, while the later bound on U_k in lines 1861-1870 uses beta^{2R_i}.",
+          "ref": "Appendix D.3, equation (22), lines 1839-1845",
+          "source_pdf_lines": [
+            1839,
+            1845
+          ],
+          "math": "U_k=\\prod_{i=0}^{k}(1+\\gamma c\\beta^{R_i}),\\quad \\forall k\\ge0,\\quad U_{-1}=1.\\quad U_k^{-1}S_k\\le U_{k-1}^{-1}\\Delta_k-U_k^{-1}\\Delta_{k+1}+U_k^{-1}F_k,\\quad\\forall k\\ge0.",
+          "uses": [
+            "lemma6_one_step_recursion_hypothesis"
+          ],
+          "produces": "weighted_one_step_22"
+        },
+        {
+          "step": 2,
+          "description": "Sum (22) from k=0 to K to telescope the Delta terms.",
+          "ref": "Appendix D.3, lines 1849-1857",
+          "source_pdf_lines": [
+            1849,
+            1857
+          ],
+          "math": "\\sum_{k=0}^{K}U_k^{-1}S_k\\le\\Delta_0-U_K^{-1}\\Delta_{K+1}+\\sum_{k=0}^{K}U_k^{-1}F_k.",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "telescoped_weighted_sum"
+        },
+        {
+          "step": 3,
+          "description": "Use gamma<1/(3c) and the R_k schedule to bound U_k uniformly by 2.",
+          "ref": "Appendix D.3, lines 1858-1870",
+          "source_pdf_lines": [
+            1858,
+            1870
+          ],
+          "math": "U_k=\\exp\\left(\\sum_{i=1}^{k}\\ln(1+\\gamma c\\beta^{2R_i})\\right)\\le\\exp\\left(\\sum_{i=1}^{k}\\gamma c\\beta^{2R_i}\\right)\\le\\exp\\left(\\gamma c\\sum_{i=1}^{k}\\frac1{i^2}\\right)<e^{2/3}<2.",
+          "uses": [
+            "appendix_D3_lemma6_schedule_stepsize_prerequisite",
+            "previous_step:1"
+          ],
+          "produces": "uniform_U_bound"
+        },
+        {
+          "step": 4,
+          "description": "Multiply back by U_K and use the uniform U bounds to get the lemma conclusion. The math field preserves the PDF display's terminal \\Delta_{k+1}; the preceding telescoped display has \\Delta_{K+1}, so the K-index normalization is recorded only as an implicit source inconsistency, not substituted into this source formula.",
+          "ref": "Appendix D.3, lines 1872-1883",
+          "source_pdf_lines": [
+            1872,
+            1883
+          ],
+          "math": "\\sum_{k=0}^{K}S_k\\le U_K\\left(\\sum_{k=0}^{K}U_k^{-1}S_k\\right)\\le U_K\\left(\\Delta_0-U_K^{-1}\\Delta_{k+1}+\\sum_{k=0}^{K}U_k^{-1}F_k\\right)\\le3\\Delta_0+3\\sum_{k=0}^{K}F_k.",
+          "uses": [
+            "previous_step:2",
+            "previous_step:3"
+          ],
+          "produces": "absorbing_extra_errors_conclusion"
+        }
+      ]
+    }
+  ]
+}

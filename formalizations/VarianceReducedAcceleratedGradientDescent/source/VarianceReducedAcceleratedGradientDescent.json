@@ -1,0 +1,2577 @@
+{
+  "algorithm": "VarianceReducedAcceleratedGradientDescent",
+  "full_name": "Variance-Reduced Accelerated Gradient Descent for Smooth Convex and Strongly Convex Finite-Sum Optimization",
+  "source_reference": "Lan, First-order and Stochastic Optimization Methods for Machine Learning, Springer 2020 (Theorem 5.9)",
+  "setup": {
+    "problem": {
+      "math": "\\min_{x\\in X}\\{\\Psi(x):=f(x)+h(x)\\}",
+      "ref": "Eq. (5.3.1)",
+      "description": "Composite finite-sum optimization problem used by Section 5.4."
+    },
+    "variable_space": {
+      "math": "X\\subseteq \\mathbb{R}^m\\text{ is a closed convex set},\\quad f(x)=\\frac{1}{m}\\sum_{i=1}^m f_i(x),\\quad h\\text{ is a simple but possibly nondifferentiable convex function}",
+      "ref": "Section 5.3, lines 16420-16426"
+    }
+  },
+  "assumptions": [
+    {
+      "name": "Component convexity",
+      "math": "X\\subseteq \\mathbb{R}^m\\text{ is a closed convex set, }f\\text{ is the average of }m\\text{ smooth convex component functions }f_i,\\text{ i.e., }f(x)=\\sum_{i=1}^m f_i(x)/m,\\text{ and }h\\text{ is a simple but possibly non-differentiable convex function}",
+      "ref": "Section 5.3, lines 16423-16426",
+      "parameters": [
+        "X",
+        "f",
+        "f_i",
+        "h"
+      ]
+    },
+    {
+      "name": "Component smoothness",
+      "math": "\\|\\nabla f_i(x)-\\nabla f_i(y)\\|_*\\le L_i\\|x-y\\|,\\quad \\forall x,y\\in X",
+      "ref": "Section 5.3, lines 16426-16429",
+      "parameters": [
+        "L_i>0"
+      ]
+    },
+    {
+      "name": "Average smoothness constant",
+      "math": "L_f\\le L\\equiv \\frac{1}{m}\\sum_{i=1}^m L_i",
+      "ref": "Section 5.3, lines 16430-16433",
+      "parameters": [
+        "L",
+        "L_f"
+      ]
+    },
+    {
+      "name": "Possible strong convexity",
+      "math": "f(y)\\ge f(x)+\\langle \\nabla f(x),y-x\\rangle+\\mu V(x,y),\\quad \\forall x,y\\in X",
+      "ref": "Eq. (5.3.2)",
+      "parameters": [
+        "\\mu\\ge 0"
+      ]
+    },
+    {
+      "name": "Smooth non-strongly convex subsection condition",
+      "math": "\\mu=0\\text{ in (5.3.2)}",
+      "ref": "Section 5.4.1, lines 17061-17064",
+      "parameters": [
+        "\\mu"
+      ]
+    },
+    {
+      "name": "Convexity of h",
+      "math": "h\\text{ is a simple but possibly nondifferentiable convex function}",
+      "ref": "Section 5.3, lines 16423-16426",
+      "parameters": [
+        "h"
+      ]
+    },
+    {
+      "name": "Sampling distribution and L_Q",
+      "math": "q_i=\\frac{L_i}{\\sum_{i=1}^m L_i},\\quad i=1,\\ldots,m,\\qquad L_Q:=\\frac{1}{m}\\max_{i=1,\\ldots,m}\\frac{L_i}{q_i}",
+      "ref": "Eq. (5.3.4), Theorem 5.9 lines 17637-17643",
+      "parameters": [
+        "q_i",
+        "L_Q"
+      ]
+    },
+    {
+      "name": "Bregman prox function",
+      "math": "V(x,z)=\\nu(z)-[\\nu(x)+\\langle \\nabla \\nu(x),z-x\\rangle]",
+      "ref": "Eq. (3.2.2)",
+      "parameters": [
+        "V",
+        "\\nu"
+      ]
+    },
+    {
+      "name": "Prox strong-convexity lower bound",
+      "math": "V(x,z)\\ge \\frac{\\sigma_\\nu}{2}\\|x-z\\|^2",
+      "ref": "Eq. (3.2.3) and modulus-one normalization lines 3345-3346",
+      "parameters": [
+        "V",
+        "\\sigma_\\nu"
+      ]
+    },
+    {
+      "name": "Prox modulus-one normalization",
+      "math": "\\sigma_\\nu=1",
+      "ref": "Lines 3345-3346",
+      "parameters": [
+        "\\sigma_\\nu"
+      ]
+    },
+    {
+      "name": "Strongly convex unified schedule",
+      "math": "T_s=\\begin{cases}2^{s-1},&s\\le s_0,\\\\ T_{s_0},&s>s_0,\\end{cases}\\quad \\gamma_s=\\frac{1}{3L\\alpha_s},\\quad p_s=\\frac{1}{2},\\quad \\alpha_s=\\begin{cases}\\frac{1}{2},&s\\le s_0,\\\\ \\max\\left\\{\\frac{2}{s-s_0+4},\\min\\left\\{\\sqrt{\\frac{m\\mu}{3L}},\\frac{1}{2}\\right\\}\\right\\},&s>s_0,\\end{cases}",
+      "ref": "Eqs. (5.4.17), (5.4.25)",
+      "parameters": [
+        "T_s",
+        "\\gamma_s",
+        "p_s",
+        "\\alpha_s",
+        "s_0"
+      ]
+    },
+    {
+      "name": "Theorem 5.9 printed cutoff definition",
+      "math": "s_0:=\\lfloor\\log m\\rfloor+1",
+      "ref": "Theorem 5.9, lines 17637-17639",
+      "parameters": [
+        "s_0",
+        "m"
+      ]
+    },
+    {
+      "name": "Strongly convex epoch cutoff size facts",
+      "math": "\\text{for }s\\ge s_0,\\ m\\ge T_s\\equiv T_{s_0}=2^{\\lfloor\\log_2 m\\rfloor}\\ge \\frac{m}{2}",
+      "ref": "Lemma 5.19 proof around Eq. (5.4.28), lines 17408-17414",
+      "parameters": [
+        "T_s",
+        "T_{s_0}",
+        "m"
+      ]
+    },
+    {
+      "name": "Theta smooth weights",
+      "math": "\\theta_t=\\begin{cases}\\frac{\\gamma_s}{\\alpha_s}(\\alpha_s+p_s),&t=1,\\ldots,T_s-1,\\\\ \\frac{\\gamma_s}{\\alpha_s},&t=T_s,\\end{cases}",
+      "ref": "Eq. (5.4.12)",
+      "parameters": [
+        "\\theta_t"
+      ]
+    },
+    {
+      "name": "Smooth epoch coefficients and average",
+      "math": "L_s:=\\frac{\\gamma_s}{\\alpha_s}+(T_s-1)\\frac{\\gamma_s(\\alpha_s+p_s)}{\\alpha_s},\\quad R_s:=\\frac{\\gamma_s}{\\alpha_s}(1-\\alpha_s)+(T_s-1)\\frac{\\gamma_sp_s}{\\alpha_s},\\qquad w_s:=L_s-R_{s+1}\\ge 0,\\ \\forall s\\ge 1,\\qquad \\bar{x}^s:=\\left(\\sum_{j=1}^{s-1}w_j\\right)^{-1}\\sum_{j=1}^{s-1}w_j\\tilde{x}^j",
+      "ref": "Eqs. (5.4.13)-(5.4.16)",
+      "parameters": [
+        "L_s",
+        "R_s",
+        "w_s",
+        "\\bar{x}^s"
+      ]
+    },
+    {
+      "name": "Theta geometric weights",
+      "math": "\\theta_t=\\begin{cases}\\Gamma_{t-1}-(1-\\alpha_s-p_s)\\Gamma_t,&1\\le t\\le T_s-1,\\\\ \\Gamma_{t-1},&t=T_s,\\end{cases}\\qquad \\Gamma_t=(1+\\mu\\gamma_s)^t",
+      "ref": "Eq. (5.4.26)",
+      "parameters": [
+        "\\theta_t",
+        "\\Gamma_t"
+      ]
+    },
+    {
+      "name": "D0 definition",
+      "math": "D_0:=2[\\psi(x^0)-\\psi(x^*)]+3LV(x^0,x^*)",
+      "ref": "Eq. (5.4.20)",
+      "parameters": [
+        "D_0"
+      ]
+    },
+    {
+      "name": "Accelerated linear tail regime",
+      "math": "s>\\bar{s}_0:=s_0+\\sqrt{\\frac{12L}{m\\mu}}-4\\text{ and }m<\\frac{3L}{4\\mu}",
+      "ref": "Lemma 5.21, lines 17485-17493",
+      "parameters": [
+        "s",
+        "\\bar{s}_0",
+        "m",
+        "\\mu"
+      ]
+    },
+    {
+      "name": "Optimal solution x^*",
+      "math": "\\text{Let }x^*\\text{ be an optimal solution of (5.3.1)}",
+      "ref": "Lemma 5.12, line 16494; Lemma 5.19, lines 17378-17382; Lemma 5.21, lines 17485-17495",
+      "parameters": [
+        "x^*"
+      ]
+    },
+    {
+      "name": "estimator residual delta_t",
+      "math": "\\delta_t:=G_t-\\nabla f(\\underline{x}_t)",
+      "ref": "Eq. (5.4.2)",
+      "parameters": [
+        "\\delta_t",
+        "G_t"
+      ]
+    },
+    {
+      "name": "auxiliary point x_{t-1}^+",
+      "math": "x_{t-1}^+:=\\frac{1}{1+\\mu\\gamma_s}(x_{t-1}+\\mu\\gamma_s\\underline{x}_t)",
+      "ref": "Eq. (5.4.3)",
+      "parameters": [
+        "x_{t-1}^+"
+      ]
+    },
+    {
+      "name": "inner identity",
+      "math": "\\bar{x}_t-\\underline{x}_t=\\alpha_s(x_t-x_{t-1}^+)",
+      "ref": "Eq. (5.4.6)",
+      "parameters": [
+        "\\bar{x}_t",
+        "\\underline{x}_t",
+        "x_{t-1}^+"
+      ]
+    }
+  ],
+  "algorithm_spec": {
+    "ref": "Algorithm 5.7",
+    "initialization": {
+      "math": "\\tilde{x}^0=x^0",
+      "ref": "Algorithm 5.7, lines 16891-16894"
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "Epoch full gradient",
+        "math": "\\tilde{x}=\\tilde{x}^{s-1}\\quad\\text{and}\\quad \\tilde{g}=\\nabla F(\\tilde{x})",
+        "ref": "Algorithm 5.7, line 16895"
+      },
+      {
+        "step": 2,
+        "name": "Epoch initial points",
+        "math": "x_0=x^{s-1},\\quad \\bar{x}_0=\\tilde{x},\\quad T=T_s",
+        "ref": "Algorithm 5.7, line 16896"
+      },
+      {
+        "step": 3,
+        "name": "Random component",
+        "math": "\\text{Pick }i_t\\in\\{1,\\ldots,m\\}\\text{ randomly according to }Q=\\{q_1,\\ldots,q_m\\}\\text{ on }\\{1,\\ldots,m\\}",
+        "ref": "Algorithm 5.7, line 16898"
+      },
+      {
+        "step": 4,
+        "name": "Accelerated search point",
+        "math": "\\underline{x}_t=\\frac{(1+\\mu\\gamma_s)(1-\\alpha_s-p_s)\\bar{x}_{t-1}+\\alpha_s x_{t-1}+(1+\\mu\\gamma_s)p_s\\tilde{x}}{1+\\mu\\gamma_s(1-\\alpha_s)}",
+        "ref": "Algorithm 5.7, line 16899"
+      },
+      {
+        "step": 5,
+        "name": "Variance reduced gradient",
+        "math": "G_t=\\frac{\\nabla f_{i_t}(\\underline{x}_t)-\\nabla f_{i_t}(\\tilde{x})}{q_{i_t}n}+\\tilde{g}",
+        "ref": "Algorithm 5.7, line 16900"
+      },
+      {
+        "step": 6,
+        "name": "Prox update",
+        "math": "x_t=\\operatorname*{argmin}_{x\\in X}\\{\\gamma_s[\\langle G_t,x\\rangle+h(x)+\\mu V(\\underline{x}_t,x)]+V(x_{t-1},x)\\}",
+        "ref": "Algorithm 5.7, line 16901"
+      },
+      {
+        "step": 7,
+        "name": "Averaged inner iterate",
+        "math": "\\bar{x}_t=(1-\\alpha_s-p_s)\\bar{x}_{t-1}+\\alpha_s x_t+p_s\\tilde{x}",
+        "ref": "Algorithm 5.7, line 16902"
+      },
+      {
+        "step": 8,
+        "name": "Epoch output",
+        "math": "x^s=x_T\\quad\\text{and}\\quad \\tilde{x}^s=\\frac{\\sum_{t=1}^{T}\\theta_t\\bar{x}_t}{\\sum_{t=1}^{T}\\theta_t}",
+        "ref": "Algorithm 5.7, lines 16904-16907"
+      }
+    ],
+    "output": {
+      "math": "\\tilde{x}^s=\\frac{\\sum_{t=1}^{T}\\theta_t\\bar{x}_t}{\\sum_{t=1}^{T}\\theta_t}",
+      "ref": "Algorithm 5.7, lines 16904-16907",
+      "type": "epoch weighted average"
+    },
+    "parameters": [
+      {
+        "name": "linearization l_f",
+        "math": "l_f(z,x):=f(z)+\\langle \\nabla f(z),x-z\\rangle",
+        "ref": "Eq. (5.4.1)"
+      },
+      {
+        "name": "estimator residual delta_t",
+        "math": "\\delta_t:=G_t-\\nabla f(\\underline{x}_t)",
+        "ref": "Eq. (5.4.2)"
+      },
+      {
+        "name": "auxiliary point x_{t-1}^+",
+        "math": "x_{t-1}^+:=\\frac{1}{1+\\mu\\gamma_s}(x_{t-1}+\\mu\\gamma_s\\underline{x}_t)",
+        "ref": "Eq. (5.4.3)"
+      },
+      {
+        "name": "inner identity",
+        "math": "\\bar{x}_t-\\underline{x}_t=\\alpha_s(x_t-x_{t-1}^+)",
+        "ref": "Eq. (5.4.6)"
+      }
+    ]
+  },
+  "main_theorem": {
+    "ref": "Theorem 5.9",
+    "statement_math": "\\text{Suppose that the probabilities }q_i\\text{'s are set to }L_i/\\sum_{i=1}^m L_i\\text{ for }i=1,\\ldots,m.\\ \\text{Moreover, let us denote }s_0:=\\lfloor\\log m\\rfloor+1\\text{ and assume that the weights }\\{\\theta_t\\}\\text{ are set to (5.4.12) if }1\\le s\\le s_0\\text{ or }s_0<s\\le s_0+\\sqrt{\\frac{12L}{m\\mu}}-4,\\ m<\\frac{3L}{4\\mu}.\\ \\text{Otherwise, they are set to (5.4.26). If the parameters }\\{T_s\\},\\{\\gamma_s\\},\\text{ and }\\{p_s\\}\\text{ set to (5.4.17) with }\\{\\alpha_s\\}\\text{ given by (5.4.25), then we have }\\mathbb{E}[\\psi(\\tilde{x}^s)-\\psi(x^*)]\\le \\begin{cases}2^{-(s+1)}D_0,&1\\le s\\le s_0,\\\\ \\left(\\frac{4}{5}\\right)^sD_0,&s>s_0\\text{ and }m\\ge \\frac{3L}{4\\mu},\\\\ \\frac{16D_0}{(s-s_0+4)^2m},&s_0<s\\le s_0+\\sqrt{\\frac{12L}{m\\mu}}-4\\text{ and }m<\\frac{3L}{4\\mu},\\\\ \\left(1+\\sqrt{\\frac{\\mu}{3mL}}\\right)^{-m(s-\\bar{s}_0)/2}\\frac{D_0}{3L/(4\\mu)},&s_0+\\sqrt{\\frac{12L}{m\\mu}}-4=\\bar{s}_0<s\\text{ and }m<\\frac{3L}{4\\mu},\\end{cases}\\ \\text{where }x^*\\text{ is an optimal solution of (5.3.1) and }D_0\\text{ is defined as in (5.4.20).}",
+    "rate": "Corollary 5.11 gives total component-gradient bounds O(m log(D0/eps)), O(m log m + sqrt(m D0/eps)), or O(m log m + sqrt(mL/mu) log((D0/eps)/(3L/(4mu)))) according to the three regimes.",
+    "measure": "expected objective gap \\mathbb{E}[\\psi(\\tilde{x}^s)-\\psi(x^*)]",
+    "proof": [
+      {
+        "step": 1,
+        "description": "The theorem fixes the nonuniform probabilities, the switching rule for theta_t, the parameter policy (5.4.17) with alpha_s from (5.4.25), and the printed prerequisites that x* is an optimal solution of (5.3.1) and D0 is defined by (5.4.20).",
+        "ref": "Theorem 5.9 setup, lines 17637-17643",
+        "source_pdf_lines": [
+          17637,
+          17643
+        ],
+        "uses": [
+          "Sampling distribution and L_Q",
+          "Strongly convex unified schedule",
+          "Theorem 5.9 printed cutoff definition",
+          "Theta smooth weights",
+          "Theta geometric weights",
+          "Optimal solution x^*",
+          "D0 definition"
+        ],
+        "produces": "theorem_parameter_context_with_x_star_and_D0"
+      },
+      {
+        "step": 2,
+        "description": "For 1 <= s <= s0, invoke the first-phase bound.",
+        "ref": "Theorem 5.9 first case, lines 17644-17647",
+        "source_pdf_lines": [
+          17644,
+          17647
+        ],
+        "math": "2^{-(s+1)}D_0,\\qquad 1\\le s\\le s_0",
+        "uses": [
+          "First-phase epoch decay (Lemma 5.18)",
+          "Optimal solution x^*",
+          "D0 definition",
+          "previous_step:1"
+        ],
+        "produces": "main_case_1"
+      },
+      {
+        "step": 3,
+        "description": "For s > s0 and m >= 3L/(4mu), invoke the large-m linear contraction lemma.",
+        "ref": "Theorem 5.9 second case, lines 17648-17653",
+        "source_pdf_lines": [
+          17648,
+          17653
+        ],
+        "math": "\\left(\\frac{4}{5}\\right)^sD_0,\\qquad s>s_0\\text{ and }m\\ge \\frac{3L}{4\\mu}",
+        "uses": [
+          "Linear contraction for large m (Lemma 5.19)",
+          "Optimal solution x^*",
+          "D0 definition",
+          "previous_step:1"
+        ],
+        "produces": "main_case_2"
+      },
+      {
+        "step": 4,
+        "description": "For the intermediate small-m range, invoke Lemma 5.20.",
+        "ref": "Theorem 5.9 third case, lines 17658-17664",
+        "source_pdf_lines": [
+          17658,
+          17664
+        ],
+        "math": "\\frac{16D_0}{(s-s_0+4)^2m},\\qquad s_0<s\\le s_0+\\sqrt{\\frac{12L}{m\\mu}}-4\\text{ and }m<\\frac{3L}{4\\mu}",
+        "uses": [
+          "Intermediate sublinear regime (Lemma 5.20)",
+          "Optimal solution x^*",
+          "D0 definition",
+          "previous_step:1"
+        ],
+        "produces": "main_case_3"
+      },
+      {
+        "step": 5,
+        "description": "For s > sbar0 in the small-m range, invoke Lemma 5.21 with sbar0 as printed in Theorem 5.9.",
+        "ref": "Theorem 5.9 fourth case, lines 17668-17682",
+        "source_pdf_lines": [
+          17668,
+          17682
+        ],
+        "math": "\\left(1+\\sqrt{\\frac{\\mu}{3mL}}\\right)^{-m(s-\\bar{s}_0)/2}\\frac{D_0}{3L/(4\\mu)},\\qquad s_0+\\sqrt{\\frac{12L}{m\\mu}}-4=\\bar{s}_0<s\\text{ and }m<\\frac{3L}{4\\mu}",
+        "uses": [
+          "Accelerated linear tail (Lemma 5.21)",
+          "Optimal solution x^*",
+          "D0 definition",
+          "previous_step:1"
+        ],
+        "produces": "main_case_4"
+      },
+      {
+        "step": 6,
+        "description": "The four case bounds are exactly the piecewise statement (5.4.32), with x* optimal for (5.3.1) and D0 from (5.4.20).",
+        "ref": "Eq. (5.4.32) and following line, lines 17644-17683",
+        "source_pdf_lines": [
+          17644,
+          17683
+        ],
+        "uses": [
+          "previous_step:2",
+          "previous_step:3",
+          "previous_step:4",
+          "previous_step:5",
+          "Optimal solution x^*",
+          "D0 definition"
+        ],
+        "produces": "main_theorem_5_9"
+      }
+    ]
+  },
+  "key_lemmas": [
+    {
+      "name": "Smoothness gap inequality (Lemma 5.8)",
+      "ref": "Lemma 5.8",
+      "statement_math": "\\text{If }f:X\\to\\mathbb{R}\\text{ has Lipschitz continuous gradients with constant }L,\\text{ then }\\frac{1}{2L}\\|\\nabla f(x)-\\nabla f(z)\\|_*^2\\le f(x)-f(z)-\\langle \\nabla f(z),x-z\\rangle,\\quad \\forall x,z\\in X",
+      "role": "Used componentwise in Lemma 5.12 and in turn in the variance bound.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Define phi and note that it has L-Lipschitz continuous gradients, with nabla phi(z)=0 and min phi = phi(z)=0.",
+          "ref": "Lemma 5.8 proof, lines 14735-14737",
+          "source_pdf_lines": [
+            14735,
+            14737
+          ],
+          "math": "\\phi(x)=f(x)-f(z)-\\langle \\nabla f(z),x-z\\rangle",
+          "uses": [
+            "Component smoothness"
+          ],
+          "produces": "phi_definition"
+        },
+        {
+          "step": 2,
+          "description": "Compare phi(z) with phi(x-L^{-1} nabla phi(x)) and expand using the integral form printed in the proof.",
+          "ref": "Lemma 5.8 proof, lines 14739-14745",
+          "source_pdf_lines": [
+            14739,
+            14745
+          ],
+          "math": "\\phi(z)\\le \\phi\\left(x-\\frac{1}{L}\\nabla \\phi(x)\\right)=\\phi(x)+\\langle \\nabla \\phi(x),-\\frac{1}{L}\\nabla \\phi(x)\\rangle+\\int_0^1\\left\\langle \\nabla\\phi\\left(x-\\frac{\\tau}{L}\\nabla\\phi(x)\\right)-\\nabla\\phi(x),-\\frac{1}{L}\\nabla\\phi(x)\\right\\rangle d\\tau",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "phi_integral_expansion"
+        },
+        {
+          "step": 3,
+          "description": "Apply L-Lipschitz continuity of nabla phi to the integral and compute the one-half factor.",
+          "ref": "Lemma 5.8 proof, lines 14746-14752",
+          "source_pdf_lines": [
+            14746,
+            14752
+          ],
+          "math": "\\phi(z)\\le \\phi(x)-\\frac{1}{L}\\|\\nabla\\phi(x)\\|_*^2+\\int_0^1\\frac{\\tau}{L}\\|\\nabla\\phi(x)\\|_*^2d\\tau=\\phi(x)-\\frac{1}{2L}\\|\\nabla\\phi(x)\\|_*^2",
+          "uses": [
+            "previous_step:2"
+          ],
+          "produces": "phi_descent_bound"
+        },
+        {
+          "step": 4,
+          "description": "Rearrange the preceding display and substitute nabla phi(x)=nabla f(x)-nabla f(z).",
+          "ref": "Lemma 5.8 proof, lines 14754-14756",
+          "source_pdf_lines": [
+            14754,
+            14756
+          ],
+          "math": "\\frac{1}{2L}\\|\\nabla\\phi(x)\\|_*^2\\le \\phi(x)-\\phi(z)=\\phi(x)",
+          "uses": [
+            "previous_step:1",
+            "previous_step:3"
+          ],
+          "produces": "lemma_5_8"
+        }
+      ]
+    },
+    {
+      "name": "Weighted component gradient-gap bound (Lemma 5.12)",
+      "ref": "Lemma 5.12",
+      "statement_math": "\\text{Let }x^*\\text{ be an optimal solution of (5.3.1). Then we have }\\frac{1}{m}\\sum_{i=1}^m\\frac{1}{mq_i}\\|\\nabla f_i(x)-\\nabla f_i(x^*)\\|_*^2\\le 2L_Q[\\Psi(x)-\\Psi(x^*)],\\quad \\forall x\\in X",
+      "role": "Supplies the finite-sum gradient-difference bound used in Lemma 5.13.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Apply Lemma 5.8 to each component f_i.",
+          "ref": "Lemma 5.12 proof, lines 16503-16506",
+          "source_pdf_lines": [
+            16503,
+            16506
+          ],
+          "math": "\\|\\nabla f_i(x)-\\nabla f_i(x^*)\\|_*^2\\le 2L_i[f_i(x)-f_i(x^*)-\\langle \\nabla f_i(x^*),x-x^*\\rangle]",
+          "uses": [
+            "Smoothness gap inequality (Lemma 5.8)",
+            "Component convexity",
+            "Component smoothness"
+          ],
+          "produces": "component_gap_bound"
+        },
+        {
+          "step": 2,
+          "description": "Divide by the q_i-weighted factor and sum over i, using the definition of L_Q.",
+          "ref": "Eq. (5.3.5)",
+          "source_pdf_lines": [
+            16507,
+            16510
+          ],
+          "math": "\\frac{1}{m}\\sum_{i=1}^m\\frac{1}{mq_i}\\|\\nabla f_i(x)-\\nabla f_i(x^*)\\|_*^2\\le 2L_Q[f(x)-f(x^*)-\\langle \\nabla f(x^*),x-x^*\\rangle]",
+          "uses": [
+            "previous_step:1",
+            "Sampling distribution and L_Q"
+          ],
+          "produces": "finite_sum_gap_bound_5_3_5"
+        },
+        {
+          "step": 3,
+          "description": "Use optimality of x* and convexity of h to replace the linearized f gap by the composite objective gap.",
+          "ref": "Lemma 5.12 proof, lines 16512-16514",
+          "source_pdf_lines": [
+            16512,
+            16514
+          ],
+          "math": "\\langle \\nabla f(x^*)+h'(x^*),x-x^*\\rangle\\ge 0",
+          "uses": [
+            "previous_step:2",
+            "Optimal solution x^*",
+            "Convexity of h"
+          ],
+          "produces": "lemma_5_12"
+        }
+      ]
+    },
+    {
+      "name": "Finite-sum gradient-gap relation (Eq. 5.3.5)",
+      "ref": "Eq. (5.3.5)",
+      "statement_math": "\\frac{1}{m}\\sum_{i=1}^m\\frac{1}{mq_i}\\|\\nabla f_i(x)-\\nabla f_i(x^*)\\|_*^2\\le 2L_Q[f(x)-f(x^*)-\\langle \\nabla f(x^*),x-x^*\\rangle]",
+      "role": "This is the intermediate relation in Lemma 5.12's proof; Lemma 5.13 applies it with x and x* replaced by tilde{x} and x_t.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Apply Lemma 5.8 to each component f_i.",
+          "ref": "Lemma 5.12 proof, lines 16503-16506",
+          "source_pdf_lines": [
+            16503,
+            16506
+          ],
+          "math": "\\|\\nabla f_i(x)-\\nabla f_i(x^*)\\|_*^2\\le 2L_i[f_i(x)-f_i(x^*)-\\langle \\nabla f_i(x^*),x-x^*\\rangle]",
+          "uses": [
+            "Smoothness gap inequality (Lemma 5.8)",
+            "Component convexity",
+            "Component smoothness"
+          ],
+          "produces": "component_gap_bound_for_5_3_5"
+        },
+        {
+          "step": 2,
+          "description": "Divide by the q_i-weighted factor and sum over i, using the definition of L_Q to obtain the displayed relation (5.3.5).",
+          "ref": "Eq. (5.3.5)",
+          "source_pdf_lines": [
+            16507,
+            16510
+          ],
+          "math": "\\frac{1}{m}\\sum_{i=1}^m\\frac{1}{mq_i}\\|\\nabla f_i(x)-\\nabla f_i(x^*)\\|_*^2\\le 2L_Q[f(x)-f(x^*)-\\langle \\nabla f(x^*),x-x^*\\rangle]",
+          "uses": [
+            "previous_step:1",
+            "Sampling distribution and L_Q"
+          ],
+          "produces": "finite_sum_gap_relation_5_3_5"
+        }
+      ]
+    },
+    {
+      "name": "Variance estimator facts (Lemma 5.13)",
+      "ref": "Lemma 5.13",
+      "statement_math": "\\text{Conditionally on }x_1,\\ldots,x_t,\\quad \\mathbb{E}[\\delta_t]=0,\\qquad \\mathbb{E}[\\|\\delta_t\\|_*^2]\\le 2L_Q[f(\\tilde{x})-f(x_t)-\\langle \\nabla f(x_t),\\tilde{x}-x_t\\rangle],\\qquad \\mathbb{E}[\\|\\delta_t\\|_*^2]\\le 4L_Q[\\Psi(x_t)-\\Psi(x^*)+\\Psi(\\tilde{x})-\\Psi(x^*)]",
+      "role": "Provides the basic-method conditional zero-mean and variance control; Section 5.4 invokes the analogous accelerated-search-point version.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Conditionally on the history, compute the expectation of the sampled component gradient term.",
+          "ref": "Lemma 5.13 proof, lines 16525-16532",
+          "source_pdf_lines": [
+            16525,
+            16532
+          ],
+          "math": "\\mathbb{E}\\left[\\frac{1}{mq_{i_t}}\\nabla f_{i_t}(x_t)\\right]=\\sum_{i=1}^m\\frac{q_i}{mq_i}\\nabla f_i(x_t)=\\frac{1}{m}\\sum_{i=1}^m\\nabla f_i(x_t)=\\nabla f(x_t)",
+          "uses": [
+            "Sampling distribution and L_Q"
+          ],
+          "produces": "sample_gradient_unbiased_at_x_t"
+        },
+        {
+          "step": 2,
+          "description": "Apply the same conditional expectation computation at the snapshot point and conclude unbiasedness of G_t.",
+          "ref": "Eq. (5.3.9)",
+          "source_pdf_lines": [
+            16536,
+            16543
+          ],
+          "math": "\\mathbb{E}[G_t]=\\mathbb{E}\\left[\\frac{1}{mq_{i_t}}(\\nabla f_{i_t}(x_t)-\\nabla f_{i_t}(\\tilde{x}))+\\nabla f(\\tilde{x})\\right]=\\nabla f(x_t)",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "unbiasedness_5_3_9"
+        },
+        {
+          "step": 3,
+          "description": "Expand the centered squared norm of delta_t and drop the nonnegative exact-gradient difference term.",
+          "ref": "Lemma 5.13 proof, lines 16544-16553",
+          "source_pdf_lines": [
+            16544,
+            16553
+          ],
+          "math": "\\mathbb{E}[\\|\\delta_t\\|_*^2]=\\mathbb{E}\\left[\\left\\|\\frac{1}{mq_{i_t}}(\\nabla f_{i_t}(x_t)-\\nabla f_{i_t}(\\tilde{x}))+\\nabla f(\\tilde{x})-\\nabla f(x_t)\\right\\|_*^2\\right]\\le \\mathbb{E}\\left[\\left\\|\\frac{1}{mq_{i_t}}(\\nabla f_{i_t}(x_t)-\\nabla f_{i_t}(\\tilde{x}))\\right\\|_*^2\\right]",
+          "uses": [
+            "previous_step:2"
+          ],
+          "produces": "variance_raw_second_moment_bound"
+        },
+        {
+          "step": 4,
+          "description": "Apply (5.3.5) with x and x* replaced by tilde{x} and x_t to obtain the basic-method variance bound (5.3.7).",
+          "ref": "Eq. (5.3.7)",
+          "source_pdf_lines": [
+            16556,
+            16557
+          ],
+          "math": "\\mathbb{E}[\\|\\delta_t\\|_*^2]\\le 2L_Q[f(\\tilde{x})-f(x_t)-\\langle \\nabla f(x_t),\\tilde{x}-x_t\\rangle]",
+          "uses": [
+            "previous_step:3",
+            "Finite-sum gradient-gap relation (Eq. 5.3.5)"
+          ],
+          "produces": "variance_bound_5_3_7"
+        },
+        {
+          "step": 5,
+          "description": "Expand the same raw second moment by adding and subtracting the optimal component gradient.",
+          "ref": "Lemma 5.13 proof, lines 16559-16562",
+          "source_pdf_lines": [
+            16559,
+            16562
+          ],
+          "math": "\\mathbb{E}\\left[\\left(\\frac{1}{mq_{i_t}}\\right)^2\\|\\nabla f_{i_t}(x_t)-\\nabla f_{i_t}(\\tilde{x})\\|_*^2\\right]=\\mathbb{E}\\left[\\left(\\frac{1}{mq_{i_t}}\\right)^2\\|\\nabla f_{i_t}(x_t)-\\nabla f_{i_t}(x^*)+\\nabla f_{i_t}(x^*)-\\nabla f_{i_t}(\\tilde{x})\\|_*^2\\right]",
+          "uses": [
+            "previous_step:3"
+          ],
+          "produces": "variance_expand_around_optimum"
+        },
+        {
+          "step": 6,
+          "description": "Use the printed two-term squared-norm bound with coefficient 2/(m q_{i_t})^2 on each expectation term.",
+          "ref": "Lemma 5.13 proof, lines 16562-16564",
+          "source_pdf_lines": [
+            16562,
+            16564
+          ],
+          "math": "\\mathbb{E}\\left[\\left(\\frac{1}{mq_{i_t}}\\right)^2\\|\\nabla f_{i_t}(x_t)-\\nabla f_{i_t}(\\tilde{x})\\|_*^2\\right]\\le \\mathbb{E}\\left[\\frac{2}{(mq_{i_t})^2}\\|\\nabla f_{i_t}(x_t)-\\nabla f_{i_t}(x^*)\\|_*^2\\right]+\\mathbb{E}\\left[\\frac{2}{(mq_{i_t})^2}\\|\\nabla f_{i_t}(\\tilde{x})-\\nabla f_{i_t}(x^*)\\|_*^2\\right]",
+          "uses": [
+            "previous_step:5"
+          ],
+          "produces": "variance_split_around_optimum"
+        },
+        {
+          "step": 7,
+          "description": "Convert the two conditional expectations over i_t into the two printed finite sums with coefficient 2/m.",
+          "ref": "Lemma 5.13 proof, lines 16566-16568",
+          "source_pdf_lines": [
+            16566,
+            16568
+          ],
+          "math": "=\\frac{2}{m}\\sum_{i=1}^m\\frac{1}{mq_i}\\|\\nabla f_i(x_t)-\\nabla f_i(x^*)\\|_*^2+\\frac{2}{m}\\sum_{i=1}^m\\frac{1}{mq_i}\\|\\nabla f_i(\\tilde{x})-\\nabla f_i(x^*)\\|_*^2",
+          "uses": [
+            "previous_step:6",
+            "Sampling distribution and L_Q"
+          ],
+          "produces": "variance_split_finite_sums"
+        },
+        {
+          "step": 8,
+          "description": "Combine the finite-sum split with Lemma 5.12 for x_t and tilde{x} to obtain the printed bound (5.3.8).",
+          "ref": "Eq. (5.3.8), Lemma 5.13 proof line 16570",
+          "source_pdf_lines": [
+            16570,
+            16570
+          ],
+          "math": "\\mathbb{E}[\\|\\delta_t\\|_*^2]\\le 4L_Q[\\Psi(x_t)-\\Psi(x^*)+\\Psi(\\tilde{x})-\\Psi(x^*)]",
+          "uses": [
+            "previous_step:7",
+            "Weighted component gradient-gap bound (Lemma 5.12)"
+          ],
+          "produces": "variance_bound_5_3_8"
+        }
+      ]
+    },
+    {
+      "name": "Accelerated variance estimator facts (Section 5.4)",
+      "ref": "Eqs. (5.4.4)-(5.4.5)",
+      "statement_math": "\\text{Similar to the results (i.e., (5.3.6) and (5.3.7)) in Lemma 5.13, we have, conditionally on }x_1,\\ldots,x_t,\\quad \\mathbb{E}[\\delta_t]=0,\\qquad \\mathbb{E}[\\|\\delta_t\\|_*^2]\\le 2L_Q[f(\\tilde{x})-f(\\underline{x}_t)-\\langle \\nabla f(\\underline{x}_t),\\tilde{x}-\\underline{x}_t\\rangle]",
+      "role": "Provides the accelerated-search-point conditional unbiasedness and variance bound used inside Lemma 5.16.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Define the accelerated residual and record the paper's explicit Section 5.4 transfer of Lemma 5.13's first two conclusions to Algorithm 5.7.",
+          "ref": "Eqs. (5.4.2), (5.4.4)-(5.4.5), lines 16918-16927",
+          "source_pdf_lines": [
+            16918,
+            16927
+          ],
+          "math": "\\delta_t:=G_t-\\nabla f(\\underline{x}_t),\\qquad \\mathbb{E}[\\delta_t]=0,\\qquad \\mathbb{E}[\\|\\delta_t\\|_*^2]\\le 2L_Q[f(\\tilde{x})-f(\\underline{x}_t)-\\langle \\nabla f(\\underline{x}_t),\\tilde{x}-\\underline{x}_t\\rangle]",
+          "uses": [
+            "Variance estimator facts (Lemma 5.13)",
+            "estimator residual delta_t",
+            "Sampling distribution and L_Q"
+          ],
+          "produces": "accelerated_variance_bound_5_4_5"
+        }
+      ]
+    },
+    {
+      "name": "Two-center Bregman prox inequality (Lemma 3.5)",
+      "ref": "Lemma 3.5",
+      "statement_math": "\\text{Let the convex function }p:X\\to\\mathbb{R},\\text{ the points }\\tilde{x},\\tilde{y}\\in X,\\text{ and the scalars }\\mu_1,\\mu_2\\ge 0\\text{ be given. Let }\\nu:X\\to\\mathbb{R}\\text{ be a differentiable convex function and }V(x,z)\\text{ be defined in (3.2.2). If }\\hat{u}\\in\\operatorname*{Argmin}\\{p(u)+\\mu_1V(\\tilde{x},u)+\\mu_2V(\\tilde{y},u):u\\in X\\},\\text{ then for any }u\\in X,\\ p(\\hat{u})+\\mu_1V(\\tilde{x},\\hat{u})+\\mu_2V(\\tilde{y},\\hat{u})\\le p(u)+\\mu_1V(\\tilde{x},u)+\\mu_2V(\\tilde{y},u)-(\\mu_1+\\mu_2)V(\\hat{u},u)",
+      "role": "Applied to the prox update defining x_t in Algorithm 5.7.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "From the definition of uhat and differentiable convexity of V(tilde{x}, .), introduce the paper's subgradient witness p'(uhat) in partial p(uhat) and record the resulting variational inequality.",
+          "ref": "Lemma 3.5 proof, lines 3555-3558",
+          "source_pdf_lines": [
+            3555,
+            3558
+          ],
+          "math": "p'(\\hat{u})\\in\\partial p(\\hat{u}),\\qquad \\langle p'(\\hat{u})+\\mu_1\\nabla V(\\tilde{x},\\hat{u})+\\mu_2\\nabla V(\\tilde{y},\\hat{u}),u-\\hat{u}\\rangle\\ge 0,\\quad \\forall u\\in X",
+          "uses": [
+            "Bregman prox function"
+          ],
+          "produces": "subgradient_witness_at_uhat_and_prox_optimality_condition"
+        },
+        {
+          "step": 2,
+          "description": "Use the three-point identity following from the definition of V.",
+          "ref": "Lemma 3.5 proof, lines 3558-3562",
+          "source_pdf_lines": [
+            3558,
+            3562
+          ],
+          "math": "V(\\tilde{x},u)=V(\\tilde{x},\\hat{u})+\\langle \\nabla V(\\tilde{x},\\hat{u}),u-\\hat{u}\\rangle+V(\\hat{u},u),\\quad \\forall u\\in X",
+          "uses": [
+            "Bregman prox function"
+          ],
+          "produces": "bregman_three_point_identity"
+        },
+        {
+          "step": 3,
+          "description": "Expand the two Bregman terms V(tilde{x},u) and V(tilde{y},u) by applying the three-point identity to each center.",
+          "ref": "Lemma 3.5 proof, lines 3563-3568",
+          "source_pdf_lines": [
+            3563,
+            3568
+          ],
+          "math": "p(u)+\\mu_1V(\\tilde{x},u)+\\mu_2V(\\tilde{y},u)=p(u)+\\mu_1[V(\\tilde{x},\\hat{u})+\\langle \\nabla V(\\tilde{x},\\hat{u}),u-\\hat{u}\\rangle+V(\\hat{u},u)]+\\mu_2[V(\\tilde{y},\\hat{u})+\\langle \\nabla V(\\tilde{y},\\hat{u}),u-\\hat{u}\\rangle+V(\\hat{u},u)]",
+          "uses": [
+            "previous_step:2"
+          ],
+          "produces": "expanded_two_center_bregman_sum"
+        },
+        {
+          "step": 4,
+          "description": "Use convexity of p with the displayed subgradient witness p'(uhat) to replace p(u) by p(uhat)+<p'(uhat),u-uhat>, preserving the inner-product term printed by the paper.",
+          "ref": "Lemma 3.5 proof, lines 3569-3571",
+          "source_pdf_lines": [
+            3569,
+            3571
+          ],
+          "math": "p(u)+\\mu_1V(\\tilde{x},u)+\\mu_2V(\\tilde{y},u)\\ge p(\\hat{u})+\\mu_1V(\\tilde{x},\\hat{u})+\\mu_2V(\\tilde{y},\\hat{u})+\\langle p'(\\hat{u})+\\mu_1\\nabla V(\\tilde{x},\\hat{u})+\\mu_2\\nabla V(\\tilde{y},\\hat{u}),u-\\hat{u}\\rangle+(\\mu_1+\\mu_2)V(\\hat{u},u)",
+          "uses": [
+            "previous_step:1",
+            "previous_step:3"
+          ],
+          "produces": "convexity_lower_bound_with_optimality_inner_product"
+        },
+        {
+          "step": 5,
+          "description": "Apply the variational inequality from the prox optimality condition to lower-bound the inner-product term by zero.",
+          "ref": "Lemma 3.5 proof, lines 3570-3572",
+          "source_pdf_lines": [
+            3570,
+            3572
+          ],
+          "math": "p(u)+\\mu_1V(\\tilde{x},u)+\\mu_2V(\\tilde{y},u)\\ge [p(\\hat{u})+\\mu_1V(\\tilde{x},\\hat{u})+\\mu_2V(\\tilde{y},\\hat{u})]+(\\mu_1+\\mu_2)V(\\hat{u},u)",
+          "uses": [
+            "previous_step:1",
+            "previous_step:4"
+          ],
+          "produces": "final_lower_bound_before_rearrangement"
+        },
+        {
+          "step": 6,
+          "description": "Rearrange the final lower bound by subtracting (mu_1+mu_2)V(uhat,u) from the right-hand side to obtain the statement of Lemma 3.5.",
+          "ref": "Lemma 3.5 statement and proof, lines 3551-3553, 3572",
+          "source_pdf_lines": [
+            3551,
+            3572
+          ],
+          "uses": [
+            "previous_step:5"
+          ],
+          "produces": "lemma_3_5"
+        }
+      ]
+    },
+    {
+      "name": "One-step accelerated prox inequality (Lemma 5.15)",
+      "ref": "Lemma 5.15",
+      "statement_math": "\\text{For any }x\\in X,\\text{ we have }\\gamma_s[l_f(\\underline{x}_t,x_t)-l_f(\\underline{x}_t,x)+h(x_t)-h(x)]\\le \\gamma_s\\mu V(\\underline{x}_t,x)+V(x_{t-1},x)-(1+\\mu\\gamma_s)V(x_t,x)-\\frac{1+\\mu\\gamma_s}{2}\\|x_t-x_{t-1}^+\\|^2-\\gamma_s\\langle \\delta_t,x_t-x\\rangle",
+      "role": "Transforms the Algorithm 5.7 prox update into the basic one-step inequality used in Lemma 5.16.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Apply Lemma 3.5 to the definition of x_t in Algorithm 5.7.",
+          "ref": "Lemma 5.15 proof, lines 16950-16954",
+          "source_pdf_lines": [
+            16950,
+            16954
+          ],
+          "math": "\\gamma_s[\\langle G_t,x_t-x\\rangle+h(x_t)-h(x)+\\mu V(\\underline{x}_t,x_t)]+V(x_{t-1},x_t)\\le \\gamma_s\\mu V(\\underline{x}_t,x)+V(x_{t-1},x)-(1+\\mu\\gamma_s)V(x_t,x)",
+          "uses": [
+            "Two-center Bregman prox inequality (Lemma 3.5)"
+          ],
+          "produces": "prox_update_inequality"
+        },
+        {
+          "step": 2,
+          "description": "Rewrite the sampled-gradient inner product as the f-linearization gap plus the residual inner product.",
+          "ref": "Lemma 5.15 proof, lines 16955-16959",
+          "source_pdf_lines": [
+            16955,
+            16959
+          ],
+          "math": "\\langle G_t,x_t-x\\rangle=\\langle \\nabla f(\\underline{x}_t),x_t-x\\rangle+\\langle \\delta_t,x_t-x\\rangle=l_f(\\underline{x}_t,x_t)-l_f(\\underline{x}_t,x)+\\langle \\delta_t,x_t-x\\rangle",
+          "uses": [
+            "estimator residual delta_t"
+          ],
+          "produces": "gradient_inner_product_rewrite"
+        },
+    {
+      "step": 3,
+      "description": "Lower-bound the two Bregman prox terms by squared norms using the prox strong-convexity lower bound and the modulus-one normalization.",
+      "ref": "Lemma 5.15 proof, lines 16960-16963",
+      "source_pdf_lines": [
+        16960,
+        16963
+      ],
+      "math": "\\gamma_s\\mu V(\\underline{x}_t,x_t)+V(x_{t-1},x_t)\\ge \\frac{1}{2}(\\mu\\gamma_s\\|x_t-\\underline{x}_t\\|^2+\\|x_t-x_{t-1}\\|^2)",
+      "uses": [
+        "Bregman prox function",
+        "Prox strong-convexity lower bound",
+        "Prox modulus-one normalization"
+      ],
+      "produces": "bregman_terms_to_squared_norms"
+    },
+    {
+      "step": 4,
+      "description": "Lower-bound the squared-norm expression by the x_{t-1}^+ distance; the paper justifies this by the definition of x_{t-1}^+ in (5.4.3) and the convexity of \\|\\cdot\\|^2.",
+      "ref": "Lemma 5.15 proof, lines 16964-16968",
+      "source_pdf_lines": [
+        16964,
+        16968
+      ],
+      "math": "\\frac{1}{2}(\\mu\\gamma_s\\|x_t-\\underline{x}_t\\|^2+\\|x_t-x_{t-1}\\|^2)\\ge \\frac{1+\\mu\\gamma_s}{2}\\|x_t-x_{t-1}^+\\|^2",
+      "uses": [
+        "auxiliary point x_{t-1}^+",
+        "previous_step:3"
+      ],
+      "produces": "prox_norm_lower_bound"
+    },
+    {
+      "step": 5,
+      "description": "Combine the prox update inequality, inner-product rewrite, and the two norm lower bounds.",
+      "ref": "Lemma 5.15 proof, line 16968",
+      "source_pdf_lines": [
+        16968,
+        16968
+      ],
+      "uses": [
+        "previous_step:1",
+        "previous_step:2",
+        "previous_step:3",
+        "previous_step:4"
+      ],
+      "produces": "lemma_5_15"
+    }
+      ]
+    },
+    {
+      "name": "Conditional one-step recursion (Lemma 5.16)",
+      "ref": "Lemma 5.16",
+      "statement_math": "Assume that \\alpha_s\\in[0,1], p_s\\in[0,1], and \\gamma_s>0 satisfy\n\\[\n1+\\mu\\gamma_s-L\\alpha_s\\gamma_s>0, \\tag{5.4.7}\n\\]\n\\[\np_s-\\frac{L_Q\\alpha_s\\gamma_s}{1+\\mu\\gamma_s-L\\alpha_s\\gamma_s}\\ge 0. \\tag{5.4.8}\n\\]\nThen, conditional on x_1,\\ldots,x_{t-1}, we have\n\\[\n\\frac{\\gamma_s}{\\alpha_s}\\mathbb{E}[\\psi(\\bar{x}_t)-\\psi(x)]+(1+\\mu\\gamma_s)\\mathbb{E}[V(x_t,x)]\\le \\frac{\\gamma_s}{\\alpha_s}(1-\\alpha_s-p_s)\\mathbb{E}[\\psi(\\bar{x}_{t-1})-\\psi(x)]+\\frac{\\gamma_s p_s}{\\alpha_s}\\mathbb{E}[\\psi(\\tilde{x})-\\psi(x)]+\\mathbb{E}[V(x_{t-1},x)] \\tag{5.4.9}\n\\]\nfor any x\\in X.",
+      "role": "The central inner-loop recursion summed in Lemmas 5.17-5.21.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Record the local hypotheses of Lemma 5.16: alpha_s in [0,1], p_s in [0,1], gamma_s>0, together with (5.4.7) and (5.4.8). These are hypotheses of this lemma, not independent assumptions for Theorem 5.9.",
+          "ref": "Lemma 5.16, lines 16972-16976; Eqs. (5.4.7)-(5.4.8)",
+          "source_pdf_lines": [
+            16972,
+            16976
+          ],
+          "math": "\\alpha_s\\in[0,1],\\quad p_s\\in[0,1],\\quad \\gamma_s>0,\\qquad 1+\\mu\\gamma_s-L\\alpha_s\\gamma_s>0,\\qquad p_s-\\frac{L_Q\\alpha_s\\gamma_s}{1+\\mu\\gamma_s-L\\alpha_s\\gamma_s}\\ge 0",
+          "uses": [],
+          "produces": "lemma_5_16_local_side_conditions"
+        },
+        {
+          "step": 2,
+          "description": "Use smoothness of f and the definition of bar{x}_t, then substitute (5.4.6).",
+          "ref": "Lemma 5.16 proof, lines 16986-16992",
+          "source_pdf_lines": [
+            16986,
+            16992
+          ],
+          "math": "f(\\bar{x}_t)\\le l_f(\\underline{x}_t,\\bar{x}_t)+\\frac{L}{2}\\|\\bar{x}_t-\\underline{x}_t\\|^2=(1-\\alpha_s-p_s)l_f(\\underline{x}_t,\\bar{x}_{t-1})+\\alpha_sl_f(\\underline{x}_t,x_t)+p_sl_f(\\underline{x}_t,\\tilde{x})+\\frac{L\\alpha_s^2}{2}\\|x_t-x_{t-1}^+\\|^2",
+          "uses": [
+            "Average smoothness constant",
+            "inner identity"
+          ],
+          "produces": "smoothness_expansion_for_bar_x"
+        },
+        {
+          "step": 3,
+          "description": "Insert Lemma 5.15 into the alpha_s l_f term and use strong convexity of f to replace linearizations by function values where printed.",
+          "ref": "Lemma 5.16 proof, lines 16994-17005",
+          "source_pdf_lines": [
+            16994,
+            17005
+          ],
+          "math": "f(\\bar{x}_t)\\le (1-\\alpha_s-p_s)l_f(\\underline{x}_t,\\bar{x}_{t-1})+\\alpha_sl_f(\\underline{x}_t,x)+h(x)-h(x_t)+\\mu V(\\underline{x}_t,x)+\\frac{1}{\\gamma_s}V(x_{t-1},x)-\\frac{1+\\mu\\gamma_s}{\\gamma_s}V(x_t,x)+p_sl_f(\\underline{x}_t,\\tilde{x})-\\frac{\\alpha_s}{2\\gamma_s}(1+\\mu\\gamma_s-L\\alpha_s\\gamma_s)\\|x_t-x_{t-1}^+\\|^2-\\alpha_s\\langle \\delta_t,x_t-x\\rangle",
+          "uses": [
+            "previous_step:2",
+            "One-step accelerated prox inequality (Lemma 5.15)",
+            "Possible strong convexity"
+          ],
+          "produces": "raw_one_step_with_residual"
+        },
+        {
+          "step": 4,
+          "description": "Use strong convexity/convexity to bound the first linearized term by f(bar{x}_{t-1}) and split the residual inner product into x_t-x_{t-1}^+ plus x_{t-1}^+-x.",
+          "ref": "Lemma 5.16 proof, lines 17006-17016",
+          "source_pdf_lines": [
+            17006,
+            17016
+          ],
+          "math": "f(\\bar{x}_t)\\le (1-\\alpha_s-p_s)f(\\bar{x}_{t-1})+\\alpha_s\\Psi(x)-h(x_t)+\\frac{1}{\\gamma_s}V(x_{t-1},x)-\\frac{1+\\mu\\gamma_s}{\\gamma_s}V(x_t,x)+p_sl_f(\\underline{x}_t,\\tilde{x})-\\frac{\\alpha_s}{2\\gamma_s}(1+\\mu\\gamma_s-L\\alpha_s\\gamma_s)\\|x_t-x_{t-1}^+\\|^2-\\alpha_s\\langle \\delta_t,x_t-x_{t-1}^+\\rangle-\\alpha_s\\langle \\delta_t,x_{t-1}^+-x\\rangle",
+          "uses": [
+            "previous_step:3",
+            "Possible strong convexity"
+          ],
+          "produces": "residual_split_step"
+        },
+        {
+          "step": 5,
+          "description": "Apply Cauchy-Schwarz/Young to absorb the x_t-x_{t-1}^+ residual into the negative squared-distance term.",
+          "ref": "Lemma 5.16 proof, lines 17016-17027",
+          "source_pdf_lines": [
+            17016,
+            17027
+          ],
+          "math": "f(\\bar{x}_t)\\le (1-\\alpha_s-p_s)f(\\bar{x}_{t-1})+\\alpha_s\\Psi(x)-h(x_t)+\\frac{1}{\\gamma_s}V(x_{t-1},x)-\\frac{1+\\mu\\gamma_s}{\\gamma_s}V(x_t,x)+p_sl_f(\\underline{x}_t,\\tilde{x})+\\frac{\\alpha_s\\gamma_s\\|\\delta_t\\|_*^2}{2(1+\\mu\\gamma_s-L\\alpha_s\\gamma_s)}+\\alpha_s\\langle \\delta_t,x_{t-1}^+-x\\rangle",
+          "uses": [
+            "previous_step:4",
+            "previous_step:1"
+          ],
+          "produces": "young_absorbed_residual_bound"
+        },
+        {
+          "step": 6,
+          "description": "Condition on x_1,...,x_{t-1}; use the zero mean residual (5.4.4) to remove the last inner product and the variance bound (5.4.5) to replace the squared residual term by the printed gradient-gap expression.",
+          "ref": "Lemma 5.16 proof, lines 17028-17039",
+          "source_pdf_lines": [
+            17028,
+            17039
+          ],
+          "math": "p_sl_f(\\underline{x}_t,\\tilde{x})+\\frac{\\alpha_s\\gamma_s\\mathbb{E}[\\|\\delta_t\\|_*^2]}{2(1+\\mu\\gamma_s-L\\alpha_s\\gamma_s)}+\\alpha_s\\mathbb{E}[\\langle\\delta_t,x_{t-1}^+-x\\rangle]\\le p_sl_f(\\underline{x}_t,\\tilde{x})+\\frac{L_Q\\alpha_s\\gamma_s}{1+\\mu\\gamma_s-L\\alpha_s\\gamma_s}[f(\\tilde{x})-l_f(\\underline{x}_t,\\tilde{x})]",
+          "uses": [
+            "Accelerated variance estimator facts (Section 5.4)",
+            "previous_step:5"
+          ],
+          "produces": "variance_substituted_bracket"
+        },
+        {
+          "step": 7,
+          "description": "Collect the l_f(underlined x_t, tilde{x}) coefficient and the f(tilde{x}) coefficient exactly as in the displayed chain.",
+          "ref": "Lemma 5.16 proof, lines 17039-17043",
+          "source_pdf_lines": [
+            17039,
+            17043
+          ],
+          "math": "\\le \\left(p_s-\\frac{L_Q\\alpha_s\\gamma_s}{1+\\mu\\gamma_s-L\\alpha_s\\gamma_s}\\right)l_f(\\underline{x}_t,\\tilde{x})+\\frac{L_Q\\alpha_s\\gamma_s}{1+\\mu\\gamma_s-L\\alpha_s\\gamma_s}f(\\tilde{x})",
+          "uses": [
+            "previous_step:6"
+          ],
+          "produces": "stochastic_bracket_coefficients_collected"
+        },
+        {
+          "step": 8,
+          "description": "Apply condition (5.4.8) and convexity of f, so the nonnegative l_f coefficient can be bounded by replacing l_f(underlined x_t, tilde{x}) with f(tilde{x}).",
+          "ref": "Lemma 5.16 proof, lines 17043-17045",
+          "source_pdf_lines": [
+            17043,
+            17045
+          ],
+          "math": "\\le p_s f(\\tilde{x})",
+          "uses": [
+            "previous_step:7",
+            "previous_step:1",
+            "Component convexity"
+          ],
+          "produces": "stochastic_bracket_bound"
+        },
+        {
+          "step": 9,
+          "description": "Add convexity of h along the same convex combination defining bar{x}_t.",
+          "ref": "Lemma 5.16 proof, lines 17046-17047",
+          "source_pdf_lines": [
+            17046,
+            17047
+          ],
+          "math": "h(\\bar{x}_t)\\le (1-\\alpha_s-p_s)h(\\bar{x}_{t-1})+\\alpha_sh(x_t)+p_sh(\\tilde{x})",
+          "uses": [
+            "Convexity of h"
+          ],
+          "produces": "h_convexity_bound"
+        },
+        {
+          "step": 10,
+          "description": "Sum the previous conclusions to get (5.4.10)-(5.4.11).",
+          "ref": "Eqs. (5.4.10)-(5.4.11)",
+          "source_pdf_lines": [
+            17047,
+            17050
+          ],
+          "math": "\\mathbb{E}[\\Psi(\\bar{x}_t)]\\le (1-\\alpha_s-p_s)\\Psi(\\bar{x}_{t-1})+p_s\\Psi(\\tilde{x})+\\alpha_s\\Psi(x)+\\frac{\\alpha_s}{\\gamma_s}[V(x_{t-1},x)-(1+\\mu\\gamma_s)V(x_t,x)]",
+          "uses": [
+            "previous_step:5",
+            "previous_step:8",
+            "previous_step:9"
+          ],
+          "produces": "psi_one_step_5_4_10_11"
+        },
+        {
+          "step": 11,
+          "description": "Subtract Psi(x) from both sides and rearrange to the displayed conditional recursion (5.4.9).",
+          "ref": "Lemma 5.16 proof, lines 17052-17053",
+          "source_pdf_lines": [
+            17052,
+            17053
+          ],
+          "uses": [
+            "previous_step:10"
+          ],
+          "produces": "lemma_5_16"
+        }
+      ]
+    },
+    {
+      "name": "Smooth epoch recursion (Lemma 5.17)",
+      "ref": "Lemma 5.17",
+      "statement_math": "\\text{Assume that for each epoch }s,\\ s\\ge 1,\\ \\alpha_s,\\gamma_s,p_s,\\text{ and }T_s\\text{ are chosen such that (5.4.7)--(5.4.8) hold. Also, let }\\theta_t=\\begin{cases}\\frac{\\gamma_s}{\\alpha_s}(\\alpha_s+p_s),&t=1,\\ldots,T_s-1,\\\\ \\frac{\\gamma_s}{\\alpha_s},&t=T_s,\\end{cases}\\ L_s:=\\frac{\\gamma_s}{\\alpha_s}+(T_s-1)\\frac{\\gamma_s(\\alpha_s+p_s)}{\\alpha_s},\\ R_s:=\\frac{\\gamma_s}{\\alpha_s}(1-\\alpha_s)+(T_s-1)\\frac{\\gamma_sp_s}{\\alpha_s},\\ w_s:=L_s-R_{s+1}\\ge 0,\\ \\forall s\\ge 1.\\ \\text{Then }L_s\\mathbb{E}[\\Psi(\\tilde{x}^s)-\\Psi(x)]+\\left(\\sum_{j=1}^{s-1}w_j\\right)\\mathbb{E}[\\Psi(\\bar{x}^s)-\\Psi(x)]\\le R_1\\mathbb{E}[\\Psi(\\tilde{x}^0)-\\Psi(x)]+V(x^0,x)-V(x^s,x),\\ \\text{where }\\bar{x}^s:=\\left(\\sum_{j=1}^{s-1}w_j\\right)^{-1}\\sum_{j=1}^{s-1}w_j\\tilde{x}^j.",
+      "role": "The smooth-case multi-epoch telescope reused in Lemma 5.20.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Record the local hypothesis in Lemma 5.17 that the epoch parameters are chosen so that (5.4.7)--(5.4.8) hold; this is the assumption that permits using Lemma 5.16 after setting mu=0.",
+          "ref": "Lemma 5.17 statement and proof, lines 17083-17106; Eqs. (5.4.7)-(5.4.8)",
+          "source_pdf_lines": [
+            17083,
+            17106
+          ],
+          "math": "\\text{Assume that for each epoch }s,\\ s\\ge 1,\\ \\alpha_s,\\gamma_s,p_s,\\text{ and }T_s\\text{ are chosen such that (5.4.7)--(5.4.8) hold.}",
+          "uses": [],
+          "produces": "lemma_5_17_local_side_conditions"
+        },
+        {
+          "step": 2,
+          "description": "Set mu=0 in Lemma 5.16.",
+          "ref": "Lemma 5.17 proof, lines 17102-17106",
+          "source_pdf_lines": [
+            17102,
+            17106
+          ],
+          "math": "\\frac{\\gamma_s}{\\alpha_s}\\mathbb{E}[\\Psi(\\bar{x}_t)-\\Psi(x)]\\le \\frac{\\gamma_s}{\\alpha_s}(1-\\alpha_s-p_s)\\mathbb{E}[\\Psi(\\bar{x}_{t-1})-\\Psi(x)]+\\frac{\\gamma_sp_s}{\\alpha_s}\\mathbb{E}[\\Psi(\\tilde{x})-\\Psi(x)]+V(x_{t-1},x)-V(x_t,x)",
+          "uses": [
+            "Conditional one-step recursion (Lemma 5.16)",
+            "previous_step:1",
+            "Smooth non-strongly convex subsection condition"
+          ],
+          "produces": "mu_zero_inner_recursion"
+        },
+        {
+          "step": 3,
+          "description": "Sum over t=1,...,T_s, use theta_t from (5.4.12), xbar_0=tilde{x}, and rearrange.",
+          "ref": "Lemma 5.17 proof, lines 17107-17115",
+          "source_pdf_lines": [
+            17107,
+            17115
+          ],
+          "math": "\\sum_{t=1}^{T_s}\\theta_t\\mathbb{E}[\\Psi(\\bar{x}_t)-\\Psi(x)]\\le \\left[\\frac{\\gamma_s}{\\alpha_s}(1-\\alpha_s)+(T_s-1)\\frac{\\gamma_sp_s}{\\alpha_s}\\right]\\mathbb{E}[\\Psi(\\tilde{x})-\\Psi(x)]+V(x_0,x)-V(x_{T_s},x)",
+          "uses": [
+            "previous_step:2",
+            "Theta smooth weights",
+            "Smooth epoch coefficients and average"
+          ],
+          "produces": "summed_inner_epoch"
+        },
+        {
+          "step": 4,
+          "description": "Use x^s=x_T, tilde{x}^s as the weighted average, tilde{x}=tilde{x}^{s-1}, and convexity of Psi.",
+          "ref": "Lemma 5.17 proof, lines 17116-17125",
+          "source_pdf_lines": [
+            17116,
+            17125
+          ],
+          "math": "\\sum_{t=1}^{T_s}\\theta_t\\mathbb{E}[\\Psi(\\tilde{x}^s)-\\Psi(x)]\\le \\left[\\frac{\\gamma_s}{\\alpha_s}(1-\\alpha_s)+(T_s-1)\\frac{\\gamma_sp_s}{\\alpha_s}\\right]\\mathbb{E}[\\Psi(\\tilde{x}^{s-1})-\\Psi(x)]+V(x^{s-1},x)-V(x^s,x)",
+          "uses": [
+            "previous_step:3",
+            "Convexity of h",
+            "Component convexity"
+          ],
+          "produces": "epoch_weighted_average_bound"
+        },
+        {
+          "step": 5,
+          "description": "Identify the sum of weights with L_s and the coefficient with R_s.",
+          "ref": "Lemma 5.17 proof, lines 17127-17134",
+          "source_pdf_lines": [
+            17127,
+            17134
+          ],
+          "math": "L_s\\mathbb{E}[\\Psi(\\tilde{x}^s)-\\Psi(x)]\\le R_s\\mathbb{E}[\\Psi(\\tilde{x}^{s-1})-\\Psi(x)]+V(x^{s-1},x)-V(x^s,x)",
+          "uses": [
+            "previous_step:4",
+            "Smooth epoch coefficients and average"
+          ],
+          "produces": "single_epoch_recursion"
+        },
+        {
+          "step": 6,
+          "description": "Sum the single-epoch recursions, use convexity of Psi for the cross-epoch weighted average \\bar{x}^s, and rearrange with w_s=L_s-R_{s+1}.",
+          "ref": "Lemma 5.17 proof, lines 17136-17137",
+          "source_pdf_lines": [
+            17136,
+            17137
+          ],
+          "uses": [
+            "previous_step:5",
+            "Theta smooth weights",
+            "Smooth epoch coefficients and average",
+            "Component convexity",
+            "Convexity of h"
+          ],
+          "produces": "lemma_5_17"
+        }
+      ]
+    },
+    {
+      "name": "Smooth-case proof facts (Theorem 5.8)",
+      "ref": "Theorem 5.8 proof, Eqs. (5.4.19)-(5.4.21)",
+      "statement_math": "\\text{Assume that }\\theta_t\\text{ are defined in (5.4.12) and the probabilities }q_i\\text{ are set to }L_i/\\sum_{i=1}^m L_i\\text{ for }i=1,\\ldots,m.\\ \\text{Moreover, let us denote }s_0:=\\lfloor\\log_2 m\\rfloor+1\\text{ and assume that }T_s=\\begin{cases}2^{s-1},&s\\le s_0,\\\\ T_{s_0},&s>s_0,\\end{cases}\\quad \\gamma_s=\\frac{1}{3L\\alpha_s},\\quad p_s=\\frac{1}{2},\\quad \\alpha_s=\\begin{cases}\\frac{1}{2},&s\\le s_0,\\\\ \\frac{2}{s-s_0+4},&s>s_0.\\end{cases}\\ \\text{Then for any }x\\in X,\\quad \\mathbb{E}[\\Psi(\\tilde{x}^s)-\\Psi(x)]\\le \\begin{cases}2^{-(s+1)}D_0,&1\\le s\\le s_0,\\\\ \\frac{8LD_0}{(s-s_0+4)^2(m+1)},&s>s_0,\\end{cases}\\quad \\text{where }D_0:=2[\\psi(x^0)-\\psi(x^*)]+3LV(x^0,x^*).",
+      "role": "Supplies the smooth-case coefficient checks, w_s nonnegativity, R_1 value, and L_s lower bound (5.4.21) reused in Lemma 5.20 and Lemma 5.21.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "With q_i=L_i/sum_i L_i, identify L_Q=L and verify the two Lemma 5.16 conditions under the smooth-case schedule printed in Theorem 5.8.",
+          "ref": "Theorem 5.8 proof, lines 17172-17180",
+          "source_pdf_lines": [
+            17172,
+            17180
+          ],
+          "math": "1+\\mu\\gamma_s-L\\alpha_s\\gamma_s=1-L\\alpha_s\\gamma_s=\\frac{2}{3},\\qquad p_s-\\frac{L_Q\\alpha_s\\gamma_s}{1+\\mu\\gamma_s-L\\alpha_s\\gamma_s}=p_s-\\frac{1}{2}=0",
+          "uses": [
+            "Sampling distribution and L_Q",
+            "Smooth non-strongly convex subsection condition"
+          ],
+          "produces": "smooth_case_parameter_conditions"
+        },
+        {
+          "step": 2,
+          "description": "For 1 <= s < s0, compute w_s=L_s-R_{s+1} using alpha_{s+1}=alpha_s, gamma_{s+1}=gamma_s, and T_{s+1}=2T_s.",
+          "ref": "Theorem 5.8 proof, lines 17183-17188",
+          "source_pdf_lines": [
+            17183,
+            17188
+          ],
+          "math": "w_s=L_s-R_{s+1}=\\frac{\\gamma_s}{\\alpha_s}[1+(T_s-1)(\\alpha_s+p_s)-(1-\\alpha_s)-(2T_s-1)p_s]=\\frac{\\gamma_s}{\\alpha_s}[T_s(\\alpha_s-p_s)]=0",
+          "uses": [
+            "Smooth epoch coefficients and average"
+          ],
+          "produces": "smooth_case_w_zero_before_s0"
+        },
+        {
+          "step": 3,
+          "description": "For s >= s0, compute w_s=L_s-R_{s+1} and show it is nonnegative.",
+          "ref": "Theorem 5.8 proof, lines 17189-17198",
+          "source_pdf_lines": [
+            17189,
+            17198
+          ],
+          "math": "w_s=L_s-R_{s+1}=\\frac{\\gamma_s}{\\alpha_s}-\\frac{\\gamma_{s+1}}{\\alpha_{s+1}}(1-\\alpha_{s+1})+(T_{s_0}-1)\\frac{\\gamma_s(\\alpha_s+p_s)}{\\alpha_s}-\\frac{\\gamma_{s+1}p_{s+1}}{\\alpha_{s+1}}=\\frac{1}{12L}+\\frac{(T_{s_0}-1)[2(s-s_0+4)-1]}{24L}\\ge 0",
+          "uses": [
+            "Smooth epoch coefficients and average"
+          ],
+          "produces": "smooth_case_w_nonnegative_after_s0"
+        },
+        {
+          "step": 4,
+          "description": "Use the verified side conditions and w_s nonnegativity to instantiate Lemma 5.17 in its full displayed form, retaining the cross-epoch weighted-average term and the endpoint -V(x^s,x).",
+          "ref": "Eq. (5.4.15), Theorem 5.8 proof lines 17201-17203",
+          "source_pdf_lines": [
+            17090,
+            17094
+          ],
+          "math": "L_s\\mathbb{E}[\\Psi(\\tilde{x}^s)-\\Psi(x)]+\\left(\\sum_{j=1}^{s-1}w_j\\right)\\mathbb{E}[\\Psi(\\bar{x}^s)-\\Psi(x)]\\le R_1\\mathbb{E}[\\Psi(\\tilde{x}^0)-\\Psi(x)]+V(x^0,x)-V(x^s,x)",
+          "uses": [
+            "Smooth epoch recursion (Lemma 5.17)",
+            "previous_step:1",
+            "previous_step:2",
+            "previous_step:3"
+          ],
+          "produces": "smooth_case_full_iterated_bound_5_4_15"
+        },
+        {
+          "step": 5,
+          "description": "Record the theorem proof's printed iterative consequence for arbitrary x in X after applying the verified coefficient observations in (5.4.15), preserving the paper's arbitrary-x transition.",
+          "ref": "Theorem 5.8 proof, lines 17201-17204",
+          "source_pdf_lines": [
+            17201,
+            17204
+          ],
+          "math": "L_s\\mathbb{E}[\\Psi(\\tilde{x}^s)-\\Psi(x)]\\le R_1\\mathbb{E}[\\Psi(\\tilde{x}^0)-\\Psi(x)]+V(x^0,x)-V(x^s,x)",
+          "uses": [
+            "previous_step:4",
+            "Smooth epoch recursion (Lemma 5.17)"
+          ],
+          "produces": "smooth_case_printed_arbitrary_x_bound_with_endpoint"
+        },
+        {
+          "step": 6,
+          "description": "Apply Bregman nonnegativity to the printed arbitrary-x bound to discard the nonpositive endpoint -V(x^s,x), then use the printed fact R_1=2/(3L) together with tilde{x}^0=x^0.",
+          "ref": "Theorem 5.8 proof, lines 17203-17210",
+          "source_pdf_lines": [
+            17203,
+            17210
+          ],
+          "math": "L_s\\mathbb{E}[\\Psi(\\tilde{x}^s)-\\Psi(x)]\\le \\frac{2}{3L}[\\Psi(x^0)-\\Psi(x)]+V(x^0,x)",
+          "uses": [
+            "previous_step:5",
+            "Bregman prox function",
+            "Prox strong-convexity lower bound",
+            "Prox modulus-one normalization",
+            "Smooth epoch coefficients and average"
+          ],
+          "produces": "smooth_case_printed_arbitrary_x_bound_without_endpoint"
+        },
+        {
+          "step": 7,
+          "description": "Compute L_s in the two regimes: the proof first records the exact first-phase value for s <= s0, and then records the s >= s0 formula and lower bound (5.4.21).",
+          "ref": "Eq. (5.4.21), Theorem 5.8 proof lines 17211-17219",
+          "source_pdf_lines": [
+            17211,
+            17219
+          ],
+          "math": "\\text{if }s\\le s_0,\\ L_s=\\frac{2^{s+1}}{3L}.\\quad \\text{if }s\\ge s_0,\\ L_s=\\frac{1}{3L\\alpha_s^2}\\left[1+(T_s-1)\\left(\\alpha_s+\\frac{1}{2}\\right)\\right]=\\frac{(s-s_0+4)(T_{s_0}-1)}{6L}+\\frac{(s-s_0+4)^2(T_{s_0}+1)}{24L}\\ge \\frac{(s-s_0+4)^2(m+1)}{24L}",
+          "uses": [
+            "Smooth epoch coefficients and average"
+          ],
+          "produces": "smooth_case_Ls_first_phase_value_and_lower_bound_5_4_21"
+        },
+        {
+          "step": 8,
+          "description": "Specialize the preceding arbitrary-x inequality to the optimal solution x^*. This is the needed bridge from the printed bound with free x to the D_0 endpoint, since D_0 in (5.4.20) is defined using x^*.",
+          "ref": "Theorem 5.8 proof, lines 17203-17210; Eq. (5.4.20)",
+          "source_pdf_lines": [
+            17203,
+            17210
+          ],
+          "uses": [
+            "previous_step:6",
+            "Optimal solution x^*",
+            "D0 definition"
+          ],
+          "produces": "smooth_case_objective_bound_specialized_at_x_star"
+        },
+        {
+          "step": 9,
+          "description": "Combine the x=x^* specialization with the two L_s estimates. For s <= s0 use L_s=2^{s+1}/(3L); for s>s0 use L_s >= (s-s0+4)^2(m+1)/(24L). Together with D_0=2[\\psi(x^0)-\\psi(x^*)]+3LV(x^0,x^*) this gives the two printed D_0 rates with x^* on the comparison point.",
+          "ref": "Theorem 5.8 proof, lines 17211-17221; Eq. (5.4.20); Eq. (5.4.21)",
+          "source_pdf_lines": [
+            17211,
+            17221
+          ],
+          "uses": [
+            "previous_step:7",
+            "previous_step:8",
+            "D0 definition"
+          ],
+          "produces": "smooth_case_two_rate_bound_at_x_star"
+        },
+        {
+          "step": 10,
+          "description": "Use optimality of x^* for (5.3.1) to compare the arbitrary theorem statement with the x^* bound: for any x in X, \\Psi(x^*)<=\\Psi(x), hence the arbitrary-x left side is bounded above by the already established x^* left side. This recovers the paper's displayed for-any-x conclusion (5.4.19).",
+          "ref": "Theorem 5.8 statement lines 17160-17170; Theorem 5.8 proof line 17221; Eq. (5.4.20)",
+          "source_pdf_lines": [
+            17160,
+            17221
+          ],
+          "uses": [
+            "previous_step:9",
+            "Optimal solution x^*",
+            "D0 definition"
+          ],
+          "produces": "smooth_case_theorem_5_8"
+        }
+      ]
+    },
+    {
+      "name": "Smooth gradient complexity bound (Corollary 5.10)",
+      "ref": "Corollary 5.10",
+      "statement_math": "The total number of gradient evaluation performed by the variance-reduced accelerated gradient method can be bounded by\n\\[\n\\bar{N}:=\\begin{cases}O\\left(m\\log\\frac{D_0}{\\varepsilon}\\right),&m\\varepsilon\\ge D_0,\\\\ O\\left(\\sqrt{\\frac{mD_0}{\\varepsilon}}+m\\log m\\right),&\\text{o.w.}\\end{cases} \\tag{5.4.22}\n\\]\nwhere D_0 is defined in (5.4.20).",
+      "role": "Supplies the smooth-case component-gradient bounds (5.4.23) and (5.4.24) explicitly invoked at the start of Corollary 5.11.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "In the lower-accuracy and/or large-component regime m epsilon >= D0, the proof first observes the target is reached within s0 epochs and defines the bounded epoch count S_l.",
+          "ref": "Corollary 5.10 proof, lines 17240-17250",
+          "source_pdf_lines": [
+            17240,
+            17250
+          ],
+          "math": "\\frac{D_0}{2^{s_0-1}-1}\\le \\varepsilon,\\qquad S_l:=\\min\\left\\{1+\\log_2\\frac{D_0}{\\varepsilon},s_0\\right\\}",
+          "uses": [
+            "Smooth-case proof facts (Theorem 5.8)",
+            "D0 definition"
+          ],
+          "produces": "smooth_low_accuracy_epoch_bound"
+        },
+        {
+          "step": 2,
+          "description": "Use the first-regime epoch count and T_s=2^{s-1} to obtain the printed smooth complexity bound (5.4.23).",
+          "ref": "Eq. (5.4.23)",
+          "source_pdf_lines": [
+            17251,
+            17261
+          ],
+          "math": "mS_l+\\sum_{s=1}^{S_l}T_s=mS_l+\\sum_{s=1}^{S_l}2^{s-1}\\le mS_l+2^{S_l}=O\\left(\\min\\left\\{m\\log\\frac{D_0}{\\varepsilon},m\\log m\\right\\}\\right)=O\\left(m\\log\\frac{D_0}{\\varepsilon}\\right)",
+          "uses": [
+            "previous_step:1",
+            "Smooth-case proof facts (Theorem 5.8)"
+          ],
+          "produces": "smooth_complexity_bound_5_4_23"
+        },
+        {
+          "step": 3,
+          "description": "In the high-accuracy and/or smaller-component regime m epsilon < D0, the proof records the total epoch bound S_h.",
+          "ref": "Corollary 5.10 proof, lines 17261-17270",
+          "source_pdf_lines": [
+            17261,
+            17270
+          ],
+          "math": "S_h:=\\left\\lceil\\sqrt{\\frac{16D_0}{(m+1)\\varepsilon}}+s_0-4\\right\\rceil",
+          "uses": [
+            "Smooth-case proof facts (Theorem 5.8)",
+            "D0 definition"
+          ],
+          "produces": "smooth_high_accuracy_epoch_bound"
+        },
+        {
+          "step": 4,
+          "description": "Split the gradient evaluations into the first s0 epochs and the remaining epochs, then simplify to the printed high-accuracy smooth bound (5.4.24).",
+          "ref": "Eq. (5.4.24)",
+          "source_pdf_lines": [
+            17271,
+            17284
+          ],
+          "math": "ms_0+\\sum_{s=1}^{s_0}T_s+(T_{s_0}+m)(S_h-s_0)=\\sum_{s=1}^{s_0}T_s+(T_{s_0}+m)S_h=O\\left(\\sqrt{\\frac{mD_0}{\\varepsilon}}+m\\log m\\right)",
+          "uses": [
+            "previous_step:3",
+            "Smooth-case proof facts (Theorem 5.8)"
+          ],
+          "produces": "smooth_complexity_bound_5_4_24"
+        }
+      ]
+    },
+    {
+      "name": "First-phase epoch decay (Lemma 5.18)",
+      "ref": "Lemma 5.18",
+      "statement_math": "If s\\le s_0, then for any x\\in X,\n\\[\n\\mathbb{E}[\\psi(\\tilde{x}^s)-\\psi(x)]\\le 2^{-(s+1)}D_0,\\quad 1\\le s\\le s_0,\n\\]\nwhere D_0 is defined in (5.4.20).",
+      "role": "Gives the first case of Theorem 5.9 and the base bound for later cases.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Before applying Lemma 5.16, derive its side conditions from the first-phase schedule. The schedule gives alpha_s=p_s=1/2 and gamma_s=1/(3L alpha_s)=2/(3L), hence alpha_s,p_s in [0,1] and gamma_s>0. With q_i=L_i/sum_i L_i, L_Q=L; therefore 1+mu gamma_s-L alpha_s gamma_s=2/3+mu gamma_s>0 and p_s-L_Q alpha_s gamma_s/(1+mu gamma_s-L alpha_s gamma_s)>=1/2-(1/3)/(2/3)=0.",
+          "ref": "Lemma 5.18 proof, lines 17345-17351; Lemma 5.16 lines 16972-16976; Eqs. (5.4.7)-(5.4.8)",
+          "source_pdf_lines": [
+            16972,
+            17351
+          ],
+          "uses": [
+            "Strongly convex unified schedule",
+            "Sampling distribution and L_Q",
+            "Average smoothness constant",
+            "Possible strong convexity"
+          ],
+          "produces": "first_phase_lemma_5_16_side_conditions_derived"
+        },
+        {
+          "step": 2,
+          "description": "In the first phase set alpha_s=p_s=1/2, gamma_s=2/(3L), and T_s=2^{s-1}; substitute these into (5.4.9).",
+          "ref": "Lemma 5.18 proof, lines 17345-17351",
+          "source_pdf_lines": [
+            17345,
+            17351
+          ],
+          "math": "\\frac{\\gamma_s}{\\alpha_s}\\mathbb{E}[\\psi(\\bar{x}_t)-\\psi(x)]+(1+\\mu\\gamma_s)\\mathbb{E}[V(x_t,x)]\\le \\frac{\\gamma_s}{2\\alpha_s}\\mathbb{E}[\\psi(\\tilde{x})-\\psi(x)]+\\mathbb{E}[V(x_{t-1},x)]",
+          "uses": [
+            "Conditional one-step recursion (Lemma 5.16)",
+            "previous_step:1",
+            "Sampling distribution and L_Q",
+            "Strongly convex unified schedule"
+          ],
+          "produces": "first_phase_inner_recursion"
+        },
+        {
+          "step": 3,
+          "description": "Sum over t=1,...,T_s, retaining the nonnegative mu gamma_s sum.",
+          "ref": "Lemma 5.18 proof, lines 17352-17356",
+          "source_pdf_lines": [
+            17352,
+            17356
+          ],
+          "math": "\\frac{\\gamma_s}{\\alpha_s}\\sum_{t=1}^{T_s}\\mathbb{E}[\\psi(\\bar{x}_t)-\\psi(x)]+\\mathbb{E}[V(x_{T_s},x)]+\\mu\\gamma_s\\sum_{t=1}^{T_s}\\mathbb{E}[V(x_t,x)]\\le \\frac{\\gamma_sT_s}{2\\alpha_s}\\mathbb{E}[\\psi(\\tilde{x})-\\psi(x)]+\\mathbb{E}[V(x_0,x)]",
+          "uses": [
+            "previous_step:2"
+          ],
+          "produces": "first_phase_summed_recursion"
+        },
+        {
+          "step": 4,
+          "description": "Use theta_t=gamma_s/alpha_s, the epoch identities tilde{x}=tilde{x}^{s-1}, x_0=x^{s-1}, x^s=x_{T_s}, and T_s=2T_{s-1}.",
+          "ref": "Lemma 5.18 proof, lines 17357-17366",
+          "source_pdf_lines": [
+            17357,
+            17366
+          ],
+          "math": "\\frac{4T_s}{3L}\\mathbb{E}[\\psi(\\tilde{x}^s)-\\psi(x)]+\\mathbb{E}[V(x^s,x)]\\le \\frac{2T_s}{3L}\\mathbb{E}[\\psi(\\tilde{x}^{s-1})-\\psi(x)]+\\mathbb{E}[V(x^{s-1},x)]=\\frac{4T_{s-1}}{3L}\\mathbb{E}[\\psi(\\tilde{x}^{s-1})-\\psi(x)]+\\mathbb{E}[V(x^{s-1},x)]",
+          "uses": [
+            "previous_step:3",
+            "Theta smooth weights",
+            "Strongly convex unified schedule"
+          ],
+          "produces": "first_phase_epoch_recursion"
+        },
+        {
+          "step": 5,
+          "description": "Apply the epoch recursion repeatedly back to s=0.",
+          "ref": "Eq. (5.4.27)",
+          "source_pdf_lines": [
+            17367,
+            17375
+          ],
+          "math": "\\frac{4T_s}{3L}\\mathbb{E}[\\psi(\\tilde{x}^s)-\\psi(x)]+\\mathbb{E}[V(x^s,x)]\\le \\frac{2}{3L}\\mathbb{E}[\\psi(\\tilde{x}^0)-\\psi(x)]+V(x^0,x)=\\frac{2}{3L}\\mathbb{E}[\\psi(x^0)-\\psi(x)]+V(x^0,x)",
+          "uses": [
+            "previous_step:4"
+          ],
+          "produces": "recursive_bound_5_4_27"
+        },
+        {
+          "step": 6,
+          "description": "Apply Bregman nonnegativity to (5.4.27) while preserving the paper's arbitrary x in X boundary, so the left Bregman term can be dropped before the final T_s substitution.",
+          "ref": "Lemma 5.18 proof, line 17376",
+          "source_pdf_lines": [
+            17376,
+            17376
+          ],
+          "uses": [
+            "previous_step:5",
+            "Bregman prox function",
+            "Prox strong-convexity lower bound",
+            "Prox modulus-one normalization"
+          ],
+          "produces": "first_phase_objective_bound_for_arbitrary_x_before_Ts_substitution"
+        },
+        {
+          "step": 7,
+          "description": "Specialize the objective-only consequence of (5.4.27) to x=x^*. This keeps the paper's arbitrary-x derivation boundary but moves to the comparison point used in D_0.",
+          "ref": "Lemma 5.18 proof, line 17376; Eq. (5.4.20)",
+          "source_pdf_lines": [
+            17376,
+            17376
+          ],
+          "uses": [
+            "previous_step:6",
+            "Optimal solution x^*",
+            "D0 definition"
+          ],
+          "produces": "first_phase_objective_bound_specialized_at_x_star_before_Ts_substitution"
+        },
+        {
+          "step": 8,
+          "description": "Plug T_s=2^{s-1} into the x=x^* objective bound. With D_0=2[\\psi(x^0)-\\psi(x^*)]+3LV(x^0,x^*) from (5.4.20), this identifies the D_0 bound for the optimal comparison point.",
+          "ref": "Lemma 5.18 proof, line 17376; Eq. (5.4.20)",
+          "source_pdf_lines": [
+            17376,
+            17376
+          ],
+          "uses": [
+            "previous_step:7",
+            "D0 definition",
+            "Strongly convex unified schedule"
+          ],
+          "produces": "first_phase_D0_bound_at_x_star"
+        },
+        {
+          "step": 9,
+          "description": "Use optimality of x^* for (5.3.1) to pass from the x^* comparison to the lemma's printed for-any-x conclusion: for any x in X, \\psi(x^*)<=\\psi(x), so \\mathbb{E}[\\psi(\\tilde{x}^s)-\\psi(x)]<=\\mathbb{E}[\\psi(\\tilde{x}^s)-\\psi(x^*)].",
+          "ref": "Lemma 5.18 statement lines 17340-17344; Lemma 5.18 proof line 17376; Eq. (5.4.20)",
+          "source_pdf_lines": [
+            17340,
+            17376
+          ],
+          "uses": [
+            "previous_step:8",
+            "Optimal solution x^*",
+            "D0 definition"
+          ],
+          "produces": "lemma_5_18"
+        }
+      ]
+    },
+    {
+      "name": "First-phase Lyapunov relation (Eq. 5.4.27)",
+      "ref": "Eq. (5.4.27)",
+      "statement_math": "\\frac{4T_s}{3L}\\mathbb{E}[\\psi(\\tilde{x}^s)-\\psi(x)]+\\mathbb{E}[V(x^s,x)]\\le \\frac{2}{3L}\\mathbb{E}[\\psi(\\tilde{x}^0)-\\psi(x)]+V(x^0,x)=\\frac{2}{3L}\\mathbb{E}[\\psi(x^0)-\\psi(x)]+V(x^0,x)",
+      "role": "Exposes the printed Lyapunov relation used in Lemmas 5.19 and 5.20, separately from Lemma 5.18's final objective-only decay.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Before applying Lemma 5.16, derive its side conditions from the first-phase schedule. The schedule gives alpha_s=p_s=1/2 and gamma_s=1/(3L alpha_s)=2/(3L), hence alpha_s,p_s in [0,1] and gamma_s>0. With q_i=L_i/sum_i L_i, L_Q=L; therefore 1+mu gamma_s-L alpha_s gamma_s=2/3+mu gamma_s>0 and p_s-L_Q alpha_s gamma_s/(1+mu gamma_s-L alpha_s gamma_s)>=1/2-(1/3)/(2/3)=0.",
+          "ref": "Lemma 5.18 proof, lines 17345-17351; Lemma 5.16 lines 16972-16976; Eqs. (5.4.7)-(5.4.8)",
+          "source_pdf_lines": [
+            16972,
+            17351
+          ],
+          "uses": [
+            "Strongly convex unified schedule",
+            "Sampling distribution and L_Q",
+            "Average smoothness constant",
+            "Possible strong convexity"
+          ],
+          "produces": "first_phase_lyapunov_lemma_5_16_side_conditions_derived"
+        },
+        {
+          "step": 2,
+          "description": "In the first phase substitute alpha_s=p_s=1/2, gamma_s=2/(3L), and T_s=2^{s-1} into (5.4.9).",
+          "ref": "Lemma 5.18 proof, lines 17345-17351",
+          "source_pdf_lines": [
+            17345,
+            17351
+          ],
+          "math": "\\frac{\\gamma_s}{\\alpha_s}\\mathbb{E}[\\psi(\\bar{x}_t)-\\psi(x)]+(1+\\mu\\gamma_s)\\mathbb{E}[V(x_t,x)]\\le \\frac{\\gamma_s}{2\\alpha_s}\\mathbb{E}[\\psi(\\tilde{x})-\\psi(x)]+\\mathbb{E}[V(x_{t-1},x)]",
+          "uses": [
+            "Conditional one-step recursion (Lemma 5.16)",
+            "previous_step:1",
+            "Sampling distribution and L_Q",
+            "Strongly convex unified schedule"
+          ],
+          "produces": "first_phase_lyapunov_inner_recursion"
+        },
+        {
+          "step": 3,
+          "description": "Sum the preceding inequality from t=1 to T_s.",
+          "ref": "Lemma 5.18 proof, lines 17352-17356",
+          "source_pdf_lines": [
+            17352,
+            17356
+          ],
+          "math": "\\frac{\\gamma_s}{\\alpha_s}\\sum_{t=1}^{T_s}\\mathbb{E}[\\psi(\\bar{x}_t)-\\psi(x)]+\\mathbb{E}[V(x_{T_s},x)]+\\mu\\gamma_s\\sum_{t=1}^{T_s}\\mathbb{E}[V(x_t,x)]\\le \\frac{\\gamma_sT_s}{2\\alpha_s}\\mathbb{E}[\\psi(\\tilde{x})-\\psi(x)]+\\mathbb{E}[V(x_0,x)]",
+          "uses": [
+            "previous_step:2"
+          ],
+          "produces": "first_phase_lyapunov_summed_recursion"
+        },
+        {
+          "step": 4,
+          "description": "Use theta_t=gamma_s/alpha_s in the definition of tilde{x}^s, the epoch identities, and T_s=2T_{s-1}.",
+          "ref": "Lemma 5.18 proof, lines 17357-17366",
+          "source_pdf_lines": [
+            17357,
+            17366
+          ],
+          "math": "\\frac{4T_s}{3L}\\mathbb{E}[\\psi(\\tilde{x}^s)-\\psi(x)]+\\mathbb{E}[V(x^s,x)]\\le \\frac{2T_s}{3L}\\mathbb{E}[\\psi(\\tilde{x}^{s-1})-\\psi(x)]+\\mathbb{E}[V(x^{s-1},x)]=\\frac{4T_{s-1}}{3L}\\mathbb{E}[\\psi(\\tilde{x}^{s-1})-\\psi(x)]+\\mathbb{E}[V(x^{s-1},x)]",
+          "uses": [
+            "previous_step:3",
+            "Theta smooth weights",
+            "Strongly convex unified schedule"
+          ],
+          "produces": "first_phase_lyapunov_epoch_recursion"
+        },
+        {
+          "step": 5,
+          "description": "Apply the epoch recursion repeatedly back to s=0 to obtain the printed Lyapunov relation.",
+          "ref": "Eq. (5.4.27)",
+          "source_pdf_lines": [
+            17367,
+            17375
+          ],
+          "math": "\\frac{4T_s}{3L}\\mathbb{E}[\\psi(\\tilde{x}^s)-\\psi(x)]+\\mathbb{E}[V(x^s,x)]\\le \\frac{2}{3L}\\mathbb{E}[\\psi(\\tilde{x}^0)-\\psi(x)]+V(x^0,x)=\\frac{2}{3L}\\mathbb{E}[\\psi(x^0)-\\psi(x)]+V(x^0,x)",
+          "uses": [
+            "previous_step:4"
+          ],
+          "produces": "first_phase_lyapunov_relation_5_4_27"
+        }
+      ]
+    },
+    {
+      "name": "Smooth L_s lower bounds (Eq. 5.4.21)",
+      "ref": "Eq. (5.4.21)",
+      "statement_math": "\\text{if }s\\le s_0,\\ L_s=\\frac{2^{s+1}}{3L}.\\quad \\text{if }s\\ge s_0,\\ L_s=\\frac{1}{3L\\alpha_s^2}\\left[1+(T_s-1)\\left(\\alpha_s+\\frac{1}{2}\\right)\\right]=\\frac{(s-s_0+4)(T_{s_0}-1)}{6L}+\\frac{(s-s_0+4)^2(T_{s_0}+1)}{24L}\\ge \\frac{(s-s_0+4)^2(m+1)}{24L}",
+      "role": "Exposes the printed coefficient lower bound (5.4.21) and its T_{s0}-based specializations used in Lemmas 5.20 and 5.21.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "The smooth-case proof computes L_s directly from the coefficient definition in the first phase and for s >= s0.",
+          "ref": "Eq. (5.4.21), Theorem 5.8 proof lines 17211-17219",
+          "source_pdf_lines": [
+            17211,
+            17219
+          ],
+          "math": "\\text{if }s\\le s_0,\\ L_s=\\frac{2^{s+1}}{3L}.\\quad \\text{if }s\\ge s_0,\\ L_s=\\frac{1}{3L\\alpha_s^2}\\left[1+(T_s-1)\\left(\\alpha_s+\\frac{1}{2}\\right)\\right]=\\frac{(s-s_0+4)(T_{s_0}-1)}{6L}+\\frac{(s-s_0+4)^2(T_{s_0}+1)}{24L}\\ge \\frac{(s-s_0+4)^2(m+1)}{24L}",
+          "uses": [
+            "Smooth-case proof facts (Theorem 5.8)",
+            "Smooth epoch coefficients and average"
+          ],
+          "produces": "smooth_Ls_lower_bound_5_4_21"
+        },
+        {
+          "step": 2,
+          "description": "Using T_{s0}=2^{\\lfloor\\log_2 m\\rfloor} >= m/2, record the specialized lower bound used in Lemma 5.20.",
+          "ref": "Lemma 5.20 proof, lines 17480-17483",
+          "source_pdf_lines": [
+            17480,
+            17483
+          ],
+          "math": "L_s\\ge \\frac{(s-s_0+4)^2m}{48L}",
+          "uses": [
+            "previous_step:1",
+            "Strongly convex epoch cutoff size facts"
+          ],
+          "produces": "smooth_Ls_lower_bound_for_lemma_5_20"
+        },
+        {
+          "step": 3,
+          "description": "At s=bar{s}_0, use (5.4.21) with T_{s0} to get the lower bound cited in Lemma 5.21.",
+          "ref": "Lemma 5.21 proof, lines 17630-17632",
+          "source_pdf_lines": [
+            17630,
+            17632
+          ],
+          "math": "L_{\\bar{s}_0}\\ge \\frac{(\\bar{s}_0-s_0+4)^2T_{s_0}}{24L}=\\frac{T_{s_0}}{2m\\mu}",
+          "uses": [
+            "previous_step:1",
+            "Strongly convex unified schedule",
+            "Accelerated linear tail regime"
+          ],
+          "produces": "smooth_Ls_lower_bound_for_tail"
+        }
+      ]
+    },
+    {
+      "name": "Linear contraction for large m (Lemma 5.19)",
+      "ref": "Lemma 5.19",
+      "statement_math": "\\text{If }s\\ge s_0\\text{ and }m\\ge \\frac{3L}{4\\mu},\\quad \\mathbb{E}[\\psi(\\tilde{x}^s)-\\psi(x^*)]\\le \\left(\\frac{4}{5}\\right)^sD_0,\\quad \\text{where }x^*\\text{ is an optimal solution of (5.3.1).}",
+      "role": "Gives Theorem 5.9's large-m strongly convex branch.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Before applying Lemma 5.16, derive its side conditions in the large-m strongly convex regime. The printed schedule gives alpha_s=p_s=1/2, gamma_s=2/(3L), and T_s=T_{s0}; hence alpha_s,p_s in [0,1] and gamma_s>0. Since q_i=L_i/sum_i L_i implies L_Q=L and mu>=0, (5.4.7) is 1+mu gamma_s-L alpha_s gamma_s=2/3+mu gamma_s>0, and (5.4.8) follows from p_s-L_Q alpha_s gamma_s/(1+mu gamma_s-L alpha_s gamma_s)>=1/2-(1/3)/(2/3)=0.",
+          "ref": "Lemma 5.19 proof, lines 17385-17391; Lemma 5.16 lines 16972-16976; Eqs. (5.4.7)-(5.4.8)",
+          "source_pdf_lines": [
+            16972,
+            17391
+          ],
+          "uses": [
+            "Strongly convex unified schedule",
+            "Sampling distribution and L_Q",
+            "Average smoothness constant",
+            "Possible strong convexity"
+          ],
+          "produces": "large_m_regime_s_ge_s0_and_m_ge_3L_over_4mu; large_m_lemma_5_16_side_conditions_derived"
+        },
+        {
+          "step": 2,
+          "description": "In this case alpha_s=p_s=1/2, gamma_s=2/(3L), and T_s=T_{s0}; substitute into (5.4.9).",
+          "ref": "Lemma 5.19 proof, lines 17385-17391",
+          "source_pdf_lines": [
+            17385,
+            17391
+          ],
+          "math": "\\frac{4}{3L}\\mathbb{E}[\\psi(\\bar{x}_t)-\\psi(x)]+\\left(1+\\frac{2\\mu}{3L}\\right)\\mathbb{E}[V(x_t,x)]\\le \\frac{2}{3L}\\mathbb{E}[\\psi(\\tilde{x})-\\psi(x)]+\\mathbb{E}[V(x_{t-1},x)]",
+          "uses": [
+            "Conditional one-step recursion (Lemma 5.16)",
+            "previous_step:1",
+            "Sampling distribution and L_Q",
+            "Strongly convex unified schedule"
+          ],
+          "produces": "large_m_inner_recursion"
+        },
+        {
+          "step": 3,
+          "description": "Multiply by Gamma_{t-1}=(1+2mu/(3L))^{t-1}.",
+          "ref": "Lemma 5.19 proof, lines 17394-17400",
+          "source_pdf_lines": [
+            17394,
+            17400
+          ],
+          "math": "\\frac{4}{3L}\\Gamma_{t-1}\\mathbb{E}[\\psi(\\bar{x}_t)-\\psi(x)]+\\Gamma_t\\mathbb{E}[V(x_t,x)]\\le \\frac{2}{3L}\\Gamma_{t-1}\\mathbb{E}[\\psi(\\tilde{x})-\\psi(x)]+\\Gamma_{t-1}\\mathbb{E}[V(x_{t-1},x)]",
+          "uses": [
+            "previous_step:2",
+            "Theta geometric weights"
+          ],
+          "produces": "weighted_large_m_inner"
+        },
+        {
+          "step": 4,
+          "description": "Since theta_t=Gamma_{t-1}, sum over the inner loop and telescope the V terms.",
+          "ref": "Lemma 5.19 proof, lines 17401-17407",
+          "source_pdf_lines": [
+            17401,
+            17407
+          ],
+          "math": "\\frac{4}{3L}\\sum_{t=1}^{T_s}\\theta_t\\mathbb{E}[\\psi(\\bar{x}_t)-\\psi(x)]+\\Gamma_{T_s}\\mathbb{E}[V(x_{T_s},x)]\\le \\frac{2}{3L}\\sum_{t=1}^{T_s}\\theta_t\\mathbb{E}[\\psi(\\tilde{x})-\\psi(x)]+\\mathbb{E}[V(x_0,x)]",
+          "uses": [
+            "previous_step:3",
+            "Theta geometric weights"
+          ],
+          "produces": "large_m_summed_epoch"
+        },
+        {
+          "step": 5,
+          "description": "Use m >= T_s0 >= m/2 and m >= 3L/(4mu) to lower-bound Gamma_{T_s}.",
+          "ref": "Eq. (5.4.28)",
+          "source_pdf_lines": [
+            17408,
+            17414
+          ],
+          "math": "\\Gamma_{T_s}=\\left(1+\\frac{2\\mu}{3L}\\right)^{T_s}=\\left(1+\\frac{2\\mu}{3L}\\right)^{T_{s_0}}\\ge 1+\\frac{2\\mu T_{s_0}}{3L}\\ge \\frac{5}{4},\\quad \\forall s\\ge s_0",
+          "uses": [
+            "previous_step:1",
+            "previous_step:4",
+            "Strongly convex unified schedule",
+            "Strongly convex epoch cutoff size facts"
+          ],
+          "produces": "gamma_lower_bound_5_4_28"
+        },
+        {
+          "step": 6,
+          "description": "Use the weighted-average definition of tilde{x}^s, epoch identities, (5.4.28), and the fact \\psi(\\tilde{x}^s)-\\psi(x^*)\\ge 0 from x^* being an optimal solution.",
+          "ref": "Lemma 5.19 proof, lines 17415-17434",
+          "source_pdf_lines": [
+            17415,
+            17434
+          ],
+          "math": "\\frac{5}{4}\\left[\\frac{2}{3L}\\mathbb{E}[\\psi(\\tilde{x}^s)-\\psi(x^*)]+\\left(\\sum_{t=1}^{T_s}\\theta_t\\right)^{-1}\\mathbb{E}[V(x^s,x^*)]\\right]\\le \\frac{2}{3L}\\mathbb{E}[\\psi(\\tilde{x}^{s-1})-\\psi(x^*)]+\\left(\\sum_{t=1}^{T_s}\\theta_t\\right)^{-1}\\mathbb{E}[V(x^{s-1},x^*)]",
+          "uses": [
+            "previous_step:4",
+            "previous_step:5",
+            "Optimal solution x^*",
+            "Component convexity",
+            "Convexity of h"
+          ],
+          "produces": "large_m_epoch_contraction, with the dropped nonnegative objective-gap term justified by optimality of x^*"
+        },
+        {
+          "step": 7,
+          "description": "Apply the contraction recursively from s0 and use sum theta_t >= T_s0.",
+          "ref": "Lemma 5.19 proof, lines 17435-17451",
+          "source_pdf_lines": [
+            17435,
+            17451
+          ],
+          "math": "\\frac{2}{3L}\\mathbb{E}[\\psi(\\tilde{x}^s)-\\psi(x^*)]+\\left(\\sum_{t=1}^{T_s}\\theta_t\\right)^{-1}\\mathbb{E}[V(x^s,x^*)]\\le \\left(\\frac{4}{5}\\right)^{s-s_0}\\left[\\frac{2}{3L}\\mathbb{E}[\\psi(\\tilde{x}^{s_0})-\\psi(x^*)]+\\left(\\sum_{t=1}^{T_s}\\theta_t\\right)^{-1}\\mathbb{E}[V(x^{s_0},x^*)]\\right]\\le \\left(\\frac{4}{5}\\right)^{s-s_0}\\left[\\frac{2}{3L}\\mathbb{E}[\\psi(\\tilde{x}^{s_0})-\\psi(x^*)]+\\frac{1}{T_{s_0}}\\mathbb{E}[V(x^{s_0},x^*)]\\right]",
+          "uses": [
+            "previous_step:6"
+          ],
+          "produces": "large_m_recursive_contraction"
+        },
+        {
+          "step": 8,
+          "description": "Plug (5.4.27) into the preceding inequality and simplify to the printed bound.",
+          "ref": "Lemma 5.19 proof, lines 17451-17455",
+          "source_pdf_lines": [
+            17451,
+            17455
+          ],
+          "math": "\\mathbb{E}[\\psi(\\tilde{x}^s)-\\psi(x^*)]\\le \\left(\\frac{4}{5}\\right)^{s-s_0}\\frac{D_0}{2T_{s_0}}=\\left(\\frac{4}{5}\\right)^{s-s_0}\\frac{D_0}{2^{s_0}}\\le \\left(\\frac{4}{5}\\right)^sD_0,\\quad s\\ge s_0",
+          "uses": [
+            "previous_step:7",
+            "First-phase Lyapunov relation (Eq. 5.4.27)",
+            "D0 definition"
+          ],
+          "produces": "lemma_5_19"
+        }
+      ]
+    },
+    {
+      "name": "Case 3 strong-convex epoch recursion (Lemma 5.20 proof)",
+      "ref": "Lemma 5.20 proof, lines 17467-17479",
+      "statement_math": "\\text{In this case, }\\frac{1}{2}\\ge \\frac{2}{s-s_0+4}\\ge \\sqrt{\\frac{m\\mu}{3L}}.\\ \\text{Therefore, we set }\\theta_t\\text{ as in (5.4.12), }\\alpha_s=\\frac{2}{s-s_0+4},\\ p_s=\\frac{1}{2},\\ \\gamma_s=\\frac{1}{3L\\alpha_s},\\ \\text{and }T_s\\equiv T_{s_0}.",
+      "role": "Records the strong-convex analogue of the smooth epoch procedure used to obtain the first inequality of (5.4.29) without invoking the mu=0 Lemma 5.17 directly.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Identify Case 3 from the printed range and parameter choices: theta_t is (5.4.12), alpha_s=2/(s-s0+4), p_s=1/2, gamma_s=1/(3L alpha_s), and T_s=T_s0.",
+          "ref": "Lemma 5.20 proof, lines 17467-17475",
+          "source_pdf_lines": [
+            17467,
+            17475
+          ],
+          "math": "\\frac{1}{2}\\ge \\frac{2}{s-s_0+4}\\ge \\sqrt{\\frac{m\\mu}{3L}}",
+          "uses": [
+            "Strongly convex unified schedule",
+            "Theta smooth weights"
+          ],
+          "produces": "case3_smooth_weight_schedule"
+        },
+        {
+          "step": 2,
+          "description": "Verify the Lemma 5.16 side conditions from the Case 3 printed schedule. From 1/2 >= 2/(s-s0+4) >= sqrt(m mu/(3L)), alpha_s=2/(s-s0+4) lies in [0,1], p_s=1/2 lies in [0,1], and gamma_s=1/(3L alpha_s)>0. With q_i=L_i/sum_i L_i, L_Q=L; hence 1+mu gamma_s-L alpha_s gamma_s=2/3+mu gamma_s>0 and p_s-L_Q alpha_s gamma_s/(1+mu gamma_s-L alpha_s gamma_s)>=1/2-(1/3)/(2/3)=0.",
+          "ref": "Lemma 5.20 proof, lines 17467-17475; Lemma 5.16 lines 16972-16976; Eqs. (5.4.7)-(5.4.8)",
+          "source_pdf_lines": [
+            16972,
+            17475
+          ],
+          "uses": [
+            "previous_step:1",
+            "Strongly convex unified schedule",
+            "Sampling distribution and L_Q",
+            "Average smoothness constant",
+            "Possible strong convexity"
+          ],
+          "produces": "case3_lemma_5_16_side_conditions_derived"
+        },
+        {
+          "step": 3,
+          "description": "Apply Lemma 5.16 under the Case 3 schedule while retaining the printed strong-convex distance multiplier (1+mu gamma_s), rather than setting mu=0.",
+          "ref": "Lemma 5.16, Eq. (5.4.9); Lemma 5.20 proof, lines 17467-17475",
+          "source_pdf_lines": [
+            16972,
+            17475
+          ],
+          "math": "\\frac{\\gamma_s}{\\alpha_s}\\mathbb{E}[\\psi(\\bar{x}_t)-\\psi(x)]+(1+\\mu\\gamma_s)\\mathbb{E}[V(x_t,x)]\\le \\frac{\\gamma_s}{\\alpha_s}(1-\\alpha_s-p_s)\\mathbb{E}[\\psi(\\bar{x}_{t-1})-\\psi(x)]+\\frac{\\gamma_s p_s}{\\alpha_s}\\mathbb{E}[\\psi(\\tilde{x})-\\psi(x)]+\\mathbb{E}[V(x_{t-1},x)]",
+          "uses": [
+            "Conditional one-step recursion (Lemma 5.16)",
+            "previous_step:2",
+            "Sampling distribution and L_Q",
+            "previous_step:1"
+          ],
+          "produces": "case3_inner_recursion_with_strong_distance"
+        },
+        {
+          "step": 4,
+          "description": "Sum the retained strong-convex recursion over t=1,...,T_s with theta_t from (5.4.12), xbar_0=tilde{x}, and the epoch identities. This gives the smooth single-epoch left side plus the additional nonnegative derived residual mu gamma_s sum_t E[V(x_t,x)].",
+          "ref": "Lemma 5.17 proof lines 17107-17133 by the procedure cited at Lemma 5.20 lines 17474-17475",
+          "source_pdf_lines": [
+            17107,
+            17475
+          ],
+          "uses": [
+            "previous_step:3",
+            "Theta smooth weights",
+            "Smooth epoch coefficients and average",
+            "Bregman prox function",
+            "Prox strong-convexity lower bound"
+          ],
+          "produces": "derived case3 summed recursion: L_j E[psi(tilde{x}^j)-psi(x)] + E[V(x^j,x)] + mu gamma_j sum_t E[V(x_t,x)] <= R_j E[psi(tilde{x}^{j-1})-psi(x)] + E[V(x^{j-1},x)]"
+        },
+        {
+          "step": 5,
+          "description": "Drop the additional nonnegative strong-convex residual from the left side, yielding the same single-epoch L_j/R_j inequality used in the smooth procedure but with the distance term still present.",
+          "ref": "Lemma 5.20 proof, lines 17474-17479",
+          "source_pdf_lines": [
+            17474,
+            17479
+          ],
+          "uses": [
+            "previous_step:4",
+            "Bregman prox function",
+            "Prox strong-convexity lower bound"
+          ],
+          "produces": "derived case3 single_epoch_recursion: L_j E[psi(tilde{x}^j)-psi(x)] + E[V(x^j,x)] <= R_j E[psi(tilde{x}^{j-1})-psi(x)] + E[V(x^{j-1},x)]"
+        },
+        {
+          "step": 6,
+          "description": "Use the same coefficient comparison procedure as Theorem 5.8, namely w_j=L_j-R_{j+1}>=0, and telescope the derived Case 3 single-epoch recursions from j=s0+1 to s.",
+          "ref": "Lemma 5.20 proof, lines 17474-17479; Theorem 5.8 proof, lines 17183-17203",
+          "source_pdf_lines": [
+            17183,
+            17479
+          ],
+          "math": "L_s\\mathbb{E}[\\psi(\\tilde{x}^s)-\\psi(x)]+\\mathbb{E}[V(x^s,x)]\\le R_{s_0+1}\\mathbb{E}[\\psi(\\tilde{x}^{s_0})-\\psi(x)]+\\mathbb{E}[V(x^{s_0},x)]",
+          "uses": [
+            "previous_step:5",
+            "Smooth-case proof facts (Theorem 5.8)",
+            "Smooth epoch coefficients and average"
+          ],
+          "produces": "case3_compare_to_R_s0_plus_1"
+        }
+      ]
+    },
+    {
+      "name": "Intermediate Lyapunov bound (Eq. 5.4.29)",
+      "ref": "Eq. (5.4.29)",
+      "statement_math": "L_s\\mathbb{E}[\\psi(\\tilde{x}^s)-\\psi(x)]+\\mathbb{E}[V(x^s,x)]\\le R_{s_0+1}\\mathbb{E}[\\psi(\\tilde{x}^{s_0})-\\psi(x)]+\\mathbb{E}[V(x^{s_0},x)]\\le L_{s_0}\\mathbb{E}[\\psi(\\tilde{x}^{s_0})-\\psi(x)]+\\mathbb{E}[V(x^{s_0},x)]\\le \\frac{D_0}{3L}",
+      "role": "Exposes the Case 3 Lyapunov display used both to prove Lemma 5.20 and to initialize the tail proof in Lemma 5.21.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "In Case 3 the parameter setting is the same as the smooth case in Theorem 5.8, so the proof follows the same L_s, R_s, w_s procedure.",
+          "ref": "Lemma 5.20 proof, lines 17467-17475",
+          "source_pdf_lines": [
+            17467,
+            17475
+          ],
+          "math": "\\frac{1}{2}\\ge \\frac{2}{s-s_0+4}\\ge \\sqrt{\\frac{m\\mu}{3L}}",
+          "uses": [
+            "Strongly convex unified schedule",
+            "Theta smooth weights",
+            "Smooth-case proof facts (Theorem 5.8)"
+          ],
+          "produces": "case3_matches_smooth_case_schedule"
+        },
+        {
+          "step": 2,
+          "description": "Apply the Case 3 strong-convex epoch recursion, obtained by following the Theorem 5.8 coefficient procedure after retaining and dropping the nonnegative strong-convex residual, to compare epoch s against epoch s0.",
+          "ref": "Eq. (5.4.29), first inequality",
+          "source_pdf_lines": [
+            17475,
+            17478
+          ],
+          "math": "L_s\\mathbb{E}[\\psi(\\tilde{x}^s)-\\psi(x)]+\\mathbb{E}[V(x^s,x)]\\le R_{s_0+1}\\mathbb{E}[\\psi(\\tilde{x}^{s_0})-\\psi(x)]+\\mathbb{E}[V(x^{s_0},x)]",
+          "uses": [
+            "previous_step:1",
+            "Case 3 strong-convex epoch recursion (Lemma 5.20 proof)",
+            "Smooth-case proof facts (Theorem 5.8)"
+          ],
+          "produces": "case3_compare_to_R_s0_plus_1"
+        },
+        {
+          "step": 3,
+          "description": "Use the smooth-case coefficient comparison R_{s0+1} <= L_{s0}.",
+          "ref": "Eq. (5.4.29), second inequality",
+          "source_pdf_lines": [
+            17477,
+            17479
+          ],
+          "math": "R_{s_0+1}\\mathbb{E}[\\psi(\\tilde{x}^{s_0})-\\psi(x)]+\\mathbb{E}[V(x^{s_0},x)]\\le L_{s_0}\\mathbb{E}[\\psi(\\tilde{x}^{s_0})-\\psi(x)]+\\mathbb{E}[V(x^{s_0},x)]",
+          "uses": [
+            "previous_step:2",
+            "Smooth-case proof facts (Theorem 5.8)"
+          ],
+          "produces": "case3_compare_R_to_L_s0"
+        },
+        {
+          "step": 4,
+          "description": "Retain the PDF's printed last inequality in (5.4.29): the text says it follows from L_{s0} >= 2T_{s0}/(3L) and the relation in (5.4.27). This display is recorded as printed, before exposing the comparison-point specialization needed for the D_0 identification.",
+          "ref": "Eq. (5.4.29), third inequality and following sentence",
+          "source_pdf_lines": [
+            17478,
+            17483
+          ],
+          "math": "L_{s_0}\\mathbb{E}[\\psi(\\tilde{x}^{s_0})-\\psi(x)]+\\mathbb{E}[V(x^{s_0},x)]\\le \\frac{D_0}{3L}",
+          "uses": [
+            "previous_step:3",
+            "Smooth L_s lower bounds (Eq. 5.4.21)",
+            "First-phase Lyapunov relation (Eq. 5.4.27)"
+          ],
+          "produces": "printed_intermediate_lyapunov_tail_5_4_29"
+        },
+        {
+          "step": 5,
+          "description": "Specialize the needed (5.4.27) application to x=x^*. With L_{s0} >= 2T_{s0}/(3L), the first-phase Lyapunov left side at s0 controls the L_{s0} objective term plus V(x^{s0},x^*); using D_0:=2[\\psi(x^0)-\\psi(x^*)]+3LV(x^0,x^*) identifies the bound D_0/(3L).",
+          "ref": "Eq. (5.4.29), third inequality and following sentence; Eq. (5.4.27); Eq. (5.4.20)",
+          "source_pdf_lines": [
+            17367,
+            17483
+          ],
+          "uses": [
+            "previous_step:3",
+            "Smooth L_s lower bounds (Eq. 5.4.21)",
+            "First-phase Lyapunov relation (Eq. 5.4.27)",
+            "Optimal solution x^*",
+            "D0 definition"
+          ],
+          "produces": "intermediate_lyapunov_bound_5_4_29_at_x_star"
+        }
+      ]
+    },
+    {
+      "name": "Intermediate sublinear regime (Lemma 5.20)",
+      "ref": "Lemma 5.20",
+      "statement_math": "\\text{If }s_0<s\\le s_0+\\sqrt{\\frac{12L}{m\\mu}}-4\\text{ and }m<\\frac{3L}{4\\mu},\\text{ then for any }x\\in X,\\quad \\mathbb{E}[\\psi(\\tilde{x}^s)-\\psi(x)]\\le \\frac{16D_0}{(s-s_0+4)^2m}.",
+      "role": "Gives the small-m pre-tail branch of Theorem 5.9 and initializes Lemma 5.21.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "In this range, identify the schedule with the smooth-case schedule: alpha_s=2/(s-s0+4), p_s=1/2, gamma_s=1/(3L alpha_s), and T_s=T_s0.",
+          "ref": "Lemma 5.20 proof, lines 17467-17475",
+          "source_pdf_lines": [
+            17467,
+            17475
+          ],
+          "math": "\\frac{1}{2}\\ge \\frac{2}{s-s_0+4}\\ge \\sqrt{\\frac{m\\mu}{3L}}",
+          "uses": [
+            "Strongly convex unified schedule",
+            "Theta smooth weights",
+            "Smooth-case proof facts (Theorem 5.8)"
+          ],
+          "produces": "intermediate_schedule_matches_smooth_case"
+        },
+        {
+          "step": 2,
+          "description": "Invoke the separately recorded Case 3 Lyapunov chain (5.4.29), preserving the PDF's printed arbitrary-x display before the D_0 specialization bridge.",
+          "ref": "Eq. (5.4.29)",
+          "source_pdf_lines": [
+            17475,
+            17480
+          ],
+          "math": "L_s\\mathbb{E}[\\psi(\\tilde{x}^s)-\\psi(x)]+\\mathbb{E}[V(x^s,x)]\\le R_{s_0+1}\\mathbb{E}[\\psi(\\tilde{x}^{s_0})-\\psi(x)]+\\mathbb{E}[V(x^{s_0},x)]\\le L_{s_0}\\mathbb{E}[\\psi(\\tilde{x}^{s_0})-\\psi(x)]+\\mathbb{E}[V(x^{s_0},x)]\\le \\frac{D_0}{3L}",
+          "uses": [
+            "previous_step:1",
+            "Intermediate Lyapunov bound (Eq. 5.4.29)",
+            "First-phase Lyapunov relation (Eq. 5.4.27)",
+            "Smooth L_s lower bounds (Eq. 5.4.21)"
+          ],
+          "produces": "printed_intermediate_bound_5_4_29"
+        },
+        {
+          "step": 3,
+          "description": "Use the x=x^* specialization exposed in the proof of (5.4.29) to get L_s E[\\psi(\\tilde{x}^s)-\\psi(x^*)] <= D_0/(3L), after dropping the nonnegative Bregman term.",
+          "ref": "Eq. (5.4.29), third inequality and following sentence; Eq. (5.4.20)",
+          "source_pdf_lines": [
+            17478,
+            17483
+          ],
+          "uses": [
+            "previous_step:2",
+            "Intermediate Lyapunov bound (Eq. 5.4.29)",
+            "Optimal solution x^*",
+            "D0 definition",
+            "Bregman prox function",
+            "Prox strong-convexity lower bound"
+          ],
+          "produces": "intermediate_objective_bound_at_x_star_before_Ls_lower_bound"
+        },
+        {
+          "step": 4,
+          "description": "Use the lower bound on L_s from (5.4.21) to solve the x=x^* objective comparison for the sublinear rate denominator.",
+          "ref": "Lemma 5.20 proof, lines 17480-17483",
+          "source_pdf_lines": [
+            17480,
+            17483
+          ],
+          "math": "L_s\\ge \\frac{(s-s_0+4)^2m}{48L}",
+          "uses": [
+            "previous_step:3",
+            "Smooth L_s lower bounds (Eq. 5.4.21)"
+          ],
+          "produces": "intermediate_sublinear_bound_at_x_star"
+        },
+        {
+          "step": 5,
+          "description": "Use optimality of x^* for (5.3.1) to recover Lemma 5.20's arbitrary-x objective-only conclusion: for any x in X, \\psi(x^*)<=\\psi(x), hence E[\\psi(\\tilde{x}^s)-\\psi(x)]<=E[\\psi(\\tilde{x}^s)-\\psi(x^*)].",
+          "ref": "Lemma 5.20 statement and proof, lines 17467-17483; Eq. (5.4.20)",
+          "source_pdf_lines": [
+            17467,
+            17483
+          ],
+          "uses": [
+            "previous_step:4",
+            "Optimal solution x^*",
+            "D0 definition"
+          ],
+          "produces": "lemma_5_20"
+        }
+      ]
+    },
+    {
+      "name": "Accelerated linear tail (Lemma 5.21)",
+      "ref": "Lemma 5.21",
+      "statement_math": "\\text{If }s>\\bar{s}_0:=s_0+\\sqrt{\\frac{12L}{m\\mu}}-4\\text{ and }m<\\frac{3L}{4\\mu},\\quad \\mathbb{E}[\\psi(\\tilde{x}^s)-\\psi(x^*)]\\le \\left(1+\\sqrt{\\frac{\\mu}{3mL}}\\right)^{-m(s-\\bar{s}_0)/2}\\frac{D_0}{3L/(4\\mu)},\\quad \\text{where }x^*\\text{ is an optimal solution of (5.3.1).}",
+      "role": "Gives Theorem 5.9's final small-m accelerated linear branch.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "In the tail regime choose the constant policy alpha_s=sqrt(m mu/(3L)), p_s=1/2, gamma_s=1/sqrt(3mLmu), T_s=T_s0, and theta_t by (5.4.26).",
+          "ref": "Lemma 5.21 proof, lines 17497-17504",
+          "source_pdf_lines": [
+            17497,
+            17504
+          ],
+          "math": "\\alpha_s\\equiv \\sqrt{\\frac{m\\mu}{3L}},\\quad p_s\\equiv \\frac{1}{2},\\quad \\gamma_s\\equiv \\frac{1}{3L\\alpha_s}=\\frac{1}{\\sqrt{3mL\\mu}},\\quad T_s\\equiv T_{s_0}",
+          "uses": [
+            "Accelerated linear tail regime",
+            "Strongly convex unified schedule",
+            "Theta geometric weights"
+          ],
+          "produces": "tail_constant_policy"
+        },
+        {
+          "step": 2,
+          "description": "Verify the Lemma 5.16 side conditions from the constant tail schedule. The tail regime m<3L/(4mu) gives 0<alpha_s=sqrt(m mu/(3L))<1/2, while p_s=1/2 and gamma_s=1/(3L alpha_s)>0. With q_i=L_i/sum_i L_i, L_Q=L; thus 1+mu gamma_s-L alpha_s gamma_s=2/3+mu gamma_s>0 and p_s-L_Q alpha_s gamma_s/(1+mu gamma_s-L alpha_s gamma_s)>=1/2-(1/3)/(2/3)=0.",
+          "ref": "Lemma 5.21 proof, lines 17497-17504; Lemma 5.16 lines 16972-16976; Eqs. (5.4.7)-(5.4.8)",
+          "source_pdf_lines": [
+            16972,
+            17504
+          ],
+          "uses": [
+            "previous_step:1",
+            "Accelerated linear tail regime",
+            "Sampling distribution and L_Q",
+            "Average smoothness constant",
+            "Possible strong convexity"
+          ],
+          "produces": "tail_lemma_5_16_side_conditions_derived"
+        },
+        {
+          "step": 3,
+          "description": "Multiply (5.4.9) by Gamma_{t-1}=(1+mu gamma_s)^{t-1}.",
+          "ref": "Lemma 5.21 proof, lines 17503-17509",
+          "source_pdf_lines": [
+            17503,
+            17509
+          ],
+          "math": "\\frac{\\gamma_s}{\\alpha_s}\\Gamma_{t-1}\\mathbb{E}[\\psi(\\bar{x}_t)-\\psi(x)]+\\Gamma_t\\mathbb{E}[V(x_t,x)]\\le \\frac{\\Gamma_{t-1}\\gamma_s}{\\alpha_s}(1-\\alpha_s-p_s)\\mathbb{E}[\\psi(\\bar{x}_{t-1})-\\psi(x)]+\\frac{\\Gamma_{t-1}\\gamma_sp_s}{\\alpha_s}\\mathbb{E}[\\psi(\\tilde{x})-\\psi(x)]+\\Gamma_{t-1}\\mathbb{E}[V(x_{t-1},x)]",
+          "uses": [
+            "Conditional one-step recursion (Lemma 5.16)",
+            "previous_step:2",
+            "Sampling distribution and L_Q",
+            "previous_step:1"
+          ],
+          "produces": "tail_weighted_inner_recursion"
+        },
+        {
+          "step": 4,
+          "description": "Sum from t=1 to T_s and use xbar_0=tilde{x}.",
+          "ref": "Lemma 5.21 proof, lines 17510-17518",
+          "source_pdf_lines": [
+            17510,
+            17518
+          ],
+          "math": "\\frac{\\gamma_s}{\\alpha_s}\\sum_{t=1}^{T_s}\\theta_t\\mathbb{E}[\\psi(\\bar{x}_t)-\\psi(x)]+\\Gamma_{T_s}\\mathbb{E}[V(x_{T_s},x)]\\le \\frac{\\gamma_s}{\\alpha_s}\\left[1-\\alpha_s-p_s+p_s\\sum_{t=1}^{T_s}\\Gamma_{t-1}\\right]\\mathbb{E}[\\psi(\\tilde{x})-\\psi(x)]+\\mathbb{E}[V(x_0,x)]",
+          "uses": [
+            "previous_step:3",
+            "Theta geometric weights"
+          ],
+          "produces": "tail_summed_inner"
+        },
+        {
+          "step": 5,
+          "description": "Use epoch identities, the definition of tilde{x}^s, and convexity of psi to obtain (5.4.31).",
+          "ref": "Eq. (5.4.31)",
+          "source_pdf_lines": [
+            17519,
+            17531
+          ],
+          "math": "\\frac{\\gamma_s}{\\alpha_s}\\sum_{t=1}^{T_{s_0}}\\theta_t\\mathbb{E}[\\psi(\\tilde{x}^s)-\\psi(x)]+\\Gamma_{T_{s_0}}\\mathbb{E}[V(x^s,x)]\\le \\frac{\\gamma_s}{\\alpha_s}\\left[1-\\alpha_s-p_s+p_s\\sum_{t=1}^{T_{s_0}}\\Gamma_{t-1}\\right]\\mathbb{E}[\\psi(\\tilde{x}^{s-1})-\\psi(x)]+\\mathbb{E}[V(x^{s-1},x)]",
+          "uses": [
+            "previous_step:4",
+            "Component convexity",
+            "Convexity of h"
+          ],
+          "produces": "tail_epoch_recursion_5_4_31"
+        },
+        {
+          "step": 6,
+          "description": "Expand the sum of theta_t using (5.4.26).",
+          "ref": "Lemma 5.21 proof, lines 17533-17547",
+          "source_pdf_lines": [
+            17533,
+            17547
+          ],
+          "math": "\\sum_{t=1}^{T_{s_0}}\\theta_t=\\Gamma_{T_{s_0}}(1-\\alpha_s-p_s)+[1-(1-\\alpha_s-p_s)(1+\\mu\\gamma_s)]\\sum_{t=1}^{T_{s_0}}\\Gamma_{t-1}",
+          "uses": [
+            "Theta geometric weights"
+          ],
+          "produces": "tail_theta_sum_expansion"
+        },
+        {
+          "step": 7,
+          "description": "Record the printed auxiliary inequalities for the tail coefficient: the elementary power bound and the alpha_s lower bound implied by the constant policy.",
+          "ref": "Lemma 5.21 proof, lines 17548-17553",
+          "source_pdf_lines": [
+            17548,
+            17553
+          ],
+          "math": "\\text{for any }T>1\\text{ and }0\\le \\delta T\\le 1,\\quad (1+\\delta)^T\\le 1+2T\\delta,\\quad \\alpha_s=\\sqrt{\\frac{m\\mu}{3L}}\\ge \\sqrt{\\frac{T_{s_0}\\mu}{3L}}",
+          "uses": [
+            "previous_step:1",
+            "Strongly convex epoch cutoff size facts"
+          ],
+          "produces": "tail_power_and_alpha_observations"
+        },
+        {
+          "step": 8,
+          "description": "Instantiate the printed power-bound side condition with delta=mu gamma_s and T=T_{s0}-1: from T_{s0}<=m and gamma_s=1/sqrt(3mLmu), mu gamma_s(T_{s0}-1)<=mu gamma_s m=sqrt(m mu/(3L)); the tail regime m<3L/(4mu) makes this <1/2, so 0<=mu gamma_s(T_{s0}-1)<=1.",
+          "ref": "Lemma 5.21 proof, lines 17548-17558",
+          "source_pdf_lines": [
+            17548,
+            17558
+          ],
+          "uses": [
+            "Accelerated linear tail regime",
+            "previous_step:1",
+            "previous_step:7",
+            "Strongly convex epoch cutoff size facts"
+          ],
+          "produces": "tail_power_side_condition_for_T_s0_minus_one"
+        },
+        {
+          "step": 9,
+          "description": "Apply the first printed algebraic lower bound to the coefficient multiplying the geometric sum.",
+          "ref": "Lemma 5.21 proof, line 17555",
+          "source_pdf_lines": [
+            17555,
+            17555
+          ],
+          "math": "1-(1-\\alpha_s-p_s)(1+\\mu\\gamma_s)\\ge (1+\\mu\\gamma_s)(\\alpha_s-\\mu\\gamma_s+p_s)",
+          "uses": [
+            "previous_step:6",
+            "previous_step:7"
+          ],
+          "produces": "tail_coefficient_first_lower_bound"
+        },
+        {
+          "step": 10,
+          "description": "Use alpha_s >= T_{s0} mu gamma_s to replace alpha_s inside the preceding lower bound.",
+          "ref": "Lemma 5.21 proof, line 17556",
+          "source_pdf_lines": [
+            17556,
+            17556
+          ],
+          "math": "(1+\\mu\\gamma_s)(\\alpha_s-\\mu\\gamma_s+p_s)\\ge (1+\\mu\\gamma_s)(T_{s_0}\\mu\\gamma_s-\\mu\\gamma_s+p_s)",
+          "uses": [
+            "previous_step:1",
+            "previous_step:7",
+            "previous_step:9"
+          ],
+          "produces": "tail_coefficient_uses_T_s0"
+        },
+        {
+          "step": 11,
+          "description": "Use p_s=1/2 to rewrite the preceding expression as the printed bracket.",
+          "ref": "Lemma 5.21 proof, line 17557",
+          "source_pdf_lines": [
+            17557,
+            17557
+          ],
+          "math": "(1+\\mu\\gamma_s)(T_{s_0}\\mu\\gamma_s-\\mu\\gamma_s+p_s)=p_s(1+\\mu\\gamma_s)[2(T_{s_0}-1)\\mu\\gamma_s+1]",
+          "uses": [
+            "previous_step:1",
+            "previous_step:10"
+          ],
+          "produces": "tail_coefficient_bracket_rewrite"
+        },
+        {
+          "step": 12,
+          "description": "Apply the printed power inequality to compare the bracketed term with Gamma_{T_s0}.",
+          "ref": "Lemma 5.21 proof, line 17558",
+          "source_pdf_lines": [
+            17558,
+            17558
+          ],
+          "math": "p_s(1+\\mu\\gamma_s)[2(T_{s_0}-1)\\mu\\gamma_s+1]\\ge p_s(1+\\mu\\gamma_s)^{T_{s_0}}=p_s\\Gamma_{T_{s_0}}",
+          "uses": [
+            "previous_step:7",
+            "previous_step:8",
+            "previous_step:11",
+            "Theta geometric weights"
+          ],
+          "produces": "tail_coefficient_gamma_bound"
+        },
+        {
+          "step": 13,
+          "description": "Conclude the lower bound on the theta sum from the expansion and the coefficient comparison.",
+          "ref": "Lemma 5.21 proof, lines 17560-17563",
+          "source_pdf_lines": [
+            17560,
+            17563
+          ],
+          "math": "\\sum_{t=1}^{T_{s_0}}\\theta_t\\ge \\Gamma_{T_{s_0}}\\left(1-\\alpha_s-p_s+p_s\\sum_{t=1}^{T_{s_0}}\\Gamma_{t-1}\\right)",
+          "uses": [
+            "previous_step:6",
+            "previous_step:12"
+          ],
+          "produces": "tail_theta_sum_lower_bound"
+        },
+        {
+          "step": 14,
+          "description": "Combine the theta-sum lower bound with (5.4.31), using \\psi(\\tilde{x}^s)-\\psi(x^*)\\ge 0 from x^* being an optimal solution.",
+          "ref": "Lemma 5.21 proof, lines 17564-17577",
+          "source_pdf_lines": [
+            17564,
+            17577
+          ],
+          "math": "\\Gamma_{T_{s_0}}\\left[\\frac{\\gamma_s}{\\alpha_s}\\left(1-\\alpha_s-p_s+p_s\\sum_{t=1}^{T_{s_0}}\\Gamma_{t-1}\\right)\\mathbb{E}[\\psi(\\tilde{x}^s)-\\psi(x^*)]+\\mathbb{E}[V(x^s,x^*)]\\right]\\le \\frac{\\gamma_s}{\\alpha_s}\\left(1-\\alpha_s-p_s+p_s\\sum_{t=1}^{T_{s_0}}\\Gamma_{t-1}\\right)\\mathbb{E}[\\psi(\\tilde{x}^{s-1})-\\psi(x^*)]+\\mathbb{E}[V(x^{s-1},x^*)]",
+          "uses": [
+            "previous_step:5",
+            "previous_step:13",
+            "Optimal solution x^*"
+          ],
+          "produces": "tail_epoch_contraction, with the nonnegative objective-gap term justified by optimality of x^*"
+        },
+        {
+          "step": 15,
+          "description": "Apply the contraction recursively from sbar0, using Gamma_t=(1+mu gamma_s)^t and the constant step-size policy.",
+          "ref": "Lemma 5.21 proof, lines 17578-17592",
+          "source_pdf_lines": [
+            17578,
+            17592
+          ],
+          "math": "\\frac{\\gamma_s}{\\alpha_s}\\left(1-\\alpha_s-p_s+p_s\\sum_{t=1}^{T_{s_0}}\\Gamma_{t-1}\\right)\\mathbb{E}[\\psi(\\tilde{x}^s)-\\psi(x^*)]+\\mathbb{E}[V(x^s,x^*)]\\le (1+\\mu\\gamma_s)^{-T_{s_0}(s-\\bar{s}_0)}\\left[\\frac{\\gamma_s}{\\alpha_s}\\left(1-\\alpha_s-p_s+p_s\\sum_{t=1}^{T_{s_0}}\\Gamma_{t-1}\\right)\\mathbb{E}[\\psi(\\tilde{x}^{\\bar{s}_0})-\\psi(x^*)]+\\mathbb{E}[V(x^{\\bar{s}_0},x^*)]\\right]",
+          "uses": [
+            "previous_step:14"
+          ],
+          "produces": "tail_recursive_contraction"
+        },
+        {
+          "step": 16,
+          "description": "Lower-bound the bracket coefficient by gamma_s p_s T_s0/alpha_s using the printed observation after the constant tail policy is restated.",
+          "ref": "Lemma 5.21 proof, lines 17593-17596",
+          "source_pdf_lines": [
+            17593,
+            17596
+          ],
+          "math": "\\frac{\\gamma_s}{\\alpha_s}\\left(1-\\alpha_s-p_s+p_s\\sum_{t=1}^{T_{s_0}}\\Gamma_{t-1}\\right)\\ge \\frac{\\gamma_sp_sT_{s_0}}{\\alpha_s}",
+          "uses": [
+            "previous_step:1",
+            "previous_step:15"
+          ],
+          "produces": "tail_coefficient_lower_bound_by_gamma_p_T_over_alpha"
+        },
+        {
+          "step": 17,
+          "description": "Substitute p_s=1/2, gamma_s=1/(3L alpha_s), and alpha_s=sqrt(m mu/(3L)) into the printed coefficient to obtain the middle equality.",
+          "ref": "Lemma 5.21 proof, lines 17593-17601",
+          "source_pdf_lines": [
+            17593,
+            17601
+          ],
+          "math": "\\frac{\\gamma_sp_sT_{s_0}}{\\alpha_s}=\\frac{T_{s_0}}{2m\\mu}",
+          "uses": [
+            "previous_step:1",
+            "previous_step:16"
+          ],
+          "produces": "tail_coefficient_equals_T_over_2m_mu"
+        },
+        {
+          "step": 18,
+          "description": "Use the printed definition \\bar{s}_0=s_0+sqrt(12L/(m mu))-4 to rewrite the middle coefficient as the final printed coefficient.",
+          "ref": "Lemma 5.21 proof, lines 17593-17601",
+          "source_pdf_lines": [
+            17593,
+            17601
+          ],
+          "math": "\\frac{T_{s_0}}{2m\\mu}=\\frac{(\\bar{s}_0-s_0+4)^2T_{s_0}}{24L}",
+          "uses": [
+            "Accelerated linear tail regime",
+            "previous_step:15",
+            "previous_step:17",
+            "Strongly convex unified schedule"
+          ],
+          "produces": "tail_coefficient_lower_bound"
+        },
+        {
+          "step": 19,
+          "description": "Use the coefficient lower bound to isolate the objective gap and move the distance term inside the bracket.",
+          "ref": "Lemma 5.21 proof, lines 17603-17613",
+          "source_pdf_lines": [
+            17603,
+            17613
+          ],
+          "math": "\\mathbb{E}[\\psi(\\tilde{x}^s)-\\psi(x^*)]\\le (1+\\mu\\gamma_s)^{-T_{s_0}(s-\\bar{s}_0)}\\left[\\mathbb{E}[\\psi(\\tilde{x}^{\\bar{s}_0})-\\psi(x^*)]+\\frac{24L}{(\\bar{s}_0-s_0+4)^2T_{s_0}}\\mathbb{E}[V(x^{\\bar{s}_0},x^*)]\\right]",
+          "uses": [
+            "previous_step:15",
+            "previous_step:18"
+          ],
+          "produces": "tail_gap_with_distance_term"
+        },
+        {
+          "step": 20,
+          "description": "Use the lower bound L_{sbar0} >= ((sbar0-s0+4)^2 T_s0)/(24L) from (5.4.21) to bound the bracket by a scaled Lyapunov expression.",
+          "ref": "Lemma 5.21 proof, lines 17609-17613 and lines 17630-17632",
+          "source_pdf_lines": [
+            17609,
+            17632
+          ],
+          "math": "\\mathbb{E}[\\psi(\\tilde{x}^s)-\\psi(x^*)]\\le (1+\\mu\\gamma_s)^{-T_{s_0}(s-\\bar{s}_0)}\\frac{24L}{(\\bar{s}_0-s_0+4)^2T_{s_0}}\\left[L_{\\bar{s}_0}\\mathbb{E}[\\psi(\\tilde{x}^{\\bar{s}_0})-\\psi(x^*)]+\\mathbb{E}[V(x^{\\bar{s}_0},x^*)]\\right]",
+          "uses": [
+            "previous_step:19",
+            "Smooth L_s lower bounds (Eq. 5.4.21)"
+          ],
+          "produces": "tail_scaled_case3_lyapunov"
+        },
+        {
+          "step": 21,
+          "description": "Use (5.4.29) from Case 3 at sbar0 to replace the Lyapunov expression by D0/(3L).",
+          "ref": "Lemma 5.21 proof, lines 17616-17620 and line 17633",
+          "source_pdf_lines": [
+            17616,
+            17633
+          ],
+          "math": "\\mathbb{E}[\\psi(\\tilde{x}^s)-\\psi(x^*)]\\le (1+\\mu\\gamma_s)^{-T_{s_0}(s-\\bar{s}_0)}\\frac{24L}{(\\bar{s}_0-s_0+4)^2T_{s_0}}\\frac{D_0}{3L}",
+          "uses": [
+            "previous_step:20",
+            "Intermediate Lyapunov bound (Eq. 5.4.29)"
+          ],
+          "produces": "tail_after_case3_substitution"
+        },
+        {
+          "step": 22,
+          "description": "Use T_{s0} >= m/2 to obtain the printed simplification to 16D0/((sbar0-s0+4)^2m), then use sbar0-s0+4=sqrt(12L/(m mu)).",
+          "ref": "Lemma 5.21 proof, lines 17621-17634",
+          "source_pdf_lines": [
+            17621,
+            17634
+          ],
+          "math": "\\mathbb{E}[\\psi(\\tilde{x}^s)-\\psi(x^*)]\\le (1+\\mu\\gamma_s)^{-T_{s_0}(s-\\bar{s}_0)}\\frac{16D_0}{(\\bar{s}_0-s_0+4)^2m}=(1+\\mu\\gamma_s)^{-T_{s_0}(s-\\bar{s}_0)}\\frac{D_0}{3L/(4\\mu)}",
+          "uses": [
+            "Accelerated linear tail regime",
+            "previous_step:21",
+            "Strongly convex unified schedule",
+            "Strongly convex epoch cutoff size facts"
+          ],
+          "produces": "tail_denominator_simplified"
+        },
+        {
+          "step": 23,
+          "description": "Replace gamma_s by 1/sqrt(3mLmu) and use T_s0 >= m/2 to obtain the stated accelerated linear tail exponent.",
+          "ref": "Lemma 5.21 statement and proof, lines 17489-17493, 17630-17634",
+          "source_pdf_lines": [
+            17489,
+            17634
+          ],
+          "uses": [
+            "previous_step:1",
+            "previous_step:22",
+            "Strongly convex unified schedule",
+            "Strongly convex epoch cutoff size facts"
+          ],
+          "produces": "lemma_5_21"
+        }
+      ]
+    },
+    {
+      "name": "Gradient complexity bound (Corollary 5.11)",
+      "ref": "Corollary 5.11",
+      "statement_math": "The total number of gradient evaluations of f_i performed by Algorithm 5.7 to find a stochastic \\varepsilon-solution of (2.0.1) can be bounded by\n\\[\n\\bar{N}:=\\begin{cases}O\\left(m\\log\\frac{D_0}{\\varepsilon}\\right),&m\\ge \\frac{D_0}{\\varepsilon}\\text{ or }m\\ge \\frac{3L}{4\\mu},\\\\ O\\left(m\\log m+\\sqrt{\\frac{mD_0}{\\varepsilon}}\\right),&m<\\frac{D_0}{\\varepsilon}\\le \\frac{3L}{4\\mu},\\\\ O\\left(m\\log m+\\sqrt{\\frac{mL}{\\mu}}\\log\\frac{D_0/\\varepsilon}{3L/(4\\mu)}\\right),&m<\\frac{3L}{4\\mu}\\le \\frac{D_0}{\\varepsilon}.\\end{cases} \\tag{5.4.33}\n\\]\nwhere D_0 is defined as in (5.4.20).",
+      "role": "Converts Theorem 5.9's rates into component-gradient complexity.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "The first and third cases of the convergence result (5.4.32) correspond to the smooth case discussed in Corollary 5.10, so the total gradient evaluations are bounded by (5.4.23) and (5.4.24), respectively.",
+          "ref": "Corollary 5.11 proof, lines 17707-17712",
+          "source_pdf_lines": [
+            17707,
+            17712
+          ],
+          "uses": [
+            "Smooth gradient complexity bound (Corollary 5.10)"
+          ],
+          "produces": "complexity_cases_from_smooth_corollary"
+        },
+        {
+          "step": 2,
+          "description": "For the second case of (5.4.32), the number of epochs is logarithmic and the total gradient count is bounded by (5.4.34).",
+          "ref": "Eq. (5.4.34)",
+          "source_pdf_lines": [
+            17712,
+            17717
+          ],
+          "math": "mS+\\sum_{s=1}^S T_s\\le 2mS=O\\left(m\\log\\frac{D_0}{\\varepsilon}\\right)",
+          "uses": [
+            "Linear contraction for large m (Lemma 5.19)",
+            "Strongly convex unified schedule"
+          ],
+          "produces": "complexity_large_m_case"
+        },
+        {
+          "step": 3,
+          "description": "For the last case of (5.4.32), record the printed upper bound on the number of epochs needed by the variance-reduced accelerated gradient method.",
+          "ref": "Corollary 5.11 proof, lines 17718-17722",
+          "source_pdf_lines": [
+            17718,
+            17722
+          ],
+          "math": "S=\\bar{s}_0+2\\sqrt{\\frac{3L}{m\\mu}}\\log\\frac{D_0/\\varepsilon}{3L/(4\\mu)}",
+          "uses": [
+            "Accelerated linear tail (Lemma 5.21)",
+            "Strongly convex unified schedule"
+          ],
+          "produces": "linear_tail_epoch_bound"
+        },
+        {
+          "step": 4,
+          "description": "Split the total gradient count into the first phase, the intermediate phase, and the linear-tail phase.",
+          "ref": "Corollary 5.11 proof, lines 17724-17726",
+          "source_pdf_lines": [
+            17724,
+            17726
+          ],
+          "math": "\\sum_{s=1}^{S}(m+T_s)=\\sum_{s=1}^{s_0}(m+T_s)+\\sum_{s=s_0+1}^{\\bar{s}_0}(m+T_{s_0})+(m+T_{s_0})(S-\\bar{s}_0)",
+          "uses": [
+            "previous_step:3",
+            "Strongly convex unified schedule"
+          ],
+          "produces": "linear_tail_three_sum_decomposition"
+        },
+        {
+          "step": 5,
+          "description": "Apply the printed bounds for s0, T_s0, sbar0-s0, and S-sbar0 to obtain the explicit numerical upper bound before big-O simplification.",
+          "ref": "Corollary 5.11 proof, lines 17727-17731",
+          "source_pdf_lines": [
+            17727,
+            17731
+          ],
+          "math": "\\le 2m\\log m+2m\\left(\\sqrt{\\frac{12L}{m\\mu}}-4\\right)+4m\\sqrt{\\frac{3L}{m\\mu}}\\log\\frac{D_0/\\varepsilon}{3L/(4\\mu)}",
+          "uses": [
+            "previous_step:4",
+            "Strongly convex unified schedule",
+            "Strongly convex epoch cutoff size facts"
+          ],
+          "produces": "linear_tail_explicit_gradient_bound"
+        },
+        {
+          "step": 6,
+          "description": "Simplify the explicit numerical upper bound into the final big-O expression for the last case.",
+          "ref": "Corollary 5.11 proof, lines 17732-17734",
+          "source_pdf_lines": [
+            17732,
+            17734
+          ],
+          "math": "=O\\left(m\\log m+\\sqrt{\\frac{mL}{\\mu}}\\log\\frac{D_0/\\varepsilon}{3L/(4\\mu)}\\right)",
+          "uses": [
+            "previous_step:5"
+          ],
+          "produces": "linear_tail_complexity_case"
+        },
+        {
+          "step": 7,
+          "description": "Combine the smooth-case bounds, the large-m strongly convex bound, and the linear-tail complexity bound to obtain the three cases of (5.4.33).",
+          "ref": "Corollary 5.11 proof, lines 17707-17735",
+          "source_pdf_lines": [
+            17707,
+            17735
+          ],
+          "uses": [
+            "previous_step:1",
+            "previous_step:2",
+            "previous_step:6"
+          ],
+          "produces": "corollary_5_11"
+        }
+      ]
+    }
+  ]
+}

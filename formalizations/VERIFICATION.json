@@ -1,0 +1,2297 @@
+{
+  "environment": {
+    "lean": "leanprover/lean4:v4.29.0",
+    "mathlib_revision": "8a178386ffc0f5fef0b77738bb5449d50efeea95",
+    "python": "3.11"
+  },
+  "algorithms": [
+    {
+      "id": "AMSGrad",
+      "compiled": true,
+      "source_files": 25,
+      "axiom_inspection_exit_code": 0,
+      "theorems_checked": 2147,
+      "algorithm_theorems_checked": 366,
+      "nonstandard_dependencies": [],
+      "algorithm_nonstandard_dependencies": [],
+      "algorithm_uses_sorryAx": false,
+      "public_algorithm_nonstandard_dependencies": [],
+      "public_algorithm_uses_sorryAx": false,
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "source_tree_sha256": "d5f74e8cf42de371dad39a3279360741c750e333e89cea373b8c9b4992af5596",
+      "source_holes": [],
+      "source_declarations": [],
+      "verification_provenance": "Freshly compiled and inspected for this source refresh"
+    },
+    {
+      "id": "HeavyBallSecondRiddle",
+      "compiled": true,
+      "source_files": 10,
+      "theorems_checked": 2030,
+      "algorithm_theorems_checked": 745,
+      "algorithm_uses_sorryAx": false,
+      "nonstandard_dependencies": [],
+      "algorithm_nonstandard_dependencies": [],
+      "source_tree_sha256": "73c9cd603ca544e60aea7c066f103622d705507a6a54bb75054649c874d761a1",
+      "public_algorithm_nonstandard_dependencies": [],
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "public_algorithm_uses_sorryAx": false,
+      "source_holes": [],
+      "source_declarations": [],
+      "axiom_inspection_exit_code": 0,
+      "verification_provenance": "Reused successful verification of byte-identical Lean source closure and pinned dependencies"
+    },
+    {
+      "id": "Lion",
+      "compiled": true,
+      "source_files": 29,
+      "theorems_checked": 3293,
+      "algorithm_theorems_checked": 332,
+      "algorithm_uses_sorryAx": false,
+      "nonstandard_dependencies": [
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_nonneg_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.projectedWithinGradient_smoothness_gap_of_convex_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_of_convex_lipschitz_gradient",
+          "module": "SOptLib.Axioms.BaillonHaddad",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_affineDirectionDualNorm_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        }
+      ],
+      "algorithm_nonstandard_dependencies": [],
+      "source_tree_sha256": "0b417d6f8f00969c1dbc8cb810009be0923d154df2f7e391a8751345c7fbd05c",
+      "public_algorithm_nonstandard_dependencies": [],
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "public_algorithm_uses_sorryAx": false,
+      "source_holes": [],
+      "source_declarations": [
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 46,
+          "kind": "axiom",
+          "name": "perez_aros_vilches_open_convex_inner_cocoercivity"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 79,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 117,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_separating_seminorm_affine_support"
+        }
+      ],
+      "axiom_inspection_exit_code": 0,
+      "verification_provenance": "Reused successful verification of byte-identical Lean source closure and pinned dependencies"
+    },
+    {
+      "id": "MARS",
+      "compiled": true,
+      "source_files": 19,
+      "axiom_inspection_exit_code": 0,
+      "theorems_checked": 1443,
+      "algorithm_theorems_checked": 277,
+      "nonstandard_dependencies": [],
+      "algorithm_nonstandard_dependencies": [],
+      "algorithm_uses_sorryAx": false,
+      "public_algorithm_nonstandard_dependencies": [],
+      "public_algorithm_uses_sorryAx": false,
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "source_tree_sha256": "b1fa976298fb5d6b44e24791d0b81a93b758c7c0853caf3a55feb3d4a89a5f0b",
+      "source_holes": [],
+      "source_declarations": [],
+      "verification_provenance": "Updated source compiled from the published bytes with pinned dependencies; theorem dependency inspection succeeded. Unchanged local modules reused the source-and-dependency-addressed publication compiler cache."
+    },
+    {
+      "id": "NonconvexStochasticAcceleratedGD",
+      "compiled": true,
+      "source_files": 30,
+      "theorems_checked": 3177,
+      "algorithm_theorems_checked": 261,
+      "algorithm_uses_sorryAx": false,
+      "nonstandard_dependencies": [
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_nonneg_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.projectedWithinGradient_smoothness_gap_of_convex_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_of_convex_lipschitz_gradient",
+          "module": "SOptLib.Axioms.BaillonHaddad",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_affineDirectionDualNorm_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        }
+      ],
+      "algorithm_nonstandard_dependencies": [],
+      "source_tree_sha256": "f8357ddda4ae42687edcf3b91b6ab53f3ab443d216d963fb2040b1a54336b89e",
+      "public_algorithm_nonstandard_dependencies": [],
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "public_algorithm_uses_sorryAx": false,
+      "source_holes": [],
+      "source_declarations": [
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 46,
+          "kind": "axiom",
+          "name": "perez_aros_vilches_open_convex_inner_cocoercivity"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 79,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 117,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_separating_seminorm_affine_support"
+        }
+      ],
+      "axiom_inspection_exit_code": 0,
+      "verification_provenance": "Reused successful verification of byte-identical Lean source closure and pinned dependencies"
+    },
+    {
+      "id": "NonconvexStochasticBlockMirrorDescent",
+      "compiled": true,
+      "source_files": 29,
+      "theorems_checked": 3004,
+      "algorithm_theorems_checked": 253,
+      "algorithm_uses_sorryAx": false,
+      "nonstandard_dependencies": [
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_nonneg_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.projectedWithinGradient_smoothness_gap_of_convex_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_of_convex_lipschitz_gradient",
+          "module": "SOptLib.Axioms.BaillonHaddad",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_affineDirectionDualNorm_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        }
+      ],
+      "algorithm_nonstandard_dependencies": [],
+      "source_tree_sha256": "1657c2254b9444a08957e748216013f29c030a5aa034c20645a832374fcb747d",
+      "public_algorithm_nonstandard_dependencies": [],
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "public_algorithm_uses_sorryAx": false,
+      "source_holes": [],
+      "source_declarations": [
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 46,
+          "kind": "axiom",
+          "name": "perez_aros_vilches_open_convex_inner_cocoercivity"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 79,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 117,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_separating_seminorm_affine_support"
+        }
+      ],
+      "axiom_inspection_exit_code": 0,
+      "verification_provenance": "Reused successful verification of byte-identical Lean source closure and pinned dependencies"
+    },
+    {
+      "id": "NonconvexStochasticFirstOrder",
+      "compiled": true,
+      "source_files": 58,
+      "theorems_checked": 3522,
+      "algorithm_theorems_checked": 275,
+      "algorithm_uses_sorryAx": false,
+      "nonstandard_dependencies": [
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_nonneg_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.projectedWithinGradient_smoothness_gap_of_convex_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_of_convex_lipschitz_gradient",
+          "module": "SOptLib.Axioms.BaillonHaddad",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_affineDirectionDualNorm_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        }
+      ],
+      "algorithm_nonstandard_dependencies": [],
+      "source_tree_sha256": "33a079453ecacfe23378deecfdbb43ce4e8f9e1bb8ceb68053bd04a612320a6d",
+      "public_algorithm_nonstandard_dependencies": [],
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "public_algorithm_uses_sorryAx": false,
+      "source_holes": [],
+      "source_declarations": [
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 46,
+          "kind": "axiom",
+          "name": "perez_aros_vilches_open_convex_inner_cocoercivity"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 79,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 117,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_separating_seminorm_affine_support"
+        }
+      ],
+      "axiom_inspection_exit_code": 0,
+      "verification_provenance": "Reused successful verification of byte-identical Lean source closure and pinned dependencies"
+    },
+    {
+      "id": "NonconvexStochasticMirrorDescent",
+      "compiled": true,
+      "source_files": 24,
+      "theorems_checked": 2841,
+      "algorithm_theorems_checked": 694,
+      "algorithm_uses_sorryAx": false,
+      "nonstandard_dependencies": [],
+      "algorithm_nonstandard_dependencies": [],
+      "source_tree_sha256": "4d40a871f8fd986bba8d4714ec732136b07c1ae2249da7425aa99a086e043af6",
+      "public_algorithm_nonstandard_dependencies": [],
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "public_algorithm_uses_sorryAx": false,
+      "source_holes": [],
+      "source_declarations": [],
+      "axiom_inspection_exit_code": 0,
+      "verification_provenance": "Reused successful verification of byte-identical Lean source closure and pinned dependencies"
+    },
+    {
+      "id": "NonconvexVarianceReducedMirrorDescent",
+      "compiled": true,
+      "source_files": 29,
+      "theorems_checked": 2765,
+      "algorithm_theorems_checked": 240,
+      "algorithm_uses_sorryAx": false,
+      "nonstandard_dependencies": [
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_nonneg_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.projectedWithinGradient_smoothness_gap_of_convex_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_of_convex_lipschitz_gradient",
+          "module": "SOptLib.Axioms.BaillonHaddad",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_affineDirectionDualNorm_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        }
+      ],
+      "algorithm_nonstandard_dependencies": [],
+      "source_tree_sha256": "0d3bb18597514dcfea6e1ebfc972e2be3a2886dfcf23fa5ec706e51c22447995",
+      "public_algorithm_nonstandard_dependencies": [],
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "public_algorithm_uses_sorryAx": false,
+      "source_holes": [],
+      "source_declarations": [
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 46,
+          "kind": "axiom",
+          "name": "perez_aros_vilches_open_convex_inner_cocoercivity"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 79,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 117,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_separating_seminorm_affine_support"
+        }
+      ],
+      "axiom_inspection_exit_code": 0,
+      "verification_provenance": "Reused successful verification of byte-identical Lean source closure and pinned dependencies"
+    },
+    {
+      "id": "PAGE",
+      "compiled": true,
+      "source_files": 23,
+      "axiom_inspection_exit_code": 0,
+      "theorems_checked": 2233,
+      "algorithm_theorems_checked": 270,
+      "nonstandard_dependencies": [],
+      "algorithm_nonstandard_dependencies": [],
+      "algorithm_uses_sorryAx": false,
+      "public_algorithm_nonstandard_dependencies": [],
+      "public_algorithm_uses_sorryAx": false,
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "source_tree_sha256": "57ac66aa66d77325300f00dea2317e988ba1839be996e11c1c43b773aa94cc68",
+      "source_holes": [],
+      "source_declarations": [],
+      "verification_provenance": "Freshly compiled and inspected for this source refresh"
+    },
+    {
+      "id": "PullWithMemoryDGD",
+      "compiled": true,
+      "source_files": 24,
+      "theorems_checked": 2716,
+      "algorithm_theorems_checked": 269,
+      "algorithm_uses_sorryAx": false,
+      "nonstandard_dependencies": [
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_nonneg_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.projectedWithinGradient_smoothness_gap_of_convex_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_of_convex_lipschitz_gradient",
+          "module": "SOptLib.Axioms.BaillonHaddad",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_affineDirectionDualNorm_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        }
+      ],
+      "algorithm_nonstandard_dependencies": [],
+      "source_tree_sha256": "561d903540ecdb07b8676946a6c092f901ff34acd02096312a982d7aa12b4d51",
+      "public_algorithm_nonstandard_dependencies": [],
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "public_algorithm_uses_sorryAx": false,
+      "source_holes": [],
+      "source_declarations": [
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 46,
+          "kind": "axiom",
+          "name": "perez_aros_vilches_open_convex_inner_cocoercivity"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 79,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 117,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_separating_seminorm_affine_support"
+        }
+      ],
+      "axiom_inspection_exit_code": 0,
+      "verification_provenance": "Reused successful verification of byte-identical Lean source closure and pinned dependencies"
+    },
+    {
+      "id": "RCDGD",
+      "compiled": true,
+      "source_files": 13,
+      "theorems_checked": 1123,
+      "algorithm_theorems_checked": 397,
+      "algorithm_uses_sorryAx": false,
+      "nonstandard_dependencies": [],
+      "algorithm_nonstandard_dependencies": [],
+      "source_tree_sha256": "421a237d819caccc38ddf4bbd6370072662ff3b932d25e656ac7c6a783e1a7e0",
+      "public_algorithm_nonstandard_dependencies": [],
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "public_algorithm_uses_sorryAx": false,
+      "source_holes": [],
+      "source_declarations": [],
+      "axiom_inspection_exit_code": 0,
+      "verification_provenance": "Reused successful verification of byte-identical Lean source closure and pinned dependencies"
+    },
+    {
+      "id": "RSGF",
+      "compiled": true,
+      "source_files": 29,
+      "theorems_checked": 3244,
+      "algorithm_theorems_checked": 256,
+      "algorithm_uses_sorryAx": false,
+      "nonstandard_dependencies": [
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_nonneg_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.projectedWithinGradient_smoothness_gap_of_convex_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_of_convex_lipschitz_gradient",
+          "module": "SOptLib.Axioms.BaillonHaddad",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_affineDirectionDualNorm_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        }
+      ],
+      "algorithm_nonstandard_dependencies": [],
+      "source_tree_sha256": "aed0579c12e51db021fbaaef0076306e42a7741521bc3ceb5793a6b114178307",
+      "public_algorithm_nonstandard_dependencies": [],
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "public_algorithm_uses_sorryAx": false,
+      "source_holes": [],
+      "source_declarations": [
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 46,
+          "kind": "axiom",
+          "name": "perez_aros_vilches_open_convex_inner_cocoercivity"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 79,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 117,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_separating_seminorm_affine_support"
+        }
+      ],
+      "axiom_inspection_exit_code": 0,
+      "verification_provenance": "Reused successful verification of byte-identical Lean source closure and pinned dependencies"
+    },
+    {
+      "id": "RandomGradientExtrapolation",
+      "compiled": true,
+      "source_files": 32,
+      "theorems_checked": 3248,
+      "algorithm_theorems_checked": 569,
+      "algorithm_uses_sorryAx": false,
+      "nonstandard_dependencies": [
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_nonneg_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.projectedWithinGradient_smoothness_gap_of_convex_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_of_convex_lipschitz_gradient",
+          "module": "SOptLib.Axioms.BaillonHaddad",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_affineDirectionDualNorm_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        }
+      ],
+      "algorithm_nonstandard_dependencies": [],
+      "source_tree_sha256": "5772f99852c4a3a77f943107c382716b6bbd5af3b153869b499f201e3d73fc39",
+      "public_algorithm_nonstandard_dependencies": [],
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "public_algorithm_uses_sorryAx": false,
+      "source_holes": [],
+      "source_declarations": [
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 46,
+          "kind": "axiom",
+          "name": "perez_aros_vilches_open_convex_inner_cocoercivity"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 79,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 117,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_separating_seminorm_affine_support"
+        }
+      ],
+      "axiom_inspection_exit_code": 0,
+      "verification_provenance": "Reused successful verification of byte-identical Lean source closure and pinned dependencies"
+    },
+    {
+      "id": "RandomPrimalDualGradient",
+      "compiled": true,
+      "source_files": 32,
+      "theorems_checked": 3252,
+      "algorithm_theorems_checked": 569,
+      "algorithm_uses_sorryAx": false,
+      "nonstandard_dependencies": [
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_nonneg_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.projectedWithinGradient_smoothness_gap_of_convex_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_of_convex_lipschitz_gradient",
+          "module": "SOptLib.Axioms.BaillonHaddad",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_affineDirectionDualNorm_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        }
+      ],
+      "algorithm_nonstandard_dependencies": [],
+      "source_tree_sha256": "9723d0c1be65b582cb393597d159ccb0a2c26804d3c8095371e2c74dd5f76da3",
+      "public_algorithm_nonstandard_dependencies": [],
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "public_algorithm_uses_sorryAx": false,
+      "source_holes": [],
+      "source_declarations": [
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 46,
+          "kind": "axiom",
+          "name": "perez_aros_vilches_open_convex_inner_cocoercivity"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 79,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 117,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_separating_seminorm_affine_support"
+        }
+      ],
+      "axiom_inspection_exit_code": 0,
+      "verification_provenance": "Reused successful verification of byte-identical Lean source closure and pinned dependencies"
+    },
+    {
+      "id": "RandomizedAcceleratedProximalPoint",
+      "compiled": true,
+      "source_files": 33,
+      "theorems_checked": 3232,
+      "algorithm_theorems_checked": 579,
+      "algorithm_uses_sorryAx": false,
+      "nonstandard_dependencies": [
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_nonneg_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.projectedWithinGradient_smoothness_gap_of_convex_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_of_convex_lipschitz_gradient",
+          "module": "SOptLib.Axioms.BaillonHaddad",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_affineDirectionDualNorm_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        }
+      ],
+      "algorithm_nonstandard_dependencies": [],
+      "source_tree_sha256": "4e5ce76ae82135abd7a149c927d96ed9b41dd4e62c5057b9a0c9dd677ed2d488",
+      "public_algorithm_nonstandard_dependencies": [],
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "public_algorithm_uses_sorryAx": false,
+      "source_holes": [],
+      "source_declarations": [
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 46,
+          "kind": "axiom",
+          "name": "perez_aros_vilches_open_convex_inner_cocoercivity"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 79,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 117,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_separating_seminorm_affine_support"
+        }
+      ],
+      "axiom_inspection_exit_code": 0,
+      "verification_provenance": "Retained pre-publication compilation/dependency record; machine paths subsequently normalized in comments only. Non-comment text and line counts checked unchanged; not freshly compiled.",
+      "pre_publication_source_tree_sha256": "212891cb768d1455619eaf551552de296ea1ade565095d8330812b9ffcf413d2",
+      "publication_edit": {
+        "kind": "comment_only",
+        "files": [
+          "Algorithms/Unverified/RandomizedAcceleratedProximalPoint/Part001.lean"
+        ],
+        "non_comment_text_unchanged": true,
+        "fresh_compilation": false
+      }
+    },
+    {
+      "id": "SAM",
+      "compiled": true,
+      "source_files": 14,
+      "theorems_checked": 2320,
+      "algorithm_theorems_checked": 562,
+      "algorithm_uses_sorryAx": true,
+      "nonstandard_dependencies": [
+        {
+          "algorithm": true,
+          "declaration": "_private.Algorithms.Unverified.SAM.0.Algorithms.Unverified.SAM.theorem2AppendixA1GaussianKLFormulaScalarSourceCalculation_voucher_attempt_iter56",
+          "module": "Algorithms.Unverified.SAM",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "propext",
+            "sorryAx"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "_private.Algorithms.Unverified.SAM.0.Algorithms.Unverified.SAM.theorem2AppendixA1GaussianKLFormulaScalarSourceCalculation_voucher_attempt_iter57",
+          "module": "Algorithms.Unverified.SAM",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "propext",
+            "sorryAx"
+          ]
+        }
+      ],
+      "algorithm_nonstandard_dependencies": [
+        {
+          "algorithm": true,
+          "declaration": "_private.Algorithms.Unverified.SAM.0.Algorithms.Unverified.SAM.theorem2AppendixA1GaussianKLFormulaScalarSourceCalculation_voucher_attempt_iter56",
+          "module": "Algorithms.Unverified.SAM",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "propext",
+            "sorryAx"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "_private.Algorithms.Unverified.SAM.0.Algorithms.Unverified.SAM.theorem2AppendixA1GaussianKLFormulaScalarSourceCalculation_voucher_attempt_iter57",
+          "module": "Algorithms.Unverified.SAM",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "propext",
+            "sorryAx"
+          ]
+        }
+      ],
+      "source_tree_sha256": "18b8d69efcc368425a902a7bdfce544a2ea6ab663f0d1008b057f8c334da33fc",
+      "public_algorithm_nonstandard_dependencies": [],
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "public_algorithm_uses_sorryAx": false,
+      "source_holes": [],
+      "source_declarations": [],
+      "axiom_inspection_exit_code": 0,
+      "verification_provenance": "Reused successful verification of byte-identical Lean source closure and pinned dependencies"
+    },
+    {
+      "id": "SPIDER",
+      "compiled": true,
+      "source_files": 32,
+      "theorems_checked": 3249,
+      "algorithm_theorems_checked": 371,
+      "algorithm_uses_sorryAx": false,
+      "nonstandard_dependencies": [
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_nonneg_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.projectedWithinGradient_smoothness_gap_of_convex_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_of_convex_lipschitz_gradient",
+          "module": "SOptLib.Axioms.BaillonHaddad",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_affineDirectionDualNorm_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        }
+      ],
+      "algorithm_nonstandard_dependencies": [],
+      "source_tree_sha256": "9b584f039070c211d45be1bdd99a7dcf199c552b74dc0f2a369f43bf39d8a718",
+      "public_algorithm_nonstandard_dependencies": [],
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "public_algorithm_uses_sorryAx": false,
+      "source_holes": [],
+      "source_declarations": [
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 46,
+          "kind": "axiom",
+          "name": "perez_aros_vilches_open_convex_inner_cocoercivity"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 79,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 117,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_separating_seminorm_affine_support"
+        }
+      ],
+      "axiom_inspection_exit_code": 0,
+      "verification_provenance": "Reused successful verification of byte-identical Lean source closure and pinned dependencies"
+    },
+    {
+      "id": "StochasticAcceleratedGradientDescent",
+      "compiled": true,
+      "source_files": 27,
+      "theorems_checked": 1882,
+      "algorithm_theorems_checked": 474,
+      "algorithm_uses_sorryAx": false,
+      "nonstandard_dependencies": [],
+      "algorithm_nonstandard_dependencies": [],
+      "source_tree_sha256": "ecf41a9ef4309470553ca18e8a2a3052a464b2844fbb80d4d3d0066486e2719b",
+      "public_algorithm_nonstandard_dependencies": [],
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "public_algorithm_uses_sorryAx": false,
+      "source_holes": [],
+      "source_declarations": [],
+      "axiom_inspection_exit_code": 0,
+      "verification_provenance": "Reused successful verification of byte-identical Lean source closure and pinned dependencies"
+    },
+    {
+      "id": "StochasticAcceleratedMirrorProx",
+      "compiled": true,
+      "source_files": 24,
+      "theorems_checked": 2860,
+      "algorithm_theorems_checked": 343,
+      "algorithm_uses_sorryAx": false,
+      "nonstandard_dependencies": [],
+      "algorithm_nonstandard_dependencies": [],
+      "source_tree_sha256": "5d273b7319cd943e44828c1ddfeb0820dbd1da10a1903a5c3f82b3c4a1755136",
+      "public_algorithm_nonstandard_dependencies": [],
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "public_algorithm_uses_sorryAx": false,
+      "source_holes": [],
+      "source_declarations": [],
+      "axiom_inspection_exit_code": 0,
+      "verification_provenance": "Reused successful verification of byte-identical Lean source closure and pinned dependencies"
+    },
+    {
+      "id": "StochasticAcceleratedPrimalDual",
+      "compiled": true,
+      "source_files": 26,
+      "theorems_checked": 2870,
+      "algorithm_theorems_checked": 785,
+      "algorithm_uses_sorryAx": false,
+      "nonstandard_dependencies": [],
+      "algorithm_nonstandard_dependencies": [],
+      "source_tree_sha256": "0af5d441e77cc43dab3c2e87434462b75307fb58a6a33ef55005a02a7f9f711c",
+      "public_algorithm_nonstandard_dependencies": [],
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "public_algorithm_uses_sorryAx": false,
+      "source_holes": [],
+      "source_declarations": [
+        {
+          "file": "Algorithms/Unverified/StochasticAcceleratedPrimalDual.lean",
+          "line": 540,
+          "kind": "opaque",
+          "name": "SapdDisplayedLightTailBound"
+        }
+      ],
+      "axiom_inspection_exit_code": 0,
+      "verification_provenance": "Reused successful verification of byte-identical Lean source closure and pinned dependencies"
+    },
+    {
+      "id": "StochasticBlockMirrorDescent",
+      "compiled": true,
+      "source_files": 23,
+      "theorems_checked": 1550,
+      "algorithm_theorems_checked": 255,
+      "algorithm_uses_sorryAx": false,
+      "nonstandard_dependencies": [],
+      "algorithm_nonstandard_dependencies": [],
+      "source_tree_sha256": "47094e6c25bbb2a5d7105cbbc27ad32d9892f4f8e05f25bb89451735e4b1febb",
+      "public_algorithm_nonstandard_dependencies": [],
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "public_algorithm_uses_sorryAx": false,
+      "source_holes": [],
+      "source_declarations": [],
+      "axiom_inspection_exit_code": 0,
+      "verification_provenance": "Reused successful verification of byte-identical Lean source closure and pinned dependencies"
+    },
+    {
+      "id": "StochasticConditionalGradientSliding",
+      "compiled": true,
+      "source_files": 24,
+      "theorems_checked": 1751,
+      "algorithm_theorems_checked": 344,
+      "algorithm_uses_sorryAx": false,
+      "nonstandard_dependencies": [],
+      "algorithm_nonstandard_dependencies": [],
+      "source_tree_sha256": "46ae969d80e08cc425d382052040ad889d4afd9be4014850346a9bd9d3b344ec",
+      "public_algorithm_nonstandard_dependencies": [],
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "public_algorithm_uses_sorryAx": false,
+      "source_holes": [],
+      "source_declarations": [],
+      "axiom_inspection_exit_code": 0,
+      "verification_provenance": "Reused successful verification of byte-identical Lean source closure and pinned dependencies"
+    },
+    {
+      "id": "StochasticConvexConcaveSaddlePoint",
+      "compiled": true,
+      "source_files": 43,
+      "theorems_checked": 3704,
+      "algorithm_theorems_checked": 420,
+      "algorithm_uses_sorryAx": false,
+      "nonstandard_dependencies": [
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_nonneg_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.projectedWithinGradient_smoothness_gap_of_convex_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_of_convex_lipschitz_gradient",
+          "module": "SOptLib.Axioms.BaillonHaddad",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_affineDirectionDualNorm_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        }
+      ],
+      "algorithm_nonstandard_dependencies": [],
+      "source_tree_sha256": "4e69b79f70910100ced40785782ed7ae6a1d4ec8d18d39dddcb9721df351e9cd",
+      "public_algorithm_nonstandard_dependencies": [],
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "public_algorithm_uses_sorryAx": false,
+      "source_holes": [],
+      "source_declarations": [
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 46,
+          "kind": "axiom",
+          "name": "perez_aros_vilches_open_convex_inner_cocoercivity"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 79,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 117,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_separating_seminorm_affine_support"
+        }
+      ],
+      "axiom_inspection_exit_code": 0,
+      "verification_provenance": "Reused successful verification of byte-identical Lean source closure and pinned dependencies"
+    },
+    {
+      "id": "StochasticGradientSliding",
+      "compiled": true,
+      "source_files": 32,
+      "theorems_checked": 3873,
+      "algorithm_theorems_checked": 1735,
+      "algorithm_uses_sorryAx": false,
+      "nonstandard_dependencies": [],
+      "algorithm_nonstandard_dependencies": [],
+      "source_tree_sha256": "43820c79c9aa902886c6a08aea5b9fee13a446f179b8e4893a957796f9dbd65b",
+      "public_algorithm_nonstandard_dependencies": [],
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "public_algorithm_uses_sorryAx": false,
+      "source_holes": [],
+      "source_declarations": [],
+      "axiom_inspection_exit_code": 0,
+      "verification_provenance": "Retained pre-publication compilation/dependency record; machine paths subsequently normalized in comments only. Non-comment text and line counts checked unchanged; not freshly compiled.",
+      "pre_publication_source_tree_sha256": "9220c85792eb58bc5f9c3aac705cc2199813299d94207530f961ef698e5c25d4",
+      "publication_edit": {
+        "kind": "comment_only",
+        "files": [
+          "Algorithms/Unverified/StochasticGradientSliding/Part002.lean"
+        ],
+        "non_comment_text_unchanged": true,
+        "fresh_compilation": false
+      }
+    },
+    {
+      "id": "StochasticMirrorDescent",
+      "compiled": true,
+      "source_files": 31,
+      "theorems_checked": 2916,
+      "algorithm_theorems_checked": 358,
+      "algorithm_uses_sorryAx": false,
+      "nonstandard_dependencies": [
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_nonneg_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.projectedWithinGradient_smoothness_gap_of_convex_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_of_convex_lipschitz_gradient",
+          "module": "SOptLib.Axioms.BaillonHaddad",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_affineDirectionDualNorm_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        }
+      ],
+      "algorithm_nonstandard_dependencies": [],
+      "source_tree_sha256": "2b331a11d94cd054acb3524f92d0e072295b42b27c275bde3c8d846a6ac61b9b",
+      "public_algorithm_nonstandard_dependencies": [],
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "public_algorithm_uses_sorryAx": false,
+      "source_holes": [],
+      "source_declarations": [
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 46,
+          "kind": "axiom",
+          "name": "perez_aros_vilches_open_convex_inner_cocoercivity"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 79,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 117,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_separating_seminorm_affine_support"
+        }
+      ],
+      "axiom_inspection_exit_code": 0,
+      "verification_provenance": "Reused successful verification of byte-identical Lean source closure and pinned dependencies"
+    },
+    {
+      "id": "StochasticNonconvexCGSliding",
+      "compiled": true,
+      "source_files": 31,
+      "theorems_checked": 2831,
+      "algorithm_theorems_checked": 277,
+      "algorithm_uses_sorryAx": false,
+      "nonstandard_dependencies": [
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_nonneg_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.projectedWithinGradient_smoothness_gap_of_convex_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_of_convex_lipschitz_gradient",
+          "module": "SOptLib.Axioms.BaillonHaddad",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_affineDirectionDualNorm_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        }
+      ],
+      "algorithm_nonstandard_dependencies": [],
+      "source_tree_sha256": "6ab069388f1cd85c0bfc29c876ea35a3bc81b64368fcaa920229167f72d34713",
+      "public_algorithm_nonstandard_dependencies": [],
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "public_algorithm_uses_sorryAx": false,
+      "source_holes": [],
+      "source_declarations": [
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 46,
+          "kind": "axiom",
+          "name": "perez_aros_vilches_open_convex_inner_cocoercivity"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 79,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 117,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_separating_seminorm_affine_support"
+        }
+      ],
+      "axiom_inspection_exit_code": 0,
+      "verification_provenance": "Reused successful verification of byte-identical Lean source closure and pinned dependencies"
+    },
+    {
+      "id": "StochasticNonconvexConditionalGradient",
+      "compiled": true,
+      "source_files": 19,
+      "theorems_checked": 2339,
+      "algorithm_theorems_checked": 1249,
+      "algorithm_uses_sorryAx": false,
+      "nonstandard_dependencies": [
+        {
+          "algorithm": true,
+          "declaration": "phase0SignatureSurfaceBoundaryConsumer_count",
+          "module": "Algorithms.Unverified.StochasticNonconvexConditionalGradient",
+          "axioms": [
+            "phase0SignatureSurfaceBoundaryConsumer_count._native.native_decide.ax_1_1"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "phase0SignatureSurfaceRegistry_declaration_nodup",
+          "module": "Algorithms.Unverified.StochasticNonconvexConditionalGradient",
+          "axioms": [
+            "phase0SignatureSurfaceRegistry_declaration_nodup._native.native_decide.ax_1_1"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "phase0SignatureSurfaceRegistry_count",
+          "module": "Algorithms.Unverified.StochasticNonconvexConditionalGradient",
+          "axioms": [
+            "phase0SignatureSurfaceRegistry_count._native.native_decide.ax_1_1"
+          ]
+        }
+      ],
+      "algorithm_nonstandard_dependencies": [
+        {
+          "algorithm": true,
+          "declaration": "phase0SignatureSurfaceBoundaryConsumer_count",
+          "module": "Algorithms.Unverified.StochasticNonconvexConditionalGradient",
+          "axioms": [
+            "phase0SignatureSurfaceBoundaryConsumer_count._native.native_decide.ax_1_1"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "phase0SignatureSurfaceRegistry_declaration_nodup",
+          "module": "Algorithms.Unverified.StochasticNonconvexConditionalGradient",
+          "axioms": [
+            "phase0SignatureSurfaceRegistry_declaration_nodup._native.native_decide.ax_1_1"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "phase0SignatureSurfaceRegistry_count",
+          "module": "Algorithms.Unverified.StochasticNonconvexConditionalGradient",
+          "axioms": [
+            "phase0SignatureSurfaceRegistry_count._native.native_decide.ax_1_1"
+          ]
+        }
+      ],
+      "source_tree_sha256": "cfba037425dda57048bcba6d58900257b42b014b4b74ea21201b4b34d46ac454",
+      "public_algorithm_nonstandard_dependencies": [
+        {
+          "algorithm": true,
+          "declaration": "phase0SignatureSurfaceBoundaryConsumer_count",
+          "module": "Algorithms.Unverified.StochasticNonconvexConditionalGradient",
+          "axioms": [
+            "phase0SignatureSurfaceBoundaryConsumer_count._native.native_decide.ax_1_1"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "phase0SignatureSurfaceRegistry_declaration_nodup",
+          "module": "Algorithms.Unverified.StochasticNonconvexConditionalGradient",
+          "axioms": [
+            "phase0SignatureSurfaceRegistry_declaration_nodup._native.native_decide.ax_1_1"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "phase0SignatureSurfaceRegistry_count",
+          "module": "Algorithms.Unverified.StochasticNonconvexConditionalGradient",
+          "axioms": [
+            "phase0SignatureSurfaceRegistry_count._native.native_decide.ax_1_1"
+          ]
+        }
+      ],
+      "algorithm_native_decide_axioms": [
+        "phase0SignatureSurfaceBoundaryConsumer_count._native.native_decide.ax_1_1",
+        "phase0SignatureSurfaceRegistry_count._native.native_decide.ax_1_1",
+        "phase0SignatureSurfaceRegistry_declaration_nodup._native.native_decide.ax_1_1"
+      ],
+      "algorithm_custom_axioms": [],
+      "public_algorithm_uses_sorryAx": false,
+      "source_holes": [],
+      "source_declarations": [],
+      "axiom_inspection_exit_code": 0,
+      "verification_provenance": "Retained pre-publication compilation/dependency record; machine paths subsequently normalized in comments only. Non-comment text and line counts checked unchanged; not freshly compiled.",
+      "pre_publication_source_tree_sha256": "66ddcd761a5a05586078ee23cb3e12d59f78c0be81d825216c05a0f34f5c10b6",
+      "publication_edit": {
+        "kind": "comment_only",
+        "files": [
+          "Algorithms/Unverified/StochasticNonconvexConditionalGradient.lean"
+        ],
+        "non_comment_text_unchanged": true,
+        "fresh_compilation": false
+      }
+    },
+    {
+      "id": "StochasticRecursiveMomentum",
+      "compiled": true,
+      "source_files": 31,
+      "theorems_checked": 3596,
+      "algorithm_theorems_checked": 664,
+      "algorithm_uses_sorryAx": false,
+      "nonstandard_dependencies": [
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_nonneg_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.projectedWithinGradient_smoothness_gap_of_convex_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_of_convex_lipschitz_gradient",
+          "module": "SOptLib.Axioms.BaillonHaddad",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_affineDirectionDualNorm_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        }
+      ],
+      "algorithm_nonstandard_dependencies": [],
+      "source_tree_sha256": "8e4ed16d7f7d0c728425bfc4c49db6cb86fd62e41b1b01a35ac4b3136f473f9e",
+      "public_algorithm_nonstandard_dependencies": [],
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "public_algorithm_uses_sorryAx": false,
+      "source_holes": [],
+      "source_declarations": [
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 46,
+          "kind": "axiom",
+          "name": "perez_aros_vilches_open_convex_inner_cocoercivity"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 79,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 117,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_separating_seminorm_affine_support"
+        }
+      ],
+      "axiom_inspection_exit_code": 0,
+      "verification_provenance": "Reused successful verification of byte-identical Lean source closure and pinned dependencies"
+    },
+    {
+      "id": "StochasticZerothOrder",
+      "compiled": true,
+      "source_files": 30,
+      "theorems_checked": 3626,
+      "algorithm_theorems_checked": 457,
+      "algorithm_uses_sorryAx": false,
+      "nonstandard_dependencies": [
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_nonneg_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.projectedWithinGradient_smoothness_gap_of_convex_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_of_convex_lipschitz_gradient",
+          "module": "SOptLib.Axioms.BaillonHaddad",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_affineDirectionDualNorm_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        }
+      ],
+      "algorithm_nonstandard_dependencies": [],
+      "source_tree_sha256": "068a0360ad4c67897f60eec89d92775aeee6f696f43abba39b16583ce9435670",
+      "public_algorithm_nonstandard_dependencies": [],
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "public_algorithm_uses_sorryAx": false,
+      "source_holes": [],
+      "source_declarations": [
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 46,
+          "kind": "axiom",
+          "name": "perez_aros_vilches_open_convex_inner_cocoercivity"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 79,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 117,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_separating_seminorm_affine_support"
+        }
+      ],
+      "axiom_inspection_exit_code": 0,
+      "verification_provenance": "Reused successful verification of byte-identical Lean source closure and pinned dependencies"
+    },
+    {
+      "id": "VarianceReducedAcceleratedGradientDescent",
+      "compiled": true,
+      "source_files": 39,
+      "theorems_checked": 3775,
+      "algorithm_theorems_checked": 983,
+      "algorithm_uses_sorryAx": false,
+      "nonstandard_dependencies": [
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectPart003CompileDebtSurface_excludes_guardedGeneratedStep",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectPart003CompileDebtSurface_excludes_guardedGeneratedStep._native.native_decide.ax_1_1",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_nonneg_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectActivePart003SourceFillSurface_excludes_smoothCompileDebt",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectActivePart003SourceFillSurface_excludes_smoothCompileDebt._native.native_decide.ax_1_1",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.projectedWithinGradient_smoothness_gap_of_convex_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectClosedSourceDomainInfra_excluded_from_remainingObligations",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectClosedSourceDomainInfra_excluded_from_remainingObligations._native.native_decide.ax_1_1",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectSourceDomainAttempt_bucket_empty",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectSourceDomainAttempt_bucket_empty._native.native_decide.ax_1_1"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectRemainingObligationManifest_bucketCounts",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectRemainingObligationManifest_bucketCounts._native.native_decide.ax_1_1"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectRemainingObligationManifest_excludes_correctedCoreLemma519",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectRemainingObligationManifest_excludes_correctedCoreLemma519._native.native_decide.ax_1_1",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_of_convex_lipschitz_gradient",
+          "module": "SOptLib.Axioms.BaillonHaddad",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectActivePart003SourceFillSurface_excludes_correctedCoreLemma519",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectActivePart003SourceFillSurface_excludes_correctedCoreLemma519._native.native_decide.ax_1_1",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectActiveSourceFillSurface_eq_liveSourceBucket",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectActiveSourceFillSurface_eq_liveSourceBucket._native.native_decide.ax_1_1"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_affineDirectionDualNorm_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectActiveSourceFillSurface_excludes_certifiedCoreLemma518",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectActiveSourceFillSurface_excludes_certifiedCoreLemma518._native.native_decide.ax_1_1",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectRemainingObligationManifest_count",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectRemainingObligationManifest_count._native.native_decide.ax_1_1",
+            "propext"
+          ]
+        }
+      ],
+      "algorithm_nonstandard_dependencies": [
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectPart003CompileDebtSurface_excludes_guardedGeneratedStep",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectPart003CompileDebtSurface_excludes_guardedGeneratedStep._native.native_decide.ax_1_1",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectActivePart003SourceFillSurface_excludes_smoothCompileDebt",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectActivePart003SourceFillSurface_excludes_smoothCompileDebt._native.native_decide.ax_1_1",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectClosedSourceDomainInfra_excluded_from_remainingObligations",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectClosedSourceDomainInfra_excluded_from_remainingObligations._native.native_decide.ax_1_1",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectSourceDomainAttempt_bucket_empty",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectSourceDomainAttempt_bucket_empty._native.native_decide.ax_1_1"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectRemainingObligationManifest_bucketCounts",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectRemainingObligationManifest_bucketCounts._native.native_decide.ax_1_1"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectRemainingObligationManifest_excludes_correctedCoreLemma519",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectRemainingObligationManifest_excludes_correctedCoreLemma519._native.native_decide.ax_1_1",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectActivePart003SourceFillSurface_excludes_correctedCoreLemma519",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectActivePart003SourceFillSurface_excludes_correctedCoreLemma519._native.native_decide.ax_1_1",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectActiveSourceFillSurface_eq_liveSourceBucket",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectActiveSourceFillSurface_eq_liveSourceBucket._native.native_decide.ax_1_1"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectActiveSourceFillSurface_excludes_certifiedCoreLemma518",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectActiveSourceFillSurface_excludes_certifiedCoreLemma518._native.native_decide.ax_1_1",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectRemainingObligationManifest_count",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectRemainingObligationManifest_count._native.native_decide.ax_1_1",
+            "propext"
+          ]
+        }
+      ],
+      "source_tree_sha256": "5a9ae718f66a45bff7e8ffa0763bc44b9cce29897b1392e823604d2039a91710",
+      "public_algorithm_nonstandard_dependencies": [
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectPart003CompileDebtSurface_excludes_guardedGeneratedStep",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectPart003CompileDebtSurface_excludes_guardedGeneratedStep._native.native_decide.ax_1_1",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectActivePart003SourceFillSurface_excludes_smoothCompileDebt",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectActivePart003SourceFillSurface_excludes_smoothCompileDebt._native.native_decide.ax_1_1",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectClosedSourceDomainInfra_excluded_from_remainingObligations",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectClosedSourceDomainInfra_excluded_from_remainingObligations._native.native_decide.ax_1_1",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectSourceDomainAttempt_bucket_empty",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectSourceDomainAttempt_bucket_empty._native.native_decide.ax_1_1"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectRemainingObligationManifest_bucketCounts",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectRemainingObligationManifest_bucketCounts._native.native_decide.ax_1_1"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectRemainingObligationManifest_excludes_correctedCoreLemma519",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectRemainingObligationManifest_excludes_correctedCoreLemma519._native.native_decide.ax_1_1",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectActivePart003SourceFillSurface_excludes_correctedCoreLemma519",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectActivePart003SourceFillSurface_excludes_correctedCoreLemma519._native.native_decide.ax_1_1",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectActiveSourceFillSurface_eq_liveSourceBucket",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectActiveSourceFillSurface_eq_liveSourceBucket._native.native_decide.ax_1_1"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectActiveSourceFillSurface_excludes_certifiedCoreLemma518",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectActiveSourceFillSurface_excludes_certifiedCoreLemma518._native.native_decide.ax_1_1",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": true,
+          "declaration": "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectRemainingObligationManifest_count",
+          "module": "Algorithms.Unverified.VarianceReducedAcceleratedGradientDescent.Part003",
+          "axioms": [
+            "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectRemainingObligationManifest_count._native.native_decide.ax_1_1",
+            "propext"
+          ]
+        }
+      ],
+      "algorithm_native_decide_axioms": [
+        "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectActivePart003SourceFillSurface_excludes_correctedCoreLemma519._native.native_decide.ax_1_1",
+        "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectActivePart003SourceFillSurface_excludes_smoothCompileDebt._native.native_decide.ax_1_1",
+        "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectActiveSourceFillSurface_eq_liveSourceBucket._native.native_decide.ax_1_1",
+        "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectActiveSourceFillSurface_excludes_certifiedCoreLemma518._native.native_decide.ax_1_1",
+        "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectClosedSourceDomainInfra_excluded_from_remainingObligations._native.native_decide.ax_1_1",
+        "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectPart003CompileDebtSurface_excludes_guardedGeneratedStep._native.native_decide.ax_1_1",
+        "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectRemainingObligationManifest_bucketCounts._native.native_decide.ax_1_1",
+        "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectRemainingObligationManifest_count._native.native_decide.ax_1_1",
+        "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectRemainingObligationManifest_excludes_correctedCoreLemma519._native.native_decide.ax_1_1",
+        "VarianceReducedAcceleratedGradientDescent.theorem59RouteArchitectSourceDomainAttempt_bucket_empty._native.native_decide.ax_1_1"
+      ],
+      "algorithm_custom_axioms": [],
+      "public_algorithm_uses_sorryAx": false,
+      "source_holes": [],
+      "source_declarations": [
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 46,
+          "kind": "axiom",
+          "name": "perez_aros_vilches_open_convex_inner_cocoercivity"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 79,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 117,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_separating_seminorm_affine_support"
+        }
+      ],
+      "axiom_inspection_exit_code": 0,
+      "verification_provenance": "Reused successful verification of byte-identical Lean source closure and pinned dependencies"
+    },
+    {
+      "id": "VarianceReducedMirrorDescent",
+      "compiled": true,
+      "source_files": 30,
+      "theorems_checked": 2995,
+      "algorithm_theorems_checked": 479,
+      "algorithm_uses_sorryAx": false,
+      "nonstandard_dependencies": [
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_nonneg_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.projectedWithinGradient_smoothness_gap_of_convex_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_of_convex_lipschitz_gradient",
+          "module": "SOptLib.Axioms.BaillonHaddad",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_affineDirectionDualNorm_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        }
+      ],
+      "algorithm_nonstandard_dependencies": [],
+      "source_tree_sha256": "9f0a7a39c68564ea27fcef8e0dd86f2b8a2a15a9188ee23a75243f2e8b149899",
+      "public_algorithm_nonstandard_dependencies": [],
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "public_algorithm_uses_sorryAx": false,
+      "source_holes": [],
+      "source_declarations": [
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 46,
+          "kind": "axiom",
+          "name": "perez_aros_vilches_open_convex_inner_cocoercivity"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 79,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 117,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_separating_seminorm_affine_support"
+        }
+      ],
+      "axiom_inspection_exit_code": 0,
+      "verification_provenance": "Reused successful verification of byte-identical Lean source closure and pinned dependencies"
+    }
+  ],
+  "summary": {
+    "developments": 32,
+    "compiled": 32,
+    "freshly_verified_source_updates": [
+      "AMSGrad",
+      "PAGE",
+      "MARS"
+    ],
+    "algorithm_sorryAx_users": [
+      "SAM"
+    ],
+    "algorithm_custom_axiom_users": [],
+    "algorithm_native_decide_users": [
+      "StochasticNonconvexConditionalGradient",
+      "VarianceReducedAcceleratedGradientDescent"
+    ],
+    "public_algorithm_sorryAx_users": [],
+    "not_checked": 0,
+    "dependency_results_scope": "Only developments with successful compilation and dependency-inspection records."
+  },
+  "independent_dependency_cross_check": {
+    "method": "Lean #print axioms",
+    "matched_declarations": [
+      "RandomGradientExtrapolation.Setup.theorem_5_4_canonical_policy",
+      "VarianceReducedMirrorDescent.lemma_5_8",
+      "VarianceReducedMirrorDescent.theorem_5_6",
+      "VarianceReducedMirrorDescent.corollary_5_8",
+      "StochasticAcceleratedPrimalDualSetup.theorem_4_8_expected_gap_fixedDomain_mixedCenter_corrected"
+    ],
+    "checks": [
+      {
+        "declaration": "RandomGradientExtrapolation.Setup.theorem_5_4_canonical_policy",
+        "axioms": [
+          "Classical.choice",
+          "Quot.sound",
+          "propext"
+        ],
+        "method": "Lean #print axioms; agrees with full checked-environment dependency graph",
+        "compiled": true
+      },
+      {
+        "declaration": "VarianceReducedMirrorDescent.lemma_5_8",
+        "axioms": [
+          "Classical.choice",
+          "Quot.sound",
+          "propext"
+        ],
+        "method": "Lean #print axioms; agrees with full checked-environment dependency graph",
+        "compiled": true
+      },
+      {
+        "declaration": "VarianceReducedMirrorDescent.theorem_5_6",
+        "axioms": [
+          "Classical.choice",
+          "Quot.sound",
+          "propext"
+        ],
+        "method": "Lean #print axioms; agrees with full checked-environment dependency graph",
+        "compiled": true
+      },
+      {
+        "declaration": "VarianceReducedMirrorDescent.corollary_5_8",
+        "axioms": [
+          "Classical.choice",
+          "Quot.sound",
+          "propext"
+        ],
+        "method": "Lean #print axioms; agrees with full checked-environment dependency graph",
+        "compiled": true
+      },
+      {
+        "declaration": "StochasticAcceleratedPrimalDualSetup.theorem_4_8_expected_gap_fixedDomain_mixedCenter_corrected",
+        "axioms": [
+          "Classical.choice",
+          "Quot.sound",
+          "propext"
+        ],
+        "method": "Lean #print axioms; agrees with full checked-environment dependency graph",
+        "compiled": true
+      }
+    ],
+    "sapd_updated_endpoint": {
+      "declaration": "StochasticAcceleratedPrimalDualSetup.theorem_4_8_expected_gap_fixedDomain_mixedCenter_corrected",
+      "axioms": [
+        "Classical.choice",
+        "Quot.sound",
+        "propext"
+      ],
+      "method": "Lean #print axioms; agrees with full checked-environment dependency graph",
+      "compiled": true
+    },
+    "scope": "Retained checks from the preceding release; the RGE, VRMD, and SAPD source closures and pinned dependencies are unchanged in this refresh."
+  },
+  "scope": "Compilation and theorem-dependency results for all 32 released source closures. The changed MARS module was freshly compiled and inspected; other source closures retain their prior bound results. Comment-only publication edits are identified per record. TimeVaryingPushPull is withheld and excluded. Compilation does not establish source-target completion.",
+  "source_target_coverage_note": "Compilation and dependency inspection do not certify every source target. SAPD retains a corrected expected-gap endpoint and an unfinished high-probability endpoint. RGE/RAPP/VRAGD/VRMD use explicit added mathematical hypotheses. Per-development statuses and source holes are retained; historical scores are unchanged."
+}
