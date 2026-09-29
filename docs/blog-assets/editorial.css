@@ -1,0 +1,94 @@
+/* Shared gold rules tie the cover, navigation, and reading surface together. */
+::selection{background:#d9c8a2;color:#14272d}
+.site-header[data-reading="true"]{box-shadow:0 6px 28px #03101812}
+.hero-eyebrow{display:flex;align-items:center;gap:0}
+.hero-eyebrow:before{content:"";width:23px;height:1px;margin-right:16px;background:#d1b583}
+.hero-copy h1{letter-spacing:-.06em}
+.hero-meta{border-top:1px solid #c7a7751c}
+.site-header nav{position:relative}
+.site-header nav a:after{display:none}
+.site-header nav a[aria-current]{color:#f4ddae}
+.nav-indicator{position:absolute;bottom:4px;left:0;height:1px;width:0;pointer-events:none;opacity:0;background:linear-gradient(90deg,#b39460,#f5dfb5 75%,#b3946000);box-shadow:0 0 10px #c7a77535;transition:transform .36s cubic-bezier(.22,.75,.2,1),width .36s cubic-bezier(.22,.75,.2,1),opacity .2s}
+.layout{padding-top:86px}
+.article-deck{font-size:clamp(52px,4.7vw,70px);line-height:1.04;letter-spacing:-.55px;margin-bottom:30px}
+.article>p:not(.article-deck),.article>ul,.article>h3{max-width:720px}
+.article>p:not(.article-deck){line-height:1.95}
+.article h2{font-size:42px;line-height:1.16;letter-spacing:-.3px;text-wrap:balance;margin-top:86px}
+.section-number{font-size:26px;margin-bottom:22px}
+.article h3{line-height:1.6;margin-top:38px}
+.article blockquote.abstract{display:grid;grid-template-columns:82px minmax(0,1fr);gap:24px;padding:29px 0 32px;margin-bottom:38px}
+.abstract-label{font-size:28px;line-height:1.2;margin:1px 0 0}
+.abstract p{color:#2c3e44}
+.toc a{position:relative;padding-block:2px;margin-bottom:17px}
+.toc a span{font-size:17px}
+.toc a.active{background:linear-gradient(90deg,#c7a7750e,transparent 85%)}
+.toc a.active:before{content:"";position:absolute;left:-3px;top:10px;width:4px;height:4px;background:#ac874c;transform:rotate(45deg);box-shadow:0 0 8px #c7a77555}
+.table-scroll{margin-top:36px;margin-bottom:12px}
+table{font-size:13px}
+th{font-size:12px;letter-spacing:.15px;padding:18px 16px}
+td{padding:15px 16px}
+tbody tr{transition:background .18s}
+tbody tr:hover{background:#ece7dd55}
+tr.highlight td{background:#eee9dd}
+tr.highlight td:first-child{box-shadow:inset 2px 0 #aa8750}
+figure{margin-top:56px;margin-bottom:44px}
+.figure-link{position:relative;isolation:isolate}
+.figure-link:hover{transform:none!important;box-shadow:none!important}
+.figure-open{position:absolute;top:12px;right:12px;z-index:1;width:34px;height:34px;display:grid;place-items:center;background:#fdfcf9e8;color:#725631;border:1px solid #d3c3a7;opacity:0;transform:translateY(4px);transition:opacity .25s,transform .35s}
+.figure-open svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.15;stroke-linecap:square}
+.figure-link:hover .figure-open,.figure-link:focus-visible .figure-open{opacity:1;transform:none}
+figcaption{padding-top:22px;margin-top:24px;gap:24px}
+.figure-label>span:last-child{font-size:35px}
+.caption-copy{line-height:1.85}
+.article-end{margin-top:70px;padding-top:30px;gap:23px;align-items:baseline}
+.end-mark{font-size:33px}
+.article-end a{font-family:var(--serif);font-size:29px;font-weight:400;line-height:1.25;width:100%;display:flex;justify-content:space-between;align-items:baseline}
+.article-end a span{font-family:var(--sans);font-size:22px;color:#927343;padding-right:4px;transition:transform .3s}
+.article-end a:hover span{transform:translate(3px,-3px)}
+/* Native dialog keeps figure inspection in the same reading context. */
+.figure-viewer{position:fixed;inset:0;width:100vw;max-width:none;height:100dvh;max-height:none;margin:0;padding:22px clamp(18px,4vw,64px) 18px;background:#060d12;color:#f4f0e6;border:0;overflow:hidden}
+.figure-viewer[open]{display:flex;flex-direction:column;gap:16px;animation:viewer-in .22s ease-out}
+.figure-viewer::backdrop{background:#03080d}
+.viewer-toolbar,.viewer-footer{width:100%;max-width:1500px;margin-inline:auto;display:flex;align-items:center;justify-content:space-between;gap:20px;flex:none}
+.viewer-toolbar{min-height:43px}
+.viewer-toolbar p{margin:0;display:flex;align-items:baseline;gap:18px;font-size:13px;letter-spacing:.25px;line-height:1.4}
+.viewer-number{font-family:var(--serif);font-size:26px;font-style:italic;color:#dbc18f}
+.viewer-close{width:40px;height:40px;display:grid;place-items:center;background:transparent;border:1px solid #665b49;color:#f1e2c5;cursor:pointer;flex:none;transition:border-color .2s,background .2s}
+.viewer-close svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.1}
+.viewer-close:hover{border-color:#e5cea0;background:#d9bf8820}
+.viewer-stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:auto;overscroll-behavior:contain}
+.viewer-image{width:auto;height:auto;max-width:100%;max-height:100%;object-fit:contain;flex:none;cursor:zoom-in}
+.viewer-stage.is-zoomed{display:block}
+.viewer-stage.is-zoomed .viewer-image{width:var(--figure-width);max-width:none;height:auto;max-height:none;margin:auto;cursor:zoom-out}
+.viewer-footer{min-height:38px;border-top:1px solid #b499672e;padding-top:14px}
+.viewer-footer a,.viewer-footer button{color:#e8d3aa;background:none;border:0;padding:0;font:inherit;font-size:11px;text-decoration:none;letter-spacing:.2px;cursor:pointer;transition:color .2s}
+.viewer-footer a:hover,.viewer-footer button:hover{color:#fff2d6}
+.viewer-footer span{margin-left:12px}
+.figure-viewer :focus-visible{outline:2px solid #ddbd89;outline-offset:5px}
+body.figure-is-open{overflow:hidden}
+@keyframes viewer-in{from{opacity:0}to{opacity:1}}
+@media(hover:none){.figure-open{opacity:.9;transform:none}}
+@media(max-width:1150px){.layout{padding-top:66px}.article>p:not(.article-deck),.article>ul,.article>h3{max-width:none}.article-deck{font-size:59px}.article h2{font-size:39px}}
+@media(max-width:700px){
+  .hero-eyebrow:before{width:16px;margin-right:10px}
+  .layout{padding-top:46px}
+  .article-deck{font-size:44px;line-height:1.08;margin-bottom:25px}
+  .tags{display:grid;grid-template-columns:max-content max-content;column-gap:18px;row-gap:4px;width:fit-content;font-size:9px}
+  .tags span+span:before{display:none}
+  .article h2{font-size:33px;margin-top:60px;letter-spacing:-.15px}
+  .section-number{font-size:23px;margin-bottom:18px}
+  .article h3{font-size:16px;margin-top:31px}
+  .article blockquote.abstract{display:block;padding:24px 0 27px}
+  .abstract-label{font-size:25px;margin:0 0 12px}
+  .article>p:not(.article-deck){line-height:1.9}
+  figure{margin-top:37px;margin-bottom:34px}
+  .figure-open{width:29px;height:29px;top:8px;right:8px}
+  figcaption{gap:16px;padding-top:17px;margin-top:18px}
+  .figure-label>span:last-child{font-size:30px}
+  th,td{padding:13px 11px}table,th{font-size:11px}
+  .article-end{margin-top:49px;gap:16px}.article-end a{font-size:24px}.end-mark{font-size:28px}
+  .figure-viewer{padding:13px 15px 18px;gap:14px}
+  .viewer-toolbar p{font-size:11px;gap:12px}.viewer-number{font-size:23px}
+}
+@media(prefers-reduced-motion:reduce){.figure-viewer[open]{animation:none}.nav-indicator{transition:none}}
+@media print{.nav-indicator,.figure-open,.figure-viewer{display:none!important}.article>p:not(.article-deck),.article>ul{max-width:none}.article h2{font-size:25pt}}
