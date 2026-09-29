@@ -49,6 +49,7 @@
   let heroBottom = 0;
   let scrollScheduled = false;
   let headerStars = [];
+  let latticeVisible = false;
 
   try { paused = sessionStorage.getItem('proofloom-motion') === 'paused'; } catch {}
 
@@ -105,6 +106,7 @@
     headerHeight = header.getBoundingClientRect().height;
     sizeCanvas(headerCanvas, headerCtx, viewportWidth, headerHeight);
     sizeCanvas(latticeCanvas, latticeCtx, viewportWidth, viewportHeight);
+    latticeVisible = false;
     seed = 231;
     stars = Array.from({ length: mobile ? 62 : 158 }, (_, index) => {
       const x = .025 + random() * .95;
@@ -191,28 +193,65 @@
       .88 * textClearance(head.x / width, head.y / height), orbit.tint, true);
   }
 
+  function linearMeteor(paint, age, duration, lifetime, x, y, dx, dy, radius, clearance = () => 1, delicate = false) {
+    if (age < 0 || age > duration + lifetime) return;
+    const smooth = value => {
+      const t = Math.max(0, Math.min(1, value));
+      return t * t * (3 - 2 * t);
+    };
+    // Emission fades at the head; older light keeps its own position and age.
+    const emission = time => smooth(time / .2) * (1 - smooth((time - duration + .38) / .38));
+    const position = time => ({ x: x + dx * time / duration, y: y + dy * time / duration });
+    const oldest = Math.max(0, age - lifetime);
+    const newest = Math.min(age, duration);
+    paint.save();
+    if (newest > oldest) {
+      const tail = position(oldest);
+      const tip = position(newest);
+      const beam = paint.createLinearGradient(tail.x, tail.y, tip.x, tip.y);
+      for (let i = 0; i <= 24; i++) {
+        const u = i / 24;
+        const emittedAt = oldest + (newest - oldest) * u;
+        const freshness = Math.max(0, 1 - (age - emittedAt) / lifetime);
+        const p = position(emittedAt);
+        const light = emission(emittedAt) * Math.pow(freshness, 1.8) * clearance(p.x, p.y);
+        // The warm core cools into a faint silver trail as each point ages.
+        const r = Math.round(202 + 53 * freshness);
+        const g = Math.round(218 + 20 * freshness);
+        const b = Math.round(240 - 31 * freshness);
+        beam.addColorStop(u, `rgba(${r},${g},${b},${light})`);
+      }
+      paint.strokeStyle = beam;
+      paint.lineCap = 'round';
+      paint.beginPath();
+      paint.moveTo(tail.x, tail.y);
+      paint.lineTo(tip.x, tip.y);
+      paint.globalAlpha = delicate ? .08 : .13;
+      paint.lineWidth = delicate ? 2.4 : 4;
+      paint.stroke();
+      paint.globalAlpha = delicate ? .68 : .87;
+      paint.lineWidth = delicate ? .65 : 1.05;
+      paint.stroke();
+    }
+    if (age <= duration) {
+      const head = position(age);
+      const light = emission(age) * clearance(head.x, head.y);
+      paint.globalAlpha = light * .8;
+      const glow = radius * 17;
+      paint.drawImage(blooms[0], head.x - glow / 2, head.y - glow / 2, glow, glow);
+      paint.globalAlpha = light * (delicate ? .82 : 1);
+      paint.fillStyle = '#fff5df';
+      paint.beginPath();
+      paint.arc(head.x, head.y, radius, 0, tau);
+      paint.fill();
+    }
+    paint.restore();
+  }
+
   function meteor(time, cycle, offset, startX, startY, travelX, travelY) {
-    const duration = 2.8;
-    const passage = (time + offset) % cycle;
-    if (passage > duration) return;
-    const progress = passage / duration;
-    const light = Math.sin(progress * Math.PI);
-    const x = width * (startX + progress * travelX);
-    const y = height * (startY + progress * travelY);
-    const tailX = width * .105;
-    const tailY = height * .055;
-    const beam = ctx.createLinearGradient(x - tailX, y - tailY, x, y);
-    beam.addColorStop(0, 'rgba(223,229,241,0)');
-    beam.addColorStop(.65, 'rgba(218,231,249,.45)');
-    beam.addColorStop(1, 'rgba(255,239,211,.95)');
-    ctx.globalAlpha = light * .85;
-    ctx.strokeStyle = beam;
-    ctx.lineWidth = 1.1;
-    ctx.beginPath();
-    ctx.moveTo(x - tailX, y - tailY);
-    ctx.quadraticCurveTo(x - tailX * .4, y - tailY * .35, x, y);
-    ctx.stroke();
-    point(x, y, mobile ? 1 : 1.6, light * .95, 0, true);
+    linearMeteor(ctx, (time + offset) % cycle, 2.8, 1.15,
+      width * startX, height * startY, width * travelX, height * travelY,
+      mobile ? 1 : 1.35, (x, y) => textClearance(x / width, y / height));
   }
 
   function render(time) {
@@ -255,21 +294,24 @@
   }
 
   function tick(now) {
-    if (now - lastFrame >= 1000 / 30) {
-      const delta = lastFrame ? Math.min((now - lastFrame) / 1000, .1) : 0;
-      lastFrame = now;
-      elapsed += delta;
-      parallaxX += (targetX - parallaxX) * .065;
-      parallaxY += (targetY - parallaxY) * .065;
-      if (visible) render(elapsed);
-      if (reading) {
-        headerTime += delta;
-        renderHeader(headerTime);
-      }
-      if (scrollEnergy > .003) {
-        renderLattice(elapsed);
-        scrollEnergy *= .94;
-      } else if (latticeCtx) latticeCtx.clearRect(0, 0, viewportWidth, viewportHeight);
+    const delta = lastFrame ? Math.min((now - lastFrame) / 1000, .05) : 0;
+    lastFrame = now;
+    elapsed += delta;
+    // Follow the display refresh rate without changing speed on faster screens.
+    const follow = 1 - Math.exp(-2.02 * delta);
+    parallaxX += (targetX - parallaxX) * follow;
+    parallaxY += (targetY - parallaxY) * follow;
+    if (visible) render(elapsed);
+    if (reading) {
+      headerTime += delta;
+      renderHeader(headerTime);
+    }
+    if (scrollEnergy > .003) {
+      renderLattice(elapsed);
+      scrollEnergy *= Math.pow(.94, delta * 30);
+    } else if (latticeCtx && latticeVisible) {
+      latticeCtx.clearRect(0, 0, viewportWidth, viewportHeight);
+      latticeVisible = false;
     }
     frame = requestAnimationFrame(tick);
   }
@@ -291,6 +333,7 @@
     }
     if (paused || reduced.matches) {
       latticeCtx?.clearRect(0, 0, viewportWidth, viewportHeight);
+      latticeVisible = false;
       headerCtx?.clearRect(0, 0, viewportWidth, headerHeight);
     }
     if (run) frame = requestAnimationFrame(tick);
@@ -307,29 +350,12 @@
       paint.arc(star.x * viewportWidth, star.y * headerHeight, star.radius, 0, tau);
       paint.fill();
     }
-    const passage = (time + .5) % 7.8;
-    if (passage < 2.9) {
-      const progress = passage / 2.9;
-      const x = viewportWidth * (-.08 + progress * 1.22);
-      const y = 9 + progress * (headerHeight - 21);
-      const length = Math.min(210, viewportWidth * .32);
-      const tail = paint.createLinearGradient(x - length, y - 9, x, y);
-      tail.addColorStop(0, '#e6c99400');
-      tail.addColorStop(.75, '#dfc99970');
-      tail.addColorStop(1, '#fff3d9');
-      paint.globalAlpha = Math.sin(progress * Math.PI) * .92;
-      paint.strokeStyle = tail;
-      paint.lineWidth = 1.1;
-      paint.beginPath();
-      paint.moveTo(x - length, y - 9);
-      paint.lineTo(x, y);
-      paint.stroke();
-      paint.drawImage(blooms[0], x - 13, y - 13, 26, 26);
-      paint.fillStyle = '#fff4dc';
-      paint.beginPath();
-      paint.arc(x, y, 1.25, 0, tau);
-      paint.fill();
-    }
+    const duration = 6.4;
+    const dy = headerHeight * .4;
+    const speed = Math.hypot(viewportWidth * 1.22, dy) / duration;
+    const lifetime = Math.min(1.6, Math.max(.8, 200 / speed));
+    linearMeteor(paint, (time + .5) % 13.5, duration, lifetime,
+      viewportWidth * -.08, headerHeight * .25, viewportWidth * 1.22, dy, .85, () => 1, true);
     paint.globalAlpha = 1;
   }
 
@@ -337,7 +363,9 @@
     if (!latticeCtx) return;
     const paint = latticeCtx;
     paint.clearRect(0, 0, viewportWidth, viewportHeight);
+    latticeVisible = false;
     if (window.scrollY < 3) return;
+    latticeVisible = true;
     const margin = Math.max(mobile ? 15 : 28, (viewportWidth - 1180) / 2 + 16);
     paint.save();
     paint.beginPath();
