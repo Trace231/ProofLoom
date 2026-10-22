@@ -1,6 +1,6 @@
 # Algorithm catalog
 
-Each of the 32 directories is an independent Lean project. Original file names,
+Each of the 36 directories is an independent Lean project. Original file names,
 import graphs, and project-specific library versions are preserved.
 
 Run `./proofloom proofs --algorithm ID` from the package root. The complete source inventory is in [manifest.json](manifest.json). Verification results are in [VERIFICATION.json](VERIFICATION.json); see [trust boundaries](../docs/TRUST.md).
@@ -39,13 +39,19 @@ Run `./proofloom proofs --algorithm ID` from the package root. The complete sour
 | `VarianceReducedAcceleratedGradientDescent` | 30,989 | Lan, First-order and Stochastic Optimization Methods for Machine Learning, Springer 2020 (Theorem 5.9) | [Lean](VarianceReducedAcceleratedGradientDescent/Algorithms/Unverified/VarianceReducedAcceleratedGradientDescent.lean) · [source](VarianceReducedAcceleratedGradientDescent/source/VarianceReducedAcceleratedGradientDescent.json) |
 | `VarianceReducedMirrorDescent` | 13,081 | Lan, First-order and Stochastic Optimization Methods for Machine Learning, Springer 2020 (Corollary 5.8) | [Lean](VarianceReducedMirrorDescent/Algorithms/Unverified/VarianceReducedMirrorDescent.lean) · [source](VarianceReducedMirrorDescent/source/VarianceReducedMirrorDescent.json) |
 | `RCDGD` | 6,373 | Anonymous research note RCDGD-1 (Theorem 4.2) | [Lean](RCDGD/Algorithms/Unverified/RCDGD.lean) · [source](RCDGD/source/RCDGD.json) |
+| `Muon` | 37,034 | On the Convergence Analysis of Muon, arXiv:2505.23737v3, TMLR 2026 | [Lean](Muon/Algorithms/Unverified/Muon.lean) · [source](Muon/source/Muon.json) · [scope](Muon/README.md) |
+| `SDCS` | 9,127 | Lan, First-order and Stochastic Optimization Methods for Machine Learning, Springer 2020, Algorithm 8.8 and Theorem 8.11 | [Lean](SDCS/Algorithms/Unverified/SDCS.lean) · [source](SDCS/source/SDCS.json) · [scope](SDCS/README.md) |
+| `Shampoo` | 12,744 | Gupta, Koren, and Singer, arXiv:1802.09568v2, full version of ICML 2018 (Algorithms 1, 2, 3; Theorems 7, 10, 13) | [Lean](Shampoo/Algorithms/Unverified/Shampoo.lean) · [source](Shampoo/source/Shampoo.json) · [scope](Shampoo/README.md) |
+| `TimeVaryingPushPull` | 78,154 | Feiming Wang, 时变有向网络中随机 Push--Pull 的有效节点数：反例、修正定理与尖锐线性加速判据 (Theorem 7.1) | [Lean](TimeVaryingPushPull/Algorithms/Unverified/TimeVaryingPushPull.lean) · [source](TimeVaryingPushPull/source/TimeVaryingPushPull.json) · [scope](TimeVaryingPushPull/README.md) |
 
 ¹ Physical source lines, including comments and imports, summed over algorithm modules; imported analytical/library modules are not counted as algorithm lines. These counts describe this package, not the earlier paper census.
 
 ## Source versions and mathematical scope
 
-All 32 closures have retained successful compilation records bound to their source
-hashes. Compilation does not prove source-target completeness.
+The original 32 closures retain their source-bound verification records. The four
+supplementary closures captured on 2026-10-22 have also passed fresh compilation
+and dependency inspection; consult [verification](VERIFICATION.md).
+Compilation does not prove source-target completeness.
 
 RGE, RAPP, VRAGD, and VRMD expose additional analytical hypotheses. SAPD's corrected
 high-probability endpoint remains unfinished. Lion uses the verified source closure
@@ -58,3 +64,16 @@ snapshot lives in [SOptLib](../soptlib/README.md).
 
 The RCDGD input cites a research note whose author identity is absent from the
 supplied source. Its citation is preserved rather than attributed speculatively.
+
+## Supplementary developments captured 2026-10-22
+
+Muon and TimeVaryingPushPull retain their completed Phase2F proof checkpoints.
+SDCS and Shampoo retain their completed Phase4 integrated sources and exact
+imported SOptLib versions. PushPull extraction is still running; no in-progress
+extraction changes are included. These snapshots do not extend or change the
+paper’s fixed 15-task benchmark or reported scores.
+
+Muon includes a counterexample to the literal directional-small-J otherwise
+branch of Appendix B.4 and an explicit corrected branch with cross control.
+It must not be described as proving the original unchanged branch. See the
+[Muon scope note](Muon/README.md) and [trust boundaries](../docs/TRUST.md).

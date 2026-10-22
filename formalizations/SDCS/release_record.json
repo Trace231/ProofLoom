@@ -1,0 +1,35 @@
+{
+  "captured_date": "2026-10-22",
+  "snapshot_kind": "post_phase4_integrated_sources",
+  "source_git_revision": "0ea6b5f0f3e4610078dff0021f449021e348c4e4",
+  "phase2f": {
+    "original_certificate_sha256": "4c6595e533fb3b400554c1d4b429fb51643134f74bcd769d0f4f3e4edcb00a85",
+    "decision": "pass_b_best_handling_complete",
+    "faithfulness_track": "B",
+    "all_required_gates_passed": true,
+    "iterations_run": 1,
+    "proof_file_bindings": [
+      {
+        "path": "Algorithms/Unverified/SDCS.lean",
+        "certificate_sha256": "d9643e48337d97befde4f391a140050656d4848e51ad1a5807d8c035ea0672d8",
+        "packaged_sha256": "adc62f05a83782a8fb059d78f31e8f2215ffe40adca49f3d43cc84cb1d8959b8",
+        "matches": false
+      }
+    ]
+  },
+  "scope": "Phase3 and Phase4 completed with library and algorithm builds passing. The algorithm retains disclosed source corrections and explicit hypotheses; both expected bounds of Theorem 8.11 are included. The Phase2F certificate predates extraction and does not directly certify the post-extraction bytes; this release independently recompiles and inspects the packaged post-Phase4 closure.",
+  "note": "This is a portable provenance summary, not a reissued Phase2F certificate. Fresh packaged-source verification is recorded separately in ../VERIFICATION.json.",
+  "phase4": {
+    "original_report_sha256": "d3f933fd12cb785391a23c8d3a9c471d31c4fd8467995f8cec64ac57c5b6f57d",
+    "status": "complete",
+    "checks": {
+      "lib_build": true,
+      "algo_build": true,
+      "no_sorry_lib": true,
+      "no_sorry_algo": true,
+      "no_staging_imports": true,
+      "staging_cleaned": true,
+      "lakefile_clean": true
+    }
+  }
+}

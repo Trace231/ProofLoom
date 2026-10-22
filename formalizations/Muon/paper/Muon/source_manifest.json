@@ -1,0 +1,102 @@
+{
+  "paper": "On the Convergence Analysis of Muon",
+  "version": "arXiv:2505.23737v3",
+  "source_url": "https://arxiv.org/abs/2505.23737v3",
+  "pdf_sha256": "e529e49d9453b3b9816f0356b4f01b3293727c95e07ffb2b682204b5b67b5700",
+  "html_sha256": "8c22debfa3d9bf6ee647810cbe5ddeb553ef84c5035f33e4c8e61e3ede712fd9",
+  "targets": [
+    {
+      "source_id": "Proposition 3.6",
+      "lean_name": "SGD.Muon.proposition_3_6",
+      "book_name": "proposition_3_6",
+      "source_anchor": "S3.Thmtheorem6",
+      "role": "supporting"
+    },
+    {
+      "source_id": "Theorem 4.1",
+      "lean_name": "SGD.Muon.theorem_4_1",
+      "book_name": "theorem_4_1",
+      "source_anchor": "S4.Thmtheorem1",
+      "role": "main"
+    },
+    {
+      "source_id": "Corollary 4.2",
+      "lean_name": "SGD.Muon.corollary_4_2",
+      "book_name": "corollary_4_2",
+      "source_anchor": "S4.Thmtheorem2",
+      "role": "corollary"
+    },
+    {
+      "source_id": "Theorem 4.5",
+      "lean_name": "SGD.Muon.theorem_4_5",
+      "book_name": "theorem_4_5",
+      "source_anchor": "S4.Thmtheorem5",
+      "role": "main"
+    },
+    {
+      "source_id": "Theorem 4.6",
+      "lean_name": "SGD.Muon.theorem_4_6",
+      "book_name": "theorem_4_6",
+      "source_anchor": "S4.Thmtheorem6",
+      "role": "main"
+    },
+    {
+      "source_id": "Theorem 4.7",
+      "lean_name": "SGD.Muon.theorem_4_7",
+      "book_name": "theorem_4_7",
+      "source_anchor": "S4.Thmtheorem7",
+      "role": "main"
+    },
+    {
+      "source_id": "Corollary 4.8",
+      "lean_name": "SGD.Muon.corollary_4_8",
+      "book_name": "corollary_4_8",
+      "source_anchor": "S4.Thmtheorem8",
+      "role": "corollary"
+    },
+    {
+      "source_id": "Theorem 4.9",
+      "lean_name": "SGD.Muon.theorem_4_9",
+      "book_name": "theorem_4_9",
+      "source_anchor": "S4.Thmtheorem9",
+      "role": "main"
+    },
+    {
+      "source_id": "Theorem 4.10",
+      "lean_name": "SGD.Muon.theorem_4_10",
+      "book_name": "theorem_4_10",
+      "source_anchor": "S4.Thmtheorem10",
+      "role": "main"
+    },
+    {
+      "source_id": "Lemma 4.12",
+      "lean_name": "SGD.Muon.lemma_4_12",
+      "book_name": "lemma_4_12",
+      "source_anchor": "S4.Thmtheorem12",
+      "role": "supporting"
+    },
+    {
+      "source_id": "Theorem 4.14",
+      "lean_name": "SGD.Muon.theorem_4_14",
+      "book_name": "theorem_4_14",
+      "source_anchor": "S4.Thmtheorem14",
+      "role": "main"
+    },
+    {
+      "source_id": "Theorem 4.15",
+      "lean_name": "SGD.Muon.theorem_4_15",
+      "book_name": "theorem_4_15",
+      "source_anchor": "S4.Thmtheorem15",
+      "role": "main"
+    },
+    {
+      "source_id": "Theorem 4.16",
+      "lean_name": "SGD.Muon.theorem_4_16",
+      "book_name": "theorem_4_16",
+      "source_anchor": "S4.Thmtheorem16",
+      "role": "main"
+    }
+  ],
+  "publication_note": "Portable target index derived from the original manifest; machine-specific run settings and duplicated source transcriptions omitted.",
+  "original_manifest_sha256": "8ffe9dabb6d26afaab6933e7d3b9e49c3bec96ddfc4d9b6c267a60ee6c8243ca"
+}

@@ -151,7 +151,7 @@ interior is convex.
 
 <sub><a href="docs/assets/paper-artifact-atlas.pdf">PDF</a> · <a href="docs/assets/paper-artifact-atlas.pptx">Editable PowerPoint</a> · <a href="docs/assets/paper-artifact-atlas-data.json">Figure data</a></sub>
 
-The [proof catalog](formalizations/CATALOG.md) covers all 32 developments. Each
+The [proof catalog](formalizations/CATALOG.md) covers all 36 developments. Each
 project includes its Lean source, mathematical specification, and complete local
 import closure.
 
@@ -212,7 +212,7 @@ requires a matching PDF supplied by the user.
 
 ## Verification & scope
 
-All 32 developments have **retained successful compilation records** tied to their
+The original 32 developments have **retained successful compilation records** tied to their
 source hashes. They describe the supplied source snapshot. Regenerate local build
 and dependency reports with:
 
@@ -277,3 +277,13 @@ and proof revisions. Distribution details are in [release scope](docs/RELEASE.md
   <b>Melon Group · PKU CMLR</b><br />
   <sub>Original project contributions under <a href="LICENSE">MIT</a> · <a href="THIRD_PARTY_NOTICES.md">Third-party notices</a> · <a href="CONTRIBUTING.md">Contributing</a></sub>
 </p>
+
+## Supplementary formalizations — 2026-10-22
+
+The catalog now also includes [Muon](formalizations/Muon/README.md),
+[SDCS](formalizations/SDCS/README.md), [Shampoo](formalizations/Shampoo/README.md),
+and [TimeVaryingPushPull](formalizations/TimeVaryingPushPull/README.md).
+They are separate from the paper benchmark. Muon records a formal counterexample
+and disclosed correction; SDCS and Shampoo include completed library integration;
+PushPull preserves its completed proof before the ongoing extraction.
+See the source-bound [verification records](formalizations/VERIFICATION.md).

@@ -1,12 +1,14 @@
 # Formalization verification records
 
-All 32 released local source closures have retained successful compilation and
-checked-environment dependency-inspection records from the supplied archive.
+All 36 released local source closures have successful compilation and
+checked-environment dependency-inspection records. The original 32 retain their
+unchanged source-bound records; Muon, SDCS, Shampoo and TimeVaryingPushPull were
+freshly compiled and inspected from packaged sources on 2026-10-22.
 Each record identifies the verified source hashes, pinned dependencies, and
 check provenance.
 
 Source-target coverage remains distinct. SAPD has an unfinished high-probability
-endpoint; four analyses have explicit corrected hypotheses. See
+endpoint; several analyses have explicit corrected hypotheses. See
 [TRUST.md](../docs/TRUST.md).
 
 | Development | Retained verification | Algorithm theorem declarations¹ | Public uses sorryAx | Any algorithm uses sorryAx | Public custom mathematical axiom names² |
@@ -43,6 +45,10 @@ endpoint; four analyses have explicit corrected hypotheses. See
 | VarianceReducedAcceleratedGradientDescent | passed | 983 | no | no | 0 |
 | VarianceReducedMirrorDescent | passed | 479 | no | no | 0 |
 | RCDGD | passed | 397 | no | no | 0 |
+| Muon | passed (fresh) | 1667 | no | no | 0 |
+| SDCS | passed (fresh) | 340 | no | no | 0 |
+| Shampoo | passed (fresh) | 644 | no | no | 0 |
+| TimeVaryingPushPull | passed (fresh) | 2490 | no | no | 0 |
 
 ¹ Includes private and generated theorems; not a count of distinct source theorems.
 
@@ -50,3 +56,10 @@ endpoint; four analyses have explicit corrected hypotheses. See
 The [JSON report](VERIFICATION.json) records source-hole locations and handwritten declarations; dependency results
 are provided for checked developments. A dash denotes an unavailable result.
 
+
+The four new projects were built with two concurrent jobs, two Lean threads per
+job and a 12 GiB Lean memory limit. Local project modules were freshly compiled
+into a source/dependency-addressed cache; no live pipeline project objects were
+reused. Exact shared modules may reuse the objects built earlier in this same
+verification run. Source-faithfulness and correction scope are documented in
+each project README and release record.

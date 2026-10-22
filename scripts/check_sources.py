@@ -10,6 +10,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def check_verification_binding(item, result):
+    if result.get('lean_options_by_prefix', {}) != item.get('lean_options_by_prefix', {}):
+        raise ValueError(f'{item["id"]}: verification build options differ from inventory')
     fingerprint = hashlib.sha256(json.dumps(item['files'], sort_keys=True).encode()).hexdigest()
     if result.get('source_tree_sha256') != fingerprint:
         raise ValueError(f'{item["id"]}: verification status does not match source inventory')

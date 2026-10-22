@@ -1,0 +1,35 @@
+{
+  "captured_date": "2026-10-22",
+  "snapshot_kind": "post_phase4_integrated_sources",
+  "source_git_revision": "1874326a588269a27169c9e2c865ec4d67b27fad",
+  "phase2f": {
+    "original_certificate_sha256": "ababf66f9169144981b510249a09d5fd802bed981222b32da2359841f48b48e5",
+    "decision": "pass_b_best_handling_complete",
+    "faithfulness_track": "B",
+    "all_required_gates_passed": true,
+    "iterations_run": 1,
+    "proof_file_bindings": [
+      {
+        "path": "Algorithms/Unverified/Shampoo.lean",
+        "certificate_sha256": "28fb9346eb686319c8066e658d1568f37404cd1598078dbcc47e09e3294c9ab3",
+        "packaged_sha256": "6580e571c7e035c3387e8cff2bd9526e24cf29eb603cd5637a69210aa0b71c74",
+        "matches": false
+      }
+    ]
+  },
+  "scope": "Phase3 and Phase4 completed with library and algorithm builds passing. The development includes the matrix, tensor and diagonal regret endpoints with their explicit comparator and regularity hypotheses and disclosed source corrections. The Phase2F certificate predates extraction and does not directly certify the post-extraction bytes; this release independently recompiles and inspects the packaged post-Phase4 closure.",
+  "note": "This is a portable provenance summary, not a reissued Phase2F certificate. Fresh packaged-source verification is recorded separately in ../VERIFICATION.json.",
+  "phase4": {
+    "original_report_sha256": "c18c29f72d7d2d2cf437114357e04b62261c1667b293dfdf34aac74bdbb8ff73",
+    "status": "complete",
+    "checks": {
+      "lib_build": true,
+      "algo_build": true,
+      "no_sorry_lib": true,
+      "no_sorry_algo": true,
+      "no_staging_imports": true,
+      "staging_cleaned": true,
+      "lakefile_clean": true
+    }
+  }
+}
