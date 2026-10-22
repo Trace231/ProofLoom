@@ -1,6 +1,6 @@
 # Algorithm catalog
 
-Each of the 36 directories is an independent Lean project. Original file names,
+Each of the 35 directories is an independent Lean project. Original file names,
 import graphs, and project-specific library versions are preserved.
 
 Run `./proofloom proofs --algorithm ID` from the package root. The complete source inventory is in [manifest.json](manifest.json). Verification results are in [VERIFICATION.json](VERIFICATION.json); see [trust boundaries](../docs/TRUST.md).
@@ -42,13 +42,12 @@ Run `./proofloom proofs --algorithm ID` from the package root. The complete sour
 | `Muon` | 37,034 | On the Convergence Analysis of Muon, arXiv:2505.23737v3, TMLR 2026 | [Lean](Muon/Algorithms/Unverified/Muon.lean) · [source](Muon/source/Muon.json) · [scope](Muon/README.md) |
 | `SDCS` | 9,127 | Lan, First-order and Stochastic Optimization Methods for Machine Learning, Springer 2020, Algorithm 8.8 and Theorem 8.11 | [Lean](SDCS/Algorithms/Unverified/SDCS.lean) · [source](SDCS/source/SDCS.json) · [scope](SDCS/README.md) |
 | `Shampoo` | 12,744 | Gupta, Koren, and Singer, arXiv:1802.09568v2, full version of ICML 2018 (Algorithms 1, 2, 3; Theorems 7, 10, 13) | [Lean](Shampoo/Algorithms/Unverified/Shampoo.lean) · [source](Shampoo/source/Shampoo.json) · [scope](Shampoo/README.md) |
-| `TimeVaryingPushPull` | 78,154 | Feiming Wang, 时变有向网络中随机 Push--Pull 的有效节点数：反例、修正定理与尖锐线性加速判据 (Theorem 7.1) | [Lean](TimeVaryingPushPull/Algorithms/Unverified/TimeVaryingPushPull.lean) · [source](TimeVaryingPushPull/source/TimeVaryingPushPull.json) · [scope](TimeVaryingPushPull/README.md) |
 
 ¹ Physical source lines, including comments and imports, summed over algorithm modules; imported analytical/library modules are not counted as algorithm lines. These counts describe this package, not the earlier paper census.
 
 ## Source versions and mathematical scope
 
-The original 32 closures retain their source-bound verification records. The four
+The original 32 closures retain their source-bound verification records. The three
 supplementary closures captured on 2026-10-22 have also passed fresh compilation
 and dependency inspection; consult [verification](VERIFICATION.md).
 Compilation does not prove source-target completeness.
@@ -67,10 +66,9 @@ supplied source. Its citation is preserved rather than attributed speculatively.
 
 ## Supplementary developments captured 2026-10-22
 
-Muon and TimeVaryingPushPull retain their completed Phase2F proof checkpoints.
-SDCS and Shampoo retain their completed Phase4 integrated sources and exact
-imported SOptLib versions. PushPull extraction is still running; no in-progress
-extraction changes are included. These snapshots do not extend or change the
+Muon retains its completed Phase2F proof checkpoint. SDCS and Shampoo retain
+their completed Phase4 integrated sources and exact imported SOptLib versions.
+These snapshots do not extend or change the
 paper’s fixed 15-task benchmark or reported scores.
 
 Muon includes a counterexample to the literal directional-small-J otherwise

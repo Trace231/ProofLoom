@@ -2,7 +2,7 @@
 
 ProofLoom is maintained by **Melon Group · PKU CMLR**.
 
-This repository distributes 36 Lean formalization projects, the canonical SOptLib library, structured source
+This repository distributes 35 Lean formalization projects, the canonical SOptLib library, structured source
 specifications, dependency locks, and source verification tools. Structured JSON
 specifications stay with their Lean developments so the formal statements can be
 traced to their mathematical inputs.

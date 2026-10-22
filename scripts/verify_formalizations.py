@@ -28,19 +28,6 @@ def sha(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def module_options(item: dict, relative: str) -> list[str]:
-    """Retain library-specific Lake options when invoking Lean directly."""
-    module = relative[:-5].replace("/", ".")
-    options = {}
-    for prefix, values in sorted(
-        item.get("lean_options_by_prefix", {}).items(), key=lambda pair: len(pair[0])
-    ):
-        if module == prefix or module.startswith(prefix + "."):
-            options.update(values)
-    return [f"-D{name}={str(value).lower() if isinstance(value, bool) else value}"
-            for name, value in sorted(options.items())]
-
-
 def mask(text: str) -> str:
     out = []
     i = 0
@@ -250,8 +237,6 @@ def verify_one(item, args, packages, deps):
         "source_files": len(item["files"]),
         "modules": [],
     }
-    if item.get("lean_options_by_prefix"):
-        result["lean_options_by_prefix"] = item["lean_options_by_prefix"]
     build = ROOT / ".build" / args.manifest.parent.name / item["id"]
     build.mkdir(parents=True, exist_ok=True)
     local_lib = build / "lib"
@@ -274,7 +259,6 @@ def verify_one(item, args, packages, deps):
         ordered = inspect_source_closure(directory, item)
         for relative in ordered:
             source = directory / relative
-            options = module_options(item, relative)
             local_dependencies = [
                 n.replace(".", "/") + ".lean"
                 for n in import_names(source)
@@ -288,7 +272,6 @@ def verify_one(item, args, packages, deps):
                         item["lean_toolchain"],
                         lock_hash,
                         [(d, fingerprints[d]) for d in local_dependencies],
-                        *([options] if options else []),
                     ],
                     sort_keys=True,
                 ).encode()
@@ -305,7 +288,7 @@ def verify_one(item, args, packages, deps):
                     print(f'[{item["id"]}] compiling {relative}', flush=True)
                     with (cache / "compiler.log").open("w") as output:
                         proc = subprocess.run(
-                            [*lean, *options, "-o", str(object_path), relative],
+                            [*lean, "-o", str(object_path), relative],
                             cwd=directory,
                             env=env,
                             stdout=output,

@@ -103,7 +103,7 @@ source-faithfulness and corrected-source acceptance checks.
 
 ## Supplementary release, 2026-10-22
 
-Muon, SDCS, Shampoo and TimeVaryingPushPull preserve independent imported local
+Muon, SDCS and Shampoo preserve independent imported local
 library closures and pinned dependencies. Their new source/dependency checks are
 recorded in the verification report; older records cannot certify these files.
 
@@ -119,13 +119,11 @@ source conclusion is proved.
 
 SDCS and Shampoo are post-Phase4 snapshots. Their original Phase2F certificates
 predate extraction, so their release records identify the changed proof hashes
-and completed Phase4 checks separately. PushPull is the certificate-matching
-Phase2F split proof, before the still-running Phase3 extraction. Muon has not yet
-undergone Phase3/Phase4. The existing canonical `soptlib/` snapshot and earlier
+and completed Phase4 checks separately. Muon has not yet undergone Phase3/Phase4. The existing canonical `soptlib/` snapshot and earlier
 algorithm snapshots are preserved; imported additions travel with each new
 development. None of these completion labels discharges explicit hypotheses.
 
-Fresh checks of all four supplementary developments found no public algorithm
+Fresh checks of all three supplementary developments found no public algorithm
 theorem using `sorryAx` or custom mathematical axioms. The JSON report separately
 records any compiler-generated `native_decide` assumptions. Imported library
 axioms are not automatically dependencies of algorithm theorems.

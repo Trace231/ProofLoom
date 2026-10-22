@@ -151,7 +151,7 @@ interior is convex.
 
 <sub><a href="docs/assets/paper-artifact-atlas.pdf">PDF</a> · <a href="docs/assets/paper-artifact-atlas.pptx">Editable PowerPoint</a> · <a href="docs/assets/paper-artifact-atlas-data.json">Figure data</a></sub>
 
-The [proof catalog](formalizations/CATALOG.md) covers all 36 developments. Each
+The [proof catalog](formalizations/CATALOG.md) covers all 35 developments. Each
 project includes its Lean source, mathematical specification, and complete local
 import closure.
 
@@ -281,9 +281,7 @@ and proof revisions. Distribution details are in [release scope](docs/RELEASE.md
 ## Supplementary formalizations — 2026-10-22
 
 The catalog now also includes [Muon](formalizations/Muon/README.md),
-[SDCS](formalizations/SDCS/README.md), [Shampoo](formalizations/Shampoo/README.md),
-and [TimeVaryingPushPull](formalizations/TimeVaryingPushPull/README.md).
+[SDCS](formalizations/SDCS/README.md), and [Shampoo](formalizations/Shampoo/README.md).
 They are separate from the paper benchmark. Muon records a formal counterexample
-and disclosed correction; SDCS and Shampoo include completed library integration;
-PushPull preserves its completed proof before the ongoing extraction.
+and disclosed correction; SDCS and Shampoo include completed library integration.
 See the source-bound [verification records](formalizations/VERIFICATION.md).
