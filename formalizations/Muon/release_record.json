@@ -1,0 +1,40 @@
+{
+  "captured_date": "2026-10-22",
+  "snapshot_kind": "phase2f_certified_checkpoint",
+  "source_git_revision": "4ce6fa977b7cfa785e2eb867832c8b84a77c2b12",
+  "phase2f": {
+    "original_certificate_sha256": "211f2c6ded3d84e75c45a804f2c37a056fb40a3fc4fde923b6e3cc306e5fdc0c",
+    "decision": "pass_b_best_handling_complete",
+    "faithfulness_track": "B",
+    "all_required_gates_passed": true,
+    "iterations_run": 103,
+    "proof_file_bindings": [
+      {
+        "path": "Algorithms/Unverified/Muon.lean",
+        "certificate_sha256": "aaba9b63df10165799cfdbeb8f10d6179d6f2d0a718a10ca246a383eb67d735c",
+        "packaged_sha256": "aaba9b63df10165799cfdbeb8f10d6179d6f2d0a718a10ca246a383eb67d735c",
+        "matches": true
+      },
+      {
+        "path": "Algorithms/Unverified/Muon/Part001.lean",
+        "certificate_sha256": "eb3392df8517514b0dad9c50df7d6ecbcc203d7ba016f891c2718bc4e703dda3",
+        "packaged_sha256": "eb3392df8517514b0dad9c50df7d6ecbcc203d7ba016f891c2718bc4e703dda3",
+        "matches": true
+      },
+      {
+        "path": "Algorithms/Unverified/Muon/Part002.lean",
+        "certificate_sha256": "40092a5d0ce027ec3c311bf66b547d617da3d2b5c2c602c1bd6c0178aa826633",
+        "packaged_sha256": "40092a5d0ce027ec3c311bf66b547d617da3d2b5c2c602c1bd6c0178aa826633",
+        "matches": true
+      },
+      {
+        "path": "Algorithms/Unverified/Muon/Part003.lean",
+        "certificate_sha256": "b7a3ebaa87ed042dbff69a8c55acd2307925e617b1fbb624fff8c1b6f593a3bf",
+        "packaged_sha256": "b7a3ebaa87ed042dbff69a8c55acd2307925e617b1fbb624fff8c1b6f593a3bf",
+        "matches": true
+      }
+    ]
+  },
+  "scope": "Phase2F accepted Track B at iteration 103. The formalization contains an original-generated-run counterexample to the Appendix B.4 directional-small-J otherwise branch under its printed schedules. The corrected branch adds explicit realized cross control; directional and cross control together are equivalent to the Jstar bound used by the proof. The corrected generated-average and uniform-output complexity conclusions are proved. This is a disclosed sufficient repair, not a proof of the unchanged source claim or of globally minimal assumptions. Phase3/Phase4 extraction has not been performed.",
+  "note": "This is a portable provenance summary, not a reissued Phase2F certificate. Fresh packaged-source verification is recorded separately in ../VERIFICATION.json."
+}

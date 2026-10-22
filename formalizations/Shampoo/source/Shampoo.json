@@ -1,0 +1,2846 @@
+{
+  "algorithm": "ShampooTensorOCO",
+  "full_name": "Shampoo: Preconditioned Stochastic Tensor Optimization",
+  "source_reference": "Gupta, Koren, and Singer, arXiv:1802.09568v2, full version of ICML 2018 (Algorithms 1, 2, 3; Theorems 7, 10, 13)",
+  "source_outline": {
+    "main_theorem": "Theorem_10_tensor_regret",
+    "required_theorem_endpoints": [
+      "Theorem_7_matrix_regret",
+      "Theorem_10_tensor_regret",
+      "Theorem_13_diagonal_matrix_regret"
+    ],
+    "algorithm_endpoints": [
+      "Algorithm 1: Shampoo, matrix case",
+      "Algorithm 2: Shampoo, general tensor case",
+      "Algorithm 3: Diagonal version of Shampoo, matrix case"
+    ]
+  },
+  "setup": {
+    "problem": {
+      "math": "R_T = \\sum_{t=1}^T f_t(w_t) - \\min_{w \\in \\mathcal{W}} \\sum_{t=1}^T f_t(w)",
+      "ref": "Section 2.1, regret display, p.4",
+      "description": "Online convex optimization regret; the paper later compares to any fixed comparator W^* in the matrix/tensor space."
+    },
+    "variable_space": {
+      "math": "\\mathcal{W} = \\mathbb{R}^{n_1 \\times \\cdots \\times n_k}",
+      "ref": "Section 4.2, p.11"
+    }
+  },
+  "assumptions": [
+    {
+      "name": "OCO_convex_losses",
+      "math": "Here we assume that the optimization domain is $\\mathcal{W}=\\mathbb{R}^{n_1\\times\\cdots\\times n_k}$, that is, the vector space of order-$k$ tensors, and the functions $f_1,\\ldots,f_T$ are convex over this domain.",
+      "ref": "Section 4.2 lines 659-662",
+      "parameters": [
+        "\\mathcal{W}",
+        "f_1",
+        "\\ldots",
+        "f_T",
+        "k"
+      ]
+    },
+    {
+      "name": "Tensor_domain_full_space",
+      "math": "\\mathcal{W} = \\mathbb{R}^{n_1 \\times \\cdots \\times n_k}",
+      "ref": "Section 4.2 lines 659-662",
+      "parameters": [
+        "\\mathcal{W}",
+        "n_1",
+        "\\ldots",
+        "n_k"
+      ]
+    },
+    {
+      "name": "Algorithm2_gradient_definition",
+      "math": "G_t = \\nabla f_t(W_t) \\quad \\{G_t \\in \\mathbb{R}^{n_1 \\times \\cdots \\times n_k}\\}",
+      "ref": "Algorithm 2 lines 643-645",
+      "parameters": [
+        "G_t",
+        "f_t",
+        "W_t"
+      ]
+    },
+    {
+      "name": "Algorithm2_accumulator_recurrence",
+      "math": "H_t^i = H_{t-1}^i + G_t^{(i)}",
+      "ref": "Algorithm 2 lines 646-649",
+      "parameters": [
+        "H_t^i",
+        "H_{t-1}^i",
+        "G_t^{(i)}",
+        "i",
+        "t"
+      ]
+    },
+    {
+      "name": "Tensor_contraction_definition_for_PSD",
+      "math": "A^{(i)} = \\operatorname{mat}_i(A)\\operatorname{mat}_i(A)^T",
+      "ref": "Section 4.1 lines 631-638",
+      "parameters": [
+        "A^{(i)}",
+        "\\operatorname{mat}_i(A)"
+      ]
+    },
+    {
+      "name": "Theorem10_rank_assumption",
+      "math": "\\operatorname{rank}(\\operatorname{mat}_i(G_t)) \\le r_i \\quad \\forall i \\in [k],\\ t=1,\\ldots,T",
+      "ref": "Theorem 10 lines 676-679",
+      "parameters": [
+        "G_t",
+        "r_i",
+        "i",
+        "t"
+      ]
+    },
+    {
+      "name": "Theorem10_rank_geometric_mean",
+      "math": "r = \\left(\\prod_{i=1}^k r_i\\right)^{1/k}",
+      "ref": "Theorem 10 lines 676-679",
+      "parameters": [
+        "r",
+        "r_i",
+        "k"
+      ]
+    },
+    {
+      "name": "Tensor_accumulators",
+      "math": "H_T^i = \\epsilon I_{n_i} + \\sum_{t=1}^T G_t^{(i)} \\quad \\forall i \\in [k]",
+      "ref": "Theorem 10 lines 689-690",
+      "parameters": [
+        "H_T^i",
+        "\\epsilon",
+        "G_t^{(i)}"
+      ]
+    },
+    {
+      "name": "Comparator_radius_tensor",
+      "math": "D = \\max_{t \\in [T]} \\|W_t - W^*\\|_F",
+      "ref": "Theorem 10 lines 689-690",
+      "parameters": [
+        "D",
+        "W_t",
+        "W^*"
+      ]
+    },
+    {
+      "name": "Epsilon_regularization",
+      "math": "H_0^i = \\epsilon I_{n_i}",
+      "ref": "Algorithm 2 lines 641-642",
+      "parameters": [
+        "\\epsilon",
+        "H_0^i",
+        "I_{n_i}"
+      ]
+    },
+    {
+      "name": "Epsilon_nonnegative_rank_lemmas",
+      "math": "\\epsilon\\ge0",
+      "ref": "Lemma 8 lines 377-383; Lemma 11 lines 702-715",
+      "parameters": [
+        "\\epsilon"
+      ]
+    },
+    {
+      "name": "Learning_rate_Theorem10",
+      "math": "\\eta = D/\\sqrt{2r}",
+      "ref": "Proof of Theorem 7 lines 559-560; imported into Theorem 10 only by the proof-by-reference sentence at lines 734-736",
+      "parameters": [
+        "\\eta",
+        "D",
+        "r"
+      ]
+    },
+    {
+      "name": "Learning_rate_Theorem7",
+      "math": "\\eta = D/\\sqrt{2r}",
+      "ref": "Proof of Theorem 7 lines 559-560",
+      "parameters": [
+        "\\eta",
+        "D",
+        "r"
+      ]
+    },
+    {
+      "name": "Algorithm1_matrix_initialization",
+      "math": "W_1 = 0_{m\\times n};\\quad L_0 = \\epsilon I_m;\\quad R_0 = \\epsilon I_n",
+      "ref": "Algorithm 1 lines 110-111",
+      "parameters": [
+        "W_1",
+        "L_0",
+        "R_0",
+        "\\epsilon"
+      ]
+    },
+    {
+      "name": "Algorithm1_matrix_accumulator_update",
+      "math": "L_t = L_{t-1} + G_tG_t^T;\\quad R_t = R_{t-1} + G_t^TG_t",
+      "ref": "Algorithm 1 lines 114-116",
+      "parameters": [
+        "L_t",
+        "R_t",
+        "G_t"
+      ]
+    },
+    {
+      "name": "Algorithm3_diagonal_initialization",
+      "math": "W_1 = 0_{m \\times n};\\quad L_0 = \\epsilon I_m;\\quad R_0 = \\epsilon I_n",
+      "ref": "Algorithm 3 lines 1011-1012",
+      "parameters": [
+        "W_1",
+        "L_0",
+        "R_0",
+        "\\epsilon"
+      ]
+    },
+    {
+      "name": "Algorithm3_diagonal_accumulator_update",
+      "math": "L_t = L_{t-1} + \\operatorname{diag}(G_tG_t^T),\\quad R_t = R_{t-1} + \\operatorname{diag}(G_t^TG_t)",
+      "ref": "Algorithm 3 lines 1015-1018",
+      "parameters": [
+        "L_t",
+        "R_t",
+        "G_t"
+      ]
+    }
+  ],
+  "definitions": [
+    {
+      "name": "PSD_PD_order_and_powers",
+      "math": "A \\succeq 0\\ (\\text{resp. } A \\succ 0);\\quad A^\\alpha = \\sum_i \\lambda_i^\\alpha u_i u_i^T",
+      "ref": "Section 2 lines 176-184"
+    },
+    {
+      "name": "Mahalanobis_and_dual_norm",
+      "math": "\\|x\\|_A = \\sqrt{x^T A x};\\quad \\|x\\|_A^* = \\sqrt{x^T A^{-1}x}",
+      "ref": "Section 2 lines 184-185"
+    },
+    {
+      "name": "Kronecker_product",
+      "math": "A\\otimes B=\\begin{pmatrix}a_{11}B&a_{12}B&\\ldots&a_{1n}B\\\\a_{21}B&a_{22}B&\\ldots&a_{2n}B\\\\\\vdots&\\vdots&\\ddots&\\vdots\\\\a_{m1}B&a_{m2}B&\\ldots&a_{mn}B\\end{pmatrix}",
+      "ref": "Section 2.3 lines 260-268"
+    },
+    {
+      "name": "Matrix_vectorization",
+      "math": "\\operatorname{vec}(A) = (a_1\\ a_2\\ \\cdots\\ a_m)^T",
+      "ref": "Section 2.3 lines 270-272"
+    },
+    {
+      "name": "Tensor_dimensions",
+      "math": "n = \\prod_{i=1}^k n_i \\quad \\text{and} \\quad \\forall i: n_{-i}=\\prod_{j\\ne i} n_j",
+      "ref": "Section 4.1 lines 583-589"
+    },
+    {
+      "name": "Rank_one_tensor",
+      "math": "A_{j_1,\\ldots,j_k} = (u_1 \\circ u_2 \\circ \\cdots \\circ u_k)_{j_1,\\ldots,j_k} = u_{1j_1}u_{2j_2}\\cdots u_{kj_k}",
+      "ref": "Section 4.1 lines 596-602"
+    },
+    {
+      "name": "Tensor_vec",
+      "math": "\\operatorname{vec}(A) = (\\operatorname{vec}(A_{11})^T\\ \\cdots\\ \\operatorname{vec}(A_{1n_1})^T)^T;\\quad \\text{where for the base case }(k=1),\\ \\operatorname{vec}(u)=u\\text{ for any column vector }u",
+      "ref": "Section 4.1 lines 604-610"
+    },
+    {
+      "name": "Matricization",
+      "math": "\\operatorname{mat}_i(A) = (\\operatorname{vec}(A_{i1})\\ \\cdots\\ \\operatorname{vec}(A_{in_i}))^T",
+      "ref": "Section 4.1 lines 612-618"
+    },
+    {
+      "name": "Tensor_matrix_product",
+      "math": "\\operatorname{mat}_i(A\\times_i M)=M\\operatorname{mat}_i(A),\\quad (A\\times_i M)_{j_1,\\ldots,j_k}=\\sum_{s=1}^{n_i}M_{j_i s}A_{j_1,\\ldots,j_{i-1},s,j_{i+1},\\ldots,j_k}",
+      "ref": "Section 4.1 lines 619-625"
+    },
+    {
+      "name": "Tensor_contraction",
+      "math": "A^{(i)} = \\operatorname{mat}_i(A)\\operatorname{mat}_i(A)^T",
+      "ref": "Section 4.1 lines 631-638"
+    }
+  ],
+  "algorithm_spec": {
+    "initialization": {
+      "math": "W_1 = 0_{n_1 \\times \\cdots \\times n_k};\\quad \\forall i \\in [k]: H_0^i = \\epsilon I_{n_i}",
+      "ref": "Algorithm 2 lines 641-642"
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "receive_loss",
+        "math": "f_t : \\mathbb{R}^{n_1 \\times \\cdots \\times n_k} \\mapsto \\mathbb{R}",
+        "ref": "Algorithm 2 lines 642-644"
+      },
+      {
+        "step": 2,
+        "name": "gradient",
+        "math": "G_t = \\nabla f_t(W_t) \\quad \\{G_t \\in \\mathbb{R}^{n_1 \\times \\cdots \\times n_k}\\}",
+        "ref": "Algorithm 2 lines 643-645"
+      },
+      {
+        "step": 3,
+        "name": "start_preconditioned_gradient",
+        "math": "\\widetilde{G}_t \\leftarrow G_t \\quad \\{\\widetilde{G}_t \\text{ is preconditioned gradient}\\}",
+        "ref": "Algorithm 2 lines 645-646"
+      },
+      {
+        "step": 4,
+        "name": "accumulator_update",
+        "math": "H_t^i = H_{t-1}^i + G_t^{(i)}",
+        "ref": "Algorithm 2 lines 646-649"
+      },
+      {
+        "step": 5,
+        "name": "mode_preconditioning",
+        "math": "\\widetilde{G}_t \\leftarrow \\widetilde{G}_t \\times_i (H_t^i)^{-1/2k}",
+        "ref": "Algorithm 2 lines 649-651"
+      },
+      {
+        "step": 6,
+        "name": "parameter_update",
+        "math": "W_{t+1} = W_t - \\eta \\widetilde{G}_t",
+        "ref": "Algorithm 2 lines 652-655"
+      }
+    ],
+    "output": {
+      "math": "",
+      "ref": "Algorithm 2 lines 641-655",
+      "type": "no explicit output line printed; final iterate W_{T+1} is inferred from the loop update"
+    },
+    "parameters": [
+      {
+        "name": "epsilon",
+        "math": "H_0^i = \\epsilon I_{n_i}",
+        "ref": "Algorithm 2 lines 641-642"
+      },
+      {
+        "name": "eta",
+        "math": "\\eta = D/\\sqrt{2r}",
+        "ref": "Proof of Theorem 7 lines 559-560; imported for Theorem 10 by proof-by-reference at lines 734-736"
+      }
+    ]
+  },
+  "additional_algorithm_specs": [
+    {
+      "name": "Algorithm 1: Shampoo, matrix case",
+      "initialization": {
+        "math": "W_1 = 0_{m \\times n};\\quad L_0 = \\epsilon I_m;\\quad R_0 = \\epsilon I_n",
+        "ref": "Algorithm 1 lines 110-111"
+      },
+      "steps": [
+        {
+          "step": 1,
+          "name": "receive_loss",
+          "math": "f_t : \\mathbb{R}^{m \\times n}\\mapsto \\mathbb{R}",
+          "ref": "Algorithm 1 lines 111-113"
+        },
+        {
+          "step": 2,
+          "name": "matrix_gradient",
+          "math": "G_t = \\nabla f_t(W_t) \\quad \\{G_t \\in \\mathbb{R}^{m \\times n}\\}",
+          "ref": "Algorithm 1 lines 111-114"
+        },
+        {
+          "step": 3,
+          "name": "left_accumulator",
+          "math": "L_t = L_{t-1} + G_tG_t^T",
+          "ref": "Algorithm 1 lines 114-116"
+        },
+        {
+          "step": 4,
+          "name": "right_accumulator",
+          "math": "R_t = R_{t-1} + G_t^TG_t",
+          "ref": "Algorithm 1 lines 114-116"
+        },
+        {
+          "step": 5,
+          "name": "matrix_parameter_update",
+          "math": "W_{t+1} = W_t - \\eta L_t^{-1/4}G_tR_t^{-1/4}",
+          "ref": "Algorithm 1 lines 117-119"
+        }
+      ]
+    },
+    {
+      "name": "Algorithm 3: Diagonal version of Shampoo, matrix case",
+      "initialization": {
+        "math": "W_1 = 0_{m \\times n};\\quad L_0 = \\epsilon I_m;\\quad R_0 = \\epsilon I_n",
+        "ref": "Algorithm 3 lines 1011-1012"
+      },
+      "steps": [
+        {
+          "step": 1,
+          "name": "receive_loss",
+          "math": "f_t : \\mathbb{R}^{m \\times n}\\mapsto \\mathbb{R}",
+          "ref": "Algorithm 3 lines 1012-1014"
+        },
+        {
+          "step": 2,
+          "name": "diagonal_matrix_gradient",
+          "math": "G_t = \\nabla f_t(W_t) \\quad \\{G_t \\in \\mathbb{R}^{m \\times n}\\}",
+          "ref": "Algorithm 3 lines 1012-1015"
+        },
+        {
+          "step": 3,
+          "name": "diagonal_left_accumulator",
+          "math": "L_t = L_{t-1} + \\operatorname{diag}(G_tG_t^T)",
+          "ref": "Algorithm 3 lines 1015-1017"
+        },
+        {
+          "step": 4,
+          "name": "diagonal_right_accumulator",
+          "math": "R_t = R_{t-1} + \\operatorname{diag}(G_t^TG_t)",
+          "ref": "Algorithm 3 lines 1015-1018"
+        },
+        {
+          "step": 5,
+          "name": "diagonal_parameter_update",
+          "math": "W_{t+1} = W_t - \\eta L_t^{-1/4}G_tR_t^{-1/4}",
+          "ref": "Algorithm 3 lines 1018-1020"
+        }
+      ]
+    }
+  ],
+  "main_theorem": {
+    "name": "Theorem_10_tensor_regret",
+    "ref": "Theorem 10 lines 676-690",
+    "source_pdf_lines": [
+      676,
+      690
+    ],
+    "statement_math": "Theorem 10. Assume that for all $i\\in[k]$ and $t=1,\\ldots,T$ it holds that $rank(mat_i(G_t))\\le r_i$, and let $r=(\\prod_{i=1}^k r_i)^{1/k}$. Then the regret of Algorithm 2 compared to any $W^*\\in\\mathbb{R}^{n_1\\times\\cdots\\times n_k}$ is\\n\\[\\sum_{t=1}^T f_t(W_t)-\\sum_{t=1}^T f_t(W^*)\\le \\sqrt{2r}D\\prod_{i=1}^k Tr((H_T^i)^{1/2k}),\\]\\nwhere $H_T^i=\\epsilon I_{n_i}+\\sum_{t=1}^T G_t^{(i)}$ for all $i\\in[k]$ and $D=\\max_{t\\in[T]}\\|W_t-W^*\\|_F$.",
+    "rate": "Under standard assumptions each trace term is O(T^{1/2k}), so the product and regret are O(sqrt(T)); the theorem itself gives the explicit comparator-dependent bound.",
+    "measure": "Online convex regret of Algorithm 2 against a fixed tensor comparator W^*.",
+    "proof": [
+      {
+        "step": 1,
+        "description": "Define the flattened preconditioner, gradient, and iterate used in the proof of Theorem 10.",
+        "ref": "Proof of Theorem 10 lines 726-732",
+        "source_pdf_lines": [
+          726,
+          732
+        ],
+        "math": "H_t=\\bigotimes_{i=1}^k(H_t^i)^{1/2k},\\quad g_t=\\operatorname{vec}(G_t),\\quad w_t=\\operatorname{vec}(W_t).",
+        "uses": [
+          "Algorithm2_accumulator_recurrence",
+          "Tensor_accumulators",
+          "Algorithm2_gradient_definition"
+        ],
+        "produces": "Theorem_10_flattened_notation"
+      },
+      {
+        "step": 2,
+        "description": "Use Lemma 12 to translate the tensor-mode preconditioning in Algorithm 2 into the flattened update printed in the proof.",
+        "ref": "Proof of Theorem 10 lines 734-735",
+        "source_pdf_lines": [
+          734,
+          735
+        ],
+        "math": "w_{t+1}=w_t-\\eta H_t^{-1}g_t.",
+        "uses": [
+          "Lemma_12_tensor_kron_vec",
+          "previous_step:1"
+        ],
+        "produces": "Theorem_10_flattened_update"
+      },
+      {
+        "step": 3,
+        "description": "Record the paper's proof-by-reference sentence as the bridge that authorizes replaying the Theorem 7 proof after the tensor flattened update, with Lemma 11 replacing Lemma 8.",
+        "ref": "Proof of Theorem 10 lines 735-736",
+        "source_pdf_lines": [
+          735,
+          736
+        ],
+        "math": "",
+        "uses": [
+          "Theorem_7_matrix_regret",
+          "Lemma_11_tensor_rank_domination",
+          "previous_step:2"
+        ],
+        "produces": "Theorem_10_imports_Theorem_7_route_with_Lemma_11_for_Lemma_8"
+      },
+      {
+        "step": 4,
+        "description": "Record the tensor self-contraction definition that makes each Algorithm 2 accumulator increment a Gram matrix of a matricization.",
+        "ref": "Section 4.1 lines 631-638",
+        "source_pdf_lines": [
+          631,
+          638
+        ],
+        "math": "A^{(i)} = \\operatorname{mat}_i(A)\\operatorname{mat}_i(A)^T",
+        "uses": [
+          "Tensor_contraction_definition_for_PSD"
+        ],
+        "produces": "Theorem_10_tensor_contraction_Gram_form"
+      },
+      {
+        "step": 5,
+        "description": "Record the Algorithm 2 accumulator recurrence and initialization for each tensor mode.",
+        "ref": "Algorithm 2 lines 641-649",
+        "source_pdf_lines": [
+          641,
+          649
+        ],
+        "math": "H_t^i = H_{t-1}^i + G_t^{(i)}",
+        "uses": [
+          "Algorithm2_accumulator_recurrence",
+          "Epsilon_regularization",
+          "previous_step:4"
+        ],
+        "produces": "Theorem_10_algorithm2_mode_accumulator_recurrence"
+      },
+      {
+        "step": 6,
+        "description": "Derive only the mode-wise PSD-increment monotonicity that follows from the printed Algorithm 2 recurrence and epsilon >= 0: since G_t^{(i)} is a Gram self-product, 0\\preceq G_t^{(i)}, so the recurrence gives 0\\preceq H_{t-1}^i\\preceq H_t^i for every mode i and time t. This does not establish the strict positive-definiteness required by Lemma 1 when epsilon=0 and early accumulators are singular.",
+        "ref": "Algorithm 2 lines 641-649 with contraction definition lines 631-638",
+        "source_pdf_lines": [
+          631,
+          649
+        ],
+        "math": "",
+        "uses": [
+          "Gram_self_product_PSD",
+          "Tensor_contraction_definition_for_PSD",
+          "Algorithm2_accumulator_recurrence",
+          "Epsilon_regularization",
+          "Epsilon_nonnegative_rank_lemmas",
+          "previous_step:4",
+          "previous_step:5"
+        ],
+        "produces": "Theorem_10_modewise_monotonicity: 0 \\preceq H_{t-1}^i \\preceq H_t^i for every i,t"
+      },
+      {
+        "step": 7,
+        "description": "Apply Lemma 6 to the mode-wise order chain, transferring monotonicity to the powered factors (H_t^i)^{1/2k}.",
+        "ref": "Proof of Theorem 7 lines 489-490 imported by Proof of Theorem 10 lines 735-736; Lemma 6 lines 323-324",
+        "source_pdf_lines": [
+          489,
+          490
+        ],
+        "math": "",
+        "uses": [
+          "Lemma_6_operator_monotone_powers",
+          "previous_step:6"
+        ],
+        "produces": "Theorem_10_powered_modewise_monotonicity: (H_{t-1}^i)^{1/2k} \\preceq (H_t^i)^{1/2k}"
+      },
+      {
+        "step": 8,
+        "description": "Record the tensor analogue of the strict flattened-preconditioner chain imported from Theorem 7 before applying Lemma 1. This is a source-trace step, not a derivation from the previous PSD monotonicity: with only epsilon >= 0, the printed assumptions do not rule out singular H_1, so the strict premise H_1,...,H_T > 0 remains an explicit source discrepancy/formalization side condition.",
+        "ref": "Proof of Theorem 7 lines 489-490 imported by Proof of Theorem 10 lines 735-736",
+        "source_pdf_lines": [
+          489,
+          490
+        ],
+        "math": "0 < H_1 \\preceq \\cdots \\preceq H_T",
+        "uses": [
+          "Lemma_1_adaptive_OMD_regret",
+          "Lemma_3_kron_calculus",
+          "previous_step:1",
+          "previous_step:3",
+          "previous_step:7"
+        ],
+        "produces": "Theorem_10_source_asserted_Lemma1_prerequisite_not_derived_from_epsilon_nonnegative: 0 < H_1 \\preceq \\cdots \\preceq H_T"
+      },
+      {
+        "step": 9,
+        "description": "Replay Theorem 7's Eq. (3) first-term bound with tensor flattened iterates, using D=max_t ||W_t-W^*||_F from Theorem 10 and H_0=0.",
+        "ref": "Proof of Theorem 7 lines 491-501 imported by Proof of Theorem 10 lines 735-736",
+        "source_pdf_lines": [
+          491,
+          501
+        ],
+        "math": "\\sum_{t=1}^T(w_t-w^*)^T(H_t-H_{t-1})(w_t-w^*)\\le D^2\\sum_{t=1}^T\\operatorname{Tr}(H_t-H_{t-1})=D^2\\operatorname{Tr}(H_T).",
+        "uses": [
+          "Comparator_radius_tensor",
+          "previous_step:8"
+        ],
+        "produces": "Theorem_10_equation_3_first_term_bound"
+      },
+      {
+        "step": 10,
+        "description": "Combine Lemma 1 with the tensor Eq. (3) replay to obtain the Eq. (4) regret inequality before bounding the dual-norm sum.",
+        "ref": "Proof of Theorem 7 lines 502-508 imported by Proof of Theorem 10 lines 735-736",
+        "source_pdf_lines": [
+          502,
+          508
+        ],
+        "math": "\\sum_{t=1}^T f_t(W_t)-\\sum_{t=1}^T f_t(W^*)\\le\\frac{D^2}{2\\eta}\\operatorname{Tr}(H_T)+\\frac{\\eta}{2}\\sum_{t=1}^T(\\|g_t\\|_{H_t}^*)^2.",
+        "uses": [
+          "Lemma_1_adaptive_OMD_regret",
+          "previous_step:8",
+          "previous_step:9"
+        ],
+        "produces": "Theorem_10_equation_4_regret_before_dual_norm_bound"
+      },
+      {
+        "step": 11,
+        "description": "Replay Theorem 7's Eq. (5) hatted-preconditioner domination with Lemma 11 in place of Lemma 8. Lemma 11 already has the tensor epsilon-scaled form epsilon I_n+sum_s g_sg_s^T <= r H_t^2, so the hatted sequence for the tensor replay is built from epsilon I_n+sum_s g_sg_s^T, not r epsilon I_n+sum_s g_sg_s^T.",
+        "ref": "Proof of Theorem 7 lines 511-518 imported by Proof of Theorem 10 lines 735-736",
+        "source_pdf_lines": [
+          511,
+          518
+        ],
+        "math": "",
+        "uses": [
+          "Lemma_11_tensor_rank_domination",
+          "Lemma_6_operator_monotone_powers",
+          "Theorem10_rank_assumption",
+          "Theorem10_rank_geometric_mean",
+          "previous_step:1",
+          "previous_step:3"
+        ],
+        "produces": "Theorem_10_equation_5_hhat_bound: \\widehat H_t=(\\epsilon I_n+\\sum_{s=1}^t g_sg_s^T)^{1/2}\\preceq\\sqrt r H_t"
+      },
+      {
+        "step": 12,
+        "description": "Replay Theorem 7's sequence in source order: after the tensor hatted preconditioner has been defined by the Eq. (5) replay, choose the potential for Lemma 2; the following step identifies the argmin. The displayed matrix-case source has r epsilon, while the tensor replay requires epsilon because the hatted matrix is defined from epsilon I_n+M_t.",
+        "ref": "Proof of Theorem 7 lines 520-523 imported by Proof of Theorem 10 lines 735-736",
+        "source_pdf_lines": [
+          520,
+          523
+        ],
+        "math": "",
+        "uses": [
+          "Lemma_2_FTL_BTL_potential",
+          "previous_step:3",
+          "previous_step:11"
+        ],
+        "produces": "Theorem_10_potential_choice_for_equation_6_after_hhat: derived tensor replay potential Phi(H)=Tr(H)+epsilon Tr(H^{-1})"
+      },
+      {
+        "step": 13,
+        "description": "Replay Theorem 7's argmin identification with M_t=sum_{s=1}^t g_sg_s^T and the tensor hatted preconditioner defined from epsilon I_n+M_t.",
+        "ref": "Proof of Theorem 7 lines 523-528 imported by Proof of Theorem 10 lines 735-736",
+        "source_pdf_lines": [
+          523,
+          528
+        ],
+        "math": "\\operatorname*{argmin}_{H\\succ0}M_t\\bullet H^{-1}+\\Phi(H)=\\operatorname*{argmin}_{H\\succ0}\\operatorname{Tr}(\\widehat{H}_t^2H^{-1}+H)=\\widehat{H}_t.",
+        "uses": [
+          "Lemma_2_FTL_BTL_potential",
+          "previous_step:11",
+          "previous_step:12"
+        ],
+        "produces": "Theorem_10_potential_argmin_identification"
+      },
+      {
+        "step": 14,
+        "description": "Replay the derivative calculation printed in Theorem 7 to justify the hatted-preconditioner minimizer.",
+        "ref": "Proof of Theorem 7 lines 530-531 imported by Proof of Theorem 10 lines 735-736",
+        "source_pdf_lines": [
+          530,
+          531
+        ],
+        "math": "\\nabla_X\\operatorname{Tr}(AX+X^{-1})=A-X^{-2}.",
+        "uses": [
+          "previous_step:13"
+        ],
+        "produces": "Theorem_10_argmin_gradient_condition"
+      },
+      {
+        "step": 15,
+        "description": "Apply Lemma 2 with the imported tensor hatted sequence to obtain the first inequality in Eq. (6).",
+        "ref": "Proof of Theorem 7 lines 531-538 imported by Proof of Theorem 10 lines 735-736",
+        "source_pdf_lines": [
+          531,
+          538
+        ],
+        "math": "\\sum_{t=1}^T(\\|g_t\\|_{\\widehat{H}_t}^*)^2\\le\\sum_{t=1}^T(\\|g_t\\|_{\\widehat{H}_T}^*)^2+\\Phi(\\widehat{H}_T)-\\Phi(\\widehat{H}_0).",
+        "uses": [
+          "Lemma_2_FTL_BTL_potential",
+          "previous_step:12",
+          "previous_step:13",
+          "previous_step:14"
+        ],
+        "produces": "Theorem_10_equation_6_first_inequality"
+      },
+      {
+        "step": 16,
+        "description": "Replay the terminal objective expansion in Eq. (6).",
+        "ref": "Proof of Theorem 7 lines 540-546 imported by Proof of Theorem 10 lines 735-736",
+        "source_pdf_lines": [
+          540,
+          546
+        ],
+        "math": "",
+        "uses": [
+          "previous_step:11",
+          "previous_step:12",
+          "previous_step:15"
+        ],
+        "produces": "Theorem_10_equation_6_terminal_objective_expansion: derived tensor replay terminal side <= (epsilon I_n+sum_t g_tg_t^T) bullet \\widehat H_T^{-1}+Tr(\\widehat H_T)"
+      },
+      {
+        "step": 17,
+        "description": "Replay the final simplification of Eq. (6), using the hatted-preconditioner definition.",
+        "ref": "Proof of Theorem 7 lines 546-547 imported by Proof of Theorem 10 lines 735-736",
+        "source_pdf_lines": [
+          546,
+          547
+        ],
+        "math": "",
+        "uses": [
+          "previous_step:11",
+          "previous_step:16"
+        ],
+        "produces": "Theorem_10_equation_6_hhat_dual_sum_bound: derived tensor replay (epsilon I_n+sum_t g_tg_t^T) bullet \\widehat H_T^{-1}+Tr(\\widehat H_T)=2Tr(\\widehat H_T)"
+      },
+      {
+        "step": 18,
+        "description": "Use the tensor Eq. (5) replay once to transfer the dual norm from H_t to the hatted tensor preconditioner.",
+        "ref": "Proof of Theorem 7 lines 549-555 imported by Proof of Theorem 10 lines 735-736",
+        "source_pdf_lines": [
+          549,
+          555
+        ],
+        "math": "\\sum_{t=1}^T(\\|g_t\\|_{H_t}^*)^2\\le\\sqrt{r}\\sum_{t=1}^T(\\|g_t\\|_{\\widehat{H}_t}^*)^2.",
+        "uses": [
+          "previous_step:11"
+        ],
+        "produces": "Theorem_10_dual_norm_transfer_first_inequality"
+      },
+      {
+        "step": 19,
+        "description": "Substitute the Eq. (6) hatted dual-norm bound into the transferred dual-norm inequality.",
+        "ref": "Proof of Theorem 7 lines 553-555 imported by Proof of Theorem 10 lines 735-736",
+        "source_pdf_lines": [
+          553,
+          555
+        ],
+        "math": "\\sqrt{r}\\sum_{t=1}^T(\\|g_t\\|_{\\widehat{H}_t}^*)^2\\le2\\sqrt{r}\\operatorname{Tr}(\\widehat{H}_T).",
+        "uses": [
+          "previous_step:15",
+          "previous_step:16",
+          "previous_step:17",
+          "previous_step:18"
+        ],
+        "produces": "Theorem_10_dual_norm_transfer_second_inequality"
+      },
+      {
+        "step": 20,
+        "description": "Use the tensor Eq. (5) replay a second time to replace Tr(\\widehat H_T) by sqrt(r) Tr(H_T).",
+        "ref": "Proof of Theorem 7 lines 553-557 imported by Proof of Theorem 10 lines 735-736",
+        "source_pdf_lines": [
+          553,
+          557
+        ],
+        "math": "2\\sqrt{r}\\operatorname{Tr}(\\widehat{H}_T)\\le2r\\operatorname{Tr}(H_T).",
+        "uses": [
+          "previous_step:11",
+          "previous_step:19"
+        ],
+        "produces": "Theorem_10_dual_norm_sum_bound"
+      },
+      {
+        "step": 21,
+        "description": "Substitute the tensor dual-norm sum bound into Eq. (4), yielding the pre-eta coefficient.",
+        "ref": "Proof of Theorem 7 lines 559-564 imported by Proof of Theorem 10 lines 735-736",
+        "source_pdf_lines": [
+          559,
+          564
+        ],
+        "math": "",
+        "uses": [
+          "previous_step:10",
+          "previous_step:20"
+        ],
+        "produces": "Theorem_10_regret_bound_before_eta_choice: regret <= (D^2/(2\\eta)+\\eta r) Tr(H_T)"
+      },
+      {
+        "step": 22,
+        "description": "Use the learning-rate choice printed in Theorem 7's final substitution and imported by the identical-proof sentence to simplify the coefficient to sqrt(2r)D.",
+        "ref": "Proof of Theorem 7 lines 559-560 imported by Proof of Theorem 10 lines 735-736",
+        "source_pdf_lines": [
+          559,
+          560
+        ],
+        "math": "",
+        "uses": [
+          "Learning_rate_Theorem10",
+          "previous_step:21"
+        ],
+        "produces": "Theorem_10_eta_simplification: (D^2/(2\\eta)+\\eta r) becomes \\sqrt{2r}D under \\eta=D/\\sqrt{2r}"
+      },
+      {
+        "step": 23,
+        "description": "Carry out the trace endpoint required by the proof-by-reference: the Kronecker trace identity changes Tr(H_T) into the product of the mode traces appearing in Theorem 10.",
+        "ref": "Proof of Theorem 10 lines 726-736 with Lemma 3(v) lines 291-292",
+        "source_pdf_lines": [
+          726,
+          736
+        ],
+        "math": "",
+        "uses": [
+          "Lemma_3_kron_calculus",
+          "previous_step:1",
+          "previous_step:22"
+        ],
+        "produces": "derived_trace_endpoint: Tr(H_T)=\\prod_{i=1}^k\\operatorname{Tr}((H_T^i)^{1/2k})"
+      },
+      {
+        "step": 24,
+        "description": "Combine the imported eta simplification with the tensor Kronecker trace rewrite to obtain the displayed Theorem 10 regret bound.",
+        "ref": "Theorem 10 lines 676-690; Proof of Theorem 10 lines 735-736",
+        "source_pdf_lines": [
+          676,
+          690
+        ],
+        "math": "",
+        "uses": [
+          "previous_step:22",
+          "previous_step:23"
+        ],
+        "produces": "Theorem_10_bound"
+      }
+    ]
+  },
+  "key_lemmas": [
+    {
+      "name": "Lemma_1_adaptive_OMD_regret",
+      "ref": "Lemma 1 lines 232-238",
+      "statement_math": "\\text{For any sequence of matrices } H_1,\\ldots,H_T \\succ 0, \\text{ the regret of online mirror descent is bounded above by } \\frac{1}{2\\eta}\\sum_{t=1}^T(\\|w_t-w^*\\|_{H_t}^2-\\|w_{t+1}-w^*\\|_{H_t}^2)+\\frac{\\eta}{2}\\sum_{t=1}^T(\\|g_t\\|_{H_t}^*)^2.",
+      "role": "Provides the adaptive mirror descent regret inequality used for Theorems 7, 10, and 13.",
+      "proof": "cited"
+    },
+    {
+      "name": "Lemma_2_FTL_BTL_potential",
+      "ref": "Lemma 2 lines 243-255; Appendix C.1 lines 1272-1303",
+      "statement_math": "\\text{Let } g_1,\\ldots,g_T \\text{ be a sequence of vectors, and let } M_t=\\sum_{s=1}^t g_sg_s^T \\text{ for } t\\ge1. \\text{ Given a function } \\Phi \\text{ over PSD matrices, define } H_t=\\operatorname*{argmin}_{H\\succ0} M_t\\bullet H^{-1}+\\Phi(H) \\text{ (and assume that a minimum is attained for all } t). \\text{ Then } \\sum_{t=1}^T(\\|g_t\\|_{H_t}^*)^2 \\le \\sum_{t=1}^T(\\|g_t\\|_{H_T}^*)^2+\\Phi(H_T)-\\Phi(H_0).",
+      "role": "Bounds the cumulative adaptive dual norm by the terminal potential in the Shampoo regret proof.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Rewrite the desired inequality by moving Phi(H_0) to the left-hand side.",
+          "ref": "Appendix C.1 lines 1273-1280",
+          "source_pdf_lines": [
+            1273,
+            1280
+          ],
+          "math": "\\sum_{t=1}^T(\\|g_t\\|_{H_t}^*)^2+\\Phi(H_0)\\le\\sum_{t=1}^T(\\|g_t\\|_{H_T}^*)^2+\\Phi(H_T).",
+          "uses": [],
+          "produces": "Lemma_2_rewritten_target"
+        },
+        {
+          "step": 2,
+          "description": "Proceed by induction on T; the base case T=0 is stated to be trivial.",
+          "ref": "Appendix C.1 lines 1282-1283",
+          "source_pdf_lines": [
+            1282,
+            1283
+          ],
+          "math": "",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "Lemma_2_induction_setup"
+        },
+        {
+          "step": 3,
+          "description": "Apply the induction hypothesis up to T-1.",
+          "ref": "Appendix C.1 lines 1283-1289",
+          "source_pdf_lines": [
+            1283,
+            1289
+          ],
+          "math": "\\sum_{t=1}^{T-1}(\\|g_t\\|_{H_t}^*)^2+\\Phi(H_0)\\le\\sum_{t=1}^{T-1}(\\|g_t\\|_{H_{T-1}}^*)^2+\\Phi(H_{T-1}).",
+          "uses": [
+            "previous_step:2"
+          ],
+          "produces": "Lemma_2_induction_hypothesis_bound"
+        },
+        {
+          "step": 4,
+          "description": "Record the printed FTL objective identity for M_{T-1}; H_{T-1} is a minimizer of this objective.",
+          "ref": "Appendix C.1 lines 1295-1301",
+          "source_pdf_lines": [
+            1295,
+            1301
+          ],
+          "math": "M_{T-1}\\bullet H^{-1}+\\Phi(H)=\\sum_{t=1}^{T-1}(\\|g_t\\|_H^*)^2+\\Phi(H).",
+          "uses": [],
+          "produces": "Lemma_2_FTL_objective_for_T_minus_1"
+        },
+        {
+          "step": 5,
+          "description": "Use the minimizer property of H_{T-1} in the objective from the previous step to replace H_{T-1} by H_T, giving the second displayed inequality in the induction chain.",
+          "ref": "Appendix C.1 lines 1290-1293, justified by lines 1295-1301",
+          "source_pdf_lines": [
+            1290,
+            1293
+          ],
+          "math": "\\sum_{t=1}^{T-1}(\\|g_t\\|_{H_{T-1}}^*)^2+\\Phi(H_{T-1})\\le\\sum_{t=1}^{T-1}(\\|g_t\\|_{H_T}^*)^2+\\Phi(H_T).",
+          "uses": [
+            "previous_step:3",
+            "previous_step:4"
+          ],
+          "produces": "Lemma_2_second_induction_inequality"
+        },
+        {
+          "step": 6,
+          "description": "Combine the two inequalities in the displayed induction chain.",
+          "ref": "Appendix C.1 lines 1283-1293",
+          "source_pdf_lines": [
+            1283,
+            1293
+          ],
+          "math": "",
+          "uses": [
+            "previous_step:3",
+            "previous_step:5"
+          ],
+          "produces": "Lemma_2_T_minus_1_bound_with_terminal_HT"
+        },
+        {
+          "step": 7,
+          "description": "Add (||g_T||_{H_T}^*)^2 to both sides to obtain the rewritten target.",
+          "ref": "Appendix C.1 line 1303",
+          "source_pdf_lines": [
+            1303,
+            1303
+          ],
+          "math": "",
+          "uses": [
+            "previous_step:1",
+            "previous_step:6"
+          ],
+          "produces": "Lemma_2_conclusion"
+        }
+      ]
+    },
+    {
+      "name": "Algorithm3_diagonal_preconditioner_monotone",
+      "ref": "Algorithm 3 lines 1011-1020; Appendix A lines 1045-1056",
+      "statement_math": "H_t=L_t^{1/4}\\otimes R_t^{1/4}",
+      "role": "Formalization scaffolding, not a printed source lemma: derives the diagonal-PSD side condition needed when Appendix A applies v^TMv\\le\\|v\\|_\\infty^2Tr(M) to M=H_t-H_{t-1}.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Record Algorithm 3's initialization and diagonal accumulator recurrences.",
+          "ref": "Algorithm 3 lines 1011-1018",
+          "source_pdf_lines": [
+            1011,
+            1018
+          ],
+          "math": "W_1 = 0_{m \\times n};\\quad L_0 = \\epsilon I_m;\\quad R_0 = \\epsilon I_n;\\quad L_t=L_{t-1}+diag(G_tG_t^T),\\quad R_t=R_{t-1}+diag(G_t^TG_t).",
+          "uses": [
+            "Algorithm3_diagonal_initialization",
+            "Algorithm3_diagonal_accumulator_update"
+          ],
+          "produces": "Algorithm3_diagonal_preconditioner_recurrences"
+        },
+        {
+          "step": 2,
+          "description": "From the diagonal Gram updates, derive that each increment diag(G_tG_t^T) and diag(G_t^TG_t) is diagonal PSD; hence the accumulated L_t and R_t are diagonal PSD and are monotone in Loewner order. This is a formalization of the side condition behind Appendix A's phrase 'for a diagonal PSD matrix M'.",
+          "ref": "Algorithm 3 lines 1015-1018; Appendix A lines 1055-1056",
+          "source_pdf_lines": [
+            1015,
+            1056
+          ],
+          "math": "",
+          "uses": [
+            "Epsilon_nonnegative_rank_lemmas",
+            "previous_step:1"
+          ],
+          "produces": "Algorithm3_LR_diagonal_PSD_monotone"
+        },
+        {
+          "step": 3,
+          "description": "Apply operator monotonicity of the one-fourth power to the monotone diagonal PSD accumulators, so L_t^{1/4} and R_t^{1/4} are diagonal PSD and remain monotone.",
+          "ref": "Appendix A lines 1045-1056; Lemma 6 lines 323-324",
+          "source_pdf_lines": [
+            1045,
+            1056
+          ],
+          "math": "",
+          "uses": [
+            "Lemma_6_operator_monotone_powers",
+            "previous_step:2"
+          ],
+          "produces": "Algorithm3_powered_LR_diagonal_PSD_monotone"
+        },
+        {
+          "step": 4,
+          "description": "Use the Kronecker PSD/order calculus for the definition H_t=L_t^{1/4}\\otimes R_t^{1/4}; since the factors are diagonal PSD and monotone, H_t is diagonal PSD, H_{t-1}\\preceq H_t, and H_t-H_{t-1} is diagonal PSD.",
+          "ref": "Appendix A lines 1045-1056; Lemma 3 lines 276-295",
+          "source_pdf_lines": [
+            1045,
+            1056
+          ],
+          "math": "H_t=L_t^{1/4}\\otimes R_t^{1/4}.",
+          "uses": [
+            "Lemma_3_kron_calculus",
+            "previous_step:3"
+          ],
+          "produces": "Algorithm3_H_increment_diagonal_PSD"
+        }
+      ]
+    },
+    {
+      "name": "Gram_self_product_PSD",
+      "ref": "Imported Mathlib PSD fact; source PSD notation Section 2 lines 176-184 and contraction definition lines 631-638",
+      "statement_math": "\\text{For a real matrix } A,\\ AA^T\\succeq0 \\text{ and } A^TA\\succeq0.",
+      "role": "Supplies the PSD-increment prerequisite used to derive monotonicity of Shampoo accumulators from the printed recurrences.",
+      "proof": "cited"
+    },
+    {
+      "name": "Lemma_3_kron_calculus",
+      "ref": "Lemma 3 lines 276-295",
+      "statement_math": "(i)\\ (A\\otimes B)(A'\\otimes B')=(AA')\\otimes(BB');\\quad (ii)\\ (A\\otimes B)^T=A^T\\otimes B^T;\\quad (iii)\\ \\text{If } A,B\\succeq0, \\text{ then } (A\\otimes B)^s=A^s\\otimes B^s, \\text{ and in particular, if } A,B\\succ0 \\text{ then } (A\\otimes B)^{-1}=A^{-1}\\otimes B^{-1};\\quad (iv)\\ \\text{If } A\\succeq A' \\text{ and } B\\succeq B' \\text{ then } A\\otimes B\\succeq A'\\otimes B', \\text{ and in particular, if } A,B\\succeq0 \\text{ then } A\\otimes B\\succeq0;\\quad (v)\\ \\operatorname{Tr}(A\\otimes B)=\\operatorname{Tr}(A)\\operatorname{Tr}(B);\\quad (vi)\\ \\operatorname{vec}(uv^T)=u\\otimes v.",
+      "role": "Supplies Kronecker algebra, trace factorization, PSD order preservation, powers, and rank-one vectorization.",
+      "proof": "cited"
+    },
+    {
+      "name": "Lemma_4_matrix_kron_vec",
+      "ref": "Lemma 4 lines 301-304; Appendix C.2 lines 1305-1317",
+      "statement_math": "\\text{Let } G\\in\\mathbb{R}^{m\\times n},\\ L\\in\\mathbb{R}^{m\\times m}\\text{ and } R\\in\\mathbb{R}^{n\\times n}. \\text{ Then } (L\\otimes R^T)\\operatorname{vec}(G)=\\operatorname{vec}(LGR).",
+      "role": "Converts Shampoo matrix updates into a single flattened Kronecker-preconditioned gradient step.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "First prove the identity for rank-one G=uv^T and expand the left hand side using Lemma 3(vi) then Lemma 3(i).",
+          "ref": "Appendix C.2 lines 1305-1310",
+          "source_pdf_lines": [
+            1305,
+            1310
+          ],
+          "math": "(L\\otimes R^T)\\operatorname{vec}(G)=(L\\otimes R^T)\\operatorname{vec}(uv^T)=(L\\otimes R^T)(u\\otimes v)=(Lu)\\otimes(R^Tv).",
+          "uses": [
+            "Lemma_3_kron_calculus"
+          ],
+          "produces": "Lemma_4_rank_one_left"
+        },
+        {
+          "step": 2,
+          "description": "Expand the right hand side for rank-one G=uv^T and use Lemma 3(vi) again.",
+          "ref": "Appendix C.2 lines 1311-1314",
+          "source_pdf_lines": [
+            1311,
+            1314
+          ],
+          "math": "\\operatorname{vec}(LGR)=\\operatorname{vec}(Luv^TR)=\\operatorname{vec}(Lu(R^Tv)^T)=(Lu)\\otimes(R^Tv).",
+          "uses": [
+            "Lemma_3_kron_calculus",
+            "previous_step:1"
+          ],
+          "produces": "Lemma_4_rank_one_identity"
+        },
+        {
+          "step": 3,
+          "description": "Extend from rank-one matrices to arbitrary matrices by expressing any matrix as a sum of rank-one matrices and using linearity of all operators involved.",
+          "ref": "Appendix C.2 lines 1315-1317",
+          "source_pdf_lines": [
+            1315,
+            1317
+          ],
+          "math": "",
+          "uses": [
+            "previous_step:2"
+          ],
+          "produces": "Lemma_4_conclusion"
+        }
+      ]
+    },
+    {
+      "name": "Lemma_5_Ando_geometric_mean",
+      "ref": "Lemma 5 lines 309-315",
+      "statement_math": "\\text{Assume that } 0\\preceq X_i\\preceq Y_i \\text{ for all } i=1,\\ldots,n. \\text{ Assume further that all } X_i \\text{ commute with each other and all } Y_i \\text{ commute with each other. Let } \\alpha_1,\\ldots,\\alpha_n\\ge0 \\text{ such that } \\sum_{i=1}^n\\alpha_i=1, \\text{ then } X_1^{\\alpha_1}\\cdots X_n^{\\alpha_n}\\preceq Y_1^{\\alpha_1}\\cdots Y_n^{\\alpha_n}.",
+      "role": "Provides operator monotonicity for products of commuting PSD matrices in Lemma 8 and Lemma 11.",
+      "proof": "cited"
+    },
+    {
+      "name": "Lemma_6_operator_monotone_powers",
+      "ref": "Lemma 6 lines 323-324",
+      "statement_math": "\\text{The function } x\\mapsto x^\\alpha \\text{ is operator-monotone for } \\alpha\\in[0,1], \\text{ that is, if } 0\\preceq X\\preceq Y \\text{ then } X^\\alpha\\preceq Y^\\alpha.",
+      "role": "Turns Lemma 8 and Lemma 11 domination into square-root domination of preconditioners.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "The paper states this as a classic Loewner result and an immediate consequence of Lemma 5.",
+          "ref": "Section 2.4 lines 318-324",
+          "source_pdf_lines": [
+            318,
+            324
+          ],
+          "math": "",
+          "uses": [
+            "Lemma_5_Ando_geometric_mean"
+          ],
+          "produces": "Lemma_6_conclusion"
+        }
+      ]
+    },
+    {
+      "name": "Theorem_7_matrix_regret",
+      "ref": "Theorem 7 lines 332-348; proof lines 478-568",
+      "statement_math": "\\text{Assume that the gradients } G_1,\\ldots,G_T \\text{ are matrices of rank at most } r. \\text{ Then the regret of Algorithm 1 compared to any } W^*\\in\\mathbb{R}^{m\\times n} \\text{ is bounded as follows, } \\sum_{t=1}^T f_t(W_t)-\\sum_{t=1}^T f_t(W^*) \\le \\sqrt{2r}D\\operatorname{Tr}(L_T^{1/4})\\operatorname{Tr}(R_T^{1/4}), \\text{ where } L_T=\\epsilon I_m+\\sum_{t=1}^TG_tG_t^T,\\ R_T=\\epsilon I_n+\\sum_{t=0}^TG_t^TG_t,\\ D=\\max_{t\\in[T]}\\|W_t-W^*\\|_F.",
+      "role": "Matrix endpoint and proof template for the general tensor theorem.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Recall Algorithm 1's matrix update.",
+          "ref": "Proof of Theorem 7 lines 478-480",
+          "source_pdf_lines": [
+            478,
+            480
+          ],
+          "math": "W_{t+1}=W_t-\\eta L_t^{-1/4}G_tR_t^{-1/4}.",
+          "uses": [],
+          "produces": "matrix_algorithm_update"
+        },
+        {
+          "step": 2,
+          "description": "Use Lemma 4 to view the left and right preconditioning matrices as the single flattened Kronecker preconditioner H_t=L_t^{1/4}\\otimes R_t^{1/4}, with g_t=vec(G_t) and w_t=vec(W_t).",
+          "ref": "Proof of Theorem 7 lines 482-488",
+          "source_pdf_lines": [
+            482,
+            488
+          ],
+          "math": "w_{t+1}=w_t-\\eta H_t^{-1}g_t.",
+          "uses": [
+            "Lemma_4_matrix_kron_vec",
+            "previous_step:1"
+          ],
+          "produces": "equation_2_matrix_flat_update"
+        },
+        {
+          "step": 3,
+          "description": "Record Algorithm 1's accumulator initialization and update recurrences before invoking the monotonicity premise in the proof.",
+          "ref": "Algorithm 1 lines 110-116; Proof of Theorem 7 lines 489-490",
+          "source_pdf_lines": [
+            110,
+            116
+          ],
+          "math": "L_0 = \\epsilon I_m;\\quad R_0 = \\epsilon I_n;\\quad L_t = L_{t-1}+G_tG_t^T;\\quad R_t=R_{t-1}+G_t^TG_t.",
+          "uses": [
+            "Algorithm1_matrix_initialization",
+            "Algorithm1_matrix_accumulator_update"
+          ],
+          "produces": "Algorithm1_matrix_accumulator_recurrences"
+        },
+        {
+          "step": 4,
+          "description": "Derive only the non-strict PSD accumulator monotonicity that follows from Algorithm 1 and epsilon >= 0: the increments G_tG_t^T and G_t^TG_t are PSD Gram self-products, so 0\\preceq L_{t-1}\\preceq L_t and 0\\preceq R_{t-1}\\preceq R_t. This step deliberately does not claim the paper's strict 0<L_1 and 0<R_1 conclusions.",
+          "ref": "Proof of Theorem 7 lines 489-490 with Algorithm 1 lines 110-116",
+          "source_pdf_lines": [
+            489,
+            490
+          ],
+          "math": "",
+          "uses": [
+            "Gram_self_product_PSD",
+            "Algorithm1_matrix_initialization",
+            "Algorithm1_matrix_accumulator_update",
+            "Epsilon_nonnegative_rank_lemmas",
+            "previous_step:3"
+          ],
+          "produces": "Theorem_7_left_right_accumulator_PSD_monotonicity: 0\\preceq L_{t-1}\\preceq L_t and 0\\preceq R_{t-1}\\preceq R_t"
+        },
+        {
+          "step": 5,
+          "description": "Record the paper's printed strict left/right chains before invoking Lemma 1. This is a source-trace step, not a derivation from the previous PSD monotonicity: with epsilon=0, Algorithm 1 and the rank assumptions allow singular L_1 or R_1.",
+          "ref": "Proof of Theorem 7 lines 482-490; Lemma 6 lines 323-324",
+          "source_pdf_lines": [
+            482,
+            490
+          ],
+          "math": "0 < L_1 \\preceq \\cdots \\preceq L_T \\quad\\text{and}\\quad 0 < R_1 \\preceq \\cdots \\preceq R_T",
+          "uses": [
+            "previous_step:4"
+          ],
+          "produces": "Theorem_7_source_asserted_strict_left_right_chain_not_derived_from_epsilon_nonnegative"
+        },
+        {
+          "step": 6,
+          "description": "Conditioned on the paper's asserted strict left/right chains, apply Lemma 6 to the fourth-power factors and Lemma 3(iv) to H_t=L_t^{1/4}\\otimes R_t^{1/4}. This records the strict flattened preconditioner chain required for Lemma 1 while preserving that strict positivity came from the source assertion, not from epsilon >= 0.",
+          "ref": "Proof of Theorem 7 lines 489-490",
+          "source_pdf_lines": [
+            489,
+            490
+          ],
+          "math": "0 < H_1 \\preceq \\cdots \\preceq H_T",
+          "uses": [
+            "Lemma_1_adaptive_OMD_regret",
+            "Lemma_3_kron_calculus",
+            "Lemma_6_operator_monotone_powers",
+            "previous_step:2",
+            "previous_step:5"
+          ],
+          "produces": "Lemma_1_applicable_with_source_asserted_monotone_Ht"
+        },
+        {
+          "step": 7,
+          "description": "Use D=max_t ||w_t-w^*||=max_t ||W_t-W^*||_F and H_0=0 to bound the first Lemma 1 term by the displayed telescoping trace expression.",
+          "ref": "Proof of Theorem 7 lines 491-501",
+          "source_pdf_lines": [
+            491,
+            501
+          ],
+          "math": "\\sum_{t=1}^T(w_t-w^*)^T(H_t-H_{t-1})(w_t-w^*)\\le D^2\\sum_{t=1}^T\\operatorname{Tr}(H_t-H_{t-1})=D^2\\operatorname{Tr}(H_T).",
+          "uses": [
+            "previous_step:6"
+          ],
+          "produces": "equation_3_first_term_bound"
+        },
+        {
+          "step": 8,
+          "description": "Combine Lemma 1 with Eq. (3) to obtain the displayed regret inequality Eq. (4).",
+          "ref": "Proof of Theorem 7 lines 502-508",
+          "source_pdf_lines": [
+            502,
+            508
+          ],
+          "math": "\\sum_{t=1}^T f_t(W_t)-\\sum_{t=1}^T f_t(W^*)\\le\\frac{D^2}{2\\eta}\\operatorname{Tr}(H_T)+\\frac{\\eta}{2}\\sum_{t=1}^T(\\|g_t\\|_{H_t}^*)^2.",
+          "uses": [
+            "Lemma_1_adaptive_OMD_regret",
+            "previous_step:7"
+          ],
+          "produces": "equation_4_regret_before_dual_norm_bound"
+        },
+        {
+          "step": 9,
+          "description": "Use Lemma 8 and operator monotonicity of the square-root function from Lemma 6 to define and bound the hatted full preconditioner.",
+          "ref": "Proof of Theorem 7 lines 511-518",
+          "source_pdf_lines": [
+            511,
+            518
+          ],
+          "math": "\\widehat{H}_t\\stackrel{\\mathrm{def}}{=}(r\\epsilon I+\\sum_{s=1}^t g_sg_s^T)^{1/2}\\preceq\\sqrt{r}H_t.",
+          "uses": [
+            "Lemma_8_matrix_rank_domination",
+            "Lemma_6_operator_monotone_powers"
+          ],
+          "produces": "equation_5_hhat_bound"
+        },
+        {
+          "step": 10,
+          "description": "Choose the potential used in Lemma 2.",
+          "ref": "Proof of Theorem 7 lines 520-523",
+          "source_pdf_lines": [
+            520,
+            523
+          ],
+          "math": "\\Phi(H)=\\operatorname{Tr}(H)+r\\epsilon\\operatorname{Tr}(H^{-1}).",
+          "uses": [
+            "Lemma_2_FTL_BTL_potential"
+          ],
+          "produces": "potential_choice_for_equation_6"
+        },
+        {
+          "step": 11,
+          "description": "Set M_t=\\sum_{s=1}^t g_sg_s^T and rewrite the Lemma 2 argmin objective as the displayed trace objective whose minimizer is \\widehat H_t.",
+          "ref": "Proof of Theorem 7 lines 523-528",
+          "source_pdf_lines": [
+            523,
+            528
+          ],
+          "math": "\\operatorname*{argmin}_{H\\succ0}M_t\\bullet H^{-1}+\\Phi(H)=\\operatorname*{argmin}_{H\\succ0}\\operatorname{Tr}(\\widehat{H}_t^2H^{-1}+H)=\\widehat{H}_t.",
+          "uses": [
+            "Lemma_2_FTL_BTL_potential",
+            "previous_step:9",
+            "previous_step:10"
+          ],
+          "produces": "potential_argmin_identification"
+        },
+        {
+          "step": 12,
+          "description": "Justify the displayed minimizer by the paper's derivative calculation for Tr(AX+X^{-1}).",
+          "ref": "Proof of Theorem 7 lines 530-531",
+          "source_pdf_lines": [
+            530,
+            531
+          ],
+          "math": "\\nabla_X\\operatorname{Tr}(AX+X^{-1})=A-X^{-2}.",
+          "uses": [
+            "previous_step:11"
+          ],
+          "produces": "argmin_gradient_condition"
+        },
+        {
+          "step": 13,
+          "description": "Apply Lemma 2 with the chosen potential and minimizing sequence to get the first inequality in Eq. (6).",
+          "ref": "Proof of Theorem 7 lines 531-538",
+          "source_pdf_lines": [
+            531,
+            538
+          ],
+          "math": "\\sum_{t=1}^T(\\|g_t\\|_{\\widehat{H}_t}^*)^2\\le\\sum_{t=1}^T(\\|g_t\\|_{\\widehat{H}_T}^*)^2+\\Phi(\\widehat{H}_T)-\\Phi(\\widehat{H}_0).",
+          "uses": [
+            "Lemma_2_FTL_BTL_potential",
+            "previous_step:10",
+            "previous_step:11",
+            "previous_step:12"
+          ],
+          "produces": "equation_6_first_inequality"
+        },
+        {
+          "step": 14,
+          "description": "Expand the terminal right-hand side using the definition of \\widehat H_T and the chosen potential, producing the second inequality printed in Eq. (6).",
+          "ref": "Proof of Theorem 7 lines 540-546",
+          "source_pdf_lines": [
+            540,
+            546
+          ],
+          "math": "\\sum_{t=1}^T(\\|g_t\\|_{\\widehat{H}_T}^*)^2+\\Phi(\\widehat{H}_T)-\\Phi(\\widehat{H}_0)\\le(r\\epsilon I+\\sum_{t=1}^Tg_tg_t^T)\\bullet\\widehat{H}_T^{-1}+\\operatorname{Tr}(\\widehat{H}_T).",
+          "uses": [
+            "previous_step:9",
+            "previous_step:10",
+            "previous_step:13"
+          ],
+          "produces": "equation_6_terminal_objective_expansion"
+        },
+        {
+          "step": 15,
+          "description": "Use \\widehat H_T^2=r\\epsilon I+\\sum_{t=1}^Tg_tg_t^T to simplify the expanded objective to twice the trace.",
+          "ref": "Proof of Theorem 7 lines 546-547",
+          "source_pdf_lines": [
+            546,
+            547
+          ],
+          "math": "(r\\epsilon I+\\sum_{t=1}^Tg_tg_t^T)\\bullet\\widehat{H}_T^{-1}+\\operatorname{Tr}(\\widehat{H}_T)=2\\operatorname{Tr}(\\widehat{H}_T).",
+          "uses": [
+            "previous_step:9",
+            "previous_step:14"
+          ],
+          "produces": "equation_6_hhat_dual_sum_bound"
+        },
+        {
+          "step": 16,
+          "description": "Use Eq. (5) once to compare the Algorithm preconditioner dual norm to the hatted dual norm.",
+          "ref": "Proof of Theorem 7 lines 549-555",
+          "source_pdf_lines": [
+            549,
+            555
+          ],
+          "math": "\\sum_{t=1}^T(\\|g_t\\|_{H_t}^*)^2\\le\\sqrt{r}\\sum_{t=1}^T(\\|g_t\\|_{\\widehat{H}_t}^*)^2.",
+          "uses": [
+            "previous_step:9"
+          ],
+          "produces": "dual_norm_transfer_first_inequality"
+        },
+        {
+          "step": 17,
+          "description": "Use Eq. (6) to bound the transferred hatted dual-norm sum by 2 sqrt(r) Tr(\\widehat H_T).",
+          "ref": "Proof of Theorem 7 lines 553-555",
+          "source_pdf_lines": [
+            553,
+            555
+          ],
+          "math": "\\sqrt{r}\\sum_{t=1}^T(\\|g_t\\|_{\\widehat{H}_t}^*)^2\\le2\\sqrt{r}\\operatorname{Tr}(\\widehat{H}_T).",
+          "uses": [
+            "previous_step:13",
+            "previous_step:14",
+            "previous_step:15",
+            "previous_step:16"
+          ],
+          "produces": "dual_norm_transfer_second_inequality"
+        },
+        {
+          "step": 18,
+          "description": "Use Eq. (5) a second time to replace Tr(\\widehat H_T) by sqrt(r) Tr(H_T).",
+          "ref": "Proof of Theorem 7 lines 553-557",
+          "source_pdf_lines": [
+            553,
+            557
+          ],
+          "math": "2\\sqrt{r}\\operatorname{Tr}(\\widehat{H}_T)\\le2r\\operatorname{Tr}(H_T).",
+          "uses": [
+            "previous_step:9",
+            "previous_step:17"
+          ],
+          "produces": "matrix_dual_norm_sum_bound"
+        },
+        {
+          "step": 19,
+          "description": "Substitute the dual-norm sum bound into Eq. (4), yielding the coefficient before optimizing eta; this is the left inequality inside the final displayed proof line.",
+          "ref": "Proof of Theorem 7 lines 559-564",
+          "source_pdf_lines": [
+            559,
+            564
+          ],
+          "math": "",
+          "uses": [
+            "previous_step:8",
+            "previous_step:18"
+          ],
+          "produces": "regret_bound_before_eta_choice"
+        },
+        {
+          "step": 20,
+          "description": "Choose \\eta=D/\\sqrt{2r} as printed in the proof to simplify the coefficient to \\sqrt{2r}D.",
+          "ref": "Proof of Theorem 7 lines 559-564",
+          "source_pdf_lines": [
+            559,
+            564
+          ],
+          "math": "",
+          "uses": [
+            "Learning_rate_Theorem7",
+            "previous_step:19"
+          ],
+          "produces": "derived_eta_simplification: (D^2/(2\\eta)+\\eta r) becomes \\sqrt{2r}D under \\eta=D/\\sqrt{2r}"
+        },
+        {
+          "step": 21,
+          "description": "Combine the printed eta choice with the Kronecker trace identity for H_T=L_T^{1/4}\\otimes R_T^{1/4}; the math field records the final displayed proof line rather than an intermediate equality.",
+          "ref": "Proof of Theorem 7 lines 559-568",
+          "source_pdf_lines": [
+            559,
+            568
+          ],
+          "math": "\\sum_{t=1}^T f_t(W_t)-\\sum_{t=1}^T f_t(W^*)\\le\\left(\\frac{D^2}{2\\eta}+\\eta r\\right)\\operatorname{Tr}(H_T)=\\sqrt{2r}D\\operatorname{Tr}(L_T^{1/4})\\operatorname{Tr}(R_T^{1/4}).",
+          "uses": [
+            "Lemma_3_kron_calculus",
+            "previous_step:2",
+            "previous_step:19",
+            "previous_step:20"
+          ],
+          "produces": "Theorem_7_bound"
+        }
+      ]
+    },
+    {
+      "name": "Lemma_8_matrix_rank_domination",
+      "ref": "Lemma 8 lines 377-383; proof lines 451-474",
+      "statement_math": "\\text{Assume that } G_1,\\ldots,G_T\\in\\mathbb{R}^{m\\times n} \\text{ are matrices of rank at most } r. \\text{ Let } g_t=\\operatorname{vec}(G_t) \\text{ denote the vectorization of } G_t \\text{ for all } t. \\text{ Then, for any } \\epsilon\\ge0,\\ \\epsilon I_{mn}+\\frac{1}{r}\\sum_{t=1}^T g_tg_t^T \\preceq (\\epsilon I_m+\\sum_{t=1}^T G_tG_t^T)^{1/2}\\otimes(\\epsilon I_n+\\sum_{t=1}^T G_t^TG_t)^{1/2}.",
+      "role": "Main rank-dependent domination that compares the structured matrix preconditioner to a full AdaGrad preconditioner.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Introduce the shorthand accumulators A_m and B_n.",
+          "ref": "Proof of Lemma 8 lines 451-457",
+          "source_pdf_lines": [
+            451,
+            457
+          ],
+          "math": "A_m\\stackrel{\\mathrm{def}}{=}\\epsilon I_m+\\sum_{t=1}^T G_tG_t^T,\\quad B_n\\stackrel{\\mathrm{def}}{=}\\epsilon I_n+\\sum_{t=1}^T G_t^TG_t.",
+          "uses": [],
+          "produces": "Lemma_8_accumulator_notation"
+        },
+        {
+          "step": 2,
+          "description": "Use Lemma 9 and the accumulator notation to obtain the two printed upper bounds.",
+          "ref": "Proof of Lemma 8 lines 459-463",
+          "source_pdf_lines": [
+            459,
+            463
+          ],
+          "math": "\\epsilon I_{mn}+\\frac1r\\sum_{t=1}^T g_tg_t^T\\preceq I_m\\otimes B_n\\quad\\text{and}\\quad\\epsilon I_{mn}+\\frac1r\\sum_{t=1}^T g_tg_t^T\\preceq A_m\\otimes I_n.",
+          "uses": [
+            "Lemma_9_single_matrix_rank_domination",
+            "previous_step:1"
+          ],
+          "produces": "Lemma_8_two_upper_bounds"
+        },
+        {
+          "step": 3,
+          "description": "Observe the printed commutativity fact: I_m\\otimes B_n and A_m\\otimes I_n commute with each other.",
+          "ref": "Proof of Lemma 8 lines 465-466",
+          "source_pdf_lines": [
+            465,
+            466
+          ],
+          "math": "",
+          "uses": [
+            "Lemma_3_kron_calculus",
+            "previous_step:1"
+          ],
+          "produces": "Lemma_8_commuting_upper_bounds"
+        },
+        {
+          "step": 4,
+          "description": "Apply Lemma 5 to the commuting upper bounds to get the geometric-mean product bound.",
+          "ref": "Proof of Lemma 8 lines 465-471",
+          "source_pdf_lines": [
+            465,
+            471
+          ],
+          "math": "\\epsilon I_{mn}+\\frac1r\\sum_{t=1}^Tg_tg_t^T\\preceq(I_m\\otimes B_n)^{1/2}(A_m\\otimes I_n)^{1/2}.",
+          "uses": [
+            "Lemma_5_Ando_geometric_mean",
+            "previous_step:2",
+            "previous_step:3"
+          ],
+          "produces": "Lemma_8_geometric_mean_bound"
+        },
+        {
+          "step": 5,
+          "description": "Use Lemma 3(iii) to rewrite the Kronecker powers in the product.",
+          "ref": "Proof of Lemma 8 lines 466-470",
+          "source_pdf_lines": [
+            466,
+            470
+          ],
+          "math": "(I_m\\otimes B_n)^{1/2}(A_m\\otimes I_n)^{1/2}=(I_m\\otimes B_n^{1/2})(A_m^{1/2}\\otimes I_n).",
+          "uses": [
+            "Lemma_3_kron_calculus",
+            "previous_step:4"
+          ],
+          "produces": "Lemma_8_kron_power_rewrite"
+        },
+        {
+          "step": 6,
+          "description": "Use Lemma 3(i) to multiply the two Kronecker factors and complete the proof.",
+          "ref": "Proof of Lemma 8 lines 468-474",
+          "source_pdf_lines": [
+            468,
+            474
+          ],
+          "math": "(I_m\\otimes B_n^{1/2})(A_m^{1/2}\\otimes I_n)=A_m^{1/2}\\otimes B_n^{1/2}.",
+          "uses": [
+            "Lemma_3_kron_calculus",
+            "previous_step:5"
+          ],
+          "produces": "Lemma_8_conclusion"
+        }
+      ]
+    },
+    {
+      "name": "Lemma_9_single_matrix_rank_domination",
+      "ref": "Lemma 9 lines 389-392; proof lines 394-449",
+      "statement_math": "\\text{Let } G \\text{ be an } m\\times n \\text{ matrix of rank at most } r \\text{ and denote } g=\\operatorname{vec}(G). \\text{ Then, } \\frac{1}{r}gg^T\\preceq I_m\\otimes(G^TG) \\text{ and } \\frac{1}{r}gg^T\\preceq (GG^T)\\otimes I_n.",
+      "role": "Single-gradient rank bound used to prove Lemma 8 and, through matricizations, Lemma 11.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Write the singular value decomposition and vectorize using Lemma 3(vi).",
+          "ref": "Proof of Lemma 9 lines 394-403",
+          "source_pdf_lines": [
+            394,
+            403
+          ],
+          "math": "G=\\sum_{i=1}^r\\sigma_i u_iv_i^T,\\quad g=\\sum_{i=1}^r\\sigma_i(u_i\\otimes v_i),\\quad gg^T=\\left(\\sum_{i=1}^r\\sigma_i(u_i\\otimes v_i)\\right)\\left(\\sum_{i=1}^r\\sigma_i(u_i\\otimes v_i)\\right)^T.",
+          "uses": [
+            "Lemma_3_kron_calculus"
+          ],
+          "produces": "Lemma_9_svd_vectorized"
+        },
+        {
+          "step": 2,
+          "description": "State the auxiliary vector inequality for any set of vectors w_1,...,w_r.",
+          "ref": "Proof of Lemma 9 lines 405-409",
+          "source_pdf_lines": [
+            405,
+            409
+          ],
+          "math": "\\left(\\sum_{i=1}^r w_i\\right)\\left(\\sum_{i=1}^r w_i\\right)^T\\preceq r\\sum_{i=1}^r w_iw_i^T.",
+          "uses": [],
+          "produces": "Lemma_9_vector_sum_psd_claim"
+        },
+        {
+          "step": 3,
+          "description": "Introduce the arbitrary quadratic-form test vector x and the scalars alpha_i=x^T w_i that the paper uses to prove the PSD inequality.",
+          "ref": "Proof of Lemma 9 lines 411-413",
+          "source_pdf_lines": [
+            411,
+            413
+          ],
+          "math": "",
+          "uses": [
+            "previous_step:2"
+          ],
+          "produces": "Lemma_9_quadratic_test_setup: for arbitrary x, set alpha_i=x^T w_i"
+        },
+        {
+          "step": 4,
+          "description": "Apply convexity of alpha -> alpha^2 to the quadratic form, proving the auxiliary vector PSD inequality by testing on x.",
+          "ref": "Proof of Lemma 9 lines 413-418",
+          "source_pdf_lines": [
+            413,
+            418
+          ],
+          "math": "x^T\\left(\\sum_{i=1}^r w_i\\right)\\left(\\sum_{i=1}^r w_i\\right)^Tx=\\left(\\sum_{i=1}^r\\alpha_i\\right)^2\\le r\\sum_{i=1}^r\\alpha_i^2=r x^T\\left(\\sum_{i=1}^r w_iw_i^T\\right)x.",
+          "uses": [
+            "previous_step:2",
+            "previous_step:3"
+          ],
+          "produces": "Lemma_9_vector_sum_psd_bound"
+        },
+        {
+          "step": 5,
+          "description": "Apply the vector inequality to the vectorized SVD expansion and rewrite each term with Lemma 3(i).",
+          "ref": "Proof of Lemma 9 lines 424-436",
+          "source_pdf_lines": [
+            424,
+            436
+          ],
+          "math": "gg^T\\preceq r\\sum_{i=1}^r\\sigma_i^2(u_i\\otimes v_i)(u_i\\otimes v_i)^T=r\\sum_{i=1}^r\\sigma_i^2(u_iu_i^T)\\otimes(v_iv_i^T).",
+          "uses": [
+            "Lemma_3_kron_calculus",
+            "previous_step:1",
+            "previous_step:4"
+          ],
+          "produces": "Lemma_9_kron_sum_bound"
+        },
+        {
+          "step": 6,
+          "description": "Use G G^T = sum sigma_i^2 u_i u_i^T and v_i v_i^T \\preceq I_n to get the bound with (GG^T) \\otimes I_n.",
+          "ref": "Proof of Lemma 9 lines 437-444",
+          "source_pdf_lines": [
+            437,
+            444
+          ],
+          "math": "\\frac{1}{r}gg^T\\preceq \\sum_{i=1}^r\\sigma_i^2(u_iu_i^T)\\otimes I_n=(GG^T)\\otimes I_n.",
+          "uses": [
+            "previous_step:5"
+          ],
+          "produces": "Lemma_9_second_printed_inequality"
+        },
+        {
+          "step": 7,
+          "description": "Similarly use G^T G = sum sigma_i^2 v_i v_i^T and u_i u_i^T \\preceq I_m to obtain the other bound.",
+          "ref": "Proof of Lemma 9 lines 446-449",
+          "source_pdf_lines": [
+            446,
+            449
+          ],
+          "math": "",
+          "uses": [
+            "previous_step:5"
+          ],
+          "produces": "Lemma_9_first_printed_inequality"
+        }
+      ]
+    },
+    {
+      "name": "Lemma_11_tensor_rank_domination",
+      "ref": "Lemma 11 lines 702-716; Appendix B.1 lines 1201-1234",
+      "statement_math": "\\text{Assume that } G_1,\\ldots,G_T \\text{ are all order } k \\text{ tensors of dimension } n_1\\times\\cdots\\times n_k, \\text{ and let } n=n_1\\cdots n_k \\text{ and } g_t=\\operatorname{vec}(G_t) \\text{ for all } t. \\text{ Let } r_i \\text{ denote the bound on the rank of the ith matricization of } G_1,\\ldots,G_T, \\text{ namely, } \\operatorname{rank}(\\operatorname{mat}_i(G_t))\\le r_i \\text{ for all } t \\text{ and } i\\in[k]. \\text{ Denote } r=(\\prod_{i=1}^k r_i)^{1/k}. \\text{ Then, for any } \\epsilon\\ge0 \\text{ it holds that } \\epsilon I_n+\\sum_{t=1}^T g_tg_t^T \\preceq r\\bigotimes_{i=1}^k(\\epsilon I_{n_i}+\\sum_{t=1}^T G_t^{(i)})^{1/k}.",
+      "role": "Tensor analogue of Lemma 8; the key domination input for Theorem 10.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "For a fixed mode i, apply Lemma 9 to mat_i(G_t), using the rank bound of that matricization.",
+          "ref": "Appendix B.1 lines 1201-1205",
+          "source_pdf_lines": [
+            1201,
+            1205
+          ],
+          "math": "\\frac{1}{r_i}\\operatorname{vec}(\\operatorname{mat}_i(G_t))\\operatorname{vec}(\\operatorname{mat}_i(G_t))^T\\preceq (\\operatorname{mat}_i(G_t)\\operatorname{mat}_i(G_t)^T)\\otimes I_{n_{-i}}=G_t^{(i)}\\otimes\\bigotimes_{j\\ne i}I_{n_j}.",
+          "uses": [
+            "Lemma_9_single_matrix_rank_domination",
+            "Theorem10_rank_assumption"
+          ],
+          "produces": "Lemma_11_mode_matricized_bound"
+        },
+        {
+          "step": 2,
+          "description": "Use Lemma 15 to translate the matricized-vector inequality into the tensor-vector Kronecker ordering.",
+          "ref": "Appendix B.1 lines 1207-1215",
+          "source_pdf_lines": [
+            1207,
+            1215
+          ],
+          "math": "\\frac{1}{r_i}g_tg_t^T\\preceq \\left(\\bigotimes_{j=1}^{i-1}I_{n_j}\\right)\\otimes G_t^{(i)}\\otimes\\left(\\bigotimes_{j=i+1}^{k}I_{n_j}\\right).",
+          "uses": [
+            "Lemma_15_matricized_psd_equivalence",
+            "previous_step:1"
+          ],
+          "produces": "Lemma_11_single_t_tensor_bound"
+        },
+        {
+          "step": 3,
+          "description": "Sum over t and add epsilon identity terms, preserving one inequality for each dimension i.",
+          "ref": "Appendix B.1 lines 1216-1231",
+          "source_pdf_lines": [
+            1216,
+            1231
+          ],
+          "math": "\\epsilon I_n+\\sum_{t=1}^Tg_tg_t^T\\preceq r_i\\epsilon I_n+r_i\\left(\\bigotimes_{j=1}^{i-1}I_{n_j}\\right)\\otimes\\left(\\sum_{t=1}^T G_t^{(i)}\\right)\\otimes\\left(\\bigotimes_{j=i+1}^{k}I_{n_j}\\right)=r_i\\left(\\bigotimes_{j=1}^{i-1}I_{n_j}\\right)\\otimes\\left(\\epsilon I_{n_i}+\\sum_{t=1}^TG_t^{(i)}\\right)\\otimes\\left(\\bigotimes_{j=i+1}^{k}I_{n_j}\\right).",
+          "uses": [
+            "previous_step:2"
+          ],
+          "produces": "Lemma_11_k_mode_bounds"
+        },
+        {
+          "step": 4,
+          "description": "The right-hand side matrices are PSD and commute; apply Lemma 5 with equal weights 1/k and collect the scalar geometric mean of r_i.",
+          "ref": "Appendix B.1 lines 1233-1234",
+          "source_pdf_lines": [
+            1233,
+            1234
+          ],
+          "math": "",
+          "uses": [
+            "Lemma_5_Ando_geometric_mean",
+            "Theorem10_rank_geometric_mean",
+            "previous_step:3"
+          ],
+          "produces": "Lemma_11_conclusion"
+        }
+      ]
+    },
+    {
+      "name": "Lemma_12_tensor_kron_vec",
+      "ref": "Lemma 12 lines 718-722; Appendix B.2 lines 1236-1265",
+      "statement_math": "\\text{Let } G \\text{ be an } n_1\\times\\ldots\\times n_k \\text{ dimensional tensor and } M_i \\text{ be an } n_i\\times n_i \\text{ for } i\\in[k], \\text{ then } (\\bigotimes_{i=1}^k M_i)\\operatorname{vec}(G)=\\operatorname{vec}(G\\times_1M_1\\times_2M_2\\ldots\\times_kM_k).",
+      "role": "Shows Algorithm 2's mode-wise tensor preconditioning is a single Kronecker-preconditioned flattened update.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Prove by induction on k >= 2; the base case k=2 is Lemma 4.",
+          "ref": "Appendix B.2 lines 1236-1238",
+          "source_pdf_lines": [
+            1236,
+            1238
+          ],
+          "math": "",
+          "uses": [
+            "Lemma_4_matrix_kron_vec"
+          ],
+          "produces": "Lemma_12_induction_setup"
+        },
+        {
+          "step": 2,
+          "description": "For the induction step set H to the Kronecker product over the first k-1 modes and rewrite vec(G) as vec(mat_k(G)^T); then apply Lemma 4.",
+          "ref": "Appendix B.2 lines 1239-1244",
+          "source_pdf_lines": [
+            1239,
+            1244
+          ],
+          "math": "\\left(\\bigotimes_{i=1}^k M_i\\right)\\operatorname{vec}(G)=(H\\otimes M_k)\\operatorname{vec}(\\operatorname{mat}_k(G)^T)=\\operatorname{vec}(H\\operatorname{mat}_k(G)^TM_k^T).",
+          "uses": [
+            "Lemma_4_matrix_kron_vec",
+            "Lemma_14_tensor_vec_mat_identities",
+            "previous_step:1"
+          ],
+          "produces": "Lemma_12_lhs_rewritten"
+        },
+        {
+          "step": 3,
+          "description": "Introduce the k-th-mode slices G_k^1,...,G_k^{n_k}; the paper records that the i-th row of mat_k(G) is vec(G_k^i)^T before invoking induction.",
+          "ref": "Appendix B.2 lines 1246-1248",
+          "source_pdf_lines": [
+            1246,
+            1248
+          ],
+          "math": "",
+          "uses": [
+            "Lemma_14_tensor_vec_mat_identities",
+            "previous_step:2"
+          ],
+          "produces": "Lemma_12_k_mode_slice_rows"
+        },
+        {
+          "step": 4,
+          "description": "Apply the induction hypothesis to H vec(G_k^i) for each k-th-mode slice.",
+          "ref": "Appendix B.2 lines 1248-1252",
+          "source_pdf_lines": [
+            1248,
+            1252
+          ],
+          "math": "H\\operatorname{vec}(G_k^i)=\\left(\\bigotimes_{i=1}^{k-1}M_i\\right)\\operatorname{vec}(G_k^i)=\\operatorname{vec}(G_k^i\\times_1M_1\\times_2M_2\\cdots\\times_{k-1}M_{k-1}).",
+          "uses": [
+            "previous_step:1",
+            "previous_step:3"
+          ],
+          "produces": "Lemma_12_slice_induction_identity"
+        },
+        {
+          "step": 5,
+          "description": "Stack the n_k vector identities, for i=1,...,n_k, to form n_k by n_{-k} matrices.",
+          "ref": "Appendix B.2 lines 1254-1257",
+          "source_pdf_lines": [
+            1254,
+            1257
+          ],
+          "math": "H\\operatorname{mat}_k(G)^T=\\operatorname{mat}_k(G\\times_1M_1\\times_2M_2\\cdots\\times_{k-1}M_{k-1})^T.",
+          "uses": [
+            "previous_step:4"
+          ],
+          "produces": "Lemma_12_stacked_slice_identity"
+        },
+        {
+          "step": 6,
+          "description": "Let G' be the partially preconditioned tensor and substitute the stacked identity into the left-hand side already rewritten in step 2.",
+          "ref": "Appendix B.2 lines 1258-1261",
+          "source_pdf_lines": [
+            1258,
+            1261
+          ],
+          "math": "\\left(\\bigotimes_{i=1}^kM_i\\right)\\operatorname{vec}(G)=\\operatorname{vec}(\\operatorname{mat}_k(G')^TM_k^T).",
+          "uses": [
+            "previous_step:2",
+            "previous_step:5"
+          ],
+          "produces": "Lemma_12_substituted_G_prime"
+        },
+        {
+          "step": 7,
+          "description": "Transpose the matrix product inside vec, as printed on the next line of the display.",
+          "ref": "Appendix B.2 lines 1260-1262",
+          "source_pdf_lines": [
+            1260,
+            1262
+          ],
+          "math": "\\operatorname{vec}(\\operatorname{mat}_k(G')^TM_k^T)=\\operatorname{vec}((M_k\\operatorname{mat}_k(G'))^T).",
+          "uses": [
+            "previous_step:6"
+          ],
+          "produces": "Lemma_12_transposed_product"
+        },
+        {
+          "step": 8,
+          "description": "Use the tensor matricization identity B mat_i(A)=mat_i(A x_i B), printed in the margin, with i=k and B=M_k.",
+          "ref": "Appendix B.2 lines 1262-1263",
+          "source_pdf_lines": [
+            1262,
+            1263
+          ],
+          "math": "\\operatorname{vec}((M_k\\operatorname{mat}_k(G'))^T)=\\operatorname{vec}(\\operatorname{mat}_k(G'\\times_kM_k)^T).",
+          "uses": [
+            "Lemma_14_tensor_vec_mat_identities",
+            "previous_step:7"
+          ],
+          "produces": "Lemma_12_mat_update_to_tensor_product"
+        },
+        {
+          "step": 9,
+          "description": "Use the printed identity vec(mat_k(G)^T)=vec(G) to remove the final matricization.",
+          "ref": "Appendix B.2 lines 1263-1264",
+          "source_pdf_lines": [
+            1263,
+            1264
+          ],
+          "math": "\\operatorname{vec}(\\operatorname{mat}_k(G'\\times_kM_k)^T)=\\operatorname{vec}(G'\\times_kM_k).",
+          "uses": [
+            "Lemma_14_tensor_vec_mat_identities",
+            "previous_step:8"
+          ],
+          "produces": "Lemma_12_vec_mat_removed"
+        },
+        {
+          "step": 10,
+          "description": "Expand the definition of G' to obtain the claimed tensor product identity.",
+          "ref": "Appendix B.2 lines 1258-1265",
+          "source_pdf_lines": [
+            1258,
+            1265
+          ],
+          "math": "\\operatorname{vec}(G'\\times_kM_k)=\\operatorname{vec}(G\\times_1M_1\\cdots\\times_kM_k).",
+          "uses": [
+            "previous_step:6",
+            "previous_step:9"
+          ],
+          "produces": "Lemma_12_conclusion"
+        }
+      ]
+    },
+    {
+      "name": "Lemma_14_tensor_vec_mat_identities",
+      "ref": "Lemma 14 lines 1073-1082",
+      "statement_math": "\\text{For any column vectors } u_1,\\ldots,u_k \\text{ and order-}k \\text{ tensor } A \\text{ it holds that: } (i)\\ \\operatorname{vec}(u_1\\circ\\cdots\\circ u_k)=u_1\\otimes\\cdots\\otimes u_k;\\quad (ii)\\ \\operatorname{mat}_i(u_1\\circ\\cdots\\circ u_k)=u_i(\\bigotimes_{i'\\ne i}u_{i'})^T;\\quad (iii)\\ \\operatorname{vec}(A)=\\operatorname{vec}(\\operatorname{mat}_1(A))=\\operatorname{vec}(\\operatorname{mat}_k(A)^T);\\quad (iv)\\ \\operatorname{mat}_i(A\\times_iM)=M\\operatorname{mat}_i(A).",
+      "role": "Appendix B identity bundle used in Lemmas 11, 12, and 15.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Start the induction proof of (i): the statement is trivial for k=1, and the j-th first-dimension slice of the rank-one tensor is u_{1j}(u_2\\circ\\cdots\\circ u_k).",
+          "ref": "Appendix B lines 1084-1085",
+          "source_pdf_lines": [
+            1084,
+            1085
+          ],
+          "math": "",
+          "uses": [],
+          "produces": "Lemma_14_i_induction_setup"
+        },
+        {
+          "step": 2,
+          "description": "Apply the induction hypothesis to vectorize the slices and obtain the displayed identity for (i).",
+          "ref": "Appendix B lines 1085-1090",
+          "source_pdf_lines": [
+            1085,
+            1090
+          ],
+          "math": "\\operatorname{vec}(u_1\\circ\\cdots\\circ u_k)=(u_{11}(u_2\\otimes\\cdots\\otimes u_k)^T,\\ldots,u_{1n_1}(u_2\\otimes\\cdots\\otimes u_k)^T)^T=u_1\\otimes\\cdots\\otimes u_k.",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "Lemma_14_i"
+        },
+        {
+          "step": 3,
+          "description": "For (ii), identify the j-th slice along mode i as u_{ij}(u_1\\circ\\cdots\\circ u_{i-1}\\circ u_{i+1}\\circ\\cdots\\circ u_k).",
+          "ref": "Appendix B lines 1091-1092",
+          "source_pdf_lines": [
+            1091,
+            1092
+          ],
+          "math": "",
+          "uses": [
+            "previous_step:2"
+          ],
+          "produces": "Lemma_14_ii_slice_description"
+        },
+        {
+          "step": 4,
+          "description": "Stack the vectorized mode-i slices as rows to obtain the displayed matricization identity (ii).",
+          "ref": "Appendix B lines 1092-1095",
+          "source_pdf_lines": [
+            1092,
+            1095
+          ],
+          "math": "\\operatorname{mat}_i(u_1\\circ\\cdots\\circ u_k)=(u_i^1\\bigotimes_{j\\ne i}u_j,\\ldots,u_i^{n_i}\\bigotimes_{j\\ne i}u_j)^T=u_i\\left(\\bigotimes_{j\\ne i}u_j\\right)^T.",
+          "uses": [
+            "previous_step:3"
+          ],
+          "produces": "Lemma_14_ii"
+        },
+        {
+          "step": 5,
+          "description": "For (iii), specialize first to a rank-one tensor A=u_1\\circ\\cdots\\circ u_k.",
+          "ref": "Appendix B lines 1098-1099",
+          "source_pdf_lines": [
+            1098,
+            1099
+          ],
+          "math": "",
+          "uses": [
+            "previous_step:2",
+            "previous_step:4"
+          ],
+          "produces": "Lemma_14_iii_rank_one_case"
+        },
+        {
+          "step": 6,
+          "description": "Compute vec(mat_1(A)) in the rank-one case and identify it with vec(A).",
+          "ref": "Appendix B lines 1100-1102",
+          "source_pdf_lines": [
+            1100,
+            1102
+          ],
+          "math": "\\operatorname{vec}(\\operatorname{mat}_1(A))=\\operatorname{vec}(u_1(u_2\\otimes\\cdots\\otimes u_k)^T)=u_1\\otimes\\cdots\\otimes u_k=\\operatorname{vec}(A).",
+          "uses": [
+            "previous_step:2",
+            "previous_step:5"
+          ],
+          "produces": "Lemma_14_iii_mat1_rank_one"
+        },
+        {
+          "step": 7,
+          "description": "Compute vec(mat_k(A)^T) in the rank-one case and identify it with vec(A).",
+          "ref": "Appendix B lines 1103-1107",
+          "source_pdf_lines": [
+            1103,
+            1107
+          ],
+          "math": "\\operatorname{vec}(\\operatorname{mat}_k(A)^T)=\\operatorname{vec}((u_k(u_1\\otimes\\cdots\\otimes u_{k-1})^T)^T)=\\operatorname{vec}((u_1\\otimes\\cdots\\otimes u_{k-1})(u_k)^T)=u_1\\otimes\\cdots\\otimes u_k=\\operatorname{vec}(A).",
+          "uses": [
+            "previous_step:2",
+            "previous_step:5"
+          ],
+          "produces": "Lemma_14_iii_matk_rank_one"
+        },
+        {
+          "step": 8,
+          "description": "Extend (iii) from rank-one tensors to arbitrary tensors because any tensor can be written as a sum of rank-one tensors and mat_i and vec are linear.",
+          "ref": "Appendix B lines 1109-1110",
+          "source_pdf_lines": [
+            1109,
+            1110
+          ],
+          "math": "",
+          "uses": [
+            "previous_step:6",
+            "previous_step:7"
+          ],
+          "produces": "Lemma_14_iii"
+        },
+        {
+          "step": 9,
+          "description": "For (iv), start with rank-one A and use the definition of tensor-matrix product to move M onto the i-th factor.",
+          "ref": "Appendix B lines 1111-1114",
+          "source_pdf_lines": [
+            1111,
+            1114
+          ],
+          "math": "A\\times_iM=u_1\\circ\\cdots\\circ u_{i-1}\\circ Mu_i\\circ u_{i+1}\\circ\\cdots\\circ u_k.",
+          "uses": [],
+          "produces": "Lemma_14_iv_rank_one_product"
+        },
+        {
+          "step": 10,
+          "description": "Apply (ii) to the rank-one product to obtain the displayed matrix identity.",
+          "ref": "Appendix B lines 1115-1118",
+          "source_pdf_lines": [
+            1115,
+            1118
+          ],
+          "math": "\\operatorname{mat}_i(A\\times_iM)=Mu_i\\left(\\bigotimes_{j\\ne i}u_j\\right)^T=M\\operatorname{mat}_i(A).",
+          "uses": [
+            "previous_step:4",
+            "previous_step:9"
+          ],
+          "produces": "Lemma_14_iv_rank_one"
+        },
+        {
+          "step": 11,
+          "description": "Extend (iv) from rank-one tensors to arbitrary A by the linearity of all operators involved.",
+          "ref": "Appendix B lines 1120-1121",
+          "source_pdf_lines": [
+            1120,
+            1121
+          ],
+          "math": "",
+          "uses": [
+            "previous_step:10"
+          ],
+          "produces": "Lemma_14_iv"
+        }
+      ]
+    },
+    {
+      "name": "Lemma_15_matricized_psd_equivalence",
+      "ref": "Lemma 15 lines 1126-1131",
+      "statement_math": "\\text{Let } G \\text{ be an order } k \\text{ tensor of dimension } n_1\\times\\cdots\\times n_k, \\text{ and } B \\text{ an } n_i\\times n_i \\text{ matrix. Let } g_i=\\operatorname{vec}(\\operatorname{mat}_i(G)) \\text{ and } g=\\operatorname{vec}(G). \\text{ Then } g_ig_i^T\\preceq B\\otimes\\bigotimes_{j\\ne i}I_{n_j}\\ \\Longleftrightarrow\\ gg^T\\preceq\\left(\\bigotimes_{j<i}I_{n_j}\\right)\\otimes B\\otimes\\left(\\bigotimes_{j>i}I_{n_j}\\right).",
+      "role": "Transfers Lemma 9's matricized PSD inequality back to the tensor vectorization order in Lemma 11.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Test the two PSD inequalities on an arbitrary tensor X and define x and x_i.",
+          "ref": "Appendix B.1 lines 1137-1145",
+          "source_pdf_lines": [
+            1137,
+            1145
+          ],
+          "math": "x=\\operatorname{vec}(X),\\quad x_i=\\operatorname{vec}(\\operatorname{mat}_i(X));\\quad x_i^Tg_ig_i^Tx_i\\le x_i^T(B\\otimes\\bigotimes_{j\\ne i}I_{n_j})x_i \\Longleftrightarrow x^Tgg^Tx\\le x^T((\\bigotimes_{j<i}I_{n_j})\\otimes B\\otimes(\\bigotimes_{j>i}I_{n_j}))x.",
+          "uses": [],
+          "produces": "Lemma_15_quadratic_form_goal"
+        },
+        {
+          "step": 2,
+          "description": "Note that the two left-hand sides are equal because both are the squared dot product of tensors G and X.",
+          "ref": "Appendix B.1 lines 1146-1149",
+          "source_pdf_lines": [
+            1146,
+            1149
+          ],
+          "math": "",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "Lemma_15_lhs_equality"
+        },
+        {
+          "step": 3,
+          "description": "Write X in the standard tensor basis, with alpha ranging over all k-tuples and e_{alpha_j} the standard unit vectors.",
+          "ref": "Appendix B.1 lines 1150-1152",
+          "source_pdf_lines": [
+            1150,
+            1152
+          ],
+          "math": "X=\\sum_\\alpha X_\\alpha(e_{\\alpha_1}\\circ\\cdots\\circ e_{\\alpha_k}).",
+          "uses": [],
+          "produces": "Lemma_15_tensor_basis_expansion"
+        },
+        {
+          "step": 4,
+          "description": "Vectorize the tensor-basis expansion of X in the order used by vec.",
+          "ref": "Appendix B.1 lines 1153-1153",
+          "source_pdf_lines": [
+            1153,
+            1153
+          ],
+          "math": "x=\\operatorname{vec}(X)=\\sum_\\alpha X_\\alpha(e_{\\alpha_1}\\otimes\\cdots\\otimes e_{\\alpha_k}).",
+          "uses": [
+            "Lemma_14_tensor_vec_mat_identities",
+            "previous_step:3"
+          ],
+          "produces": "Lemma_15_vec_X_basis_expansion"
+        },
+        {
+          "step": 5,
+          "description": "Insert the vectorized basis expansion into the tensor-order quadratic form.",
+          "ref": "Appendix B.1 lines 1153-1156",
+          "source_pdf_lines": [
+            1153,
+            1156
+          ],
+          "math": "x^T\\left[\\left(\\bigotimes_{j<i}I_{n_j}\\right)\\otimes B\\otimes\\left(\\bigotimes_{j>i}I_{n_j}\\right)\\right]x=x^T\\sum_\\alpha X_\\alpha\\left[\\left(\\bigotimes_{j<i}I_{n_j}\\right)\\otimes B\\otimes\\left(\\bigotimes_{j>i}I_{n_j}\\right)\\right](e_{\\alpha_1}\\otimes\\cdots\\otimes e_{\\alpha_k}).",
+          "uses": [
+            "previous_step:4"
+          ],
+          "produces": "Lemma_15_tensor_rhs_insert_basis"
+        },
+        {
+          "step": 6,
+          "description": "Apply the identity matrices and B to the basis vector in the tensor-order quadratic form.",
+          "ref": "Appendix B.1 lines 1157-1159",
+          "source_pdf_lines": [
+            1157,
+            1159
+          ],
+          "math": "x^T\\sum_\\alpha X_\\alpha\\left[\\left(\\bigotimes_{j<i}e_{\\alpha_j}\\right)\\otimes Be_{\\alpha_i}\\otimes\\left(\\bigotimes_{j>i}e_{\\alpha_j}\\right)\\right].",
+          "uses": [
+            "previous_step:5"
+          ],
+          "produces": "Lemma_15_tensor_rhs_after_operator_action"
+        },
+        {
+          "step": 7,
+          "description": "Expand the remaining x^T using the same basis vectorization, yielding the double sum over alpha and alpha'.",
+          "ref": "Appendix B.1 lines 1160-1162",
+          "source_pdf_lines": [
+            1160,
+            1162
+          ],
+          "math": "\\sum_{\\alpha,\\alpha'}X_\\alpha X_{\\alpha'}\\left[\\left(\\bigotimes_{j<i}e_{\\alpha'_j}^Te_{\\alpha_j}\\right)\\otimes e_{\\alpha'_i}^TBe_{\\alpha_i}\\otimes\\left(\\bigotimes_{j>i}e_{\\alpha'_j}^Te_{\\alpha_j}\\right)\\right].",
+          "uses": [
+            "previous_step:4",
+            "previous_step:6"
+          ],
+          "produces": "Lemma_15_tensor_rhs_double_sum"
+        },
+        {
+          "step": 8,
+          "description": "Use the orthogonality of the standard basis vectors, as stated in the text after the display, to reduce the double sum to the final tensor-order RHS.",
+          "ref": "Appendix B.1 lines 1163-1168",
+          "source_pdf_lines": [
+            1163,
+            1168
+          ],
+          "math": "\\sum_{\\alpha,\\alpha_i'}B_{\\alpha_i'\\alpha_i}X_{\\alpha_1\\ldots\\alpha_i\\ldots\\alpha_k}X_{\\alpha_1\\ldots\\alpha_i'\\ldots\\alpha_k}.",
+          "uses": [
+            "previous_step:7"
+          ],
+          "produces": "Lemma_15_tensor_order_rhs"
+        },
+        {
+          "step": 9,
+          "description": "Recall the paper's displayed expansion of mat_i(X).",
+          "ref": "Appendix B.1 lines 1169-1172",
+          "source_pdf_lines": [
+            1169,
+            1172
+          ],
+          "math": "\\operatorname{mat}_i(X)=\\sum_\\alpha X_\\alpha e_{\\alpha_i}\\left(\\bigotimes_{j\\ne i}e_{\\alpha_j}\\right)^T.",
+          "uses": [
+            "Lemma_14_tensor_vec_mat_identities",
+            "previous_step:3"
+          ],
+          "produces": "Lemma_15_mat_i_X_expansion"
+        },
+        {
+          "step": 10,
+          "description": "Vectorize the displayed expansion of mat_i(X).",
+          "ref": "Appendix B.1 lines 1174-1176",
+          "source_pdf_lines": [
+            1174,
+            1176
+          ],
+          "math": "x_i=\\operatorname{vec}(\\operatorname{mat}_i(X))=\\sum_\\alpha X_\\alpha e_{\\alpha_i}\\otimes\\left(\\bigotimes_{j\\ne i}e_{\\alpha_j}\\right).",
+          "uses": [
+            "Lemma_14_tensor_vec_mat_identities",
+            "previous_step:9"
+          ],
+          "produces": "Lemma_15_x_i_basis_expansion"
+        },
+        {
+          "step": 11,
+          "description": "Insert the vectorized matricization expansion into the matricized-order quadratic form.",
+          "ref": "Appendix B.1 lines 1178-1181",
+          "source_pdf_lines": [
+            1178,
+            1181
+          ],
+          "math": "x_i^T\\left[B\\otimes\\left(\\bigotimes_{j\\ne i}I_{n_j}\\right)\\right]x_i=x_i^T\\sum_\\alpha X_\\alpha\\left[B\\otimes\\left(\\bigotimes_{j\\ne i}I_{n_j}\\right)\\right]\\left(e_{\\alpha_i}\\otimes\\bigotimes_{j\\ne i}e_{\\alpha_j}\\right).",
+          "uses": [
+            "previous_step:10"
+          ],
+          "produces": "Lemma_15_matricized_rhs_insert_basis"
+        },
+        {
+          "step": 12,
+          "description": "Apply B and the identity matrices to the basis vector in the matricized-order quadratic form.",
+          "ref": "Appendix B.1 lines 1182-1184",
+          "source_pdf_lines": [
+            1182,
+            1184
+          ],
+          "math": "x_i^T\\sum_\\alpha X_\\alpha\\left(Be_{\\alpha_i}\\otimes\\bigotimes_{j\\ne i}e_{\\alpha_j}\\right).",
+          "uses": [
+            "previous_step:11"
+          ],
+          "produces": "Lemma_15_matricized_rhs_after_operator_action"
+        },
+        {
+          "step": 13,
+          "description": "Expand x_i^T, then use the same standard-basis orthogonality to reach the matching final sum.",
+          "ref": "Appendix B.1 lines 1185-1190",
+          "source_pdf_lines": [
+            1185,
+            1190
+          ],
+          "math": "\\sum_{\\alpha'}\\sum_\\alpha X_\\alpha X_{\\alpha'}\\left(e_{\\alpha'_i}^TBe_{\\alpha_i}\\otimes\\bigotimes_{j\\ne i}e_{\\alpha'_j}^Te_{\\alpha_j}\\right)=\\sum_{\\alpha,\\alpha_i'}B_{\\alpha_i'\\alpha_i}X_{\\alpha_1\\ldots\\alpha_i\\ldots\\alpha_k}X_{\\alpha_1\\ldots\\alpha_i'\\ldots\\alpha_k}.",
+          "uses": [
+            "previous_step:10",
+            "previous_step:12"
+          ],
+          "produces": "Lemma_15_matricized_rhs"
+        },
+        {
+          "step": 14,
+          "description": "Conclude the right-hand sides are equal, and together with left-hand side equality this proves the equivalence.",
+          "ref": "Appendix B.1 lines 1192-1197",
+          "source_pdf_lines": [
+            1192,
+            1197
+          ],
+          "math": "x_i^T(B\\otimes\\bigotimes_{j\\ne i}I_{n_j})x_i=x^T((\\bigotimes_{j<i}I_{n_j})\\otimes B\\otimes(\\bigotimes_{j>i}I_{n_j}))x.",
+          "uses": [
+            "previous_step:2",
+            "previous_step:8",
+            "previous_step:13"
+          ],
+          "produces": "Lemma_15_conclusion"
+        }
+      ]
+    },
+    {
+      "name": "Derived_Theorem13_diagonal_FTL_BTL_bridge",
+      "ref": "Formalization scaffolding for Appendix A lines 1058-1067, using the Appendix C.1 FTL-BTL proof pattern at lines 1272-1303",
+      "statement_math": "\\text{using the facts that } A\\preceq B\\Rightarrow diag(A)\\preceq diag(B) \\text{ and } diag(A\\otimes B)=diag(A)\\otimes diag(B), \\text{ we can show (from Lemmas 6 and 8) that }\\n\\[\\widehat{H}_t\\stackrel{def}{=}diag\\left(r\\epsilon I_{mn}+\\sum_{s=1}^tg_sg_s^T\\right)^{1/2}\\preceq\\sqrt r L_t^{1/4}\\otimes R_t^{1/4}=\\sqrt r H_t,\\]\\n\\text{replacing Eq. (5). Now, proceeding exactly as in the proof of Theorem 7 with Eqs. (3) and (5) replaced by the above facts leads to the result.}",
+      "role": "Formalization scaffolding, not a printed source lemma: supplies the diagonal-cone argmin/FTL-BTL bridge that Appendix A leaves implicit when it says to proceed exactly as in Theorem 7.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Record the Appendix A diagonal hatted preconditioner whose Eq. (6) replay needs a diagonal-cone FTL/BTL bridge rather than the unconstrained Lemma 2 argmin.",
+          "ref": "Appendix A lines 1058-1064",
+          "source_pdf_lines": [
+            1058,
+            1064
+          ],
+          "math": "\\widehat{H}_t\\stackrel{def}{=}diag\\left(r\\epsilon I_{mn}+\\sum_{s=1}^tg_sg_s^T\\right)^{1/2}.",
+          "uses": [],
+          "produces": "Derived_Theorem13_diagonal_hhat_definition"
+        },
+        {
+          "step": 2,
+          "description": "Use the same potential printed in Theorem 7 because Appendix A imports the proof exactly after replacing Eq. (3) and Eq. (5).",
+          "ref": "Theorem 7 lines 520-523; Appendix A lines 1066-1067",
+          "source_pdf_lines": [
+            520,
+            523
+          ],
+          "math": "\\Phi(H)=\\operatorname{Tr}(H)+r\\epsilon\\operatorname{Tr}(H^{-1}).",
+          "uses": [
+            "Theorem_7_matrix_regret",
+            "previous_step:1"
+          ],
+          "produces": "Derived_Theorem13_diagonal_potential_choice"
+        },
+        {
+          "step": 3,
+          "description": "Supply the missing Appendix A prerequisite: over the positive diagonal cone, the objective M_t bullet H^{-1}+Phi(H) has coordinatewise minimizer diag(r epsilon I_{mn}+M_t)^{1/2}. This is derived from the same derivative calculation printed in Theorem 7, restricted to diagonal coordinates; it is not asserted as an unconstrained full-matrix argmin.",
+          "ref": "Appendix A lines 1058-1067; Theorem 7 lines 523-531",
+          "source_pdf_lines": [
+            530,
+            531
+          ],
+          "math": "\\nabla_X\\operatorname{Tr}(AX+X^{-1})=A-X^{-2}.",
+          "uses": [
+            "Theorem_7_matrix_regret",
+            "previous_step:1",
+            "previous_step:2"
+          ],
+          "produces": "Derived_Theorem13_diagonal_argmin_bridge: \\widehat H_t=argmin_{H diagonal, H>0} M_t\\bullet H^{-1}+\\Phi(H)"
+        },
+        {
+          "step": 4,
+          "description": "Rewrite the desired diagonal-cone FTL/BTL inequality in the same form as Appendix C.1, moving Phi(H_0) to the left-hand side. This step records the printed C.1 target shape; the produces field specializes H_t to the diagonal hatted sequence.",
+          "ref": "Appendix C.1 lines 1273-1280; Appendix A lines 1066-1067",
+          "source_pdf_lines": [
+            1273,
+            1280
+          ],
+          "math": "\\sum_{t=1}^T(\\|g_t\\|_{H_t}^*)^2+\\Phi(H_0)\\le\\sum_{t=1}^T(\\|g_t\\|_{H_T}^*)^2+\\Phi(H_T).",
+          "uses": [
+            "previous_step:3"
+          ],
+          "produces": "Derived_Theorem13_diagonal_rewritten_target: sum_t (||g_t||^*_{\\widehat H_t})^2+Phi(\\widehat H_0) <= sum_t (||g_t||^*_{\\widehat H_T})^2+Phi(\\widehat H_T)"
+        },
+        {
+          "step": 5,
+          "description": "Set up the induction on T and record that the base case T=0 is trivial, exactly as in Appendix C.1.",
+          "ref": "Appendix C.1 lines 1282-1283; Appendix A lines 1066-1067",
+          "source_pdf_lines": [
+            1282,
+            1283
+          ],
+          "math": "",
+          "uses": [
+            "previous_step:4"
+          ],
+          "produces": "Derived_Theorem13_diagonal_induction_setup"
+        },
+        {
+          "step": 6,
+          "description": "Apply the induction hypothesis through T-1 on the positive diagonal cone.",
+          "ref": "Appendix C.1 lines 1283-1289; Appendix A lines 1066-1067",
+          "source_pdf_lines": [
+            1283,
+            1289
+          ],
+          "math": "\\sum_{t=1}^{T-1}(\\|g_t\\|_{H_t}^*)^2+\\Phi(H_0)\\le\\sum_{t=1}^{T-1}(\\|g_t\\|_{H_{T-1}}^*)^2+\\Phi(H_{T-1}).",
+          "uses": [
+            "previous_step:5"
+          ],
+          "produces": "Derived_Theorem13_diagonal_induction_hypothesis_bound"
+        },
+        {
+          "step": 7,
+          "description": "Record the FTL objective identity used in Appendix C.1; for the diagonal bridge the same identity is evaluated only on positive diagonal H.",
+          "ref": "Appendix C.1 lines 1295-1301; Appendix A lines 1066-1067",
+          "source_pdf_lines": [
+            1295,
+            1301
+          ],
+          "math": "M_{T-1}\\bullet H^{-1}+\\Phi(H)=\\sum_{t=1}^{T-1}(\\|g_t\\|_H^*)^2+\\Phi(H).",
+          "uses": [
+            "previous_step:3"
+          ],
+          "produces": "Derived_Theorem13_diagonal_FTL_objective_for_T_minus_1"
+        },
+        {
+          "step": 8,
+          "description": "Use the diagonal minimizer property from the coordinatewise argmin bridge to compare the T-1 objective at \\widehat H_{T-1} with the same objective at \\widehat H_T. This is the diagonal-cone replacement for the second inequality in the Appendix C.1 induction chain.",
+          "ref": "Appendix C.1 lines 1290-1301; Appendix A lines 1066-1067",
+          "source_pdf_lines": [
+            1290,
+            1301
+          ],
+          "math": "\\sum_{t=1}^{T-1}(\\|g_t\\|_{H_{T-1}}^*)^2+\\Phi(H_{T-1})\\le\\sum_{t=1}^{T-1}(\\|g_t\\|_{H_T}^*)^2+\\Phi(H_T).",
+          "uses": [
+            "previous_step:3",
+            "previous_step:6",
+            "previous_step:7"
+          ],
+          "produces": "Derived_Theorem13_diagonal_second_induction_inequality"
+        },
+        {
+          "step": 9,
+          "description": "Combine the induction-hypothesis inequality with the diagonal minimizer inequality, mirroring the two-line displayed chain in Appendix C.1.",
+          "ref": "Appendix C.1 lines 1283-1293; Appendix A lines 1066-1067",
+          "source_pdf_lines": [
+            1283,
+            1293
+          ],
+          "math": "",
+          "uses": [
+            "previous_step:6",
+            "previous_step:8"
+          ],
+          "produces": "Derived_Theorem13_diagonal_T_minus_1_bound_with_terminal_HhatT"
+        },
+        {
+          "step": 10,
+          "description": "Add (||g_T||^*_{\\widehat H_T})^2 to both sides to obtain the rewritten diagonal target.",
+          "ref": "Appendix C.1 line 1303; Appendix A lines 1066-1067",
+          "source_pdf_lines": [
+            1303,
+            1303
+          ],
+          "math": "",
+          "uses": [
+            "previous_step:4",
+            "previous_step:9"
+          ],
+          "produces": "Derived_Theorem13_diagonal_FTL_BTL_rewritten_conclusion"
+        },
+        {
+          "step": 11,
+          "description": "Move Phi(\\widehat H_0) back to the right-hand side, yielding the first inequality needed in the diagonal Eq. (6) replay.",
+          "ref": "Appendix C.1 lines 1273-1280 and 1303; Appendix A lines 1066-1067",
+          "source_pdf_lines": [
+            1273,
+            1303
+          ],
+          "math": "",
+          "uses": [
+            "previous_step:10"
+          ],
+          "produces": "Derived_Theorem13_diagonal_equation_6_first_inequality: sum_t (||g_t||^*_{\\widehat H_t})^2 <= sum_t (||g_t||^*_{\\widehat H_T})^2+Phi(\\widehat H_T)-Phi(\\widehat H_0)"
+        },
+        {
+          "step": 12,
+          "description": "Expand the terminal side with the diagonal hatted definition; the diagonal operator is retained explicitly because only the diagonal-cone bridge has been supplied.",
+          "ref": "Theorem 7 lines 540-546; Appendix A lines 1058-1067",
+          "source_pdf_lines": [
+            540,
+            546
+          ],
+          "math": "",
+          "uses": [
+            "previous_step:1",
+            "previous_step:2",
+            "previous_step:11"
+          ],
+          "produces": "Derived_Theorem13_diagonal_terminal_expansion: terminal side <= diag(r epsilon I_{mn}+sum_t g_tg_t^T) bullet \\widehat H_T^{-1}+Tr(\\widehat H_T)"
+        },
+        {
+          "step": 13,
+          "description": "Use the diagonal hatted identity to simplify the expanded terminal objective to twice the trace.",
+          "ref": "Theorem 7 lines 546-547; Appendix A lines 1058-1067",
+          "source_pdf_lines": [
+            546,
+            547
+          ],
+          "math": "",
+          "uses": [
+            "previous_step:1",
+            "previous_step:12"
+          ],
+          "produces": "Derived_Theorem13_diagonal_equation_6_chain: sum_t (||g_t||^*_{\\widehat H_t})^2 <= 2 Tr(\\widehat H_T)"
+        }
+      ]
+    },
+    {
+      "name": "Theorem_13_diagonal_matrix_regret",
+      "ref": "Theorem 13 lines 1025-1044; proof sketch lines 1045-1067",
+      "statement_math": "Theorem 13. Assume that the gradients $G_1,\\ldots,G_T$ are matrices of rank at most $r$. Then the regret of Algorithm 3 compared to any $W^*\\in\\mathbb{R}^{m\\times n}$ is bounded as\\n\\[\\sum_{t=1}^T f_t(W_t)-\\sum_{t=1}^T f_t(W^*)\\le \\sqrt{2r}D_\\infty Tr(L_T^{1/4})Tr(R_T^{1/4}),\\]\\nwhere\\n\\[L_T=\\epsilon I_m+\\sum_{t=1}^T diag(G_tG_t^T),\\quad R_T=\\epsilon I_n+\\sum_{t=0}^T diag(G_t^TG_t),\\quad D_\\infty=\\max_{t\\in[T]}\\|W_t-W^*\\|_\\infty.\\]\\n(Here, $\\|A\\|_\\infty$ is the entry-wise $\\ell_\\infty$ norm of a matrix $A$, i.e., $\\|A\\|_\\infty\\stackrel{def}{=}\\|vec(A)\\|_\\infty$.)",
+      "role": "Appendix A diagonal endpoint; uses Algorithm 3 and modifies the matrix proof with diagonal trace and diagonal preconditioner domination.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Set the same Kronecker preconditioner notation as in Theorem 7.",
+          "ref": "Appendix A lines 1045-1046",
+          "source_pdf_lines": [
+            1045,
+            1046
+          ],
+          "math": "H_t=L_t^{1/4}\\otimes R_t^{1/4}.",
+          "uses": [],
+          "produces": "Theorem_13_Ht_definition"
+        },
+        {
+          "step": 2,
+          "description": "Record Algorithm 3's initialization and diagonal accumulator recurrences; the separate support lemma proves from these recurrences, matrix powers, and Kronecker order that L_t, R_t, L_t^{1/4}, R_t^{1/4}, H_t, and H_t-H_{t-1} are diagonal PSD where needed.",
+          "ref": "Algorithm 3 lines 1011-1018; Theorem 13 lines 1038-1042",
+          "source_pdf_lines": [
+            1011,
+            1018
+          ],
+          "math": "L_t=L_{t-1}+diag(G_tG_t^T),\\quad R_t=R_{t-1}+diag(G_t^TG_t).",
+          "uses": [
+            "Algorithm3_diagonal_initialization",
+            "Algorithm3_diagonal_accumulator_update",
+            "Algorithm3_diagonal_preconditioner_monotone"
+          ],
+          "produces": "Theorem_13_algorithm3_diagonal_accumulator_definitions: accumulator identities L_t=diag(epsilon I_m+sum_{s=1}^t G_sG_s^T) and R_t=diag(epsilon I_n+sum_{s=1}^t G_s^TG_s), plus Algorithm3_H_increment_diagonal_PSD for applying the diagonal trace bound"
+        },
+        {
+          "step": 3,
+          "description": "Record the textual justification for the first inequality in the Eq. (3) replacement: for diagonal PSD M, v^T M v <= ||v||_infty^2 Tr(M).",
+          "ref": "Appendix A lines 1055-1056",
+          "source_pdf_lines": [
+            1055,
+            1056
+          ],
+          "math": "v^TMv\\le\\|v\\|_\\infty^2Tr(M).",
+          "uses": [],
+          "produces": "Theorem_13_diagonal_psd_trace_bound"
+        },
+        {
+          "step": 4,
+          "description": "Replace Eq. (3) by applying the diagonal PSD trace bound to H_t-H_{t-1}, using D_infty=max_t ||w_t-w^*||_infty inherited from the theorem statement.",
+          "ref": "Appendix A lines 1046-1053",
+          "source_pdf_lines": [
+            1046,
+            1053
+          ],
+          "math": "\\sum_{t=1}^T(w_t-w^*)^T(H_t-H_{t-1})(w_t-w^*)\\le D_\\infty^2\\sum_{t=1}^T\\operatorname{Tr}(H_t-H_{t-1}).",
+          "uses": [
+            "previous_step:1",
+            "previous_step:2",
+            "previous_step:3",
+            "Algorithm3_diagonal_preconditioner_monotone"
+          ],
+          "produces": "Theorem_13_diagonal_equation_3_inequality"
+        },
+        {
+          "step": 5,
+          "description": "Telescope the trace increments in the same displayed replacement for Eq. (3).",
+          "ref": "Appendix A lines 1050-1053",
+          "source_pdf_lines": [
+            1050,
+            1053
+          ],
+          "math": "D_\\infty^2\\sum_{t=1}^T\\operatorname{Tr}(H_t-H_{t-1})=D_\\infty^2\\operatorname{Tr}(H_T).",
+          "uses": [
+            "previous_step:4"
+          ],
+          "produces": "Theorem_13_replacement_for_equation_3"
+        },
+        {
+          "step": 6,
+          "description": "Record the first printed diagonal fact used to derive the replacement for Eq. (5).",
+          "ref": "Appendix A lines 1056-1057",
+          "source_pdf_lines": [
+            1056,
+            1057
+          ],
+          "math": "A\\preceq B\\Rightarrow diag(A)\\preceq diag(B).",
+          "uses": [],
+          "produces": "Theorem_13_diag_order_preservation"
+        },
+        {
+          "step": 7,
+          "description": "Record the second printed diagonal fact used to derive the replacement for Eq. (5).",
+          "ref": "Appendix A lines 1056-1057",
+          "source_pdf_lines": [
+            1056,
+            1057
+          ],
+          "math": "diag(A\\otimes B)=diag(A)\\otimes diag(B).",
+          "uses": [
+            "Lemma_3_kron_calculus"
+          ],
+          "produces": "Theorem_13_diag_kron_identity"
+        },
+        {
+          "step": 8,
+          "description": "Define the diagonal hatted preconditioner used as the replacement for Eq. (5).",
+          "ref": "Appendix A lines 1058-1064",
+          "source_pdf_lines": [
+            1058,
+            1064
+          ],
+          "math": "\\widehat{H}_t\\stackrel{def}{=}diag\\left(r\\epsilon I_{mn}+\\sum_{s=1}^tg_sg_s^T\\right)^{1/2}.",
+          "uses": [],
+          "produces": "Theorem_13_hhat_diag_definition"
+        },
+        {
+          "step": 9,
+          "description": "Apply Lemmas 6 and 8 together with Algorithm 3's diagonal accumulator definitions and the two printed diagonal facts to dominate the diagonal hatted preconditioner by the diagonal Shampoo Kronecker preconditioner.",
+          "ref": "Appendix A lines 1056-1064",
+          "source_pdf_lines": [
+            1056,
+            1064
+          ],
+          "math": "\\widehat{H}_t\\preceq\\sqrt{r}L_t^{1/4}\\otimes R_t^{1/4}.",
+          "uses": [
+            "Lemma_6_operator_monotone_powers",
+            "Lemma_8_matrix_rank_domination",
+            "previous_step:2",
+            "previous_step:6",
+            "previous_step:7",
+            "previous_step:8"
+          ],
+          "produces": "Theorem_13_diag_hhat_domination"
+        },
+        {
+          "step": 10,
+          "description": "Use the definition of H_t from the start of the proof to rewrite the RHS as sqrt(r) H_t, completing the printed replacement for Eq. (5).",
+          "ref": "Appendix A lines 1061-1064",
+          "source_pdf_lines": [
+            1061,
+            1064
+          ],
+          "math": "\\sqrt{r}L_t^{1/4}\\otimes R_t^{1/4}=\\sqrt{r}H_t.",
+          "uses": [
+            "previous_step:1",
+            "previous_step:9"
+          ],
+          "produces": "Theorem_13_replacement_for_equation_5"
+        },
+        {
+          "step": 11,
+          "description": "Import the Theorem 7 flattening route for Algorithm 3: combine Algorithm 3's parameter update with H_t=L_t^{1/4}\\otimes R_t^{1/4}, g_t=vec(G_t), w_t=vec(W_t), and Lemma 4, producing the same flattened update premise as Eq. (2).",
+          "ref": "Algorithm 3 lines 1018-1020; Appendix A lines 1045-1046; Theorem 7 lines 478-488",
+          "source_pdf_lines": [
+            1018,
+            1020
+          ],
+          "math": "W_{t+1}=W_t-\\eta L_t^{-1/4}G_tR_t^{-1/4}.",
+          "uses": [
+            "Lemma_4_matrix_kron_vec",
+            "previous_step:1",
+            "previous_step:2"
+          ],
+          "produces": "Theorem_13_flattened_algorithm3_update: w_{t+1}=w_t-eta H_t^{-1}g_t"
+        },
+        {
+          "step": 12,
+          "description": "Record the Lemma 1 strict-positive preconditioner prerequisite imported with Appendix A's instruction that the proof is identical to Theorem 7. This is a source-trace side condition, not a derivation from Algorithm3_diagonal_preconditioner_monotone: the printed Algorithm 3 assumptions with epsilon >= 0 prove diagonal PSD/monotone accumulators, but do not by themselves rule out singular H_t when epsilon=0.",
+          "ref": "Appendix A lines 1066-1067; Proof of Theorem 7 lines 489-490; Lemma 1 lines 232-238",
+          "source_pdf_lines": [
+            489,
+            490
+          ],
+          "math": "0 < H_1 \\preceq \\cdots \\preceq H_T",
+          "uses": [
+            "Lemma_1_adaptive_OMD_regret",
+            "Lemma_3_kron_calculus",
+            "Algorithm3_diagonal_preconditioner_monotone",
+            "previous_step:1",
+            "previous_step:2",
+            "previous_step:11"
+          ],
+          "produces": "Theorem_13_source_asserted_Lemma1_prerequisite_not_derived_from_epsilon_nonnegative: 0 < H_1 \\preceq \\cdots \\preceq H_T"
+        },
+        {
+          "step": 13,
+          "description": "Replay the Theorem 7 transition from Lemma 1 to Eq. (4), replacing Theorem 7's Eq. (3) with the diagonal Eq. (3) replacement and replacing D by D_infty; the Lemma 1 invocation consumes the explicit strict-positive H-chain recorded in the preceding step.",
+          "ref": "Appendix A lines 1066-1067; Theorem 7 lines 489-508",
+          "source_pdf_lines": [
+            489,
+            508
+          ],
+          "math": "",
+          "uses": [
+            "Theorem_7_matrix_regret",
+            "Lemma_1_adaptive_OMD_regret",
+            "previous_step:5",
+            "previous_step:11",
+            "previous_step:12"
+          ],
+          "produces": "Theorem_13_equation_4_with_D_infty: regret <= (D_infty^2/(2\\eta)) Tr(H_T) + (\\eta/2) sum_t (||g_t||^*_{H_t})^2"
+        },
+        {
+          "step": 14,
+          "description": "Replay Theorem 7's potential choice for the Appendix A diagonal hatted sequence through the source's instruction to proceed exactly as in Theorem 7.",
+          "ref": "Appendix A lines 1066-1067; Theorem 7 lines 520-523",
+          "source_pdf_lines": [
+            520,
+            523
+          ],
+          "math": "\\Phi(H)=\\operatorname{Tr}(H)+r\\epsilon\\operatorname{Tr}(H^{-1}).",
+          "uses": [
+            "Theorem_7_matrix_regret",
+            "previous_step:8",
+            "previous_step:10"
+          ],
+          "produces": "Theorem_13_diagonal_potential_choice_for_equation_6"
+        },
+        {
+          "step": 15,
+          "description": "Record the source-faithful boundary for importing Eq. (6): Appendix A prints the diagonal hatted preconditioner and then says to proceed exactly as in Theorem 7 with Eqs. (3) and (5) replaced. The paper does not state a separate diagonal-cone FTL/BTL lemma, so the formalization route must consume the explicit derived bridge named in this JSON rather than applying unconstrained Lemma 2 directly.",
+          "ref": "Appendix A lines 1064-1067; Theorem 7 lines 523-528",
+          "source_pdf_lines": [
+            1064,
+            1067
+          ],
+          "math": "",
+          "uses": [
+            "Theorem_7_matrix_regret",
+            "Derived_Theorem13_diagonal_FTL_BTL_bridge",
+            "previous_step:8",
+            "previous_step:10",
+            "previous_step:14"
+          ],
+          "produces": "Theorem_13_imported_equation_6_route_selected: Appendix A imports Theorem 7's Eq. (6) route after replacing Eq. (3) and Eq. (5); the missing diagonal argmin/FTL-BTL prerequisite is supplied by Derived_Theorem13_diagonal_FTL_BTL_bridge"
+        },
+        {
+          "step": 16,
+          "description": "Replay Theorem 7's printed derivative calculation only as the coordinatewise minimizer calculation consumed by the derived diagonal bridge, not as an unconstrained full-matrix argmin for Appendix A's diagonal hatted preconditioner.",
+          "ref": "Appendix A lines 1058-1067; Theorem 7 lines 530-531",
+          "source_pdf_lines": [
+            530,
+            531
+          ],
+          "math": "\\nabla_X\\operatorname{Tr}(AX+X^{-1})=A-X^{-2}.",
+          "uses": [
+            "Theorem_7_matrix_regret",
+            "Derived_Theorem13_diagonal_FTL_BTL_bridge",
+            "previous_step:8",
+            "previous_step:15"
+          ],
+          "produces": "Theorem_13_diagonal_argmin_bridge_available"
+        },
+        {
+          "step": 17,
+          "description": "Apply the derived diagonal FTL/BTL bridge to get the first inequality in the diagonal Eq. (6) replay; this supplies the argmin hypothesis that Appendix A leaves implicit.",
+          "ref": "Appendix A lines 1066-1067; Theorem 7 lines 531-538",
+          "source_pdf_lines": [
+            531,
+            538
+          ],
+          "math": "",
+          "uses": [
+            "Theorem_7_matrix_regret",
+            "Derived_Theorem13_diagonal_FTL_BTL_bridge",
+            "previous_step:14",
+            "previous_step:15",
+            "previous_step:16"
+          ],
+          "produces": "Theorem_13_imported_equation_6_first_inequality: sum_t (||g_t||^*_{\\widehat H_t})^2 <= sum_t (||g_t||^*_{\\widehat H_T})^2 + Phi(\\widehat H_T)-Phi(\\widehat H_0)"
+        },
+        {
+          "step": 18,
+          "description": "Replay the terminal objective expansion from Theorem 7 for Appendix A's diagonal hatted preconditioner under the printed replacement for Eq. (5).",
+          "ref": "Appendix A lines 1066-1067; Theorem 7 lines 540-546",
+          "source_pdf_lines": [
+            540,
+            546
+          ],
+          "math": "",
+          "uses": [
+            "Theorem_7_matrix_regret",
+            "Derived_Theorem13_diagonal_FTL_BTL_bridge",
+            "previous_step:8",
+            "previous_step:14",
+            "previous_step:16",
+            "previous_step:17"
+          ],
+          "produces": "Theorem_13_imported_equation_6_terminal_expansion: terminal side <= diag(r epsilon I+sum_t g_t g_t^T) bullet \\widehat H_T^{-1}+Tr(\\widehat H_T)"
+        },
+        {
+          "step": 19,
+          "description": "Replay the final 2Tr simplification from Theorem 7, completing the imported Eq. (6) bound for Appendix A's diagonal hatted preconditioner.",
+          "ref": "Appendix A lines 1066-1067; Theorem 7 lines 546-547",
+          "source_pdf_lines": [
+            546,
+            547
+          ],
+          "math": "",
+          "uses": [
+            "Theorem_7_matrix_regret",
+            "Derived_Theorem13_diagonal_FTL_BTL_bridge",
+            "previous_step:8",
+            "previous_step:16",
+            "previous_step:18"
+          ],
+          "produces": "Theorem_13_imported_equation_6_chain: sum_t (||g_t||^*_{\\widehat H_t})^2 <= 2 Tr(\\widehat H_T)"
+        },
+        {
+          "step": 20,
+          "description": "Replay Theorem 7's first use of Eq. (5), now using the diagonal Eq. (5) replacement, to transfer the dual norm from H_t to the diagonal hatted preconditioner.",
+          "ref": "Appendix A lines 1066-1067; Theorem 7 lines 549-555",
+          "source_pdf_lines": [
+            549,
+            555
+          ],
+          "math": "",
+          "uses": [
+            "Theorem_7_matrix_regret",
+            "previous_step:10",
+            "previous_step:19"
+          ],
+          "produces": "Theorem_13_dual_norm_transfer_first_inequality: sum_t (||g_t||^*_{H_t})^2 <= sqrt(r) sum_t (||g_t||^*_{\\widehat H_t})^2"
+        },
+        {
+          "step": 21,
+          "description": "Replay Theorem 7's Eq. (6) substitution and second use of Eq. (5), obtaining the same dual-norm upper bound with diagonal H_t.",
+          "ref": "Appendix A lines 1066-1067; Theorem 7 lines 553-557",
+          "source_pdf_lines": [
+            553,
+            557
+          ],
+          "math": "",
+          "uses": [
+            "Theorem_7_matrix_regret",
+            "previous_step:10",
+            "previous_step:19",
+            "previous_step:20"
+          ],
+          "produces": "Theorem_13_dual_norm_sum_bound: sum_t (||g_t||^*_{H_t})^2 <= 2r Tr(H_T)"
+        },
+        {
+          "step": 22,
+          "description": "Substitute the diagonal dual-norm sum bound into the diagonal Eq. (4) replay, yielding the pre-eta coefficient with D_infty.",
+          "ref": "Appendix A lines 1066-1067; Theorem 7 lines 559-564",
+          "source_pdf_lines": [
+            559,
+            564
+          ],
+          "math": "",
+          "uses": [
+            "previous_step:13",
+            "previous_step:21"
+          ],
+          "produces": "Theorem_13_regret_bound_before_eta_choice: regret <= (D_infty^2/(2\\eta)+\\eta r) Tr(H_T)"
+        },
+        {
+          "step": 23,
+          "description": "Record the prerequisite for the Appendix A eta replay: replacing Eq. (3) changes the comparator-radius term from Theorem 7's D to Theorem 13's D_infty, so the pre-eta coefficient produced by the imported route is D_infty^2/(2 eta)+eta r.",
+          "ref": "Appendix A lines 1046-1053 and 1066-1067; Theorem 7 lines 559-564",
+          "source_pdf_lines": [
+            1046,
+            1067
+          ],
+          "math": "",
+          "uses": [
+            "Theorem_7_matrix_regret",
+            "previous_step:5",
+            "previous_step:22"
+          ],
+          "produces": "Theorem_13_D_to_Dinfty_substitution_for_eta_replay"
+        },
+        {
+          "step": 24,
+          "description": "Derive the Appendix A eta substitution from the proof-by-reference sentence: Theorem 7 prints eta=D/sqrt(2r), and the preceding replacement step supplies D_infty as the corresponding comparator radius.",
+          "ref": "Appendix A lines 1066-1067; Theorem 7 lines 559-560",
+          "source_pdf_lines": [
+            559,
+            560
+          ],
+          "math": "",
+          "uses": [
+            "Learning_rate_Theorem7",
+            "Theorem_7_matrix_regret",
+            "previous_step:23"
+          ],
+          "produces": "Theorem_13_imported_eta_choice: eta = D_infty/sqrt(2r); coefficient simplifies to sqrt(2r)D_infty"
+        },
+        {
+          "step": 25,
+          "description": "Replay the final Kronecker trace rewrite from Theorem 7 for H_T=L_T^{1/4}\\otimes R_T^{1/4}.",
+          "ref": "Appendix A lines 1066-1067; Theorem 7 lines 559-568",
+          "source_pdf_lines": [
+            559,
+            568
+          ],
+          "math": "",
+          "uses": [
+            "Lemma_3_kron_calculus",
+            "previous_step:1",
+            "previous_step:2"
+          ],
+          "produces": "Theorem_13_trace_rewrite: Tr(H_T)=Tr(L_T^{1/4})Tr(R_T^{1/4})"
+        },
+        {
+          "step": 26,
+          "description": "Combine the imported eta simplification with the Kronecker trace rewrite to obtain the Theorem 13 displayed regret bound.",
+          "ref": "Theorem 13 lines 1025-1044; Appendix A lines 1066-1067",
+          "source_pdf_lines": [
+            1025,
+            1044
+          ],
+          "math": "\\sum_{t=1}^T f_t(W_t)-\\sum_{t=1}^T f_t(W^*)\\le \\sqrt{2r}D_\\infty Tr(L_T^{1/4})Tr(R_T^{1/4}),",
+          "uses": [
+            "previous_step:24",
+            "previous_step:25"
+          ],
+          "produces": "Theorem_13_bound"
+        }
+      ]
+    }
+  ],
+  "source_discrepancies": [
+    {
+      "name": "Theorem_7_RT_index_in_extraction",
+      "ref": "Theorem 7 lines 342-348",
+      "description": "The theorem display in the Poppler extraction reads R_T = epsilon I_n + sum_{t=0}^T G_t^TG_t, while Algorithm 1 initializes R_0=epsilon I_n and updates for t=1,...,T, suggesting the intended accumulated-gradient sum is over t=1,...,T. This JSON preserves the theorem display in Theorem_7_matrix_regret statement_math and uses algorithmic accumulator definitions elsewhere."
+    },
+    {
+      "name": "Theorem_13_RT_index_in_extraction",
+      "ref": "Theorem 13 lines 1035-1041",
+      "description": "The theorem display analogously extracts R_T with sum_{t=0}^T diag(G_t^TG_t), while Algorithm 3 updates from t=1,...,T. This JSON preserves the theorem display in Theorem_13_diagonal_matrix_regret statement_math."
+    },
+    {
+      "name": "Appendix_A_diagonal_Lemma2_adaptation_implicit",
+      "ref": "Appendix A lines 1058-1067; Theorem 7 lines 520-547; Appendix C.1 lines 1272-1303",
+      "description": "Appendix A replaces Eq. (5) by the diagonal hatted preconditioner \\widehat H_t=diag(r\\epsilon I_{mn}+\\sum_{s=1}^t g_sg_s^T)^{1/2} and then says to proceed exactly as in Theorem 7. Theorem 7's Eq. (6) proof invokes Lemma 2 using the unconstrained positive definite argmin of a full trace objective. This JSON does not assert that the Appendix A diagonal \\widehat H_t is that unconstrained argmin; instead it adds Derived_Theorem13_diagonal_FTL_BTL_bridge as formalization scaffolding for the positive diagonal cone and makes the Theorem 13 Eq. (6) replay depend on that bridge."
+    },
+    {
+      "name": "Appendix_A_diagonal_monotonicity_scaffolding_not_printed",
+      "ref": "Algorithm 3 lines 1011-1020; Appendix A lines 1045-1056",
+      "description": "Appendix A defines H_t=L_t^{1/4}\\otimes R_t^{1/4} and applies the inequality v^TMv<=||v||_infty^2 Tr(M) for a diagonal PSD matrix M, but it does not print a standalone lemma saying L_t, R_t, their one-fourth powers, H_t, and H_t-H_{t-1} are diagonal PSD or monotone. Algorithm3_diagonal_preconditioner_monotone is therefore marked as formalization scaffolding whose source math is limited to the printed H_t definition and whose derived PSD/order facts are recorded in proof produces fields."
+    },
+    {
+      "name": "Epsilon_PD_condition_not_explicit_in_theorem_heads",
+      "ref": "Algorithms 1-3; Proof of Theorem 7 lines 489-490; Lemmas 8 and 11",
+      "description": "Algorithms initialize with epsilon times the identity and Lemmas 8/11 state epsilon >= 0, but Lemma 1 requires H_1,...,H_T > 0 and the proof of Theorem 7 asserts 0 < H_1 <= ... <= H_T via 0 < L_1 <= ... <= L_T and 0 < R_1 <= ... <= R_T. With epsilon=0 and zero or rank-deficient early gradients, Algorithm 1/2 recurrences plus Gram PSD increments prove only non-strict PSD monotonicity, not the strict-positive premise. The Theorem_7_matrix_regret, Theorem_10_tensor_regret, and Theorem_13_diagonal_matrix_regret proof traces therefore mark the strict chain as source-asserted/formalization-side-condition rather than derived from Epsilon_nonnegative_rank_lemmas or the diagonal PSD monotonicity scaffolding."
+    },
+    {
+      "name": "Lemma_numbering_gap",
+      "ref": "Source line search for Lemma statements",
+      "description": "The paper has Lemmas 1-6, 8, 9, 11, 12, 14, and 15; numbers 7, 10, and 13 are Theorems, not Lemmas. The requested scope phrase 'Lemmas 1-12' is therefore interpreted as including all numbered lemmas up to Lemma 12 that actually exist in the source, plus Appendix B support Lemmas 14 and 15."
+    }
+  ]
+}

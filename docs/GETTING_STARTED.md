@@ -25,7 +25,7 @@ First use installs the pinned Lean toolchain and Mathlib dependencies. The setup
 under the user's normal Elan directory if absent; dependencies and build outputs
 are stored under `.deps/` and `.build/` in this checkout.
 
-`./proofloom proofs` checks all 32 projects. Use `--jobs`, `--threads`, and
+`./proofloom proofs` checks all 35 projects. Use `--jobs`, `--threads`, and
 `--memory-mb` to adjust verifier resource limits; run
 `python3 scripts/verify_formalizations.py --help` for current defaults and options.
 Reports under `.build/` describe your local run. Read [trust scope](TRUST.md)

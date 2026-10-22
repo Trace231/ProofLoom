@@ -2197,15 +2197,267 @@
       ],
       "axiom_inspection_exit_code": 0,
       "verification_provenance": "Reused successful verification of byte-identical Lean source closure and pinned dependencies"
+    },
+    {
+      "id": "Muon",
+      "compiled": true,
+      "source_files": 27,
+      "axiom_inspection_exit_code": 0,
+      "theorems_checked": 4259,
+      "algorithm_theorems_checked": 1667,
+      "nonstandard_dependencies": [
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_nonneg_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.projectedWithinGradient_smoothness_gap_of_convex_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_of_convex_lipschitz_gradient",
+          "module": "SOptLib.Axioms.BaillonHaddad",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_affineDirectionDualNorm_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        }
+      ],
+      "algorithm_nonstandard_dependencies": [],
+      "algorithm_uses_sorryAx": false,
+      "public_algorithm_nonstandard_dependencies": [],
+      "public_algorithm_uses_sorryAx": false,
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "elapsed_seconds": 514.59,
+      "source_tree_sha256": "ccb74a8408b7e244f7f947b3a5a3e211229bfe09cba89ae1a6116e39b2cdda88",
+      "source_holes": [],
+      "source_declarations": [
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 46,
+          "kind": "axiom",
+          "name": "perez_aros_vilches_open_convex_inner_cocoercivity"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 79,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 117,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_separating_seminorm_affine_support"
+        }
+      ],
+      "verification_provenance": "Fresh compilation of packaged local source closure and checked-environment theorem dependency inspection on 2026-10-22; only pinned upstream dependency caches reused."
+    },
+    {
+      "id": "SDCS",
+      "compiled": true,
+      "source_files": 29,
+      "axiom_inspection_exit_code": 0,
+      "theorems_checked": 3231,
+      "algorithm_theorems_checked": 340,
+      "nonstandard_dependencies": [
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_nonneg_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.projectedWithinGradient_smoothness_gap_of_convex_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_of_convex_lipschitz_gradient",
+          "module": "SOptLib.Axioms.BaillonHaddad",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_affineDirectionDualNorm_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        }
+      ],
+      "algorithm_nonstandard_dependencies": [],
+      "algorithm_uses_sorryAx": false,
+      "public_algorithm_nonstandard_dependencies": [],
+      "public_algorithm_uses_sorryAx": false,
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "elapsed_seconds": 333.07,
+      "source_tree_sha256": "881deb4b2b9e6c4bfb8982c6f8ae8e5ff347f1bee39270129d22db459e8cd405",
+      "source_holes": [],
+      "source_declarations": [
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 46,
+          "kind": "axiom",
+          "name": "perez_aros_vilches_open_convex_inner_cocoercivity"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 79,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 117,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_separating_seminorm_affine_support"
+        }
+      ],
+      "verification_provenance": "Fresh compilation of packaged local source closure and checked-environment theorem dependency inspection on 2026-10-22; only pinned upstream dependency caches reused."
+    },
+    {
+      "id": "Shampoo",
+      "compiled": true,
+      "source_files": 36,
+      "axiom_inspection_exit_code": 0,
+      "theorems_checked": 4257,
+      "algorithm_theorems_checked": 644,
+      "nonstandard_dependencies": [
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_nonneg_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.projectedWithinGradient_smoothness_gap_of_convex_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_of_convex_lipschitz_gradient",
+          "module": "SOptLib.Axioms.BaillonHaddad",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz",
+            "propext"
+          ]
+        },
+        {
+          "algorithm": false,
+          "declaration": "SOptLib.carrier_baillon_haddad_gap_of_affineDirectionDualNorm_lipschitz",
+          "module": "SOptLib.Layer0.Objective",
+          "axioms": [
+            "Classical.choice",
+            "Quot.sound",
+            "SOptLib.carrier_baillon_haddad_of_separating_seminorm_affine_support",
+            "propext"
+          ]
+        }
+      ],
+      "algorithm_nonstandard_dependencies": [],
+      "algorithm_uses_sorryAx": false,
+      "public_algorithm_nonstandard_dependencies": [],
+      "public_algorithm_uses_sorryAx": false,
+      "algorithm_native_decide_axioms": [],
+      "algorithm_custom_axioms": [],
+      "elapsed_seconds": 568.22,
+      "source_tree_sha256": "c3e3e2661b25ddd4bfb33177afaf2fe55f0a3394189a4ce52482f0ae8c0837b7",
+      "source_holes": [],
+      "source_declarations": [
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 46,
+          "kind": "axiom",
+          "name": "perez_aros_vilches_open_convex_inner_cocoercivity"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 79,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_support_upper_gradient_semantics_lipschitz"
+        },
+        {
+          "file": "SOptLib/Axioms/BaillonHaddad.lean",
+          "line": 117,
+          "kind": "axiom",
+          "name": "carrier_baillon_haddad_of_separating_seminorm_affine_support"
+        }
+      ],
+      "verification_provenance": "Fresh compilation of packaged local source closure and checked-environment theorem dependency inspection on 2026-10-22; only pinned upstream dependency caches reused."
     }
   ],
   "summary": {
-    "developments": 32,
-    "compiled": 32,
+    "developments": 35,
+    "compiled": 35,
     "freshly_verified_source_updates": [
-      "AMSGrad",
-      "PAGE",
-      "MARS"
+      "Muon",
+      "SDCS",
+      "Shampoo"
     ],
     "algorithm_sorryAx_users": [
       "SAM"
@@ -2292,6 +2544,6 @@
     },
     "scope": "Retained checks from the preceding release; the RGE, VRMD, and SAPD source closures and pinned dependencies are unchanged in this refresh."
   },
-  "scope": "Compilation and theorem-dependency results for all 32 released source closures. The changed MARS module was freshly compiled and inspected; other source closures retain their prior bound results. Comment-only publication edits are identified per record. TimeVaryingPushPull is withheld and excluded. Compilation does not establish source-target completion.",
+  "scope": "Source-bound compilation and theorem-dependency results for 35 released source closures. Muon, SDCS and Shampoo were freshly compiled and inspected for the 2026-10-22 supplement; the original 32 retain their unchanged bound records. TimeVaryingPushPull remains withheld and excluded. Compilation does not establish source-target completeness.",
   "source_target_coverage_note": "Compilation and dependency inspection do not certify every source target. SAPD retains a corrected expected-gap endpoint and an unfinished high-probability endpoint. RGE/RAPP/VRAGD/VRMD use explicit added mathematical hypotheses. Per-development statuses and source holes are retained; historical scores are unchanged."
 }

@@ -6,7 +6,7 @@ A source error should be represented by a corrected statement with visible new
 conditions or an explicit conditional boundary. It cannot justify describing an
 assumed proposition as a proved theorem.
 
-Among the 32 developments with successful retained dependency inspections, no public algorithm theorem depends on
+Among the original 32 developments with successful retained dependency inspections, no public algorithm theorem depends on
 `sorryAx` or a custom mathematical axiom. SAM's private expected-error tests and
 compiler-generated `native_decide` assumptions are still disclosed below. This
 dependency result does not establish source-target completeness or discharge
@@ -100,3 +100,30 @@ to their source hashes. Local diagnostics are written only under ignored `.build
 Compilation and dependency inspection do not replace the original Phase 2F
 source-faithfulness and corrected-source acceptance checks.
 
+
+## Supplementary release, 2026-10-22
+
+Muon, SDCS and Shampoo preserve independent imported local
+library closures and pinned dependencies. Their new source/dependency checks are
+recorded in the verification report; older records cannot certify these files.
+
+Muon completed Phase2F on Track B at iteration 103. The original-generated-run
+counterexample satisfies the literal directional-small-J assumptions and printed
+schedules of the Appendix B.4 otherwise branch but violates its uniform
+O(epsilon) conclusion. The corrected branch explicitly adds realized cross
+control; together with directional control it is equivalent to the Jstar bound
+used in the finite-horizon proof. The corrected generated-average and uniform
+generated-output conclusions are proved. This is a sufficient disclosed repair,
+not a claim that its assumptions are globally weakest or that the unchanged
+source conclusion is proved.
+
+SDCS and Shampoo are post-Phase4 snapshots. Their original Phase2F certificates
+predate extraction, so their release records identify the changed proof hashes
+and completed Phase4 checks separately. Muon has not yet undergone Phase3/Phase4. The existing canonical `soptlib/` snapshot and earlier
+algorithm snapshots are preserved; imported additions travel with each new
+development. None of these completion labels discharges explicit hypotheses.
+
+Fresh checks of all three supplementary developments found no public algorithm
+theorem using `sorryAx` or custom mathematical axioms. The JSON report separately
+records any compiler-generated `native_decide` assumptions. Imported library
+axioms are not automatically dependencies of algorithm theorems.

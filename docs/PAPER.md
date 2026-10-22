@@ -123,8 +123,10 @@ versions. The SAM scale mismatch and restricted-domain smoothness issue in the
 [README](../README.md#what-formalization-reveals) are selected examples.
 
 Its corpus census contains 33 construction snapshots, including one unreleased
-development. This repository releases **32 developments** and a separately frozen
-canonical SOptLib snapshot. Paper-level line and declaration counts should not be
+development. The original repository release contained **32 developments** and a separately frozen
+canonical SOptLib snapshot. Three supplementary developments were added on
+2026-10-22, bringing the current catalog to 35; they do not change the paper’s
+benchmark or its reported results. Paper-level line and declaration counts should not be
 used as measurements of this checkout.
 
 There are also differences in endpoint versions. For example, the paper's

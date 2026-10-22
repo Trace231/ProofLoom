@@ -1,0 +1,1380 @@
+{
+  "algorithm": "SDCS",
+  "full_name": "Stochastic Decentralized Communication Sliding",
+  "source_reference": "Lan, First-order and Stochastic Optimization Methods for Machine Learning, Springer 2020, Algorithm 8.8 and Theorem 8.11",
+  "setup": {
+    "problem": {
+      "math": "\\min_x F(x) := \\sum_{i=1}^m f_i(x_i)\\quad \\text{s.t. } \\mathcal{L}x=0,\\quad x_i\\in X_i,\\ i=1,\\ldots,m,",
+      "ref": "(8.3.6)",
+      "description": "Decentralized reformulation with one local copy x_i per agent and the network consensus constraint encoded by the lifted Laplacian \\mathcal{L}=L\\otimes I_d."
+    },
+    "variable_space": {
+      "math": "x=(x_1,\\ldots,x_m)\\in X_1\\times\\cdots\\times X_m,\\quad F:X_1\\times\\cdots\\times X_m\\to \\mathbb{R},\\quad \\mathcal{L}=L\\otimes I_d\\in \\mathbb{R}^{md\\times md},\\quad y=(y_1,\\ldots,y_m)\\in \\mathbb{R}^{md}.",
+      "ref": "(8.3.6)-(8.3.7)"
+    },
+    "saddle_point_problem": {
+      "math": "\\min_{x\\in X}\\left\\{F(x)+\\max_{y\\in\\mathbb{R}^{md}}\\langle \\mathcal{L}x,y\\rangle\\right\\},",
+      "ref": "(8.3.7)",
+      "description": "The primal-dual reformulation used for the gap and residual analysis."
+    }
+  },
+  "assumptions": [
+    {
+      "name": "ConnectedGraph",
+      "math": "\\text{The graph }G\\text{ is connected.}",
+      "ref": "Assumption 18",
+      "parameters": [
+        "G",
+        "L",
+        "\\mathcal{L}"
+      ]
+    },
+    {
+      "name": "SaddlePointExistence",
+      "math": "\\text{there exists an optimal solution }x^*\\in X\\text{ of (8.3.6) and there exists }y^*\\in\\mathbb{R}^{md}\\text{ such that }(x^*,y^*)\\text{ is a saddle point of (8.3.7).}",
+      "ref": "p. 536, paragraph after (8.3.7)",
+      "parameters": [
+        "x^*",
+        "y^*"
+      ]
+    },
+    {
+      "name": "ProxStrongConvexityModulusOne",
+      "math": "V_i(x_i,u_i)\\ge \\frac{1}{2}\\|x_i-u_i\\|_{X_i}^2,\\quad \\forall x_i,u_i\\in X_i,\\ i=1,\\ldots,m.",
+      "ref": "(8.3.12)",
+      "parameters": [
+        "V_i",
+        "X_i"
+      ]
+    },
+    {
+      "name": "StackedPrimalNorm",
+      "math": "\\|x\\|^2\\equiv \\|x\\|_X^2:=\\sum_{i=1}^m \\|x_i\\|_{X_i}^2,",
+      "ref": "(8.3.13)",
+      "parameters": [
+        "\\|\\cdot\\|",
+        "\\|\\cdot\\|_{X_i}"
+      ]
+    },
+    {
+      "name": "StackedProxFunction",
+      "math": "V(x,u):=\\sum_{i=1}^m V_i(x_i,u_i),\\quad \\forall x,u\\in X.",
+      "ref": "(8.3.14)",
+      "parameters": [
+        "V",
+        "V_i"
+      ]
+    },
+    {
+      "name": "StackedProxLowerBound",
+      "math": "V(x,u)\\ge \\frac{1}{2}\\|x-u\\|^2,\\quad \\forall x,u\\in X.",
+      "ref": "(8.3.15)",
+      "parameters": [
+        "V",
+        "\\|\\cdot\\|"
+      ]
+    },
+    {
+      "name": "ObjectiveGrowthCondition",
+      "math": "\\mu V_i(y,x)\\le f_i(x)-f_i(y)-\\langle f_i'(y),x-y\\rangle\\le M\\|x-y\\|,\\quad \\forall x,y\\in X_i,",
+      "ref": "(8.3.16)",
+      "parameters": [
+        "\\mu",
+        "M",
+        "f_i",
+        "V_i"
+      ]
+    },
+    {
+      "name": "GeneralConvexCase",
+      "math": "\\mu=0\\text{ and }M>0",
+      "ref": "Lemma 8.5 statement",
+      "parameters": [
+        "\\mu",
+        "M"
+      ]
+    },
+    {
+      "name": "StochasticOracleUnbiased",
+      "math": "\\mathbb{E}[G_i(u_t,\\xi_{it})]=f_i'(u_t)\\in\\partial f_i(u_t),",
+      "ref": "(8.3.61)",
+      "parameters": [
+        "G_i",
+        "\\xi_{it}",
+        "u_t",
+        "f_i'"
+      ]
+    },
+    {
+      "name": "StochasticOracleVariance",
+      "math": "\\mathbb{E}[\\|G_i(u_t,\\xi_{it})-f_i'(u_t)\\|_*^2]\\le \\sigma^2,",
+      "ref": "(8.3.62)",
+      "parameters": [
+        "G_i",
+        "\\xi_{it}",
+        "\\sigma"
+      ]
+    },
+    {
+      "name": "StochasticQueryIndependence",
+      "math": "\\xi_{it}\\text{ is independent of the search point }u_t",
+      "ref": "p. 549, paragraph after (8.3.62)",
+      "parameters": [
+        "\\xi_{it}",
+        "u_t"
+      ]
+    }
+  ],
+  "algorithm_spec": {
+    "initialization": {
+      "math": "\\text{Let }x_i^0=x_i^{-1}=\\hat{x}_i^0\\in X_i,\\ y_i^0\\in\\mathbb{R}^d\\text{ for }i\\in[m]\\text{ and the nonnegative parameters }\\{\\alpha_k\\},\\{\\tau_k\\},\\{\\eta_k\\},\\text{ and }\\{T_k\\}\\text{ be given.}",
+      "ref": "Algorithm 8.7 initialization, modified by Algorithm 8.8"
+    },
+    "steps": [
+      {
+        "step": 1,
+        "name": "outer_extrapolation",
+        "math": "\\tilde{x}_i^k=\\alpha_k(\\hat{x}_i^{k-1}-x_i^{k-2})+x_i^{k-1},",
+        "ref": "(8.3.17)/(8.3.20)"
+      },
+      {
+        "step": 2,
+        "name": "primal_neighbor_disagreement",
+        "math": "v_i^k=\\sum_{j\\in N_i}L_{ij}\\tilde{x}_j^k,",
+        "ref": "(8.3.21)"
+      },
+      {
+        "step": 3,
+        "name": "dual_update",
+        "math": "y_i^k=\\arg\\min_{y_i\\in\\mathbb{R}^d}\\langle -v_i^k,y_i\\rangle+\\frac{\\tau_k}{2}\\|y_i-y_i^{k-1}\\|^2=y_i^{k-1}+\\frac{1}{\\tau_k}v_i^k,",
+        "ref": "(8.3.22)"
+      },
+      {
+        "step": 4,
+        "name": "dual_neighbor_disagreement",
+        "math": "w_i^k=\\sum_{j\\in N_i}L_{ij}y_j^k,",
+        "ref": "(8.3.23)"
+      },
+      {
+        "step": 5,
+        "name": "call_stochastic_cs",
+        "math": "(x_i^k,\\hat{x}_i^k)=\\operatorname{CS}(f_i,X_i,V_i,T_k,\\eta_k,w_i^k,x_i^{k-1}),",
+        "ref": "(8.3.24) with Algorithm 8.8 replacement"
+      },
+      {
+        "step": 6,
+        "name": "stochastic_inner_subgradient",
+        "math": "h_{t-1}=H(u_{t-1},\\xi^{t-1}),",
+        "ref": "(8.3.63)"
+      },
+      {
+        "step": 7,
+        "name": "stochastic_inner_projection",
+        "math": "u_t=\\arg\\min_{u\\in U}\\left\\{\\langle w+h_{t-1},u\\rangle+\\eta V(x,u)+\\eta\\beta_tV(u_{t-1},u)\\right\\},",
+        "ref": "(8.3.64)"
+      },
+      {
+        "step": 8,
+        "name": "inner_weighted_average",
+        "math": "\\hat{u}_T:=\\left(\\sum_{t=1}^T\\lambda_t\\right)^{-1}\\sum_{t=1}^T\\lambda_tu_t.",
+        "ref": "(8.3.27)"
+      }
+    ],
+    "output": {
+      "math": "\\hat{z}_N=\\left(\\sum_{k=1}^N\\theta_k\\right)^{-1}\\sum_{k=1}^N\\theta_k(\\hat{x}_k,y_k),\\quad \\hat{x}_N=\\frac{1}{N}\\sum_{k=1}^N\\hat{x}_k\\text{ under }\\theta_k=1.",
+      "ref": "Algorithm 8.7 output and Theorem 8.11 line after (8.3.69)",
+      "type": "weighted average of generated outer iterates"
+    },
+    "parameters": [
+      {
+        "name": "DCSPrimalSubproblemPhi",
+        "math": "x_k=\\arg\\min_{x\\in X}\\Phi^k(x):=\\langle\\mathcal{L}y_k,x\\rangle+F(x)+\\eta_kV(x_{k-1},x).",
+        "ref": "(8.3.19)"
+      },
+      {
+        "name": "LocalCSSubproblemIdentification",
+        "math": "\\arg\\min_{u\\in U}\\langle w,u\\rangle+\\phi(u)+\\eta V(x,u)\\quad\\text{with }u=x_i,\\ U=X_i,\\ w=w_i^k,\\ \\phi=f_i,\\ \\eta=\\eta_k,\\ \\text{and }V=V_i,",
+        "ref": "(8.3.28) and paragraph after (8.3.28)"
+      },
+      {
+        "name": "CSProcedureParameterCondition",
+        "math": "\\lambda_{t+1}(\\eta\\beta_{t+1}-\\mu)\\le \\lambda_t(1+\\beta_t)\\eta,\\quad \\forall t\\ge 1.",
+        "ref": "(8.3.1)"
+      },
+      {
+        "name": "general_parameter_condition_29",
+        "math": "\\theta_k\\frac{(T_k+1)(T_k+2)\\eta_k}{T_k(T_k+3)}\\le \\theta_{k-1}\\frac{(T_{k-1}+1)(T_{k-1}+2)\\eta_{k-1}}{T_{k-1}(T_{k-1}+3)},\\quad k=2,\\ldots,N,",
+        "ref": "(8.3.29)"
+      },
+      {
+        "name": "general_parameter_condition_30",
+        "math": "\\alpha_k\\theta_k=\\theta_{k-1},\\quad k=2,\\ldots,N,",
+        "ref": "(8.3.30)"
+      },
+      {
+        "name": "general_parameter_condition_31",
+        "math": "\\theta_k\\tau_k=\\theta_1\\tau_1,\\quad k=2,\\ldots,N,",
+        "ref": "(8.3.31)"
+      },
+      {
+        "name": "general_parameter_condition_32",
+        "math": "\\alpha_k\\|\\mathcal{L}\\|^2\\le \\eta_{k-1}\\tau_k,\\quad k=2,\\ldots,N,",
+        "ref": "(8.3.32)"
+      },
+      {
+        "name": "general_parameter_condition_33",
+        "math": "\\theta_N\\|\\mathcal{L}\\|^2\\le \\theta_1\\tau_1\\eta_N,",
+        "ref": "(8.3.33)"
+      },
+      {
+        "name": "general_cs_weights",
+        "math": "\\lambda_t=t+1,\\quad \\beta_t=\\frac{t}{2},\\quad \\forall t\\ge 1.",
+        "ref": "(8.3.34)"
+      },
+      {
+        "name": "theorem_811_schedule",
+        "math": "\\alpha_k=\\theta_k=1,\\quad \\eta_k=2\\|\\mathcal{L}\\|,\\quad \\tau_k=\\|\\mathcal{L}\\|,\\quad \\text{and }T_k=\\left\\lceil\\frac{m(M^2+\\sigma^2)N}{\\|\\mathcal{L}\\|^2\\widetilde{D}}\\right\\rceil,\\quad \\forall k=1,\\ldots,N,",
+        "ref": "(8.3.67)"
+      },
+      {
+        "name": "lemma_85_residual_vector",
+        "math": "\\hat{s}:=\\theta_N\\mathcal{L}(\\hat{x}_N-x_{N-1})+\\theta_1\\tau_1(y_N-y_0).",
+        "ref": "Lemma 8.5 after (8.3.65)"
+      }
+    ]
+  },
+  "main_theorem": {
+    "statement_math": "\\text{Let }x^*\\text{ be an optimal solution of (8.3.6), the parameters }\\{\\lambda_t\\}\\text{ and }\\{\\beta_t\\}\\text{ in the CS procedure of Algorithm 8.8 be set as (8.3.34),\\text{ and suppose that }\\{\\alpha_k\\},\\{\\theta_k\\},\\{\\eta_k\\},\\{\\tau_k\\}\\text{ and }\\{T_k\\}\\text{ are set to }\\alpha_k=\\theta_k=1,\\quad \\eta_k=2\\|\\mathcal{L}\\|,\\quad \\tau_k=\\|\\mathcal{L}\\|,\\quad \\text{and }T_k=\\left\\lceil\\frac{m(M^2+\\sigma^2)N}{\\|\\mathcal{L}\\|^2\\widetilde{D}}\\right\\rceil,\\quad \\forall k=1,\\ldots,N,\\text{ for some }\\widetilde{D}>0.\\text{ Then, under Assumptions (8.3.61) and (8.3.62), we have for any }N\\ge1\\quad \\mathbb{E}[F(\\hat{x}_k)-F(x^*)]\\le\\frac{\\|\\mathcal{L}\\|}{N}\\left[3V(x_0,x^*)+\\frac{1}{2}\\|y_0\\|^2+4\\widetilde{D}\\right],\\quad \\mathbb{E}[\\|\\mathcal{L}\\hat{x}_N\\|]\\le\\frac{\\|\\mathcal{L}\\|}{N}\\left[3\\sqrt{6V(x_0,x^*)+8\\widetilde{D}}+4\\|y^*-y_0\\|\\right],\\quad \\text{where }\\hat{x}_N=\\frac{1}{N}\\sum_{k=1}^N\\hat{x}_k,\\text{ and }y^*\\text{ is an arbitrary dual optimal solution.}",
+    "source_statement_math_verbatim_ocr": "Stable local proof-window artifact source/original_source_pypdf_layout_lines.txt lines 84-101 verifies the Theorem 8.11 statement over printed pp. 550-551: line 88 has the ceiling schedule in (8.3.67), lines 92-93 print (8.3.68) with E[F(\\hat{x}_k)-F(x^*)], lines 97-101 print (8.3.69) and then define \\hat{x}_N=N^{-1}\\sum_{k=1}^N\\hat{x}_k. Bare pdftotext is unavailable in this shell, so this pypdf layout extraction is committed for judge fallback.",
+    "rate": "Both the expected objective residual and expected consensus residual are O(\\|\\mathcal{L}\\|/N) for the averaged generated iterate, with T_k chosen proportional to m(M^2+\\sigma^2)N/(\\|\\mathcal{L}\\|^2\\widetilde{D}).",
+    "measure": "Expected objective residual \\mathbb{E}[F(\\hat{x}_N)-F(x^*)] and expected consensus residual \\mathbb{E}[\\|\\mathcal{L}\\hat{x}_N\\|].",
+    "proof": [
+      {
+        "step": 1,
+        "description": "Check that the schedule in (8.3.67) satisfies the general parameter conditions required by Lemma 8.5.",
+        "ref": "Theorem 8.11 proof, first sentence",
+        "source_pdf_lines": [
+          32633,
+          32634
+        ],
+        "uses": [
+          "Theorem811ScheduleFacts"
+        ],
+        "produces": "Conditions (8.3.29)-(8.3.33) are available for applying Lemma 8.5."
+      },
+      {
+        "step": 2,
+        "description": "Use the perturbed gap definition (8.3.10) together with Lemma 8.5, specialized to x=x^*, to convert the bound on Q(\\hat{z}_N;z) into an upper bound on g(\\hat{s}_N,\\hat{z}_N).",
+        "ref": "(8.3.70)",
+        "source_pdf_lines": [
+          32636,
+          32653
+        ],
+        "math": "g(\\hat{s}_N,\\hat{z}_N)=\\max_y Q(\\hat{z}_N;x^*,y)-\\left(\\sum_{k=1}^N\\theta_k\\right)^{-1}\\langle \\hat{s},y\\rangle\\le \\left(\\sum_{k=1}^N\\theta_k\\right)^{-1}\\left[\\frac{(T_1+1)(T_1+2)\\theta_1\\eta_1}{T_1(T_1+3)}V(x_0,x^*)+\\frac{\\theta_1\\tau_1}{2}\\|y_0\\|^2+\\sum_{k=1}^N\\sum_{t=1}^{T_k}\\sum_{i=1}^m\\frac{2\\theta_k}{T_k(T_k+3)}\\left((t+1)\\langle\\delta_i^{t-1,k},x_i^*-u_i^{t-1}\\rangle+\\frac{4(M^2+\\|\\delta_i^{t-1,k}\\|_*^2)}{\\eta_k}\\right)\\right],",
+        "uses": [
+          "PerturbedGapDefinition",
+          "GeneralSDCSGapLemma85",
+          "previous_step:1"
+        ],
+        "produces": "Printed gap bound (8.3.70)."
+      },
+      {
+        "step": 3,
+        "description": "Define the scaled perturbation used in Proposition 8.6. The OCR line says s_N; the displayed gap uses \\hat{s}_N, and the proof later uses \\mathbb{E}[\\hat{s}_N]=N^{-1}\\mathbb{E}[\\hat{s}].",
+        "ref": "line after (8.3.70)",
+        "source_pdf_lines": [
+          32654,
+          32655
+        ],
+        "math": "\\hat{s}_N=\\left(\\sum_{k=1}^N\\theta_k\\right)^{-1}\\hat{s}.",
+        "uses": [
+          "previous_step:2"
+        ],
+        "produces": "Scaled residual vector \\hat{s}_N."
+      },
+      {
+        "step": 4,
+        "description": "From the stochastic oracle assumptions and independence of the generated query from the fresh oracle noise, identify the zero-mean stochastic error and its second-moment bound; the lemma proof records the derived conditional inner-product cancellation needed when taking expectations in (8.3.70).",
+        "ref": "Theorem 8.11 proof after (8.3.70)",
+        "source_pdf_lines": [
+          32655,
+          32659
+        ],
+        "math": "\\mathbb{E}[\\delta_i^{t-1,k}]=0,\\quad \\mathbb{E}[\\|\\delta_i^{t-1,k}\\|_*^2]\\le \\sigma^2,\\quad \\forall i\\in\\{1,\\ldots,m\\},\\ t\\ge1,\\ k\\ge1,",
+        "uses": [
+          "StochasticOracleErrorMomentFacts"
+        ],
+        "produces": "Derived conditional cancellation \\mathbb{E}[\\langle\\delta_i^{t-1,k},x_i^*-u_i^{t-1}\\rangle\\mid u_i^{t-1}]=0, hence unconditional cancellation of the linear stochastic-error terms, and replacement of \\|\\delta_i^{t-1,k}\\|_*^2 by \\sigma^2 in expectation."
+      },
+      {
+        "step": 5,
+        "description": "Use the schedule to bound the first inner-loop ratio.",
+        "ref": "Theorem 8.11 proof after stochastic moment display",
+        "source_pdf_lines": [
+          32660,
+          32663
+        ],
+        "math": "\\frac{(T_1+1)(T_1+2)}{T_1(T_1+3)}=1+\\frac{2}{T_1^2+3T_1}\\le \\frac{3}{2}.",
+        "uses": [
+          "Theorem811ScheduleFacts"
+        ],
+        "produces": "The coefficient on V(x_0,x^*) is bounded by (3/2)\\eta_1=3\\|\\mathcal{L}\\| before averaging, yielding the printed constant 3."
+      },
+      {
+        "step": 6,
+        "description": "Take expectations on both sides of (8.3.70), use the conditional cancellation \\mathbb{E}[\\langle\\delta_i^{t-1,k},x_i^*-u_i^{t-1}\\rangle\\mid u_i^{t-1}]=0 for each generated inner query, use the variance bound, and plug in (8.3.67). The first printed inequality carries V(x_0,x); the subsequent simplification specializes the comparison point to x^*.",
+        "ref": "(8.3.71), first displayed inequality",
+        "source_pdf_lines": [
+          32664,
+          32677
+        ],
+        "math": "\\mathbb{E}[g(\\hat{s}_N,\\hat{z}_N)]\\le\\left(\\sum_{k=1}^N\\theta_k\\right)^{-1}\\left[\\frac{(T_1+1)(T_1+2)\\theta_1\\eta_1}{T_1(T_1+3)}V(x_0,x)+\\frac{\\theta_1\\tau_1}{2}\\|y_0\\|^2+\\sum_{k=1}^N\\frac{8m(M^2+\\sigma^2)\\theta_k}{(T_k+3)\\eta_k}\\right]",
+        "uses": [
+          "previous_step:2",
+          "previous_step:4",
+          "previous_step:5",
+          "Theorem811ScheduleFacts"
+        ],
+        "produces": "Expected perturbed gap bound before final simplification; after the printed line, the proof uses the x=x^* specialization for the displayed endpoint."
+      },
+      {
+        "step": 7,
+        "description": "Complete the substitution of the constant schedule (\\theta_k=1, \\eta_k=2\\|\\mathcal{L}\\|, \\tau_k=\\|\\mathcal{L}\\|) and the lower bound on T_k+3 implicit in (8.3.67).",
+        "ref": "(8.3.71), second displayed inequality",
+        "source_pdf_lines": [
+          32670,
+          32677
+        ],
+        "math": "\\mathbb{E}[g(\\hat{s}_N,\\hat{z}_N)]\\le \\frac{\\|\\mathcal{L}\\|}{N}\\left[3V(x_0,x^*)+\\frac{1}{2}\\|y_0\\|^2+4\\widetilde{D}\\right],",
+        "uses": [
+          "previous_step:6",
+          "Theorem811ScheduleFacts"
+        ],
+        "produces": "Final expected perturbed gap estimate."
+      },
+      {
+        "step": 8,
+        "description": "Express the expected norm of the scaled perturbation by the triangle inequality and the definition of \\hat{s}; this substitutes \\theta_N=1 and \\theta_1\\tau_1=\\|\\mathcal{L}\\| from (8.3.67), then uses \\|\\mathcal{L}(\\hat{x}_N-x_{N-1})\\|\\le\\|\\mathcal{L}\\|\\|\\hat{x}_N-x_{N-1}\\| and inserts y^* in y_N-y_0.",
+        "ref": "Theorem 8.11 proof after (8.3.71)",
+        "source_pdf_lines": [
+          32674,
+          32676
+        ],
+        "math": "\\mathbb{E}[\\|\\hat{s}_N\\|]=\\frac{1}{N}\\mathbb{E}[\\|\\hat{s}\\|]\\le\\frac{\\|\\mathcal{L}\\|}{N}\\mathbb{E}\\left[\\|\\hat{x}_N-x_{N-1}\\|+\\|y_N-y^*\\|+\\|y^*-y_0\\|\\right].",
+        "uses": [
+          "previous_step:3",
+          "GeneralSDCSGapLemma85",
+          "Theorem811ScheduleFacts"
+        ],
+        "produces": "Perturbation norm reduced to expected primal-step and dual-distance norms with the printed \\|\\mathcal{L}\\|/N coefficient."
+      },
+      {
+        "step": 9,
+        "description": "Record the Jensen display as printed in the Theorem 8.11 proof. The display invokes (8.3.66) and Jensen, but its terms involving \\|y^*-y_0\\| are inconsistent with the squared dual-distance term printed in Lemma 8.5; the usable consequence is therefore recorded in the next derived step rather than silently changing this source math.",
+        "ref": "Theorem 8.11 proof, Jensen display",
+        "source_pdf_lines": [
+          32678,
+          32681
+        ],
+        "math": "\\left(\\mathbb{E}[\\|\\hat{x}_N-x_{N-1}\\|]\\right)^2\\le \\mathbb{E}[\\|\\hat{x}_N-x_{N-1}\\|^2]\\le 6V(x_0,x^*)+\\|y^*-y_0\\|+8\\widetilde{D},\\quad \\left(\\mathbb{E}[\\|y^*-y_N\\|]\\right)^2\\le \\mathbb{E}[\\|y^*-y_N\\|^2]\\le 12V(x_0,x^*)+2\\|y^*-y_0\\|+16\\widetilde{D}.",
+        "uses": [
+          "GeneralSDCSGapLemma85",
+          "previous_step:4",
+          "Theorem811ScheduleFacts"
+        ],
+        "produces": "Printed Jensen display; source discrepancy noted for the missing square on \\|y^*-y_0\\| needed by the final square-root simplification."
+      },
+      {
+        "step": 10,
+        "description": "Use the actual squared term \\frac{\\theta_1\\tau_1}{2}\\|y^*-y_0\\|^2 from Lemma 8.5's residual inequality (8.3.66), the zero-mean/variance substitution from the theorem proof, and the schedule (8.3.67) to derive the second-moment bounds that are compatible with the final displayed perturbation estimate. This is a derived prerequisite-flow step, not a separately printed theorem display.",
+        "ref": "Lemma 8.5 (8.3.66) and Theorem 8.11 proof, Jensen display",
+        "source_pdf_lines": [
+          32589,
+          32681
+        ],
+        "uses": [
+          "GeneralSDCSGapLemma85",
+          "previous_step:4",
+          "Theorem811ScheduleFacts",
+          "previous_step:9"
+        ],
+        "produces": "Derived from source: \\mathbb{E}[\\|\\hat{x}_N-x_{N-1}\\|^2]\\le 6V(x_0,x^*)+\\|y^*-y_0\\|^2+8\\widetilde{D} and \\mathbb{E}[\\|y^*-y_N\\|^2]\\le 12V(x_0,x^*)+2\\|y^*-y_0\\|^2+16\\widetilde{D}."
+      },
+      {
+        "step": 11,
+        "description": "Apply Jensen's inequality to pass from second moments to squared expected norms, then use square-root subadditivity to combine the primal-step, dual-distance, and inserted \\|y^*-y_0\\| terms in the perturbation decomposition.",
+        "ref": "Theorem 8.11 proof, transition from Jensen display to next display",
+        "source_pdf_lines": [
+          32678,
+          32689
+        ],
+        "uses": [
+          "previous_step:10"
+        ],
+        "produces": "Derived bound used in the printed final perturbation estimate: \\mathbb{E}[\\|\\hat{x}_N-x_{N-1}\\|]+\\mathbb{E}[\\|y_N-y^*\\|]+\\|y^*-y_0\\|\\le 3\\sqrt{6V(x_0,x^*)+8\\widetilde{D}}+4\\|y^*-y_0\\|."
+      },
+      {
+        "step": 12,
+        "description": "Combine the perturbation decomposition with the two Jensen bounds to obtain the final expected perturbation bound printed before invoking Proposition 8.6.",
+        "ref": "Theorem 8.11 proof, display before final sentence",
+        "source_pdf_lines": [
+          32683,
+          32689
+        ],
+        "math": "\\mathbb{E}[\\|\\hat{s}_N\\|]\\le \\frac{\\|\\mathcal{L}\\|}{N}\\left[3\\sqrt{6V(x_0,x^*)+8\\widetilde{D}}+4\\|y^*-y_0\\|\\right].",
+        "uses": [
+          "previous_step:8",
+          "previous_step:11"
+        ],
+        "produces": "Expected perturbation/consensus candidate bound."
+      },
+      {
+        "step": 13,
+        "description": "Before taking expectations through Proposition 8.6, use the pathwise bound (8.3.70) to record that the perturbed gap is finite almost surely for the generated averaged iterate and scaled perturbation.",
+        "ref": "(8.3.70)",
+        "source_pdf_lines": [
+          32636,
+          32653
+        ],
+        "uses": [
+          "previous_step:2",
+          "previous_step:3",
+          "Theorem811ScheduleFacts",
+          "StochasticOracleErrorMomentFacts"
+        ],
+        "produces": "For almost every generated sample path, g(\\hat{s}_N,\\hat{z}_N)<\\infty, so the Y=\\mathbb{R}^{md} part of Proposition 8.6 can be applied pointwise."
+      },
+      {
+        "step": 14,
+        "description": "Record the remaining pointwise prerequisite for Proposition 8.6: the scaled perturbation has finite norm because it is defined from the finite generated iterates by (8.3.10) and the line following (8.3.70).",
+        "ref": "(8.3.10) and line after (8.3.70)",
+        "source_pdf_lines": [
+          32654,
+          32676
+        ],
+        "uses": [
+          "previous_step:3",
+          "GeneralSDCSGapLemma85",
+          "Theorem811ScheduleFacts"
+        ],
+        "produces": "For almost every generated sample path, \\|\\hat{s}_N\\|<\\infty, so Proposition 8.6 may be applied with a finite pathwise \\delta."
+      },
+      {
+        "step": 15,
+        "description": "Apply Proposition 8.6 with Y=\\mathbb{R}^{md} to the pointwise finite perturbed gap and finite perturbation norm.",
+        "ref": "Theorem 8.11 proof final sentence; Proposition 8.6 finiteness clause",
+        "source_pdf_lines": [
+          31868,
+          31870
+        ],
+        "uses": [
+          "PerturbedGapToResidualsProposition86",
+          "previous_step:13",
+          "previous_step:14"
+        ],
+        "produces": "Pointwise almost-sure identification \\hat{s}_N=\\mathcal{L}\\hat{x}_N for the actual averaged generated iterate."
+      },
+      {
+        "step": 16,
+        "description": "Use the expansion in the proof of Proposition 8.6, together with \\hat{s}_N=\\mathcal{L}\\hat{x}_N, to identify the perturbed gap with the objective residual pointwise.",
+        "ref": "Theorem 8.11 proof final sentence; Proposition 8.6 proof expansion",
+        "source_pdf_lines": [
+          31859,
+          31868
+        ],
+        "uses": [
+          "PerturbedGapToResidualsProposition86",
+          "previous_step:15"
+        ],
+        "produces": "For almost every generated sample path, g(\\hat{s}_N,\\hat{z}_N)=F(\\hat{x}_N)-F(x^*)."
+      },
+      {
+        "step": 17,
+        "description": "Take expectations in the pointwise objective-residual identity and use the expected perturbed gap estimate (8.3.71).",
+        "ref": "Theorem 8.11 proof final sentence; (8.3.68)",
+        "source_pdf_lines": [
+          32691,
+          32692
+        ],
+        "uses": [
+          "previous_step:7",
+          "previous_step:16"
+        ],
+        "produces": "Expected objective residual (8.3.68) for \\hat{x}_N, with the source theorem statement displaying \\hat{x}_k and the following line defining \\hat{x}_N=N^{-1}\\sum_{k=1}^N\\hat{x}_k."
+      },
+      {
+        "step": 18,
+        "description": "Take expectations in the pointwise identification \\hat{s}_N=\\mathcal{L}\\hat{x}_N and combine it with the perturbation-norm estimate.",
+        "ref": "Theorem 8.11 proof final sentence; (8.3.69)",
+        "source_pdf_lines": [
+          32691,
+          32692
+        ],
+        "uses": [
+          "previous_step:12",
+          "previous_step:15"
+        ],
+        "produces": "Expected consensus residual (8.3.69) for \\hat{x}_N."
+      },
+      {
+        "step": 19,
+        "description": "Use the stochastic (\\epsilon,\\delta)-solution definition to interpret the two expectation bounds as the stochastic objective and feasibility residuals claimed by Theorem 8.11.",
+        "ref": "Definition 8.1 stochastic sentence",
+        "source_pdf_lines": [
+          31846,
+          31847
+        ],
+        "uses": [
+          "EpsilonDeltaSolutionDefinition",
+          "previous_step:17",
+          "previous_step:18"
+        ],
+        "produces": "(8.3.68) and (8.3.69) are obtained for the averaged generated iterate \\hat{x}_N in expectation."
+      }
+    ]
+  },
+  "key_lemmas": [
+    {
+      "name": "PerturbedGapDefinition",
+      "ref": "(8.3.8)-(8.3.10)",
+      "statement_math": "Q(z;\\bar{z}):=F(x)+\\langle \\mathcal{L}x,\\bar{y}\\rangle-[F(\\bar{x})+\\langle \\mathcal{L}\\bar{x},y\\rangle],\\quad g_Y(s,z):=\\sup_{\\bar{y}\\in Y}Q(z;x^*,\\bar{y})-\\langle s,\\bar{y}\\rangle.",
+      "role": "Defines the primal-dual and perturbed gap functions used by Lemma 8.5, Theorem 8.11, and Proposition 8.6.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "The displayed statement is the paper's definition of Q and g_Y.",
+          "ref": "(8.3.8)-(8.3.10)",
+          "source_pdf_lines": [
+            31838,
+            31851
+          ],
+          "uses": [],
+          "produces": "Definitions of Q and g_Y."
+        }
+      ]
+    },
+    {
+      "name": "EpsilonDeltaSolutionDefinition",
+      "ref": "(8.3.11)",
+      "statement_math": "F(x)-F(x^*)\\le \\epsilon\\quad\\text{and}\\quad \\|\\mathcal{L}x\\|\\le \\delta.",
+      "role": "Defines objective and feasibility residuals for deterministic and stochastic solutions.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "The displayed statement is the paper's definition of an (epsilon, delta)-solution.",
+          "ref": "(8.3.11)",
+          "source_pdf_lines": [
+            31852,
+            31857
+          ],
+          "uses": [],
+          "produces": "Definition of objective and feasibility residuals."
+        }
+      ]
+    },
+    {
+      "name": "PerturbedGapToResidualsProposition86",
+      "ref": "Proposition 8.6",
+      "statement_math": "\\text{For any }Y\\subset\\mathbb{R}^{md}\\text{ such that }0\\in Y,\\text{ if }g_Y(\\mathcal{L}x,z)\\le \\epsilon<\\infty\\text{ and }\\|\\mathcal{L}x\\|\\le \\delta,\\text{ where }z=(x,y)\\in X\\times\\mathbb{R}^{md},\\text{ then }x\\text{ is an }(\\epsilon,\\delta)\\text{-solution of (8.3.6). In particular, when }Y=\\mathbb{R}^{md},\\text{ for any }s\\text{ such that }g(s,z)\\le\\epsilon<\\infty\\text{ and }\\|s\\|\\le\\delta,\\text{ we always have }s=\\mathcal{L}x.",
+      "role": "Converts the expected perturbed gap and perturbation norm estimates into the objective and consensus residual endpoints.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Expand the perturbed gap using the definitions of Q and g_Y.",
+          "ref": "Proposition 8.6 proof",
+          "source_pdf_lines": [
+            31859,
+            31866
+          ],
+          "math": "g_Y(s,z)=\\sup_{\\tilde{y}\\in Y}[F(x)-\\langle\\tilde{y},\\mathcal{L}x\\rangle]-F(x^*)+\\langle s,\\tilde{y}\\rangle=F(x)-F(x^*)+\\sup_{\\tilde{y}\\in Y}\\langle-\\tilde{y},\\mathcal{L}x-s\\rangle.",
+          "uses": [
+            "PerturbedGapDefinition"
+          ],
+          "produces": "Expanded formula for g_Y(s,z)."
+        },
+        {
+          "step": 2,
+          "description": "Set s=\\mathcal{L}x so the supremum term vanishes and combine with the feasibility bound.",
+          "ref": "Proposition 8.6 proof",
+          "source_pdf_lines": [
+            31867,
+            31868
+          ],
+          "uses": [
+            "previous_step:1",
+            "EpsilonDeltaSolutionDefinition"
+          ],
+          "produces": "If g_Y(\\mathcal{L}x,z)=F(x)-F(x^*)\\le\\epsilon and \\|\\mathcal{L}x\\|\\le\\delta, then x is an (\\epsilon,\\delta)-solution."
+        },
+        {
+          "step": 3,
+          "description": "For Y=\\mathbb{R}^{md}, the support function is infinite unless \\mathcal{L}x-s=0.",
+          "ref": "Proposition 8.6 proof",
+          "source_pdf_lines": [
+            31868,
+            31870
+          ],
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "g(s,z)<\\infty implies s=\\mathcal{L}x."
+        }
+      ]
+    },
+    {
+      "name": "ProjectionLemma35",
+      "ref": "Lemma 3.5",
+      "statement_math": "\\text{Let the convex function }p:X\\to\\mathbb{R},\\text{ the points }\\tilde{x},\\tilde{y}\\in X,\\text{ and the scalars }\\mu_1,\\mu_2\\ge0\\text{ be given. Let }\\nu:X\\to\\mathbb{R}\\text{ be a differentiable convex function and }V(x,z)\\text{ be defined in (3.2.2). If }\\hat{u}\\in\\operatorname{Argmin}\\{p(u)+\\mu_1V(\\tilde{x},u)+\\mu_2V(\\tilde{y},u):u\\in X\\},\\text{ then for any }u\\in X,\\ p(\\hat{u})+\\mu_1V(\\tilde{x},\\hat{u})+\\mu_2V(\\tilde{y},\\hat{u})\\le p(u)+\\mu_1V(\\tilde{x},u)+\\mu_2V(\\tilde{y},u)-(\\mu_1+\\mu_2)V(\\hat{u},u).",
+      "role": "Supplies the optimality inequality for both the primal stochastic CS projection and the dual update.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Use the definition of \\hat{u} and differentiability/convexity of the Bregman terms to obtain the first-order variational inequality.",
+          "ref": "Lemma 3.5 proof",
+          "source_pdf_lines": [
+            3555,
+            3557
+          ],
+          "math": "\\langle p'(\\hat{u})+\\mu_1\\nabla V(\\tilde{x},\\hat{u})+\\mu_2\\nabla V(\\tilde{y},\\hat{u}),u-\\hat{u}\\rangle\\ge0,\\quad \\forall u\\in X,",
+          "uses": [],
+          "produces": "First-order condition at \\hat{u}."
+        },
+        {
+          "step": 2,
+          "description": "Use the three-point identity for the Bregman distance.",
+          "ref": "Lemma 3.5 proof",
+          "source_pdf_lines": [
+            3558,
+            3561
+          ],
+          "math": "V(\\tilde{x},u)=V(\\tilde{x},\\hat{u})+\\langle\\nabla V(\\tilde{x},\\hat{u}),u-\\hat{u}\\rangle+V(\\hat{u},u),\\quad \\forall u\\in X.",
+          "uses": [],
+          "produces": "Bregman expansion identity."
+        },
+        {
+          "step": 3,
+          "description": "Expand both Bregman terms in the objective expression using the identity from the previous step.",
+          "ref": "Lemma 3.5 proof",
+          "source_pdf_lines": [
+            3563,
+            3568
+          ],
+          "math": "p(u)+\\mu_1V(\\tilde{x},u)+\\mu_2V(\\tilde{y},u)=p(u)+\\mu_1[V(\\tilde{x},\\hat{u})+\\langle\\nabla V(\\tilde{x},\\hat{u}),u-\\hat{u}\\rangle+V(\\hat{u},u)]+\\mu_2[V(\\tilde{y},\\hat{u})+\\langle\\nabla V(\\tilde{y},\\hat{u}),u-\\hat{u}\\rangle+V(\\hat{u},u)]",
+          "uses": [
+            "previous_step:1",
+            "previous_step:2"
+          ],
+          "produces": "Expanded expression for p(u)+\\mu_1V(\\tilde{x},u)+\\mu_2V(\\tilde{y},u)."
+        },
+        {
+          "step": 4,
+          "description": "Use convexity of p and the first-order condition to replace the expanded expression by the displayed lower bound containing the first-order residual.",
+          "ref": "Lemma 3.5 proof",
+          "source_pdf_lines": [
+            3569,
+            3571
+          ],
+          "math": "p(u)+\\mu_1V(\\tilde{x},u)+\\mu_2V(\\tilde{y},u)\\ge p(\\hat{u})+\\mu_1V(\\tilde{x},\\hat{u})+\\mu_2V(\\tilde{y},\\hat{u})+\\langle p'(\\hat{u})+\\mu_1\\nabla V(\\tilde{x},\\hat{u})+\\mu_2\\nabla V(\\tilde{y},\\hat{u}),u-\\hat{u}\\rangle+(\\mu_1+\\mu_2)V(\\hat{u},u)",
+          "uses": [
+            "previous_step:1",
+            "previous_step:3"
+          ],
+          "produces": "Convexity/first-order lower bound before dropping the nonnegative variational term."
+        },
+        {
+          "step": 5,
+          "description": "Drop the first-order residual by the variational inequality and keep the terminal Bregman term.",
+          "ref": "Lemma 3.5 proof",
+          "source_pdf_lines": [
+            3572,
+            3572
+          ],
+          "math": "p(u)+\\mu_1V(\\tilde{x},u)+\\mu_2V(\\tilde{y},u)\\ge[p(\\hat{u})+\\mu_1V(\\tilde{x},\\hat{u})+\\mu_2V(\\tilde{y},\\hat{u})]+(\\mu_1+\\mu_2)V(\\hat{u},u).",
+          "uses": [
+            "previous_step:1",
+            "previous_step:4"
+          ],
+          "produces": "Lower bound with +(\\mu_1+\\mu_2)V(\\hat{u},u)."
+        },
+        {
+          "step": 6,
+          "description": "Rearrange the preceding displayed lower bound to the Lemma 3.5 projection inequality.",
+          "ref": "Lemma 3.5 statement and proof",
+          "source_pdf_lines": [
+            3553,
+            3553
+          ],
+          "math": "p(\\hat{u})+\\mu_1V(\\tilde{x},\\hat{u})+\\mu_2V(\\tilde{y},\\hat{u})\\le p(u)+\\mu_1V(\\tilde{x},u)+\\mu_2V(\\tilde{y},u)-(\\mu_1+\\mu_2)V(\\hat{u},u).",
+          "uses": [
+            "previous_step:5"
+          ],
+          "produces": "Projection inequality stated in Lemma 3.5."
+        }
+      ]
+    },
+    {
+      "name": "CSProcedureConvergenceProposition87",
+      "ref": "Proposition 8.7",
+      "statement_math": "\\text{If }\\{\\beta_t\\}\\text{ and }\\{\\lambda_t\\}\\text{ in the CS procedure satisfy }\\lambda_{t+1}(\\eta\\beta_{t+1}-\\mu)\\le \\lambda_t(1+\\beta_t)\\eta,\\ \\forall t\\ge1,\\text{ then, for }t\\ge1\\text{ and }u\\in U,\\ (\\sum_{t=1}^T\\lambda_t)^{-1}\\left[\\eta(1+\\beta_T)\\lambda_TV(u_T,u)+\\sum_{t=1}^T\\lambda_t\\langle\\delta^{t-1},u-u_{t-1}\\rangle+\\Phi(\\hat{u}_T)-\\Phi(u)\\right]\\le (\\sum_{t=1}^T\\lambda_t)^{-1}\\left[(\\eta\\beta_1-\\mu)\\lambda_1V(u_0,u)+\\sum_{t=1}^T\\frac{(M+\\|\\delta^{t-1}\\|_*)^2\\lambda_t}{2\\eta\\beta_t}\\right].",
+      "role": "Analyzes the stochastic CS inner loop used inside Algorithm 8.8 and is the first step in the proof of Lemma 8.5.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Use the first upper-growth inequality in (8.3.16) with \\phi:=f_i at u_{t-1} to bound \\phi(u_t) by the value, subgradient, and Lipschitz increment at u_{t-1}.",
+          "ref": "Proposition 8.7 proof",
+          "source_pdf_lines": [
+            33102,
+            33104
+          ],
+          "math": "\\phi(u_t)\\le \\phi(u_{t-1})+\\langle\\phi'(u_{t-1}),u_t-u_{t-1}\\rangle+M\\|u_t-u_{t-1}\\|",
+          "uses": [
+            "ObjectiveGrowthCondition"
+          ],
+          "produces": "First line of the three-line \\phi(u_t) bound."
+        },
+        {
+          "step": 2,
+          "description": "Algebraically insert the arbitrary comparison point u by splitting \\langle\\phi'(u_{t-1}),u_t-u_{t-1}\\rangle into the two displayed inner products through u.",
+          "ref": "Proposition 8.7 proof",
+          "source_pdf_lines": [
+            33104,
+            33106
+          ],
+          "math": "\\phi(u_{t-1})+\\langle\\phi'(u_{t-1}),u_t-u_{t-1}\\rangle+M\\|u_t-u_{t-1}\\|=\\phi(u_{t-1})+\\langle\\phi'(u_{t-1}),u-u_{t-1}\\rangle+\\langle\\phi'(u_{t-1}),u_t-u\\rangle+M\\|u_t-u_{t-1}\\|",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "Middle equality in the displayed \\phi(u_t) chain."
+        },
+        {
+          "step": 3,
+          "description": "Use the lower-growth/strong-convexity side of (8.3.16) to replace \\phi(u_{t-1})+\\langle\\phi'(u_{t-1}),u-u_{t-1}\\rangle by \\phi(u)-\\mu V(u_{t-1},u).",
+          "ref": "Proposition 8.7 proof",
+          "source_pdf_lines": [
+            33105,
+            33108
+          ],
+          "math": "\\phi(u_t)\\le \\phi(u)-\\mu V(u_{t-1},u)+\\langle\\phi'(u_{t-1}),u_t-u\\rangle+M\\|u_t-u_{t-1}\\|,",
+          "uses": [
+            "ObjectiveGrowthCondition",
+            "previous_step:2"
+          ],
+          "produces": "One-step upper bound for \\phi(u_t)-\\phi(u)."
+        },
+        {
+          "step": 4,
+          "description": "Apply Lemma 3.5 to the inner projection (8.3.26).",
+          "ref": "Proposition 8.7 proof",
+          "source_pdf_lines": [
+            33109,
+            33113
+          ],
+          "math": "\\langle w+h_{t-1},u_t-u\\rangle+\\eta V(x,u_t)-\\eta V(x,u)\\le \\eta\\beta_tV(u_{t-1},u)-\\eta(1+\\beta_t)V(u_t,u)-\\eta\\beta_tV(u_{t-1},u_t),\\quad \\forall u\\in U.",
+          "uses": [
+            "ProjectionLemma35"
+          ],
+          "produces": "Projection inequality for the stochastic CS step."
+        },
+        {
+          "step": 5,
+          "description": "Combine the objective bound and projection inequality, and substitute \\delta^{t-1}=\\phi'(u_{t-1})-h_{t-1}.",
+          "ref": "(8.3.4)-(8.3.5)",
+          "source_pdf_lines": [
+            33114,
+            33127
+          ],
+          "math": "\\langle w,u_t-u\\rangle+\\phi(u_t)-\\phi(u)+\\langle\\delta^{t-1},u-u_{t-1}\\rangle+\\eta V(x,u_t)-\\eta V(x,u)\\le (\\eta\\beta_t-\\mu)V(u_{t-1},u)-\\eta(1+\\beta_t)V(u_t,u)+\\langle\\delta^{t-1},u_t-u_{t-1}\\rangle+M\\|u_t-u_{t-1}\\|-\\eta\\beta_tV(u_{t-1},u_t).",
+          "uses": [
+            "previous_step:3",
+            "previous_step:4"
+          ],
+          "produces": "Combined one-step inequality with the stochastic error term."
+        },
+        {
+          "step": 6,
+          "description": "Bound the stochastic-error and prox terms in the final line of (8.3.5) by Cauchy-Schwarz and the prox lower bound (8.3.12), keeping the intermediate quadratic expression printed before the scalar inequality is applied.",
+          "ref": "Proposition 8.7 proof after (8.3.5)",
+          "source_pdf_lines": [
+            33129,
+            33135
+          ],
+          "math": "\\langle\\delta^{t-1},u_t-u_{t-1}\\rangle+M\\|u_t-u_{t-1}\\|-\\eta\\beta_tV(u_{t-1},u_t)\\le(\\|\\delta^{t-1}\\|_*+M)\\|u_t-u_{t-1}\\|-\\frac{\\eta\\beta_t}{2}\\|u_t-u_{t-1}\\|^2",
+          "uses": [
+            "ProxStrongConvexityModulusOne",
+            "previous_step:5"
+          ],
+          "produces": "Intermediate norm/quadratic upper bound printed in the proof."
+        },
+        {
+          "step": 7,
+          "description": "Apply the printed scalar fact -a t^2/2+bt <= b^2/(2a), with a=\\eta\\beta_t and b=M+\\|\\delta^{t-1}\\|_*, to the intermediate quadratic expression.",
+          "ref": "Proposition 8.7 proof after (8.3.5)",
+          "source_pdf_lines": [
+            33129,
+            33137
+          ],
+          "math": "(\\|\\delta^{t-1}\\|_*+M)\\|u_t-u_{t-1}\\|-\\frac{\\eta\\beta_t}{2}\\|u_t-u_{t-1}\\|^2\\le \\frac{(M+\\|\\delta^{t-1}\\|_*)^2}{2\\eta\\beta_t}.",
+          "uses": [
+            "previous_step:6"
+          ],
+          "produces": "One-step error upper bound."
+        },
+        {
+          "step": 8,
+          "description": "Rewrite the one-step inequality with \\Phi(u)=\\langle w,u\\rangle+\\phi(u)+\\eta V(x,u).",
+          "ref": "Proposition 8.7 proof, display after (8.3.5)",
+          "source_pdf_lines": [
+            33139,
+            33145
+          ],
+          "math": "\\Phi(u_t)-\\Phi(u)+\\langle\\delta^{t-1},u-u_{t-1}\\rangle\\le(\\eta\\beta_t-\\mu)V(u_{t-1},u)-\\eta(1+\\beta_t)V(u_t,u)+\\frac{(M+\\|\\delta^{t-1}\\|_*)^2}{2\\eta\\beta_t},\\quad \\forall u\\in U.",
+          "uses": [
+            "previous_step:5",
+            "previous_step:7"
+          ],
+          "produces": "One-step \\Phi inequality."
+        },
+        {
+          "step": 9,
+          "description": "Multiply by \\lambda_t and sum from t=1 to T.",
+          "ref": "Proposition 8.7 proof, summation display",
+          "source_pdf_lines": [
+            33148,
+            33159
+          ],
+          "math": "\\sum_{t=1}^T\\lambda_t[\\Phi(u_t)-\\Phi(u)+\\langle\\delta^{t-1},u-u_{t-1}\\rangle]\\le\\sum_{t=1}^T[(\\eta\\beta_t-\\mu)\\lambda_tV(u_{t-1},u)-\\eta(1+\\beta_t)\\lambda_tV(u_t,u)]+\\sum_{t=1}^T\\frac{(M+\\|\\delta^{t-1}\\|_*)^2\\lambda_t}{2\\eta\\beta_t}.",
+          "uses": [
+            "previous_step:8"
+          ],
+          "produces": "Weighted sum inequality."
+        },
+        {
+          "step": 10,
+          "description": "Use the parameter condition \\lambda_{t+1}(\\eta\\beta_{t+1}-\\mu)\\le\\lambda_t(1+\\beta_t)\\eta to telescope the Bregman terms, then use convexity of \\Phi and the definition of \\hat{u}_T.",
+          "ref": "Proposition 8.7 proof, final display",
+          "source_pdf_lines": [
+            33161,
+            33176
+          ],
+          "math": "\\Phi(\\hat{u}_T)-\\Phi(u)+\\left(\\sum_{t=1}^T\\lambda_t\\right)^{-1}\\sum_{t=1}^T\\lambda_t\\langle\\delta^{t-1},u-u_{t-1}\\rangle\\le\\left(\\sum_{t=1}^T\\lambda_t\\right)^{-1}\\left[(\\eta\\beta_1-\\mu)\\lambda_1V(u_0,u)-\\eta(1+\\beta_T)\\lambda_TV(u_T,u)+\\sum_{t=1}^T\\frac{(M+\\|\\delta^{t-1}\\|_*)^2\\lambda_t}{2\\eta\\beta_t}\\right],",
+          "uses": [
+            "previous_step:9",
+            "CSProcedureParameterCondition",
+            "inner_weighted_average"
+          ],
+          "produces": "Proposition 8.7 bound (8.3.2)."
+        }
+      ]
+    },
+    {
+      "name": "GeneralSDCSGapLemma85",
+      "ref": "Lemma 8.5",
+      "statement_math": "\\text{Let the iterates }(\\hat{x}_k,y_k)\\text{ for }k=1,\\ldots,N\\text{ be generated by Algorithm 8.8, }\\hat{z}_N:=\\left(\\sum_{k=1}^N\\theta_k\\right)^{-1}\\sum_{k=1}^N\\theta_k(\\hat{x}_k,y_k),\\text{ and Assumptions (8.3.61)-(8.3.62) hold. If the objective }f_i,i=1,\\ldots,m,\\text{ are general nonsmooth convex functions, i.e., }\\mu=0\\text{ and }M>0,\\text{ let the parameters }\\{\\alpha_k\\},\\{\\theta_k\\},\\{\\eta_k\\},\\{\\tau_k\\},\\text{ and }\\{T_k\\}\\text{ in Algorithm 8.8 satisfy (8.3.29)-(8.3.33),\\text{ and the parameters }\\{\\lambda_t\\}\\text{ and }\\{\\beta_t\\}\\text{ in the CS procedure of Algorithm 8.8 be set as (8.3.34). Then, for all }z\\in X\\times\\mathbb{R}^{md},\\quad Q(\\hat{z}_N;z)\\le\\left(\\sum_{k=1}^N\\theta_k\\right)^{-1}\\left[\\frac{(T_1+1)(T_1+2)\\theta_1\\eta_1}{T_1(T_1+3)}V(x_0,x)+\\frac{\\theta_1\\tau_1}{2}\\|y_0\\|^2+\\langle\\hat{s},y\\rangle+\\sum_{k=1}^N\\sum_{t=1}^{T_k}\\sum_{i=1}^m\\frac{2\\theta_k}{T_k(T_k+3)}\\left((t+1)\\langle\\delta_i^{t-1,k},x_i-u_i^{t-1}\\rangle+\\frac{4(M^2+\\|\\delta_i^{t-1,k}\\|_*^2)}{\\eta_k}\\right)\\right],\\quad \\text{where }\\hat{s}:=\\theta_N\\mathcal{L}(\\hat{x}_N-x_{N-1})+\\theta_1\\tau_1(y_N-y_0)\\text{ and }Q\\text{ is defined in (8.3.8). Furthermore, for any saddle point }(x^*,y^*)\\text{ of (8.3.7), we have }\\quad \\frac{\\theta_N}{2}\\left(1-\\frac{\\theta_N\\|\\mathcal{L}\\|^2}{\\eta_N\\tau_N}\\right)\\max\\{\\eta_N\\|\\hat{x}_N-x_{N-1}\\|^2,\\tau_N\\|y^*-y_N\\|^2\\}\\le\\frac{(T_1+1)(T_1+2)\\theta_1\\eta_1}{T_1(T_1+3)}V(x_0,x^*)+\\frac{\\theta_1\\tau_1}{2}\\|y^*-y_0\\|^2+\\sum_{k=1}^N\\sum_{t=1}^{T_k}\\sum_{i=1}^m\\frac{2\\theta_k}{T_k(T_k+3)}\\left((t+1)\\langle\\delta_i^{t-1,k},x_i^*-u_i^{t-1}\\rangle+\\frac{4(M^2+\\|\\delta_i^{t-1,k}\\|_*^2)}{\\eta_k}\\right).",
+      "role": "Provides the SDCS gap estimate and the primal/dual residual inequality that Theorem 8.11 specializes and takes expectations over.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "In the general convex case \\mu=0,M>0, use the weights (8.3.34), which satisfy the CS condition (8.3.1), and specialize Proposition 8.7 to each agent with \\phi:=f_i.",
+          "ref": "Proof of Lemma 8.5, first display",
+          "source_pdf_lines": [
+            33182,
+            33201
+          ],
+          "math": "\\left(\\sum_{t=1}^T\\lambda_t\\right)^{-1}\\left[\\eta(1+\\beta_T)\\lambda_TV_i(u_i^T,u_i)+\\sum_{t=1}^T\\lambda_t\\langle\\delta_i^{t-1},u_i-u_i^{t-1}\\rangle+\\Phi_i(\\hat{u}_i^T)-\\Phi_i(u_i)\\right]\\le\\left(\\sum_{t=1}^T\\lambda_t\\right)^{-1}\\left[\\eta\\beta_1\\lambda_1V_i(u_i^0,u_i)+\\sum_{t=1}^T\\frac{(M+\\|\\delta_i^{t-1}\\|_*)^2\\lambda_t}{2\\eta\\beta_t}\\right],\\quad \\forall u_i\\in X_i.",
+          "uses": [
+            "GeneralConvexCase",
+            "general_cs_weights",
+            "CSProcedureParameterCondition",
+            "CSProcedureConvergenceProposition87"
+          ],
+          "produces": "The weights (8.3.34) satisfy the CS condition (8.3.1) under \\mu=0, and hence yield the per-agent stochastic CS inequality."
+        },
+        {
+          "step": 2,
+          "description": "Use the definition of \\Phi^k in (8.3.19) and the input/output settings in the CS procedure to assemble the per-agent inequalities into a vector inequality for every outer iteration k.",
+          "ref": "Proof of Lemma 8.5, display before p. 560",
+          "source_pdf_lines": [
+            33205,
+            33220
+          ],
+          "math": "\\Phi^k(\\hat{x}_k)-\\Phi^k(x)+\\left(\\sum_{t=1}^{T_k}\\lambda_t\\right)^{-1}\\left[\\eta_k(1+\\beta_{T_k})\\lambda_{T_k}V(x_k,x)+\\sum_{t=1}^{T_k}\\sum_{i=1}^m\\lambda_t\\langle\\delta_i^{t-1,k},x_i-u_i^{t-1}\\rangle\\right]\\le\\left(\\sum_{t=1}^{T_k}\\lambda_t\\right)^{-1}\\left[\\eta_k\\beta_1\\lambda_1V(x_{k-1},x)+\\sum_{t=1}^{T_k}\\sum_{i=1}^m\\frac{(M+\\|\\delta_i^{t-1,k}\\|_*)^2\\lambda_t}{2\\eta_k\\beta_t}\\right],\\quad \\forall x\\in X.",
+          "uses": [
+            "previous_step:1",
+            "DCSPrimalSubproblemPhi",
+            "LocalCSSubproblemIdentification"
+          ],
+          "produces": "Outer CS inequality for \\Phi^k(\\hat{x}_k)-\\Phi^k(x)."
+        },
+        {
+          "step": 3,
+          "description": "Plug in \\lambda_t=t+1 and \\beta_t=t/2, expand \\Phi^k, and rearrange.",
+          "ref": "Proof of Lemma 8.5, first display on p. 560",
+          "source_pdf_lines": [
+            33230,
+            33243
+          ],
+          "math": "\\langle\\mathcal{L}(\\hat{x}_k-x),y_k\\rangle+F(\\hat{x}_k)-F(x)\\le\\frac{(T_k+1)(T_k+2)\\eta_k}{T_k(T_k+3)}\\left[V(x_{k-1},x)-V(x_k,x)\\right]-\\eta_kV(x_{k-1},\\hat{x}_k)+\\frac{2}{T_k(T_k+3)}\\sum_{t=1}^{T_k}\\sum_{i=1}^m\\left[(t+1)\\langle\\delta_i^{t-1,k},x_i-u_i^{t-1}\\rangle+\\frac{2(M+\\|\\delta_i^{t-1,k}\\|_*)^2}{\\eta_k}\\right],\\quad \\forall x\\in X.",
+          "uses": [
+            "previous_step:2",
+            "general_cs_weights",
+            "DCSPrimalSubproblemPhi"
+          ],
+          "produces": "Rearranged outer primal inequality."
+        },
+        {
+          "step": 4,
+          "description": "Apply Lemma 3.5 to the dual update (8.3.22).",
+          "ref": "(8.3.6) in proof of Lemma 8.5",
+          "source_pdf_lines": [
+            33247,
+            33252
+          ],
+          "math": "\\langle v_i^k,y_i-y_i^k\\rangle\\le \\frac{\\tau_k}{2}\\left(\\|y_i-y_i^{k-1}\\|^2-\\|y_i-y_i^k\\|^2-\\|y_i^{k-1}-y_i^k\\|^2\\right),\\quad \\forall y_i\\in\\mathbb{R}^d.",
+          "uses": [
+            "ProjectionLemma35"
+          ],
+          "produces": "Dual one-step inequality."
+        },
+        {
+          "step": 5,
+          "description": "Combine the primal inequality, the dual inequality, and the definition of Q.",
+          "ref": "Proof of Lemma 8.5 after (8.3.6)",
+          "source_pdf_lines": [
+            33253,
+            33276
+          ],
+          "math": "Q(\\hat{x}_k,y_k;z)\\le\\langle\\mathcal{L}(\\hat{x}_k-\\tilde{x}_k),y-y_k\\rangle+\\frac{(T_k+1)(T_k+2)\\eta_k}{T_k(T_k+3)}\\left[V(x_{k-1},x)-V(x_k,x)\\right]-\\eta_kV(x_{k-1},\\hat{x}_k)+\\frac{\\tau_k}{2}\\left(\\|y-y_{k-1}\\|^2-\\|y-y_k\\|^2-\\|y_{k-1}-y_k\\|^2\\right)+\\frac{2}{T_k(T_k+3)}\\sum_{t=1}^{T_k}\\sum_{i=1}^m\\left[(t+1)\\langle\\delta_i^{t-1,k},x_i-u_i^{t-1}\\rangle+\\frac{2(M+\\|\\delta_i^{t-1,k}\\|_*)^2}{\\eta_k}\\right].",
+          "uses": [
+            "PerturbedGapDefinition",
+            "previous_step:3",
+            "previous_step:4"
+          ],
+          "produces": "One-outer-iteration Q inequality."
+        },
+        {
+          "step": 6,
+          "description": "Multiply the one-step Q inequality by \\theta_k, sum over k, and define \\Delta_k.",
+          "ref": "(8.3.7)-(8.3.8) in proof of Lemma 8.5",
+          "source_pdf_lines": [
+            33277,
+            33303
+          ],
+          "math": "\\sum_{k=1}^N\\theta_kQ(\\hat{x}_k,y_k;z)\\le\\sum_{k=1}^N\\theta_k\\Delta_k+\\sum_{k=1}^N\\sum_{t=1}^{T_k}\\sum_{i=1}^m\\frac{2\\theta_k}{T_k(T_k+3)}\\left[(t+1)\\langle\\delta_i^{t-1,k},x_i-u_i^{t-1}\\rangle+\\frac{2(M+\\|\\delta_i^{t-1,k}\\|_*)^2}{\\eta_k}\\right],\\quad \\Delta_k:=\\langle\\mathcal{L}(\\hat{x}_k-\\tilde{x}_k),y-y_k\\rangle+\\frac{(T_k+1)(T_k+2)\\eta_k}{T_k(T_k+3)}\\left[V(x_{k-1},x)-V(x_k,x)\\right]-\\eta_kV(x_{k-1},\\hat{x}_k)+\\frac{\\tau_k}{2}\\left(\\|y-y_{k-1}\\|^2-\\|y-y_k\\|^2-\\|y_{k-1}-y_k\\|^2\\right).",
+          "uses": [
+            "previous_step:5"
+          ],
+          "produces": "Summed Q inequality and definition of \\Delta_k."
+        },
+        {
+          "step": 7,
+          "description": "Use the definition of \\tilde{x}_k, condition (8.3.29), and condition (8.3.31) to begin bounding \\sum_k\\theta_k\\Delta_k.",
+          "ref": "Proof of Lemma 8.5, start of telescoping display",
+          "source_pdf_lines": [
+            33304,
+            33325
+          ],
+          "math": "\\sum_{k=1}^N\\theta_k\\Delta_k\\le\\sum_{k=1}^N\\theta_k\\left[\\langle\\mathcal{L}(\\hat{x}_k-x_{k-1}),y-y_k\\rangle-\\alpha_k\\langle\\mathcal{L}(\\hat{x}_{k-1}-x_{k-2}),y-y_{k-1}\\rangle\\right]-\\sum_{k=1}^N\\theta_k\\left[\\alpha_k\\langle\\mathcal{L}(\\hat{x}_{k-1}-x_{k-2}),y_{k-1}-y_k\\rangle+\\eta_kV(x_{k-1},\\hat{x}_k)+\\frac{\\tau_k}{2}\\|y_{k-1}-y_k\\|^2\\right]+\\frac{(T_1+1)(T_1+2)\\theta_1\\eta_1}{T_1(T_1+3)}V(x_0,x)-\\frac{(T_N+1)(T_N+2)\\theta_N\\eta_N}{T_N(T_N+3)}V(x_N,x)+\\frac{\\theta_1\\tau_1}{2}\\|y-y_0\\|^2-\\frac{\\theta_N\\tau_N}{2}\\|y-y_N\\|^2.",
+          "uses": [
+            "previous_step:6",
+            "outer_extrapolation",
+            "general_parameter_condition_29",
+            "general_parameter_condition_31"
+          ],
+          "produces": "First expanded bound on \\sum_k\\theta_k\\Delta_k with adjacent-k cancellation terms exposed."
+        },
+        {
+          "step": 8,
+          "description": "Step (a): use (8.3.30) and x_{-1}=\\hat{x}_0 to telescope the extrapolation terms, leaving the terminal k=N term and a sum over k=2,...,N.",
+          "ref": "Proof of Lemma 8.5, inequality (a)",
+          "source_pdf_lines": [
+            33316,
+            33330
+          ],
+          "math": "\\sum_{k=1}^N\\theta_k\\Delta_k\\le\\theta_N\\langle\\mathcal{L}(\\hat{x}_N-x_{N-1}),y-y_N\\rangle-\\theta_N\\eta_NV(x_{N-1},\\hat{x}_N)-\\sum_{k=2}^N\\left[\\theta_k\\alpha_k\\langle\\mathcal{L}(\\hat{x}_{k-1}-x_{k-2}),y_{k-1}-y_k\\rangle+\\theta_{k-1}\\eta_{k-1}V(x_{k-2},\\hat{x}_{k-1})+\\frac{\\theta_k\\tau_k}{2}\\|y_{k-1}-y_k\\|^2\\right]+\\frac{(T_1+1)(T_1+2)\\theta_1\\eta_1}{T_1(T_1+3)}V(x_0,x)-\\frac{(T_N+1)(T_N+2)\\theta_N\\eta_N}{T_N(T_N+3)}V(x_N,x)+\\frac{\\theta_1\\tau_1}{2}\\|y-y_0\\|^2-\\frac{\\theta_N\\tau_N}{2}\\|y-y_N\\|^2.",
+          "uses": [
+            "previous_step:7",
+            "general_parameter_condition_30"
+          ],
+          "produces": "Telescoped extrapolation contribution."
+        },
+        {
+          "step": 9,
+          "description": "Step (b): bound the cross terms using b< u,v > - a||v||^2/2 <= b^2||u||^2/(2a), together with (8.3.30) and the norm bound (8.3.15); the prose justification is printed at lines 33358-33360.",
+          "ref": "Proof of Lemma 8.5, inequality (b)",
+          "source_pdf_lines": [
+            33331,
+            33339
+          ],
+          "math": "\\sum_{k=1}^N\\theta_k\\Delta_k\\le\\theta_N\\langle\\mathcal{L}(\\hat{x}_N-x_{N-1}),y-y_N\\rangle-\\theta_N\\eta_NV(x_{N-1},\\hat{x}_N)+\\frac{\\theta_1\\tau_1}{2}\\|y-y_0\\|^2-\\frac{\\theta_N\\tau_N}{2}\\|y-y_N\\|^2+\\sum_{k=2}^N\\left(\\frac{\\theta_{k-1}\\alpha_k\\|\\mathcal{L}\\|^2}{2\\tau_k}-\\frac{\\theta_{k-1}\\eta_{k-1}}{2}\\right)\\|x_{k-2}-\\hat{x}_{k-1}\\|^2+\\frac{(T_1+1)(T_1+2)\\theta_1\\eta_1}{T_1(T_1+3)}V(x_0,x)-\\frac{(T_N+1)(T_N+2)\\theta_N\\eta_N}{T_N(T_N+3)}V(x_N,x).",
+          "uses": [
+            "StackedProxLowerBound",
+            "previous_step:8",
+            "general_parameter_condition_30"
+          ],
+          "produces": "Bounded cross-term sum involving \\alpha_k\\|\\mathcal{L}\\|^2/(2\\tau_k)-\\eta_{k-1}/2."
+        },
+        {
+          "step": 10,
+          "description": "Step (c): apply (8.3.32) to drop the nonpositive cross-term sum.",
+          "ref": "Proof of Lemma 8.5, inequality (c)",
+          "source_pdf_lines": [
+            33340,
+            33346
+          ],
+          "math": "\\sum_{k=1}^N\\theta_k\\Delta_k\\le\\theta_N\\langle\\mathcal{L}(\\hat{x}_N-x_{N-1}),y-y_N\\rangle-\\theta_N\\eta_NV(x_{N-1},\\hat{x}_N)+\\frac{\\theta_1\\tau_1}{2}\\|y-y_0\\|^2-\\frac{\\theta_N\\tau_N}{2}\\|y-y_N\\|^2+\\frac{(T_1+1)(T_1+2)\\theta_1\\eta_1}{T_1(T_1+3)}V(x_0,x)-\\frac{(T_N+1)(T_N+2)\\theta_N\\eta_N}{T_N(T_N+3)}V(x_N,x).",
+          "uses": [
+            "previous_step:9",
+            "general_parameter_condition_32"
+          ],
+          "produces": "Simplified \\sum_k\\theta_k\\Delta_k bound without the cross-term sum."
+        },
+        {
+          "step": 11,
+          "description": "Step (d): use (8.3.31) and the identity ||y-y_0||^2-||y-y_N||^2=||y_0||^2-||y_N||^2-2<y,y_0-y_N> to rearrange terms and expose \\hat{s}.",
+          "ref": "Proof of Lemma 8.5, inequality (d)",
+          "source_pdf_lines": [
+            33347,
+            33351
+          ],
+          "math": "\\sum_{k=1}^N\\theta_k\\Delta_k\\le\\theta_N\\langle y_N,\\mathcal{L}(x_{N-1}-\\hat{x}_N)\\rangle-\\theta_N\\eta_NV(x_{N-1},\\hat{x}_N)-\\frac{\\theta_1\\tau_1}{2}\\|y_N\\|^2+\\frac{(T_1+1)(T_1+2)\\theta_1\\eta_1}{T_1(T_1+3)}V(x_0,x)+\\frac{\\theta_1\\tau_1}{2}\\|y_0\\|^2+\\langle y,\\theta_N\\mathcal{L}(\\hat{x}_N-x_{N-1})+\\theta_1\\tau_1(y_N-y_0)\\rangle.",
+          "uses": [
+            "previous_step:10",
+            "general_parameter_condition_31"
+          ],
+          "produces": "Bound with \\langle y,\\theta_N\\mathcal{L}(\\hat{x}_N-x_{N-1})+\\theta_1\\tau_1(y_N-y_0)\\rangle."
+        },
+        {
+          "step": 12,
+          "description": "Step (e): use (8.3.15) and b< u,v > - a||v||^2/2 <= b^2||u||^2/(2a) on the terminal \\mathcal{L}(x_{N-1}-\\hat{x}_N) term.",
+          "ref": "Proof of Lemma 8.5, inequality (e)",
+          "source_pdf_lines": [
+            33352,
+            33356
+          ],
+          "math": "\\sum_{k=1}^N\\theta_k\\Delta_k\\le\\frac{\\theta_N\\|\\mathcal{L}\\|^2}{2\\eta_N}\\|y_N\\|^2-\\frac{\\theta_1\\tau_1}{2}\\|y_N\\|^2+\\frac{(T_1+1)(T_1+2)\\theta_1\\eta_1}{T_1(T_1+3)}V(x_0,x)+\\frac{\\theta_1\\tau_1}{2}\\|y_0\\|^2+\\langle y,\\theta_N\\mathcal{L}(\\hat{x}_N-x_{N-1})+\\theta_1\\tau_1(y_N-y_0)\\rangle.",
+          "uses": [
+            "StackedProxLowerBound",
+            "previous_step:11"
+          ],
+          "produces": "Final bound on \\sum_k\\theta_k\\Delta_k before applying (8.3.33)."
+        },
+        {
+          "step": 13,
+          "description": "Before substituting the final \\sum_k\\theta_k\\Delta_k bound into (8.3.7), use the elementary square estimate (M+a)^2 <= 2(M^2+a^2) on the stochastic error term from (8.3.7); this is the algebraic transition that changes 2(M+||\\delta_i^{t-1,k}||_*)^2/\\eta_k into the printed 4(M^2+||\\delta_i^{t-1,k}||_*^2)/\\eta_k in (8.3.9).",
+          "ref": "Transition from (8.3.7) to (8.3.9) in proof of Lemma 8.5",
+          "source_pdf_lines": [
+            33283,
+            33290
+          ],
+          "uses": [
+            "previous_step:6"
+          ],
+          "produces": "Stochastic-error summand bounded in the form printed in (8.3.9)."
+        },
+        {
+          "step": 14,
+          "description": "Use the preceding bound in the summed Q inequality and condition (8.3.33) to obtain the displayed aggregate Q bound with residual vector \\hat{s}.",
+          "ref": "(8.3.9)-(8.3.10) in proof of Lemma 8.5",
+          "source_pdf_lines": [
+            33363,
+            33378
+          ],
+          "math": "\\sum_{k=1}^N\\theta_kQ(\\hat{x}_k,y_k;z)\\le\\frac{(T_1+1)(T_1+2)\\theta_1\\eta_1}{T_1(T_1+3)}V(x_0,x)+\\frac{\\theta_1\\tau_1}{2}\\|y_0\\|^2+\\langle\\hat{s},y\\rangle+\\sum_{k=1}^N\\sum_{t=1}^{T_k}\\sum_{i=1}^m\\frac{2\\theta_k}{T_k(T_k+3)}\\left[(t+1)\\langle\\delta_i^{t-1,k},x_i-u_i^{t-1}\\rangle+\\frac{4(M^2+\\|\\delta_i^{t-1,k}\\|_*^2)}{\\eta_k}\\right],",
+          "uses": [
+            "previous_step:12",
+            "previous_step:13",
+            "general_parameter_condition_33",
+            "lemma_85_residual_vector"
+          ],
+          "produces": "Aggregate Q bound (8.3.9) and residual definition (8.3.10)."
+        },
+        {
+          "step": 15,
+          "description": "Use convexity of Q to divide by \\sum_k\\theta_k and pass from the aggregate bound to Q(\\hat{z}_N;z), giving (8.3.65).",
+          "ref": "Proof of Lemma 8.5 after (8.3.10)",
+          "source_pdf_lines": [
+            33381,
+            33382
+          ],
+          "uses": [
+            "previous_step:14"
+          ],
+          "produces": "Lemma 8.5 first conclusion (8.3.65)."
+        },
+        {
+          "step": 16,
+          "description": "Return to the stronger post-(c) bound and the summed Q inequality to keep the terminal negative norm terms.",
+          "ref": "Proof of Lemma 8.5, display after (8.3.10)",
+          "source_pdf_lines": [
+            33381,
+            33396
+          ],
+          "math": "\\sum_{k=1}^N\\theta_kQ(\\hat{x}_k,y_k;z)\\le\\theta_N\\langle\\mathcal{L}(\\hat{x}_N-x_{N-1}),y-y_N\\rangle-\\theta_N\\eta_NV(x_{N-1},\\hat{x}_N)+\\frac{\\theta_1\\tau_1}{2}\\|y-y_0\\|^2-\\frac{\\theta_N\\tau_N}{2}\\|y-y_N\\|^2+\\frac{(T_1+1)(T_1+2)\\theta_1\\eta_1}{T_1(T_1+3)}V(x_0,x)-\\frac{(T_N+1)(T_N+2)\\theta_N\\eta_N}{T_N(T_N+3)}V(x_N,x)+\\sum_{k=1}^N\\sum_{t=1}^{T_k}\\sum_{i=1}^m\\frac{2\\theta_k}{T_k(T_k+3)}\\left[(t+1)\\langle\\delta_i^{t-1,k},x_i-u_i^{t-1}\\rangle+\\frac{4(M^2+\\|\\delta_i^{t-1,k}\\|_*^2)}{\\eta_k}\\right].",
+          "uses": [
+            "previous_step:10",
+            "previous_step:13"
+          ],
+          "produces": "Stronger aggregate inequality retaining \\|\\hat{x}_N-x_{N-1}\\|^2 and \\|y-y_N\\|^2."
+        },
+        {
+          "step": 17,
+          "description": "Fix z=z^* and use \\sum_k\\theta_kQ(\\hat{x}_k,y_k;z^*)\\ge0 plus (8.3.15), then rearrange to bound the primal terminal difference.",
+          "ref": "(8.3.11) in proof of Lemma 8.5",
+          "source_pdf_lines": [
+            33399,
+            33414
+          ],
+          "math": "\\frac{\\theta_N\\eta_N}{2}\\|\\hat{x}_N-x_{N-1}\\|^2\\le\\theta_N\\langle\\mathcal{L}(\\hat{x}_N-x_{N-1}),y^*-y_N\\rangle-\\frac{\\theta_N\\tau_N}{2}\\|y^*-y_N\\|^2+\\frac{(T_1+1)(T_1+2)\\theta_1\\eta_1}{T_1(T_1+3)}V(x_0,x^*)+\\frac{\\theta_1\\tau_1}{2}\\|y^*-y_0\\|^2+\\sum_{k=1}^N\\sum_{t=1}^{T_k}\\sum_{i=1}^m\\frac{2\\theta_k}{T_k(T_k+3)}\\left[(t+1)\\langle\\delta_i^{t-1,k},x_i^*-u_i^{t-1}\\rangle+\\frac{4(M^2+\\|\\delta_i^{t-1,k}\\|_*^2)}{\\eta_k}\\right].",
+          "uses": [
+            "SaddlePointExistence",
+            "StackedProxLowerBound",
+            "previous_step:16"
+          ],
+          "produces": "First terminal residual inequality."
+        },
+        {
+          "step": 18,
+          "description": "Bound the cross term in (8.3.11) by b< u,v > - a||v||^2/2 <= b^2||u||^2/(2a).",
+          "ref": "Second inequality in (8.3.11)",
+          "source_pdf_lines": [
+            33415,
+            33430
+          ],
+          "math": "\\frac{\\theta_N\\eta_N}{2}\\|\\hat{x}_N-x_{N-1}\\|^2\\le\\frac{\\theta_N^2\\|\\mathcal{L}\\|^2}{2\\tau_N}\\|\\hat{x}_N-x_{N-1}\\|^2+\\frac{(T_1+1)(T_1+2)\\theta_1\\eta_1}{T_1(T_1+3)}V(x_0,x^*)+\\frac{\\theta_1\\tau_1}{2}\\|y^*-y_0\\|^2+\\sum_{k=1}^N\\sum_{t=1}^{T_k}\\sum_{i=1}^m\\frac{2\\theta_k}{T_k(T_k+3)}\\left[(t+1)\\langle\\delta_i^{t-1,k},x_i^*-u_i^{t-1}\\rangle+\\frac{4(M^2+\\|\\delta_i^{t-1,k}\\|_*^2)}{\\eta_k}\\right],",
+          "uses": [
+            "previous_step:17"
+          ],
+          "produces": "Primal terminal bound with coefficient \\theta_N^2\\|\\mathcal{L}\\|^2/(2\\tau_N)."
+        },
+        {
+          "step": 19,
+          "description": "Repeat the same argument symmetrically to bound the terminal dual distance.",
+          "ref": "(8.3.12) in proof of Lemma 8.5",
+          "source_pdf_lines": [
+            33433,
+            33451
+          ],
+          "math": "\\frac{\\theta_N\\tau_N}{2}\\|y^*-y_N\\|^2\\le\\frac{\\theta_N^2\\|\\mathcal{L}\\|^2}{2\\eta_N}\\|y^*-y_N\\|^2+\\frac{(T_1+1)(T_1+2)\\theta_1\\eta_1}{T_1(T_1+3)}V(x_0,x^*)+\\frac{\\theta_1\\tau_1}{2}\\|y^*-y_0\\|^2+\\sum_{k=1}^N\\sum_{t=1}^{T_k}\\sum_{i=1}^m\\frac{2\\theta_k}{T_k(T_k+3)}\\left[(t+1)\\langle\\delta_i^{t-1,k},x_i^*-u_i^{t-1}\\rangle+\\frac{4(M^2+\\|\\delta_i^{t-1,k}\\|_*^2)}{\\eta_k}\\right].",
+          "uses": [
+            "previous_step:16"
+          ],
+          "produces": "Dual terminal bound."
+        },
+        {
+          "step": 20,
+          "description": "Combine the primal and dual terminal inequalities into the max form printed as (8.3.66).",
+          "ref": "Lemma 8.5 statement and proof after (8.3.12)",
+          "source_pdf_lines": [
+            32586,
+            32604
+          ],
+          "math": "\\frac{\\theta_N}{2}\\left(1-\\frac{\\theta_N\\|\\mathcal{L}\\|^2}{\\eta_N\\tau_N}\\right)\\max\\{\\eta_N\\|\\hat{x}_N-x_{N-1}\\|^2,\\tau_N\\|y^*-y_N\\|^2\\}\\le\\frac{(T_1+1)(T_1+2)\\theta_1\\eta_1}{T_1(T_1+3)}V(x_0,x^*)+\\frac{\\theta_1\\tau_1}{2}\\|y^*-y_0\\|^2+\\sum_{k=1}^N\\sum_{t=1}^{T_k}\\sum_{i=1}^m\\frac{2\\theta_k}{T_k(T_k+3)}\\left[(t+1)\\langle\\delta_i^{t-1,k},x_i^*-u_i^{t-1}\\rangle+\\frac{4(M^2+\\|\\delta_i^{t-1,k}\\|_*^2)}{\\eta_k}\\right].",
+          "uses": [
+            "previous_step:18",
+            "previous_step:19"
+          ],
+          "produces": "Lemma 8.5 second conclusion (8.3.66)."
+        }
+      ]
+    },
+    {
+      "name": "StochasticOracleErrorMomentFacts",
+      "ref": "Theorem 8.11 proof after (8.3.70)",
+      "statement_math": "\\mathbb{E}[\\delta_i^{t-1,k}]=0,\\quad \\mathbb{E}[\\|\\delta_i^{t-1,k}\\|_*^2]\\le \\sigma^2,\\quad \\forall i\\in\\{1,\\ldots,m\\},\\ t\\ge1,\\ k\\ge1.",
+      "role": "Records the stochastic error cancellation and noise bound used when taking expectations in (8.3.70).",
+      "proof": [
+        {
+          "step": 1,
+          "description": "In the stochastic CS call, identify \\delta_i^{t-1,k}=f_i'(u_i^{t-1})-G_i(u_i^{t-1},\\xi_i^{t-1,k}) as in Proposition 8.7's \\delta^t:=\\phi'(u_t)-h_t and Algorithm 8.8's h_{t-1}=H(u_{t-1},\\xi^{t-1}).",
+          "ref": "Algorithm 8.8 (8.3.63), Proposition 8.7 definition after (8.3.3)",
+          "source_pdf_lines": [
+            32542,
+            32551
+          ],
+          "uses": [
+            "CSProcedureConvergenceProposition87"
+          ],
+          "produces": "Stochastic error variable aligned with the oracle output."
+        },
+        {
+          "step": 2,
+          "description": "Use unbiasedness and independence from the generated query point to condition on u_i^{t-1}; the conditional mean is zero, hence the unconditional mean is zero.",
+          "ref": "(8.3.61) and paragraph after (8.3.62)",
+          "source_pdf_lines": [
+            32528,
+            32535
+          ],
+          "uses": [
+            "StochasticOracleUnbiased",
+            "StochasticQueryIndependence",
+            "previous_step:1"
+          ],
+          "produces": "\\mathbb{E}[\\delta_i^{t-1,k}]=0."
+        },
+        {
+          "step": 3,
+          "description": "Combine the conditional zero mean from the preceding step with the fact that x_i^*-u_i^{t-1} is measurable with respect to the generated query/history. This is the load-bearing derived cancellation used to remove the stochastic linear term from (8.3.70) when expectations are taken in (8.3.71); it is not a separately printed display in the source.",
+          "ref": "(8.3.61), paragraph after (8.3.62), and (8.3.70)-(8.3.71)",
+          "source_pdf_lines": [
+            32528,
+            32664
+          ],
+          "uses": [
+            "StochasticOracleUnbiased",
+            "StochasticQueryIndependence",
+            "previous_step:1",
+            "previous_step:2"
+          ],
+          "produces": "Derived: \\mathbb{E}[\\langle\\delta_i^{t-1,k},x_i^*-u_i^{t-1}\\rangle\\mid u_i^{t-1}]=0, and therefore \\mathbb{E}[\\langle\\delta_i^{t-1,k},x_i^*-u_i^{t-1}\\rangle]=0."
+        },
+        {
+          "step": 4,
+          "description": "Use the stochastic oracle variance assumption at the same generated query point.",
+          "ref": "(8.3.62)",
+          "source_pdf_lines": [
+            32528,
+            32535
+          ],
+          "uses": [
+            "StochasticOracleVariance",
+            "StochasticQueryIndependence",
+            "previous_step:1"
+          ],
+          "produces": "\\mathbb{E}[\\|\\delta_i^{t-1,k}\\|_*^2]\\le\\sigma^2."
+        }
+      ]
+    },
+    {
+      "name": "Theorem811ScheduleFacts",
+      "ref": "(8.3.67) and Theorem 8.11 proof",
+      "statement_math": "\\alpha_k=\\theta_k=1,\\quad \\eta_k=2\\|\\mathcal{L}\\|,\\quad \\tau_k=\\|\\mathcal{L}\\|,\\quad T_k=\\left\\lceil\\frac{m(M^2+\\sigma^2)N}{\\|\\mathcal{L}\\|^2\\widetilde{D}}\\right\\rceil,\\quad \\frac{(T_1+1)(T_1+2)}{T_1(T_1+3)}=1+\\frac{2}{T_1^2+3T_1}\\le\\frac{3}{2}.",
+      "role": "Packages the printed parameter substitution and the arithmetic checks used in Theorem 8.11.",
+      "proof": [
+        {
+          "step": 1,
+          "description": "Substitute \\alpha_k=\\theta_k=1, \\eta_k=2\\|\\mathcal{L}\\|, and \\tau_k=\\|\\mathcal{L}\\| to verify (8.3.29)-(8.3.33).",
+          "ref": "Theorem 8.11 proof, first sentence",
+          "source_pdf_lines": [
+            32633,
+            32634
+          ],
+          "uses": [
+            "theorem_811_schedule",
+            "general_parameter_condition_29",
+            "general_parameter_condition_30",
+            "general_parameter_condition_31",
+            "general_parameter_condition_32",
+            "general_parameter_condition_33"
+          ],
+          "produces": "Theorem 8.11 schedule satisfies the hypotheses of Lemma 8.5."
+        },
+        {
+          "step": 2,
+          "description": "Use T_1>=1 to simplify the inner-loop ratio.",
+          "ref": "Theorem 8.11 proof, ratio display",
+          "source_pdf_lines": [
+            32660,
+            32663
+          ],
+          "math": "\\frac{(T_1+1)(T_1+2)}{T_1(T_1+3)}=1+\\frac{2}{T_1^2+3T_1}\\le\\frac{3}{2}.",
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "Ratio bound used in (8.3.71)."
+        },
+        {
+          "step": 3,
+          "description": "Use the ceiling in (8.3.67) to obtain the lower bound on the common inner-loop length needed for the stochastic summation term in (8.3.71). This is derived arithmetic from the printed schedule, not a separately displayed source formula.",
+          "ref": "(8.3.67)",
+          "source_pdf_lines": [
+            32614,
+            32620
+          ],
+          "uses": [
+            "previous_step:1"
+          ],
+          "produces": "Derived from T_k=\\left\\lceil m(M^2+\\sigma^2)N/(\\|\\mathcal{L}\\|^2\\widetilde{D})\\right\\rceil: T_k+3\\ge T_k\\ge m(M^2+\\sigma^2)N/(\\|\\mathcal{L}\\|^2\\widetilde{D})."
+        },
+        {
+          "step": 4,
+          "description": "Substitute \\theta_k=1 and \\eta_k=2\\|\\mathcal{L}\\| into the full stochastic summation term printed in the first line of (8.3.71), then use the denominator lower bound from the ceiling schedule to produce the 4\\widetilde{D} contribution inside the final bracket.",
+          "ref": "(8.3.71)",
+          "source_pdf_lines": [
+            32664,
+            32670
+          ],
+          "uses": [
+            "previous_step:1",
+            "previous_step:3",
+            "theorem_811_schedule"
+          ],
+          "produces": "Derived full-sum estimate: (\\sum_{k=1}^N\\theta_k)^{-1}\\sum_{k=1}^N 8m(M^2+\\sigma^2)\\theta_k/((T_k+3)\\eta_k) = 4m(M^2+\\sigma^2)/((T_k+3)\\|\\mathcal{L}\\|) \\le 4\\|\\mathcal{L}\\|\\widetilde{D}/N, matching the printed \\|\\mathcal{L}\\|N^{-1}(4\\widetilde{D}) term in (8.3.71)."
+        }
+      ]
+    }
+  ],
+  "source_discrepancies": [
+    {
+      "ref": "(8.3.68)",
+      "description": "The stable local layout artifact source/original_source_pypdf_layout_lines.txt lines 92-93 displays E[F(xhat_k)-F(x*)] in (8.3.68), but lines 97-101 then give the consensus bound and define xhat_N=N^{-1} sum_{k=1}^N xhat_k; the proof derives a bound for g(shat_N,zhat_N), hence the formal endpoint should be the averaged generated iterate xhat_N."
+    },
+    {
+      "ref": "(8.3.67)",
+      "description": "The bundled source/original_source.txt extraction is garbled around the numerator and denominator, but the stable local layout artifact source/original_source_pypdf_layout_lines.txt lines 87-89 prints a ceiling schedule T_k=ceil(m(M^2+sigma^2)N/(||L||^2 Dtilde)). The JSON uses this PDF-layout reading as the source math for (8.3.67); bare pdftotext remains unavailable in this shell."
+    },
+    {
+      "ref": "Theorem 8.11 proof ratio display after (8.3.70)",
+      "description": "The bundled text extraction renders the terminal bound ambiguously, but the stable local layout artifact source/original_source_pypdf_layout_lines.txt lines 119-121 reads ((T_1+1)(T_1+2))/(T_1(T_1+3))=1+2/(T_1^2+3T_1)<=3/2, which is also the value needed for the printed constant 3 in (8.3.71) when eta_1=2||L||."
+    },
+    {
+      "ref": "Theorem 8.11 proof after (8.3.70)",
+      "description": "The line defining the scaled perturbation appears in OCR as s_N=(sum theta_k)^{-1} shat, while the gap display and later expectation line use shat_N. The JSON uses \\hat{s}_N."
+    },
+    {
+      "ref": "Theorem 8.11 proof, Jensen display",
+      "description": "The stable local layout artifact source/original_source_pypdf_layout_lines.txt lines 134-136 prints the Jensen bounds with +||y^*-y_0|| and +2||y^*-y_0||, while Lemma 8.5 (8.3.66) contains the load-bearing term (theta_1 tau_1/2)||y^*-y_0||^2. Under schedule (8.3.67), the squared version is necessary to derive the next displayed bound with +4||y^*-y_0||; the JSON therefore preserves the printed Jensen display in proof step 9 and records the squared-term consequence only as a derived produces field in proof step 10."
+    },
+    {
+      "ref": "(8.3.71)",
+      "description": "The first displayed inequality in (8.3.71) prints V(x_0,x), while the immediately following simplified bound contains V(x_0,x^*) and the proof context has already specialized (8.3.70) at x=x^*. The JSON preserves V(x_0,x) in the source math for that first inequality and records the x^* specialization only in the description/produces fields."
+    }
+  ],
+  "source_audit_artifacts": [
+    {
+      "name": "OriginalSourceProofWindowLayoutExtraction",
+      "path": "source/original_source_pypdf_layout_lines.txt",
+      "source_pdf": "source/original_source.pdf",
+      "source_pdf_sha256": "a983e183e36482d25eeabc4f21b09a7411c3d3ae132e5277f95b9faadfb7eb29",
+      "artifact_sha256": "b285a4e878981e177c5a2e257ce1c221f2b3c05fba1fb47aa1dab1a399b228af",
+      "page_window": "printed pp. 549-552 (entire original_source.pdf excerpt)",
+      "extraction_status": "Bare `pdftotext -layout source/original_source.pdf -` is unavailable in this shell; this committed artifact is a stable pypdf layout extraction of the same proof window for audit fallback.",
+      "generation_command": "pypdf PdfReader(\"source/original_source.pdf\").pages[*].extract_text(extraction_mode=\"layout\"), with local line numbering",
+      "local_line_ranges": {
+        "stochastic_oracle_assumptions_8_3_61_8_3_62": [
+          21,
+          25
+        ],
+        "algorithm_8_8_replacement_steps_8_3_63_8_3_64": [
+          32,
+          38
+        ],
+        "lemma_8_5_statement_8_3_65_8_3_66": [
+          55,
+          76
+        ],
+        "theorem_8_11_statement_8_3_67_8_3_69": [
+          84,
+          101
+        ],
+        "theorem_8_11_proof_8_3_70_8_3_71_and_final_application": [
+          103,
+          144
+        ],
+        "post_theorem_complexity_not_endpoint": [
+          147,
+          170
+        ]
+      }
+    }
+  ]
+}
