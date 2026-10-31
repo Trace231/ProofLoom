@@ -2763,3 +2763,484 @@ theorem two_bregman_argmin_descent_of_feasible_endpoint_deriv
           ring
 
 end SOptLib
+
+-- Phase 4 batch 1 merge from Staging/composite_prox_projectedGradient_inner_ge_norm_sq_add_hdiff_of_isMinOn.lean
+-- Generalization plan (G0):
+-- concept/name: composite prox projected-gradient inner lower bound; orig was
+--   `blockProjectedGradient_inner_ge_norm_sq_add_chi_diff`, renamed away from
+--   block sampling and setup-field names while keeping the domain term
+--   projected-gradient mapping.
+-- generality used: real Hilbert ambient space with complete-space DGF API,
+--   a convex feasible carrier, a convex simple term, a distance-generating
+--   function with selected gradient, positive stepsize, and an `IsMinOn`
+--   certificate for the concrete composite Bregman prox objective. No measure,
+--   probability, oracle, filtration, smoothness of the objective, or
+--   finite-dimensional hypothesis is used.
+-- portable call pattern: mirror descent, stochastic block mirror descent, and
+--   variance-reduced mirror descent call this after proving a selected
+--   composite prox point minimizes the local Bregman prox objective; the
+--   carrier, DGF, simple term, oracle vector, and selected prox point vary,
+--   while the projected-gradient inner lower bound has the same shape.
+-- counterargument checked: not paper-local traceability because it packages
+--   the reusable transition from composite prox optimality plus DGF strong
+--   monotonicity to the projected-gradient descent lower bound; not a pure
+--   wrapper because existing SOptLib entries expose only the variational,
+--   prox-descent, and projected-gradient algebra pieces separately.
+-- coverage search: searched `projected gradient inner product greater norm
+--   squared prox variational inequality convex h difference`, `composite prox
+--   projectedGradient inner norm squared h difference IsMinOn`, and
+--   `IsDistanceGeneratingFunctionOn prox projectedGradient inner lower bound
+--   IsMinOn`; relevant partial hits were
+--   `composite_prox_variational_inequality_of_isMinOn`,
+--   `prox_descent_inner_bound_of_variational`,
+--   `projectedGradient_inner_ge_norm_sq_add_hdiff`, and
+--   `sq_norm_le_inner_gradient_sub_of_dgf_half_sq_bregman`, but no full
+--   one-call composite prox projected-gradient lower bound.
+-- minimal hypotheses: DGF supplies both the prox-point gradient realization
+--   and strong monotonicity; convexity is only for the simple term on the
+--   carrier; all remaining assumptions are pointwise data at `x`, `xp`, `g`,
+--   and `gamma`.
+
+/-- A composite Bregman prox minimizer gives the projected-gradient inner lower bound.
+
+For a convex simple term on a feasible carrier and a one-strong
+distance-generating function, an `IsMinOn` certificate for the concrete
+composite prox objective yields
+`<g, projectedGradient> >= ||projectedGradient||^2 + gamma^-1 * (h xp - h x)`.
+
+Layer: Layer0 | Gap: Level 1 (composite prox projected-gradient lower bound)
+Proof: compose the composite prox argmin variational inequality with DGF
+  strong monotonicity, then feed the resulting prox descent inner bound into
+  the SOptLib projected-gradient algebra lemma.
+Source: Mathlib convex first-order inequalities and real inner-product algebra,
+  with SOptLib Bregman/prox objective and projected-gradient APIs
+Used in: nonconvex stochastic block mirror descent one-step prox lower bound
+  before absorbing the selected-block simple-term difference into composite descent
+Book citation: book/FOML/NonconvexStochasticBlockMirrorDescent.json#/key_lemmas/1/proof/7
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, nonconvex stochastic block mirror descent -/
+theorem composite_prox_projectedGradient_inner_ge_norm_sq_add_hdiff_of_isMinOn
+    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
+    {X : Set E} {nu h : E → ℝ} {grad : E → E}
+    (hconv : ConvexOn ℝ X h)
+    (hdgf : IsDistanceGeneratingFunctionOn X nu grad)
+    (x xp : {z : E // z ∈ X}) (g : E) (γ : ℝ) (hγ : 0 < γ)
+    (hmin :
+      IsMinOn
+        (SOptLib.proxObjective
+          (fun a b : {z : E // z ∈ X} => carrierBregmanFormula nu id grad a.1 b.1)
+          (fun y : {z : E // z ∈ X} => h y.1)
+          (fun y : {z : E // z ∈ X} => y.1)
+          x g γ)
+        Set.univ xp) :
+    let prox : {z : E // z ∈ X} → E → ℝ → {z : E // z ∈ X} := fun _ _ _ => xp
+    ⟪g, SOptLib.projectedGradient (fun y : {z : E // z ∈ X} => y.1) prox x g γ⟫_ℝ ≥
+      ‖SOptLib.projectedGradient (fun y : {z : E // z ∈ X} => y.1) prox x g γ‖ ^ 2 +
+        γ⁻¹ * (h xp.1 - h x.1) := by
+  let prox : {z : E // z ∈ X} → E → ℝ → {z : E // z ∈ X} := fun _ _ _ => xp
+  have hgrad_xp : HasGradientAt nu (grad xp.1) xp.1 := hdgf.2.1 xp.1 xp.2
+  have hvi :
+      0 ≤
+        ⟪g, x.1 - xp.1⟫_ℝ +
+          γ⁻¹ * ⟪grad xp.1 - grad x.1, x.1 - xp.1⟫_ℝ +
+          (h x.1 - h xp.1) := by
+    simpa using
+      (composite_prox_variational_inequality_of_isMinOn
+        (nu := nu) (h := h) (grad := grad)
+        hconv x xp x g γ hγ hgrad_xp hmin)
+  have hstrong :
+      ‖xp.1 - x.1‖ ^ 2 ≤ ⟪xp.1 - x.1, grad xp.1 - grad x.1⟫_ℝ := by
+    simpa using
+      (SOptLib.sq_norm_le_inner_gradient_sub_of_dgf_half_sq_bregman
+        (X := X) (nu := nu) (grad := grad) hdgf xp.2 x.2)
+  have hinner :
+      γ⁻¹ * ‖x.1 - xp.1‖ ^ 2 + h xp.1 - h x.1 ≤ ⟪g, x.1 - xp.1⟫_ℝ := by
+    exact
+      prox_descent_inner_bound_of_variational
+        (eval := fun y : {z : E // z ∈ X} => y.1)
+        (grad := fun y : {z : E // z ∈ X} => grad y.1)
+        (h := fun y : {z : E // z ∈ X} => h y.1)
+        (prox := xp) (x := x) (g := g) (gamma := γ) hγ
+        (by simpa using hvi)
+        (by simpa using hstrong)
+  have hpg :=
+    projectedGradient_inner_ge_norm_sq_add_hdiff
+      (eval := fun y : {z : E // z ∈ X} => y.1)
+      (h := fun y : {z : E // z ∈ X} => h y.1)
+      (prox := prox) (x := x) (g := g) (gamma := γ) hγ
+      (by simpa [prox] using hinner)
+  simpa [prox] using hpg
+
+-- Phase 4 batch 1 merge from Staging/coercive_lower_tail_of_pos_quadratic_add_clm_add_const_add_nonneg.lean
+-- Generalization plan (G0):
+-- concept/name: continuous-linear-functional coercive lower tail; orig was
+--   `coercive_tail_of_pos_quadratic_add_clm_add_const_add_nonneg`.
+-- generality used: real seminormed additive group and normed space are enough;
+--   no measure, convexity, smoothness, oracle, Hilbert, completeness, or
+--   finite-dimensional assumptions are used.
+-- portable call pattern: noncompact prox-subproblem existence proofs use an
+--   affine lower minorant, a positive quadratic prox term, and a nonnegative
+--   residual to produce an eventual lower tail; the carrier, center,
+--   functional, residual, and objective vary while the conclusion stays fixed.
+-- counterargument checked: not paper-local traceability because it removes a
+--   recurring coercivity bridge from affine lower models to compact truncation;
+--   not a pure wrapper because it handles continuous linear functionals and a
+--   constant shift rather than the existing inner-product-only lower-tail API.
+-- coverage search: project query `positive quadratic plus continuous linear
+--   functional plus nonnegative residual coercive lower tail` found
+--   `coercive_lower_bound_of_pos_quadratic_add_linear_add_nonneg` as partial
+--   coverage and scalar `exists_nonneg_forall_le_quadratic_sub_linear_of_pos`;
+--   LeanSearch for `continuous linear map absolute value apply bounded by
+--   operator norm times norm` found Mathlib `ContinuousLinearMap.le_opNorm`,
+--   but no complete lower-tail theorem with the constant shift.
+-- minimal hypotheses: global Hilbert/completeness assumptions were weakened
+--   to the pointwise normed-space facts used by the proof; residual
+--   nonnegativity and the lower-model inequality remain pointwise on `X`.
+
+/-- A positive centered quadratic plus a continuous linear functional, constant shift,
+and nonnegative residual gives a coercive lower-tail bound.
+
+If `F` is bounded below on `X` by
+`a * ‖x - z‖ ^ 2 + ell x + c + Rterm x`, where `a > 0` and the residual is
+nonnegative on `X`, then every real target is eventually below `F` outside a
+sufficiently large ball centered at `z`.
+
+Layer: Layer0 | Gap: Level 1 (continuous-linear positive quadratic coercive lower tail)
+Proof: use the operator-norm bound to dominate the continuous linear functional
+  by a scalar linear loss from `z`, apply the scalar positive-quadratic lower-tail
+  radius, and transfer the lower model to `F`.
+Source: Mathlib continuous-linear-map operator norms and SOptLib positive quadratic
+  lower-tail algebra
+Used in: nonconvex stochastic block mirror descent block prox-solvability, where
+  an affine minorant and a positive prox quadratic give compact truncation for a
+  noncompact block subproblem
+Book citation: book/FOML/NonconvexStochasticBlockMirrorDescent.json#/algorithm_spec
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, nonconvex stochastic block mirror descent -/
+theorem coercive_lower_tail_of_pos_quadratic_add_clm_add_const_add_nonneg
+    {E : Type*} [SeminormedAddCommGroup E] [NormedSpace ℝ E]
+    {X : Set E} (x0 z : E) {a : ℝ} (ell : E →L[ℝ] ℝ)
+    (c : ℝ) (Rterm F : E → ℝ)
+    (ha : 0 < a)
+    (hF_lower :
+      ∀ x : E, x ∈ X →
+        a * ‖x - z‖ ^ 2 + ell x + c + Rterm x ≤ F x)
+    (hRterm_nonneg : ∀ x : E, x ∈ X → 0 ≤ Rterm x) :
+    ∀ B : ℝ, ∃ R : ℝ, ‖x0 - z‖ ≤ R ∧
+      ∀ x : E, x ∈ X → R ≤ ‖x - z‖ → B ≤ F x := by
+  exact coercive_lower_tail_of_pos_quadratic_add_clm_add_const_add_nonneg_glue
+    (X := X) x0 z (a := a) ell c Rterm F ha hF_lower hRterm_nonneg
+
+
+-- Phase 4 batch 2 merge from Staging/sourceDGFProx_first_variation_nonneg_of_isMinOn_linear.lean
+open scoped InnerProductSpace
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: source-DGF prox first-variation nonnegativity from a linearized
+--   prox subproblem minimizer; orig was `mirror_step_objective_first_variation_nonneg`.
+-- generality used: arbitrary complete real Hilbert ambient `E`, convex feasible
+--   carrier `X`, source core `Xcore` included in `X`, carrier potential `nu`,
+--   selected ambient gradient `grad`, one pointwise within-gradient certificate
+--   at the selected core point, and an `IsMinOn` certificate for the linear plus
+--   source-prox objective. No measure, filtration, oracle, product structure,
+--   compactness, or finite-dimensional hypothesis is used.
+-- portable call pattern: mirror descent, mirror-prox, accelerated prox, and
+--   saddle-product DGF updates call this after proving the selected prox point
+--   minimizes a linearized source-DGF objective; the carrier, core, source
+--   potential, gradient selector, linear vector, and comparison point change
+--   while the first-variation conclusion is identical.
+-- counterargument checked: overlaps with the existing carrier-Bregman
+--   variational inequality, but that API needs derivative data in an ambient
+--   `fderivWithin` form. This theorem is the source-DGF wrapper that consumes
+--   the pointwise `HasGradientWithinAt` contract already exposed by source-DGF
+--   assumptions, so it is not a paper-local traceability rename or a pure
+--   caller-side expression.
+-- coverage search: searched `prox first variation nonnegative minimizer linear
+--   Bregman IsMinOn`, `source DGF prox first variation nonnegative IsMinOn
+--   linear`, and `Convex first order condition minimizer HasDerivWithinAt right
+--   derivative nonnegative`; top hits were
+--   `prox_variational_inequality_of_isMinOn_linear_bregman`,
+--   `right_derivative_nonneg_of_min_on_Icc`, and carrier Bregman segment
+--   derivative lemmas. None provides this source-core-to-carrier wrapper without
+--   adding a `UniqueDiffWithinAt`/`fderivWithin` conversion burden at call sites.
+-- minimal hypotheses: global DGF assumptions are reduced to core inclusion,
+--   carrier convexity, the selected point's within-gradient certificate, and
+--   the linear-plus-prox `IsMinOn` certificate.
+
+/-- A source-DGF linear prox minimizer has nonnegative first variation.
+
+If a core point `y` minimizes the linearized source-DGF prox objective based at
+`z`, then every feasible comparison point `x` gives a nonnegative right
+first-variation along the segment from `y` to `x`.
+
+Layer: Layer0 | Gap: Level 1 (source-DGF linear prox first variation)
+Proof: restrict the `IsMinOn` certificate to the feasible segment, differentiate
+  the source-DGF prox expression at the left endpoint using the supplied
+  `HasGradientWithinAt` certificate, add the linear term derivative, and apply
+  the one-sided derivative sign lemma on `[0, 1]`.
+Source: Mathlib affine-segment derivative calculus, SOptLib carrier
+  totalization, and constrained one-sided first-order conditions
+Used in: stochastic convex-concave saddle-point mirror step optimality when the
+  product source-DGF prox update is converted into a first-variation inequality
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/algorithm_spec
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, stochastic mirror descent for stochastic convex-concave
+  saddle point problems -/
+theorem sourceDGFProx_first_variation_nonneg_of_isMinOn_linear
+    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
+    {X Xcore : Set E} (hX_convex : Convex ℝ X) (hcore_subset : Xcore ⊆ X)
+    (nu : {x : E // x ∈ X} → ℝ) (grad : E → E)
+    (z y : {x : E // x ∈ Xcore}) (g : E) (γ : ℝ) (x : {x : E // x ∈ X})
+    (hgrad_y :
+      HasGradientWithinAt (SOptLib.totalizeOn X nu) (grad y.1) X y.1)
+    (hmin :
+      IsMinOn
+        (fun u : {x : E // x ∈ X} =>
+          γ * ⟪g, u.1⟫_ℝ +
+            (nu u - nu ⟨z.1, hcore_subset z.2⟩ -
+              ⟪grad z.1, u.1 - z.1⟫_ℝ))
+        Set.univ ⟨y.1, hcore_subset y.2⟩) :
+    0 ≤
+      γ * ⟪g, x.1 - y.1⟫_ℝ +
+        (⟪grad y.1, x.1 - y.1⟫_ℝ -
+          ⟪grad z.1, x.1 - y.1⟫_ℝ) := by
+  classical
+  let yX : {x : E // x ∈ X} := ⟨y.1, hcore_subset y.2⟩
+  let zX : {x : E // x ∈ X} := ⟨z.1, hcore_subset z.2⟩
+  let objective : {x : E // x ∈ X} → ℝ := fun u =>
+    γ * ⟪g, u.1⟫_ℝ +
+      (nu u - nu zX - ⟪grad z.1, u.1 - z.1⟫_ℝ)
+  have hmin_all : ∀ u : {x : E // x ∈ X}, objective yX ≤ objective u := by
+    simpa [objective, yX, zX, isMinOn_univ_iff] using hmin
+  let s : Set ℝ := Set.Icc (0 : ℝ) 1
+  let line : ℝ → E := fun t => AffineMap.lineMap y.1 x.1 t
+  have hline_mem : ∀ t ∈ s, line t ∈ X := by
+    intro t ht
+    exact hX_convex.lineMap_mem (hcore_subset y.2) x.2 ht
+  let segmentPoint : (t : ℝ) → t ∈ s → {x : E // x ∈ X} :=
+    fun t ht => ⟨line t, hline_mem t ht⟩
+  let φ : ℝ → ℝ := fun t =>
+    if ht : t ∈ s then objective (segmentPoint t ht) else 0
+  have hφmin : ∀ t ∈ s, φ 0 ≤ φ t := by
+    intro t ht
+    have h0 : (0 : ℝ) ∈ s := by
+      norm_num [s]
+    have hseg0 : segmentPoint 0 h0 = yX := by
+      ext
+      simp [segmentPoint, line, yX, AffineMap.lineMap_apply_module']
+    have hφ0 : φ 0 = objective yX := by
+      dsimp [φ]
+      rw [dif_pos h0, hseg0]
+    have hφt : φ t = objective (segmentPoint t ht) := by
+      dsimp [φ]
+      rw [dif_pos ht]
+    rw [hφ0, hφt]
+    exact hmin_all (segmentPoint t ht)
+  have hφderiv :
+      HasDerivWithinAt φ
+        (γ * ⟪g, x.1 - y.1⟫_ℝ +
+          (⟪grad y.1, x.1 - y.1⟫_ℝ -
+            ⟪grad z.1, x.1 - y.1⟫_ℝ))
+        s 0 := by
+    let d : E := x.1 - y.1
+    have hline_deriv : HasDerivWithinAt line d s 0 := by
+      simpa [line, d] using
+        (AffineMap.hasDerivWithinAt_lineMap (a := y.1) (b := x.1)
+          (s := s) (x := (0 : ℝ)))
+    have hmaps : Set.MapsTo line s X := by
+      intro t ht
+      exact hline_mem t ht
+    have hνseg :
+        HasDerivWithinAt
+          (fun t : ℝ => SOptLib.totalizeOn X nu (line t))
+          ⟪grad y.1, d⟫_ℝ s 0 := by
+      have hcomp := hgrad_y.hasFDerivWithinAt.comp_hasDerivWithinAt_of_eq
+        0 hline_deriv hmaps (by simp [line])
+      simpa [Function.comp_def, ContinuousLinearMap.coe_comp, d] using hcomp
+    let β : ℝ → ℝ := fun t =>
+      if ht : t ∈ s then
+        (nu (segmentPoint t ht) - nu zX -
+          ⟪grad z.1, (segmentPoint t ht).1 - z.1⟫_ℝ) -
+          (nu yX - nu zX - ⟪grad z.1, yX.1 - z.1⟫_ℝ)
+      else 0
+    have hβ : HasDerivWithinAt β
+        (⟪grad y.1, d⟫_ℝ - ⟪grad z.1, d⟫_ℝ) s 0 := by
+      let expr : ℝ → ℝ := fun t =>
+        (SOptLib.totalizeOn X nu (line t) -
+          SOptLib.totalizeOn X nu y.1) -
+          t * ⟪grad z.1, d⟫_ℝ
+      have hlin : HasDerivWithinAt
+          (fun t : ℝ => t * ⟪grad z.1, d⟫_ℝ)
+          ⟪grad z.1, d⟫_ℝ s 0 := by
+        simpa using (hasDerivWithinAt_id (x := (0 : ℝ)) (s := s)).mul_const
+          ⟪grad z.1, d⟫_ℝ
+      have hexpr : HasDerivWithinAt expr
+          (⟪grad y.1, d⟫_ℝ - ⟪grad z.1, d⟫_ℝ) s 0 := by
+        exact (hνseg.sub_const (SOptLib.totalizeOn X nu y.1)).sub hlin
+      have heq : ∀ t ∈ s, β t = expr t := by
+        intro t ht
+        have htI : t ∈ s := ht
+        have hline_sub : line t - y.1 = t • d := by
+          simp [line, d, AffineMap.lineMap_apply_module']
+        have htotal_line :
+            SOptLib.totalizeOn X nu (line t) = nu (segmentPoint t htI) := by
+          exact SOptLib.totalizeOn_of_mem X nu (hline_mem t htI)
+        have htotal_y : SOptLib.totalizeOn X nu y.1 = nu yX := by
+          exact SOptLib.totalizeOn_of_mem X nu (hcore_subset y.2)
+        dsimp [β, expr]
+        rw [dif_pos htI, ← htotal_line, ← htotal_y]
+        have hseg_coe : (segmentPoint t htI).1 = line t := rfl
+        have hy_coe : yX.1 = y.1 := rfl
+        rw [hseg_coe, hy_coe]
+        have hz_split : line t - z.1 = (line t - y.1) + (y.1 - z.1) := by
+          abel
+        rw [hz_split, inner_add_right, hline_sub, real_inner_smul_right]
+        ring
+      exact hexpr.congr heq (by
+        have h0 : (0 : ℝ) ∈ s := by norm_num [s]
+        exact heq 0 h0)
+    let proxAlong : ℝ → ℝ := fun t =>
+      if ht : t ∈ s then
+        nu (segmentPoint t ht) - nu zX -
+          ⟪grad z.1, (segmentPoint t ht).1 - z.1⟫_ℝ
+      else 0
+    have hprox : HasDerivWithinAt proxAlong
+        (⟪grad y.1, d⟫_ℝ - ⟪grad z.1, d⟫_ℝ) s 0 := by
+      have htmp := hβ.add_const
+        (nu yX - nu zX - ⟪grad z.1, yX.1 - z.1⟫_ℝ)
+      refine htmp.congr ?_ ?_
+      · intro t ht
+        dsimp [proxAlong, β]
+        rw [dif_pos ht, dif_pos ht]
+        ring
+      · have h0 : (0 : ℝ) ∈ s := by norm_num [s]
+        dsimp [proxAlong, β]
+        rw [dif_pos h0, dif_pos h0]
+        ring
+    have hlin_obj : HasDerivWithinAt (fun t : ℝ => γ * ⟪g, line t⟫_ℝ)
+        (γ * ⟪g, d⟫_ℝ) s 0 := by
+      have hinner_aff :
+          ∀ t : ℝ, ⟪g, line t⟫_ℝ = ⟪g, y.1⟫_ℝ + t * ⟪g, d⟫_ℝ := by
+        intro t
+        simp [line, d, AffineMap.lineMap_apply_module', inner_add_right,
+          real_inner_smul_right]
+        ring
+      have hbase : HasDerivWithinAt
+          (fun t : ℝ => ⟪g, y.1⟫_ℝ + t * ⟪g, d⟫_ℝ)
+          ⟪g, d⟫_ℝ s 0 := by
+        simpa using ((hasDerivWithinAt_id (x := (0 : ℝ)) (s := s)).mul_const
+          ⟪g, d⟫_ℝ).const_add ⟪g, y.1⟫_ℝ
+      have hinner : HasDerivWithinAt (fun t : ℝ => ⟪g, line t⟫_ℝ)
+          ⟪g, d⟫_ℝ s 0 := by
+        refine hbase.congr ?_ ?_
+        · intro t _ht
+          exact hinner_aff t
+        · exact hinner_aff 0
+      simpa using hinner.const_mul γ
+    have hsum := hlin_obj.add hprox
+    simpa [objective, φ, proxAlong, d] using hsum.congr (by
+      intro t ht
+      dsimp [proxAlong]
+      rw [dif_pos ht, dif_pos ht]) (by
+      have h0 : (0 : ℝ) ∈ s := by norm_num [s]
+      dsimp [proxAlong]
+      rw [dif_pos h0, dif_pos h0])
+  exact right_derivative_nonneg_of_min_on_Icc (φ := φ) hφderiv hφmin
+
+end SOptLib
+
+
+-- Phase 4 batch 2 merge from Staging/sourceDGF_mirrorStep_variational_inequality.lean
+open scoped InnerProductSpace
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: source-DGF mirror-step variational inequality from a linearized
+--   prox subproblem minimizer; orig was `mirror_step_variational_inequality`.
+-- generality used: arbitrary complete real Hilbert ambient `E`, convex feasible
+--   carrier `X`, source core `Xcore` included in `X`, carrier potential `nu`,
+--   selected ambient gradient `grad`, a base core point `z`, a selected core
+--   step, one pointwise within-gradient certificate at the step, and an
+--   `IsMinOn` certificate for the linear plus source-prox objective. No
+--   measure, filtration, oracle, product structure, compactness, or
+--   finite-dimensional hypothesis is used.
+-- portable call pattern: mirror descent, mirror-prox, saddle-product DGF, and
+--   accelerated prox proofs can call this after proving that the selected
+--   source-core step minimizes a linearized source-DGF objective; the carrier,
+--   core, potential, gradient selector, linear vector, stepsize, and comparison
+--   point vary while the variational inequality conclusion stays the same.
+-- counterargument checked: this overlaps with the abstract `mirrorStep_variational`
+--   bridge and the staged first-variation lemma, but neither states the
+--   source-DGF linear prox argmin contract directly as the carrier
+--   variational inequality. The new theorem is not a pure paper rename because
+--   it removes all saddle setup fields and product-specific notation while
+--   preserving the reusable source-DGF mirror-step optimality boundary.
+-- coverage search: queried `source DGF mirror step variational inequality
+--   carrier`, `mirror step variational inequality minimizer DGF gradient`, and
+--   inspected `SOptLib.mirrorStep_variational`,
+--   `prox_variational_inequality_of_isMinOn_linear_bregman`,
+--   `mirrorObjective_argmin_variational`, and
+--   `sourceDGFProx_first_variation_nonneg_of_isMinOn_linear`. Existing hits
+--   cover either a fully abstract bridge requiring a supplied VI, a carrier
+--   Bregman theorem with a different gradient API, or the scalar first
+--   variation; none provides this source-core `IsMinOn` to VI wrapper.
+-- minimal hypotheses: global source-DGF assumptions are reduced to carrier
+--   convexity, core inclusion, one selected within-gradient certificate at the
+--   mirror step, and the linear-plus-prox `IsMinOn` certificate.
+
+/-- A source-DGF linear prox minimizer satisfies the mirror-step variational inequality.
+
+If a source-core point `step` minimizes the linearized source-DGF prox objective
+based at a core point `z`, then every feasible comparison point satisfies the
+carrier variational inequality with gradient vector
+`γ • g + grad step - grad z`.
+
+Layer: Layer0 | Gap: Level 0 (source-DGF mirror-step variational inequality)
+Proof: apply the source-DGF first-variation lemma for the linearized prox
+  objective, then collect the linear and Bregman-gradient terms into one
+  inner-product pairing by bilinearity.
+Source: SOptLib source-DGF prox first-variation API and Mathlib real
+  inner-product algebra
+Used in: stochastic convex-concave saddle-point mirror descent when the product
+  source-DGF prox update is converted from minimization of the one-step
+  objective into the carrier variational inequality used for regret estimates
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/algorithm_spec
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, stochastic mirror descent for stochastic convex-concave
+  saddle point problems -/
+theorem sourceDGF_mirrorStep_variational_inequality
+    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
+    {X Xcore : Set E} (hX_convex : Convex ℝ X) (hcore_subset : Xcore ⊆ X)
+    (nu : {x : E // x ∈ X} → ℝ) (grad : E → E)
+    (z step : {x : E // x ∈ Xcore}) (g : E) (γ : ℝ) (u : {x : E // x ∈ X})
+    (hgrad_step :
+      HasGradientWithinAt (SOptLib.totalizeOn X nu) (grad step.1) X step.1)
+    (hmin :
+      IsMinOn
+        (fun v : {x : E // x ∈ X} =>
+          γ * ⟪g, v.1⟫_ℝ +
+            (nu v - nu ⟨z.1, hcore_subset z.2⟩ -
+              ⟪grad z.1, v.1 - z.1⟫_ℝ))
+        Set.univ ⟨step.1, hcore_subset step.2⟩) :
+    0 ≤ ⟪γ • g + grad step.1 - grad z.1, u.1 - step.1⟫_ℝ := by
+  have hfirst :=
+    SOptLib.sourceDGFProx_first_variation_nonneg_of_isMinOn_linear
+      (X := X) (Xcore := Xcore) (hX_convex := hX_convex)
+      (hcore_subset := hcore_subset) (nu := nu) (grad := grad)
+      (z := z) (y := step) (g := g) (γ := γ) (x := u)
+      (hgrad_y := hgrad_step) (hmin := hmin)
+  have hinner :
+      ⟪γ • g + grad step.1 - grad z.1, u.1 - step.1⟫_ℝ =
+        γ * ⟪g, u.1 - step.1⟫_ℝ +
+          ⟪grad step.1, u.1 - step.1⟫_ℝ -
+            ⟪grad z.1, u.1 - step.1⟫_ℝ := by
+    rw [inner_sub_left, inner_add_left, real_inner_smul_left]
+  rw [hinner]
+  ring_nf at hfirst ⊢
+  exact hfirst
+
+end SOptLib
+

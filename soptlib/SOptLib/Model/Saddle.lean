@@ -414,3 +414,56 @@ theorem linearCoupledSaddleValue_scaledGradientFenchelPoint_isSaddlePointOn_of_r
   exact le_trans hmax hmin
 
 end SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: linearly coupled saddle-gap expansion at a zero-image reference;
+--   orig was primalDualGap_to_objectiveResidual_add_network_pairing
+-- generality used: arbitrary primal and dual carriers, a real Hilbert coupling
+--   space, and pointwise reference feasibility `A xRef = 0`; no measure,
+--   convexity, continuity, linearity, or finite-dimensional assumptions
+-- portable call pattern: network saddle, equality-constrained primal-dual, and
+--   augmented-Lagrangian gap proofs; the objective, coupling maps, points, and
+--   dual variables vary while the zero-image reference expansion is unchanged
+-- counterargument checked: although algebraically short, this is not a caller-side
+--   rename: it connects the named saddle-gap and linearly coupled saddle-value
+--   models and eliminates the otherwise present reference-dual coupling term
+-- coverage search: symbol queries for saddle-gap linear coupling, objective-gap
+--   pairing, and zero reference found `linearCoupledSaddleValue_sub_same_left`
+--   and `_sub_same_right`; both are partial because they fix one coordinate and
+--   do not state the cross-evaluated saddle-gap expansion
+-- minimal hypotheses: all already minimal for the existing real inner-product
+--   model; reference feasibility is pointwise and no global optimality is used
+
+
+open scoped InnerProductSpace
+
+namespace SOptLib
+
+/-- A linearly coupled saddle gap at a zero-image reference is the objective gap
+plus the current primal-dual pairing.
+
+The reference dual variable drops out because its primal coupling image is zero.
+
+Layer: Model | Gap: Level 1 (linearly coupled saddle-gap expansion)
+Proof: unfold the named saddle gap and linearly coupled saddle value, rewrite the
+  reference image to zero, and normalize the remaining real-ring expression.
+Source: SOptLib `saddleGap` and `linearCoupledSaddleValue`, together with
+  Mathlib real inner-product zero laws
+Used in: network saddle, equality-constrained primal-dual, and augmented-Lagrangian
+  residual proofs that convert a feasible-reference saddle gap into objective
+  suboptimality plus the current constraint pairing
+Book citation: book/research/Source.json#/key_lemmas/0/statement_math
+Origin algorithm: Guanghui Lan, First-order and Stochastic Optimization Methods
+  for Machine Learning, stochastic decentralized communication sliding -/
+theorem saddleGap_linearCoupled_eq_objectiveGap_add_pairing_of_reference_eq_zero
+    {X Y E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+    (objective : X → ℝ) (A : X → E) (coupling : Y → E)
+    (x xRef : X) (yHat y : Y) (hxRef : A xRef = 0) :
+    saddleGap
+        (linearCoupledSaddleValue A objective coupling (fun _ => 0))
+        (x, yHat) (xRef, y) =
+      objective x - objective xRef + ⟪A x, coupling y⟫_ℝ := by
+  simp [saddleGap, linearCoupledSaddleValue, hxRef]
+  ring
+
+end SOptLib

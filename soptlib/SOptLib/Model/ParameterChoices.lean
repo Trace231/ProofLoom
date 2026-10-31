@@ -1,5 +1,10 @@
 import Mathlib.Analysis.SpecialFunctions.Log.Basic
+import Mathlib.Analysis.SpecialFunctions.Pow.Continuity
+import Mathlib.Analysis.SpecialFunctions.Pow.Real
+import Mathlib.Algebra.GroupWithZero.Units.Basic
+import Mathlib.Algebra.Order.Ring.Basic
 import Mathlib.Data.Real.Sqrt
+import Mathlib.MeasureTheory.Function.SpecialFunctions.Basic
 import Mathlib.Tactic
 import SOptLib.Model.Selection
 
@@ -3142,6 +3147,589 @@ theorem mul_inverse_power_weight_eq_pred_of_one_le
 
 end SOptLib
 
+namespace SOptLib
+
+
+
+-- Generalization plan (G0):
+-- concept/name: square-root-balanced step size; orig was learningRate
+-- generality used: two real scalar parameters, a radius and a scale; no carrier,
+--   measure, convexity, smoothness, oracle, or finite-dimensional assumptions
+-- portable call pattern: adaptive mirror-descent and matrix-preconditioned regret
+--   proofs choose a constant step size while changing the comparator radius and
+--   positive scale, retaining the same radius divided by square-root scale formula
+-- counterargument checked: although the construction is a short scalar formula, it
+--   names a standard balancing choice and carries reusable unfolding and positivity
+--   API; it is not merely paper traceability or a rename of an existing declaration
+-- coverage search: searches for "positive radius divided by square root of twice
+--   positive scale" and "sqrt two scale step size positivity" found Mathlib's
+--   Real.sqrt_pos and SOptLib's varianceBalancedStepSize and inverse_rpow_step_size;
+--   these are supporting or structurally different declarations, not full coverage
+-- minimal hypotheses: the definition and unfolding need none; positivity needs
+--   exactly positivity of the radius and scale
+
+/-- The constant step size obtained by balancing a radius against twice a scale.
+
+For radius `radius` and scale `scale`, this is the closed-form choice
+`radius / sqrt (2 * scale)`.
+
+Layer: Model | Concept: square-root-balanced constant step size
+Proof: (definitional construction; divide the radius by the real square root of twice the scale)
+Source: Mathlib real square-root and real-field division APIs for balanced parameter choices
+Used in: adaptive mirror-descent and matrix-preconditioned regret proofs that balance comparator-radius and preconditioner-scale contributions
+Book citation: book/research/Source.json#/assumptions/12
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, matrix, tensor, and diagonal Shampoo regret bounds -/
+noncomputable def sqrtTwoScaleStepSize (radius scale : ℝ) : ℝ :=
+  radius / Real.sqrt (2 * scale)
+
+/-- The square-root-balanced step size unfolds to its quotient formula.
+
+Layer: Model | Gap: Level 0 (square-root-balanced step-size unfolding)
+Proof: by rfl after unfolding `sqrtTwoScaleStepSize`.
+Source: Mathlib real square-root and real-field definitional equality
+Used in: regret-coefficient algebra that substitutes the explicit balanced quotient for the named constant step size
+Book citation: book/research/Source.json#/assumptions/12
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, matrix, tensor, and diagonal Shampoo regret bounds -/
+@[simp]
+theorem sqrtTwoScaleStepSize_def (radius scale : ℝ) :
+    sqrtTwoScaleStepSize radius scale = radius / Real.sqrt (2 * scale) := by
+  rfl
+
+/-- The square-root-balanced step size is positive for positive radius and scale.
+
+Layer: Model | Gap: Level 0 (square-root-balanced step-size positivity)
+Proof: use positivity of twice the scale, Mathlib's square-root positivity theorem, and positivity of real division.
+Source: Mathlib `Real.sqrt_pos` and ordered-field multiplication and division positivity APIs
+Used in: adaptive mirror-descent and matrix-preconditioned update proofs that require a positive constant learning rate
+Book citation: book/research/Source.json#/assumptions/12
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, matrix, tensor, and diagonal Shampoo regret bounds -/
+theorem sqrtTwoScaleStepSize_pos
+    (radius scale : ℝ) (hradius : 0 < radius) (hscale : 0 < scale) :
+    0 < sqrtTwoScaleStepSize radius scale := by
+  rw [sqrtTwoScaleStepSize_def]
+  exact div_pos hradius (Real.sqrt_pos.2 (mul_pos (by norm_num) hscale))
+
+
+
+-- Generalization plan (G0):
+-- concept/name: inverse-linear plus linear coefficient balanced by a square-root
+--   step size; orig was balanced_step_size_coefficient_repeated_block
+-- generality used: two arbitrary real scalar parameters, including the
+--   totalized-division and nonpositive-square-root branches;
+--   no carrier, measure, convexity, smoothness, oracle, or dimension assumptions
+-- portable call pattern: matrix, tensor, diagonal, and adaptive mirror-descent
+--   regret proofs choose the same constant step size while changing the positive
+--   comparator radius and preconditioner scale, obtaining the same coefficient
+-- counterargument checked: this is short scalar algebra, but it is the reusable
+--   optimization step that turns a named balancing choice into its closed-form
+--   regret coefficient; it is neither paper-local traceability nor pure unfolding
+-- coverage search: symbol searches for "sqrt step size balance inverse linear
+--   linear equality positive scale" found only `sqrtTwoScaleStepSize` and its
+--   positivity API plus structurally different variance-balanced schedules;
+--   Mathlib semantic search found square-root ingredients but no full identity
+-- minimal hypotheses: none; nonpositive scale and zero radius reduce by
+--   totalized division, while the remaining branch permits field cancellation
+
+/-- The square-root-balanced step size reduces its inverse-linear plus linear
+coefficient to the geometric-mean expression.
+
+For any real `radius` and `scale`, substituting
+`radius / sqrt (2 * scale)` balances the two terms in the coefficient.
+
+Layer: Model | Gap: Level 0 (square-root-balanced regret coefficient identity)
+Proof: split off the nonpositive-scale and zero-radius branches, then cancel the nonzero radius and square-root factors and use `Real.sq_sqrt` for the positive radicand.
+Source: Mathlib real square-root and linear ordered-field division APIs for scalar parameter balancing
+Used in: matrix, tensor, and diagonal preconditioned regret proofs that close the comparator-radius and rank-scale coefficient after selecting a constant step size
+Book citation: book/research/Source.json#/assumptions/11
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, matrix, tensor, and diagonal Shampoo regret bounds -/
+theorem sqrtTwoScaleStepSize_balance (radius scale : ℝ) :
+    radius ^ 2 / (2 * sqrtTwoScaleStepSize radius scale) +
+        sqrtTwoScaleStepSize radius scale * scale =
+      Real.sqrt (2 * scale) * radius := by
+  by_cases hscale : 0 < scale
+  · by_cases hradius : radius = 0
+    · subst radius
+      simp [sqrtTwoScaleStepSize_def]
+    · have hsqrt_pos : 0 < Real.sqrt (2 * scale) := by
+        exact Real.sqrt_pos.2 (mul_pos (by norm_num) hscale)
+      have hsqrt_ne : Real.sqrt (2 * scale) ≠ 0 := ne_of_gt hsqrt_pos
+      have hsqrt_sq : Real.sqrt (2 * scale) ^ 2 = 2 * scale := by
+        exact Real.sq_sqrt (le_of_lt (mul_pos (by norm_num) hscale))
+      rw [sqrtTwoScaleStepSize_def]
+      field_simp [hsqrt_ne, hradius]
+      nlinarith [hsqrt_sq]
+  · have hsqrt_zero : Real.sqrt (2 * scale) = 0 := by
+      exact Real.sqrt_eq_zero_of_nonpos
+        (mul_nonpos_of_nonneg_of_nonpos (by norm_num) (le_of_not_gt hscale))
+    simp [sqrtTwoScaleStepSize_def, hsqrt_zero]
+
+
+open scoped BigOperators
+
+
+-- Generalization plan (G0):
+-- concept/name: geometric mean of positive natural parameters, named
+--   `positiveNatGeometricMean`; orig was `TensorAlgorithm2.rankGeometricMean`
+-- generality used: an arbitrary nonempty finite index type and a family of Mathlib
+--   positive naturals; no tensor dimensions, algorithm state, measure, convexity,
+--   smoothness, oracle, topology, or finite-dimensional vector-space assumptions
+-- portable call pattern: low-rank tensor, block-coordinate, and multilinear adaptive
+--   optimizers aggregate positive integral rank or block-size bounds while changing
+--   the finite index type and bound family but retaining the product-to-reciprocal-cardinality scalar
+-- counterargument checked: although the construction is a short scalar formula, a
+--   finite-family geometric mean is a standard named object and its unfolding and
+--   positivity API prevent repeated product/cardinality bookkeeping; it is not a
+--   paper-local rename, and Mathlib does not provide this positive-natural specialization
+-- coverage search: symbol searches for "geometric mean finite family product reciprocal
+--   cardinality" and "positive natural geometric mean product real power fintype card"
+--   found no SOptLib declaration; Mathlib semantic search found `Real.geom_mean_le_arith_mean`
+--   and weighted companions, whose signatures are inequalities over explicit products
+--   rather than a named equal-weight finite-family object, so coverage is partial
+-- minimal hypotheses: `Fintype` forms the product and cardinality, while `Nonempty`
+--   ensures the reciprocal-cardinality exponent represents a geometric mean
+
+/-- The geometric mean of a nonempty finite family of positive natural numbers.
+
+The family is coerced to real numbers, multiplied, and raised to the reciprocal
+of the cardinality of its index type.
+
+Layer: Model | Concept: geometric mean of positive natural parameters
+Proof: (definitional construction; real power of a finite product with reciprocal-cardinality exponent)
+Source: Mathlib finite products, positive natural numbers, finite cardinality, and real-power APIs
+Used in: low-rank tensor and multilinear adaptive-gradient bounds that combine modewise positive rank bounds into one scalar rate parameter
+Book citation: book/research/Source.json#/assumptions/6
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 2 tensor Shampoo -/
+noncomputable def positiveNatGeometricMean {ι : Type*} [Fintype ι] [Nonempty ι]
+    (r : ι → ℕ+) : ℝ :=
+  (∏ i : ι, ((r i : ℕ) : ℝ)) ^ (1 / (Fintype.card ι : ℝ))
+
+/-- The positive-natural geometric mean unfolds to its product and reciprocal-cardinality formula.
+
+Layer: Model | Gap: Level 0 (positive-natural geometric-mean specification)
+Proof: by rfl after unfolding `positiveNatGeometricMean`.
+Source: Mathlib finite products, finite cardinality, natural-to-real coercions, and real powers
+Used in: rewriting an aggregated modewise rank parameter into the explicit product formula used by tensor domination and regret calculations
+Book citation: book/research/Source.json#/assumptions/6
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 2 tensor Shampoo -/
+@[simp]
+theorem positiveNatGeometricMean_def {ι : Type*} [Fintype ι] [Nonempty ι]
+    (r : ι → ℕ+) :
+    positiveNatGeometricMean r =
+      (∏ i : ι, ((r i : ℕ) : ℝ)) ^ (1 / (Fintype.card ι : ℝ)) := by
+  rfl
+
+/-- The geometric mean of a nonempty finite family of positive naturals is positive.
+
+Layer: Model | Gap: Level 0 (positive-natural geometric-mean positivity)
+Proof: use positivity of every positive-natural factor, positivity of their finite product, and positivity of a real power with positive base.
+Source: Mathlib `Finset.prod_pos`, positive-natural subtype bounds, cast positivity, and `Real.rpow_pos_of_pos`
+Used in: tensor and block-preconditioned regret proofs whose learning-rate and scalar-domination algebra requires the aggregated rank parameter to be positive
+Book citation: book/research/Source.json#/assumptions/6
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 2 tensor Shampoo -/
+theorem positiveNatGeometricMean_pos {ι : Type*} [Fintype ι] [Nonempty ι]
+    (r : ι → ℕ+) :
+    0 < positiveNatGeometricMean r := by
+  rw [positiveNatGeometricMean_def]
+  apply Real.rpow_pos_of_pos
+  exact Finset.prod_pos fun i _ => by exact_mod_cast (r i).2
+
+
+open scoped BigOperators
+
+
+-- Generalization plan (G0):
+-- concept/name: factorization of a positive-natural geometric mean into
+--   equal-weight real powers, named `positiveNatGeometricMean_eq_prod_rpow`;
+--   orig was `rankGeometricMean_eq_prod_rpow_for_Lemma11`
+-- generality used: an arbitrary nonempty finite index type and a family of
+--   Mathlib positive naturals; no tensor dimensions, algorithm state, measure,
+--   convexity, smoothness, oracle, topology, or vector-space assumptions
+-- portable call pattern: low-rank tensor, block-coordinate, and multilinear
+--   adaptive methods rewrite a geometric mean of positive integral rank or
+--   block-size parameters into factorwise equal powers while changing the
+--   finite index type and parameter family
+-- counterargument checked: `Real.finset_prod_rpow` proves the underlying
+--   explicit-product identity, but does not expose the canonical
+--   `positiveNatGeometricMean` object; this companion theorem adds its reusable
+--   factorization API rather than retaining a paper-local Lemma 11 wrapper
+-- coverage search: searches for "positive natural geometric mean equals product
+--   of equal real powers", "finite product real power equals product of real
+--   powers nonnegative", and "real power of finite product equals product
+--   powers" found no SOptLib theorem; Mathlib's `Real.finset_prod_rpow` exactly
+--   supplies the algebraic step but only for an explicit finite product, so
+--   coverage is partial
+-- minimal hypotheses: `Fintype` forms the product and cardinality, while
+--   `Nonempty` is required by `positiveNatGeometricMean`; positivity follows
+--   directly from the positive-natural subtype
+
+/-- A positive-natural geometric mean is the product of its factors raised to
+the reciprocal of the family cardinality.
+
+Layer: Model | Gap: Level 0 (equal-power factorization of a finite geometric mean)
+Proof: unfold the geometric mean, then reverse `Real.finset_prod_rpow`; positivity of each real factor follows from its positive-natural witness.
+Source: Mathlib `Real.finset_prod_rpow`, positive-natural subtype coercions, finite products, and finite cardinality
+Used in: low-rank tensor and block-preconditioned domination proofs that distribute an aggregated rank geometric mean across modewise matrix-power factors
+Book citation: book/research/Source.json#/assumptions/6
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 2 tensor Shampoo -/
+theorem positiveNatGeometricMean_eq_prod_rpow
+    {ι : Type*} [Fintype ι] [Nonempty ι] (r : ι → ℕ+) :
+    positiveNatGeometricMean r =
+      ∏ i : ι, (((r i : ℕ) : ℝ) ^ (1 / (Fintype.card ι : ℝ))) := by
+  rw [positiveNatGeometricMean_def]
+  symm
+  apply Real.finset_prod_rpow
+  intro i _hi
+  exact_mod_cast (r i).2.le
+
+
+end SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: inverse geometric-mixing step size selector; orig was Theorem2ChosenStepsize.
+-- generality used: natural network size plus real denominator coefficient, Lipschitz scale, and geometric-mixing prefactor; no measure, convexity, smoothness, oracle, topology, normed-space, or finite-dimensional hypotheses are needed.
+-- portable call pattern: decentralized consensus, push-pull, and pull-with-memory convergence proofs choose a constant stepsize by inverting a scalar multiple of network size, squared mixing constant, and Lipschitz scale while changing the coefficient and constants.
+-- counterargument checked: the original declaration is a paper-facing Prop wrapper, but the reusable core is the named closed-form scalar selector; Mathlib has real division and powers but no domain-specific geometric-mixing stepsize choice, and SOptLib has other parameter-choice selectors but none with this denominator shape.
+-- coverage search: lean_search_symbols "inverse geometric mixing stepsize equals one over coefficient network size mixing constant squared Lipschitz" found finite-network geometric-mixing contracts and unrelated parameter-choice schedules; "closed form stepsize one over n C squared L" found local PullWithMemoryDGD coefficient lemmas and half-Lipschitz schedules, not this selector.
+-- minimal hypotheses: all algorithm setup fields were removed; only the parameters that occur in the scalar formula remain, with positivity hypotheses appearing only on the positivity theorem.
+
+/-- Constant inverse stepsize selected from a finite-network geometric mixing
+denominator.
+
+The value is `1 / (denomCoeff * n * C^2 * L)`, where `n` is the network size,
+`C` is a geometric-mixing prefactor, and `L` is the Lipschitz scale.
+
+Layer: Model | Concept: inverse geometric-mixing stepsize selector
+Proof: (definitional construction; reciprocal of a scalar multiple of network size, squared mixing prefactor, and Lipschitz scale)
+Source: Mathlib real field operations and decentralized-optimization geometric-mixing stepsize notation
+Used in: choosing the constant stepsize for geometric-mixing decentralized convergence theorems before substituting it into stationarity and coefficient bounds
+Book citation: book/LiangSongYuan2025/PullWithMemoryDGD.json#/main_theorem/statement_math
+Origin algorithm: Liang, Song, and Yuan, Decentralized Optimization over Time-Varying Row-Stochastic Digraphs, PULM-based Decentralized Gradient Descent -/
+noncomputable def inverse_geometric_mixing_step_size (n : Nat) (denomCoeff L C : Real) : Real :=
+  1 / (denomCoeff * (n : Real) * C ^ (2 : Nat) * L)
+
+/-- The inverse geometric-mixing stepsize unfolds to its reciprocal scalar
+formula.
+
+Layer: Model | Gap: Level 0 (inverse geometric-mixing stepsize unfolding)
+Proof: by rfl after unfolding `inverse_geometric_mixing_step_size`.
+Source: Mathlib real field operations and decentralized-optimization geometric-mixing stepsize notation
+Used in: rewriting a chosen constant stepsize to the scalar denominator used by geometric-mixing stationarity estimates
+Book citation: book/LiangSongYuan2025/PullWithMemoryDGD.json#/main_theorem/statement_math
+Origin algorithm: Liang, Song, and Yuan, Decentralized Optimization over Time-Varying Row-Stochastic Digraphs, PULM-based Decentralized Gradient Descent -/
+@[simp] theorem inverse_geometric_mixing_step_size_def
+    (n : Nat) (denomCoeff L C : Real) :
+    inverse_geometric_mixing_step_size n denomCoeff L C =
+      1 / (denomCoeff * (n : Real) * C ^ (2 : Nat) * L) := by
+  rfl
+
+/-- The inverse geometric-mixing stepsize is positive when every denominator
+factor is positive.
+
+Layer: Model | Gap: Level 0 (inverse geometric-mixing stepsize positivity)
+Proof: combine positivity of the scalar coefficient, natural network size cast, squared mixing prefactor, and Lipschitz scale, then apply positivity of a reciprocal.
+Source: Mathlib ordered real field arithmetic, natural-number casts, and power positivity APIs
+Used in: discharging positive constant-stepsize side conditions after selecting a geometric-mixing stepsize
+Book citation: book/LiangSongYuan2025/PullWithMemoryDGD.json#/main_theorem/statement_math
+Origin algorithm: Liang, Song, and Yuan, Decentralized Optimization over Time-Varying Row-Stochastic Digraphs, PULM-based Decentralized Gradient Descent -/
+theorem inverse_geometric_mixing_step_size_pos
+    (n : Nat) (denomCoeff L C : Real)
+    (hcoeff : 0 < denomCoeff) (hn : 0 < n) (hL : 0 < L)
+    (hC_sq : 0 < C ^ (2 : Nat)) :
+    0 < inverse_geometric_mixing_step_size n denomCoeff L C := by
+  unfold inverse_geometric_mixing_step_size
+  apply one_div_pos.mpr
+  exact mul_pos (mul_pos (mul_pos hcoeff (by exact_mod_cast hn)) hC_sq) hL
+
+-- Generalization plan (G0):
+-- concept/name: geometric-logarithmic inner-round natural ceiling selector; orig was theorem2ChosenCorrectedInnerRounds.
+-- generality used: real constants C and beta plus a zero-based natural index; no measure, convexity, smoothness, oracle, topology, normed-space, or finite-dimensional hypotheses are needed.
+-- portable call pattern: decentralized consensus and push-pull algorithms with zero-based communication horizons call the same selector while changing the mixing constants and outer index.
+-- counterargument checked: not merely paper-local because corrected zero-based logarithmic communication schedules recur when a positive-index formula is used over a natural horizon; not a duplicate of Mathlib because Mathlib gives only the generic Nat.le_ceil fact, not this named selector.
+-- coverage search: lean_search_symbols "natural ceiling of corrected geometric logarithmic inner round lower bound dominates lower bound all natural indices" found only the local PullWithMemoryDGD declarations; "Nat.ceil logarithmic schedule lower bound max log C log k beta" found unrelated SOptLib log-ceiling cutoff bounds; lean_leansearch "natural ceiling of a real number is at least the real number" identified Mathlib Nat.le_ceil as the proof ingredient, not a duplicate selector.
+-- minimal hypotheses: all algorithm setup fields were removed; the formula depends only on C, beta, and k.
+
+/-- Corrected zero-based geometric-logarithmic inner-round selector.
+
+For positive `k` this is the natural ceiling of
+`max (log C / (1 - beta)) (log k / (1 - beta))`; at `k = 0` it keeps the
+well-formed `log C` branch.
+
+Layer: Model | Concept: geometric-logarithmic inner-round ceiling selector
+Proof: (definitional construction; natural ceiling of the corrected all-index real logarithmic communication lower bound)
+Source: Mathlib real logarithm, lattice maximum, and natural ceiling APIs for geometric communication schedules
+Used in: selecting natural communication rounds from a zero-based geometric mixing schedule before proving the corrected schedule lower bound
+Book citation: book/LiangSongYuan2025/PullWithMemoryDGD.json#/main_theorem/statement_math
+Origin algorithm: Liang, Song, and Yuan, Decentralized Optimization over Time-Varying Row-Stochastic Digraphs, PULM-based Decentralized Gradient Descent -/
+noncomputable def geometricLogInnerRoundCeil (C beta : Real) (k : Nat) : Nat :=
+  Nat.ceil
+    (if _hk : 0 < k then
+      max (Real.log C / (1 - beta)) (Real.log (k : Real) / (1 - beta))
+    else
+      Real.log C / (1 - beta))
+
+/-- The corrected geometric-logarithmic inner-round selector unfolds to the
+natural ceiling of its corrected all-index real lower bound.
+
+Layer: Model | Gap: Level 0 (geometric-logarithmic ceiling selector unfolding)
+Proof: by rfl after unfolding `geometricLogInnerRoundCeil`.
+Source: Mathlib real logarithm, lattice maximum, and natural ceiling APIs for geometric communication schedules
+Used in: rewriting a chosen natural communication count to the scalar ceiling schedule used by zero and positive index branches
+Book citation: book/LiangSongYuan2025/PullWithMemoryDGD.json#/main_theorem/statement_math
+Origin algorithm: Liang, Song, and Yuan, Decentralized Optimization over Time-Varying Row-Stochastic Digraphs, PULM-based Decentralized Gradient Descent -/
+@[simp] theorem geometricLogInnerRoundCeil_def (C beta : Real) (k : Nat) :
+    geometricLogInnerRoundCeil C beta k =
+      Nat.ceil
+        (if _hk : 0 < k then
+          max (Real.log C / (1 - beta)) (Real.log (k : Real) / (1 - beta))
+        else
+          Real.log C / (1 - beta)) := by
+  rfl
+
+/-- The corrected geometric-logarithmic inner-round selector dominates its
+real lower bound after coercion to `Real`.
+
+Layer: Model | Gap: Level 0 (geometric-logarithmic ceiling lower bound)
+Proof: unfold the selector and apply Mathlib's generic `Nat.le_ceil`.
+Source: Mathlib natural ceiling API over ordered floor semirings, specialized to real logarithmic schedules
+Used in: proving that chosen natural communication rounds satisfy the corrected all-index geometric mixing lower-bound requirement
+Book citation: book/LiangSongYuan2025/PullWithMemoryDGD.json#/main_theorem/statement_math
+Origin algorithm: Liang, Song, and Yuan, Decentralized Optimization over Time-Varying Row-Stochastic Digraphs, PULM-based Decentralized Gradient Descent -/
+theorem geometricLogInnerRoundCeil_lower_bound (C beta : Real) (k : Nat) :
+    (if _hk : 0 < k then
+      max (Real.log C / (1 - beta)) (Real.log (k : Real) / (1 - beta))
+    else
+      Real.log C / (1 - beta)) <= (geometricLogInnerRoundCeil C beta k : Real) := by
+  unfold geometricLogInnerRoundCeil
+  exact Nat.le_ceil _
+
+-- Generalization plan (G0):
+-- concept/name: positive-index geometric-logarithmic inner-round lower-bound selector.
+-- generality used: real prefactor C and contraction beta, a natural outer index k with 0 < k; no measure, filtration, independence, integrability, convexity, smoothness, oracle, topology, normed-space, or finite-dimensional hypotheses are used.
+-- portable call pattern: decentralized consensus, push-pull, and inner-loop contraction proofs call the same real lower-bound selector when choosing communication rounds so that both a C-weighted geometric residual and a k-dependent residual are small; C, beta, and k vary while the max-of-two-log-branches conclusion stays unchanged.
+-- counterargument checked: this is not merely paper traceability because positive-index geometric communication schedules recur independently of PULM-DGD; it is not a pure wrapper over Mathlib because Mathlib supplies logarithm and max primitives but no named stochastic-optimization schedule object, and it differs from the staged ceiling selector by exposing the real lower bound before natural-number rounding.
+-- coverage search: lean_search_symbols queries "positive index logarithmic lower bound max log C over one minus beta log k over one minus beta", "geometric logarithmic inner round lower bound max two log branches", and "positive geometric logarithmic inner round lower bound real max log C log k" found only the zero-based Nat-ceiling selector geometricLogInnerRoundCeil; LeanSearch for the real logarithmic lower-bound maximum returned generic Real.log/logb lemmas, not this schedule object.
+-- minimal hypotheses: all algorithm setup fields were removed; the positive-index domain is structural to rule out the zero-index logarithm convention.
+
+/-- Positive-index geometric-logarithmic inner-round lower-bound selector.
+
+For positive `k`, this is the real lower bound
+`max (log C / (1 - beta)) (log k / (1 - beta))` used before taking a natural
+ceiling for communication or contraction rounds.
+
+Layer: Model | Concept: positive geometric-logarithmic inner-round lower-bound selector
+Proof: (definitional construction; maximum of the prefactor and positive-index logarithmic residual branches divided by the contraction gap)
+Source: Mathlib real logarithm, division in ordered fields, and lattice maximum APIs for geometric communication schedules
+Used in: selecting enough inner communication rounds from a positive-index geometric mixing schedule before natural-number ceiling totalization -/
+noncomputable def positive_geometric_log_inner_round_lower_bound
+    (C beta : Real) (k : {n : Nat // 0 < n}) : Real :=
+  max (Real.log C / (1 - beta))
+    (Real.log (k.1 : Real) / (1 - beta))
+
+/-- The positive-index geometric-logarithmic inner-round lower-bound selector
+unfolds to the maximum of its two logarithmic branches.
+
+Layer: Model | Gap: Level 0 (positive geometric-logarithmic lower-bound unfolding)
+Proof: by rfl after unfolding `positive_geometric_log_inner_round_lower_bound`.
+Source: Mathlib real logarithm, division in ordered fields, and lattice maximum APIs for geometric communication schedules
+Used in: rewriting a positive-index communication lower-bound selector to the source-level scalar display -/
+@[simp] theorem positive_geometric_log_inner_round_lower_bound_def
+    (C beta : Real) (k : {n : Nat // 0 < n}) :
+    positive_geometric_log_inner_round_lower_bound C beta k =
+      max (Real.log C / (1 - beta))
+        (Real.log (k.1 : Real) / (1 - beta)) := by
+  rfl
+
+/-- The constant logarithmic branch is bounded by the positive-index selector.
+
+Layer: Model | Gap: Level 0 (positive geometric-logarithmic left branch lower bound)
+Proof: unfold the selector and use the left branch of `max`.
+Source: Mathlib lattice maximum APIs over real logarithmic schedules
+Used in: proving that a selected positive communication count controls the constant geometric residual branch -/
+theorem log_const_div_one_sub_le_positive_geometric_log_inner_round_lower_bound
+    (C beta : Real) (k : {n : Nat // 0 < n}) :
+    Real.log C / (1 - beta) <=
+      positive_geometric_log_inner_round_lower_bound C beta k := by
+  rw [positive_geometric_log_inner_round_lower_bound_def]
+  exact le_max_left _ _
+
+/-- The positive-index logarithmic branch is bounded by the positive-index selector.
+
+Layer: Model | Gap: Level 0 (positive geometric-logarithmic right branch lower bound)
+Proof: unfold the selector and use the right branch of `max`.
+Source: Mathlib lattice maximum APIs over real logarithmic schedules
+Used in: proving that a selected positive communication count controls the index-dependent geometric residual branch -/
+theorem log_index_div_one_sub_le_positive_geometric_log_inner_round_lower_bound
+    (C beta : Real) (k : {n : Nat // 0 < n}) :
+    Real.log (k.1 : Real) / (1 - beta) <=
+      positive_geometric_log_inner_round_lower_bound C beta k := by
+  rw [positive_geometric_log_inner_round_lower_bound_def]
+  exact le_max_right _ _
+
+/-- The positive-index real lower-bound selector is dominated by the existing
+natural ceiling selector after coercion to `Real`.
+
+Layer: Model | Gap: Level 0 (positive geometric-logarithmic ceiling lower bound)
+Proof: specialize `geometricLogInnerRoundCeil_lower_bound` to the positive branch.
+Source: Mathlib `Nat.le_ceil` through the geometric-logarithmic ceiling selector API
+Used in: choosing natural communication rounds from the positive-index real lower-bound selector -/
+theorem positive_geometric_log_inner_round_lower_bound_le_geometric_log_inner_round_ceil
+    (C beta : Real) (k : {n : Nat // 0 < n}) :
+    positive_geometric_log_inner_round_lower_bound C beta k <=
+      (geometricLogInnerRoundCeil C beta k.1 : Real) := by
+  simpa [positive_geometric_log_inner_round_lower_bound_def, k.2]
+    using geometricLogInnerRoundCeil_lower_bound C beta k.1
+
+-- Generalization plan (G0):
+-- concept/name: zero-index geometric-logarithmic inner-round lower-bound selector; orig was theorem2ZeroRoundLowerBound.
+-- generality used: real prefactor C and contraction beta; no measure, filtration, independence, integrability, convexity, smoothness, oracle, topology, normed-space, or finite-dimensional hypotheses are used.
+-- portable call pattern: decentralized consensus, push-pull, and inner-loop contraction proofs call the same zero-index branch when totalizing a positive-index logarithmic communication schedule over a natural horizon; C and beta vary while the well-formed log C branch stays unchanged.
+-- counterargument checked: this is a one-line real formula, but it is not only paper traceability because it is the reusable zero-index branch paired with the already staged positive branch and ceiling selector; Mathlib has the logarithm and division primitives but no named geometric communication schedule branch.
+-- coverage search: lean_search_symbols queries "zero index geometric logarithmic inner round lower bound log C over one minus beta" and "zero geometric logarithmic lower bound real log C divided by one minus beta definition" found the local paper declaration plus existing positive-branch and ceiling-selector APIs, but no zero-branch selector; lean_leansearch "real logarithm divided by one minus beta geometric schedule zero index branch" returned generic Real.log/logb facts, not this schedule object.
+-- minimal hypotheses: all algorithm setup fields were removed; the formula depends only on C and beta.
+
+/-- Zero-index geometric-logarithmic inner-round lower-bound selector.
+
+This is the well-formed `k = 0` branch `log C / (1 - beta)` used when a
+positive-index logarithmic communication schedule is totalized over a
+zero-based natural horizon.
+
+Layer: Model | Concept: zero-index geometric-logarithmic inner-round lower-bound selector
+Proof: (definitional construction; constant logarithmic branch divided by the contraction gap)
+Source: Mathlib real logarithm and division APIs for geometric communication schedules
+Used in: selecting enough inner communication rounds at the zero index of a corrected zero-based geometric mixing schedule
+Book citation: book/LiangSongYuan2025/PullWithMemoryDGD.json#/main_theorem/statement_math
+Origin algorithm: Liang, Song, and Yuan, Decentralized Optimization over Time-Varying Row-Stochastic Digraphs, PULM-based Decentralized Gradient Descent -/
+noncomputable def zeroGeometricLogInnerRoundLowerBound (C beta : Real) : Real :=
+  Real.log C / (1 - beta)
+
+/-- The zero-index geometric-logarithmic inner-round lower-bound selector
+unfolds to the constant logarithmic branch.
+
+Layer: Model | Gap: Level 0 (zero-index geometric-logarithmic lower-bound unfolding)
+Proof: by rfl after unfolding `zeroGeometricLogInnerRoundLowerBound`.
+Source: Mathlib real logarithm and division APIs for geometric communication schedules
+Used in: rewriting the zero-index communication lower-bound selector to the source-level scalar display
+Book citation: book/LiangSongYuan2025/PullWithMemoryDGD.json#/main_theorem/statement_math
+Origin algorithm: Liang, Song, and Yuan, Decentralized Optimization over Time-Varying Row-Stochastic Digraphs, PULM-based Decentralized Gradient Descent -/
+@[simp] theorem zeroGeometricLogInnerRoundLowerBound_def (C beta : Real) :
+    zeroGeometricLogInnerRoundLowerBound C beta =
+      Real.log C / (1 - beta) := by
+  rfl
+
+/-- The zero-index real lower-bound selector is dominated by the zero-based
+natural ceiling selector after coercion to `Real`.
+
+Layer: Model | Gap: Level 0 (zero-index geometric-logarithmic ceiling lower bound)
+Proof: specialize `geometricLogInnerRoundCeil_lower_bound` at index zero and unfold the zero branch.
+Source: Mathlib natural ceiling API through the geometric-logarithmic ceiling selector
+Used in: choosing natural communication rounds from the zero-index real lower-bound selector
+Book citation: book/LiangSongYuan2025/PullWithMemoryDGD.json#/main_theorem/statement_math
+Origin algorithm: Liang, Song, and Yuan, Decentralized Optimization over Time-Varying Row-Stochastic Digraphs, PULM-based Decentralized Gradient Descent -/
+theorem zeroGeometricLogInnerRoundLowerBound_le_geometricLogInnerRoundCeil
+    (C beta : Real) :
+    zeroGeometricLogInnerRoundLowerBound C beta <=
+      (geometricLogInnerRoundCeil C beta 0 : Real) := by
+  simpa [zeroGeometricLogInnerRoundLowerBound]
+    using geometricLogInnerRoundCeil_lower_bound C beta 0
+
+-- Generalization plan (G0):
+-- concept/name: zero-based geometric-logarithmic inner-round real lower-bound selector; orig was theorem2CorrectedScheduleLowerBound.
+-- generality used: real prefactor C and contraction beta plus a zero-based natural outer index k; no measure, filtration, independence, integrability, convexity, smoothness, oracle, topology, normed-space, or finite-dimensional hypotheses are used.
+-- portable call pattern: decentralized consensus, push-pull, and pull-with-memory algorithms can call this all-index real lower-bound selector when a positive-index logarithmic communication schedule must be totalized over a natural outer-loop horizon; C, beta, and k vary while the positive and zero branch contract remains unchanged.
+-- counterargument checked: this is a one-line branch wrapper, but it is not paper-local traceability because it composes the reusable positive and zero geometric-logarithmic branch selectors into the real lower bound consumed before ceiling or schedule domination; Mathlib has only logarithm, max, and if primitives, and the existing staged ceiling selector changes the codomain to Nat.
+-- coverage search: lean_search_symbols queries "zero based geometric logarithmic inner round real lower bound positive branch zero branch" and "all index logarithmic lower bound selector log C log k one minus beta zero index" found the staged positive branch, zero branch, and Nat ceiling selector but no all-index Real-valued selector; lean_leansearch "zero based logarithmic maximum lower bound positive natural index log C divided by one minus beta" returned generic Nat logarithm declarations, not this real communication schedule object.
+-- minimal hypotheses: all algorithm setup fields were removed; the only structural hypothesis is the branch-local proof 0 < k carried internally by the dependent positive-index selector.
+
+/-- Zero-based geometric-logarithmic inner-round real lower-bound selector.
+
+For positive `k`, this uses the maximum of the constant and index-dependent
+logarithmic branches; at `k = 0`, it keeps only the well-formed constant
+branch before any natural-number ceiling is taken.
+
+Layer: Model | Concept: zero-based geometric-logarithmic inner-round real lower-bound selector
+Proof: (definitional construction; totalized branch between the positive-index logarithmic lower-bound selector and the zero-index constant lower-bound selector)
+Source: Mathlib real logarithm, division, subtype, and conditional APIs for geometric communication schedules
+Used in: expressing the real lower-bound requirement for inner communication rounds over a zero-based geometric mixing schedule before natural ceiling or schedule domination
+Book citation: book/LiangSongYuan2025/PullWithMemoryDGD.json#/main_theorem/statement_math
+Origin algorithm: Liang, Song, and Yuan, Decentralized Optimization over Time-Varying Row-Stochastic Digraphs, PULM-based Decentralized Gradient Descent -/
+noncomputable def geometric_log_inner_round_lower_bound
+    (C beta : Real) (k : Nat) : Real :=
+  if hk : 0 < k then
+    positive_geometric_log_inner_round_lower_bound C beta ⟨k, hk⟩
+  else
+    zeroGeometricLogInnerRoundLowerBound C beta
+
+/-- The zero-based geometric-logarithmic inner-round lower-bound selector
+unfolds to its positive-index and zero-index branch selectors.
+
+Layer: Model | Gap: Level 0 (zero-based geometric-logarithmic lower-bound unfolding)
+Proof: by rfl after unfolding `geometric_log_inner_round_lower_bound`.
+Source: Mathlib conditional simplification together with the positive and zero geometric-logarithmic selector APIs
+Used in: rewriting the corrected all-index communication lower-bound selector to the branch form required by schedule assumptions
+Book citation: book/LiangSongYuan2025/PullWithMemoryDGD.json#/main_theorem/statement_math
+Origin algorithm: Liang, Song, and Yuan, Decentralized Optimization over Time-Varying Row-Stochastic Digraphs, PULM-based Decentralized Gradient Descent -/
+@[simp] theorem geometric_log_inner_round_lower_bound_def
+    (C beta : Real) (k : Nat) :
+    geometric_log_inner_round_lower_bound C beta k =
+      if hk : 0 < k then
+        positive_geometric_log_inner_round_lower_bound C beta ⟨k, hk⟩
+      else
+        zeroGeometricLogInnerRoundLowerBound C beta := by
+  rfl
+
+/-- At a positive index, the zero-based lower-bound selector is the
+positive-index geometric-logarithmic selector.
+
+Layer: Model | Gap: Level 0 (positive branch of zero-based geometric-logarithmic lower bound)
+Proof: unfold `geometric_log_inner_round_lower_bound` and simplify the conditional with the supplied positivity proof.
+Source: Mathlib conditional simplification and subtype APIs specialized to positive-index logarithmic communication schedules
+Used in: recovering the displayed maximum selector from the corrected all-index communication lower-bound requirement at positive outer-loop indices
+Book citation: book/LiangSongYuan2025/PullWithMemoryDGD.json#/main_theorem/statement_math
+Origin algorithm: Liang, Song, and Yuan, Decentralized Optimization over Time-Varying Row-Stochastic Digraphs, PULM-based Decentralized Gradient Descent -/
+theorem geometric_log_inner_round_lower_bound_of_pos
+    (C beta : Real) {k : Nat} (hk : 0 < k) :
+    geometric_log_inner_round_lower_bound C beta k =
+      positive_geometric_log_inner_round_lower_bound C beta ⟨k, hk⟩ := by
+  simp [geometric_log_inner_round_lower_bound, hk]
+
+/-- At index zero, the zero-based lower-bound selector is the zero-index
+constant logarithmic branch.
+
+Layer: Model | Gap: Level 0 (zero branch of zero-based geometric-logarithmic lower bound)
+Proof: unfold `geometric_log_inner_round_lower_bound` and simplify the conditional at zero.
+Source: Mathlib natural-number order and conditional simplification APIs specialized to zero-index communication schedules
+Used in: recovering the corrected zero-index communication lower-bound branch without inventing a convention for `log 0`
+Book citation: book/LiangSongYuan2025/PullWithMemoryDGD.json#/main_theorem/statement_math
+Origin algorithm: Liang, Song, and Yuan, Decentralized Optimization over Time-Varying Row-Stochastic Digraphs, PULM-based Decentralized Gradient Descent -/
+@[simp] theorem geometric_log_inner_round_lower_bound_zero
+    (C beta : Real) :
+    geometric_log_inner_round_lower_bound C beta 0 =
+      zeroGeometricLogInnerRoundLowerBound C beta := by
+  simp [geometric_log_inner_round_lower_bound]
+
+/-- The zero-based real lower-bound selector is dominated by the natural
+ceiling selector after coercion to `Real`.
+
+Layer: Model | Gap: Level 0 (zero-based geometric-logarithmic ceiling lower bound)
+Proof: split on the positivity of the index and reuse the already staged positive and zero branch ceiling lower bounds.
+Source: Mathlib conditional case splits and natural ceiling lower-bound APIs through the geometric-logarithmic selector family
+Used in: proving that selected natural inner communication rounds satisfy the corrected all-index real lower-bound schedule requirement
+Book citation: book/LiangSongYuan2025/PullWithMemoryDGD.json#/main_theorem/statement_math
+Origin algorithm: Liang, Song, and Yuan, Decentralized Optimization over Time-Varying Row-Stochastic Digraphs, PULM-based Decentralized Gradient Descent -/
+theorem geometric_log_inner_round_lower_bound_le_geometricLogInnerRoundCeil
+    (C beta : Real) (k : Nat) :
+    geometric_log_inner_round_lower_bound C beta k <=
+      (geometricLogInnerRoundCeil C beta k : Real) := by
+  by_cases hk : 0 < k
+  · simpa [geometric_log_inner_round_lower_bound, hk]
+      using
+        positive_geometric_log_inner_round_lower_bound_le_geometric_log_inner_round_ceil
+          C beta ⟨k, hk⟩
+  · have hk0 : k = 0 := Nat.eq_zero_of_not_pos hk
+    subst hk0
+    simpa [geometric_log_inner_round_lower_bound]
+      using zeroGeometricLogInnerRoundLowerBound_le_geometricLogInnerRoundCeil C beta
+
 -- Merged from Staging/sqrtDenominatorContractionAlpha.lean
 namespace SOptLib
 
@@ -3246,5 +3834,1720 @@ theorem sqrtDenominatorContractionAlpha_pos_lt_one
   constructor
   · simpa [sqrtDenominatorContractionAlpha] using sub_pos.mpr hinv_lt_one
   · simpa [sqrtDenominatorContractionAlpha] using sub_lt_self (1 : ℝ) hinv_pos
+
+-- Generalization plan (G0):
+-- concept/name: checked quotient specification; orig was sourceQuotientSpec
+-- generality used: arbitrary group-with-zero carrier; no measure, convexity, smoothness, or oracle assumptions
+-- portable call pattern: parameter selectors and adaptive stepsize definitions construct a displayed
+--   scalar ratio; the numerator, denominator, and quotient witness vary while the checked relation stays fixed
+-- counterargument checked: although the predicate is a short conjunction, repeated ratio contracts need
+--   its bundled nonzero-denominator fact and the accompanying constructor/eliminator API
+-- coverage search: searched "checked quotient relation nonzero denominator cross multiplied quotient
+--   equation" and "division equality iff multiplication denominator nonzero"; Mathlib `eq_div_iff`
+--   supplies only the algebraic bridge, while SOptLib hits are specialized schedule and budget relations
+-- minimal hypotheses: `GroupWithZero K` supplies exactly the division and nonzero-cancellation API used below
+
+/-- A quotient witness together with the side condition that makes division valid.
+
+`checked_quotient_spec numerator denominator value` records both that the
+denominator is nonzero and that `value` satisfies the cross-multiplied quotient
+equation.
+
+Layer: Glue | Concept: checked quotient specification
+Proof: (definitional construction; pair a nonzero denominator with the cross-multiplied quotient equation)
+Source: Mathlib group-with-zero division and nonzero-denominator cancellation APIs
+Used in: displayed stochastic-optimization parameter ratios and adaptive stepsize formulas whose denominator side conditions must remain explicit
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STORM -/
+def checked_quotient_spec {K : Type*} [GroupWithZero K]
+    (numerator denominator value : K) : Prop :=
+  denominator ≠ 0 ∧ value * denominator = numerator
+
+/-- The checked quotient specification unfolds to its denominator condition and
+cross-multiplied equation.
+
+Layer: Glue | Gap: Level 0 (checked quotient definitional specification)
+Proof: by rfl after unfolding `checked_quotient_spec`.
+Source: Mathlib group-with-zero multiplication and zero APIs
+Used in: exposing denominator validity and cross-multiplied equations for stochastic-optimization parameter and stepsize ratios
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STORM -/
+@[simp]
+theorem checked_quotient_spec_def {K : Type*} [GroupWithZero K]
+    (numerator denominator value : K) :
+    checked_quotient_spec numerator denominator value ↔
+      denominator ≠ 0 ∧ value * denominator = numerator := by
+  rfl
+
+/-- Division by a nonzero denominator satisfies the checked quotient
+specification.
+
+Layer: Glue | Gap: Level 0 (checked quotient construction)
+Proof: retain the nonzero-denominator hypothesis and cancel the denominator from the quotient product using `div_mul_cancel₀`.
+Source: Mathlib group-with-zero division and `div_mul_cancel₀`
+Used in: constructing checked parameter and adaptive-stepsize ratios once their denominator side conditions have been proved
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STORM -/
+theorem checked_quotient_spec_div_of_den_ne {K : Type*} [GroupWithZero K]
+    (numerator : K) {denominator : K} (hden : denominator ≠ 0) :
+    checked_quotient_spec numerator denominator (numerator / denominator) := by
+  exact ⟨hden, div_mul_cancel₀ numerator hden⟩
+
+/-- A checked quotient witness equals ordinary division.
+
+Layer: Glue | Gap: Level 0 (checked quotient elimination)
+Proof: apply Mathlib's `eq_div_iff` using the stored nonzero denominator and cross-multiplied equation.
+Source: Mathlib group-with-zero division theorem `eq_div_iff`
+Used in: replacing checked stochastic-optimization parameter and stepsize witnesses by ordinary quotient expressions during algebraic proofs
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STORM -/
+theorem eq_div_of_checked_quotient_spec {K : Type*} [GroupWithZero K]
+    {numerator denominator value : K}
+    (h : checked_quotient_spec numerator denominator value) :
+    value = numerator / denominator := by
+  exact (eq_div_iff h.1).2 h.2
+
+-- Generalization plan (G0):
+-- concept/name: Option-valued checked quotient; orig was sourceQuotientValue
+-- generality used: arbitrary carrier with zero, division, and decidable equality; the
+--   value-specification bridge alone requires a group with zero
+-- portable call pattern: parameter selectors, adaptive stepsizes, and normalized potential terms
+--   evaluate displayed ratios; their numerators and denominators vary while zero remains an undefined denominator
+-- counterargument checked: the construction is a short conditional, but it is not paper-local or a
+--   cosmetic wrapper because it preserves undefinedness absent from total division and has a paired specification API
+-- coverage search: searched "Option-valued division returns none if denominator is zero otherwise
+--   returns quotient" and "partial division Option zero denominator"; Mathlib `Part.instDiv` only
+--   propagates existing partiality and SOptLib provides the complementary `checked_quotient_spec`, not this selector
+-- minimal hypotheses: `[Zero K] [Div K]` supply the operations used by the selector;
+--   `[DecidableEq K]` is used only to compute the zero-denominator branch
+
+/-- The partial quotient that is undefined exactly when its denominator is zero.
+
+Unlike the total division operation on a group with zero, this selector retains
+the side condition needed for a displayed quotient as `Option.none`.
+
+Layer: Glue | Concept: Option-valued checked quotient
+Proof: (definitional construction; branch on whether the denominator is zero and otherwise return ordinary division)
+Source: Mathlib zero and division operations, decidable equality, and `Option`
+Used in: stochastic-optimization parameter selectors, adaptive stepsizes, and normalized potential terms whose displayed denominators require explicit validation
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STORM -/
+def checked_quotient {K : Type*} [Zero K] [Div K] [DecidableEq K]
+    (numerator denominator : K) : Option K :=
+  if denominator = 0 then none else some (numerator / denominator)
+
+/-- The checked quotient is definitionally the zero-denominator conditional.
+
+Layer: Glue | Gap: Level 0 (checked quotient definitional equation)
+Proof: by rfl after unfolding `checked_quotient`.
+Source: Mathlib zero and division operations, decidable conditionals, and `Option`
+Used in: simplifying checked stochastic-optimization ratios after a denominator side condition has been established
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STORM -/
+@[simp]
+theorem checked_quotient_def {K : Type*} [Zero K] [Div K] [DecidableEq K]
+    (numerator denominator : K) :
+    checked_quotient numerator denominator =
+      if denominator = 0 then none else some (numerator / denominator) := by
+  rfl
+
+/-- Deprecated compatibility name for algorithm proofs staged before the
+snake_case Glue API was introduced. -/
+@[deprecated checked_quotient_def (since := "2026-08-06")]
+theorem checkedQuotientValue_def {K : Type*} [Zero K] [Div K] [DecidableEq K]
+    (numerator denominator : K) :
+    checked_quotient numerator denominator =
+      if denominator = 0 then none else some (numerator / denominator) :=
+  checked_quotient_def numerator denominator
+
+/-- A checked quotient is undefined if and only if its denominator is zero.
+
+Layer: Glue | Gap: Level 0 (checked quotient undefinedness characterization)
+Proof: unfold the selector and simplify the two zero-denominator branches.
+Source: Mathlib decidable conditionals and `Option` constructor disjointness
+Used in: proving that stochastic-optimization parameter and adaptive-stepsize ratios are available exactly under their denominator run contracts
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STORM -/
+@[simp]
+theorem checked_quotient_eq_none_iff {K : Type*} [Zero K] [Div K] [DecidableEq K]
+    (numerator denominator : K) :
+    checked_quotient numerator denominator = none ↔ denominator = 0 := by
+  simp [checked_quotient]
+
+/-- A value is returned by the checked quotient exactly when it satisfies the
+checked quotient specification.
+
+Layer: Glue | Gap: Level 0 (checked quotient value-specification equivalence)
+Proof: split on a zero denominator; in the nonzero branch use the checked quotient constructor and its division uniqueness theorem.
+Source: Mathlib group-with-zero division together with `checked_quotient_spec_div_of_den_ne` and `eq_div_of_checked_quotient_spec`
+Used in: moving between Option-valued stochastic-optimization ratios and explicit nonzero-denominator quotient witnesses
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STORM -/
+@[simp]
+theorem checked_quotient_eq_some_iff {K : Type*} [GroupWithZero K]
+    [DecidableEq K]
+    {numerator denominator value : K} :
+    checked_quotient numerator denominator = some value ↔
+      checked_quotient_spec numerator denominator value := by
+  by_cases hden : denominator = 0
+  · simp [checked_quotient, checked_quotient_spec, hden]
+  · rw [checked_quotient_def]
+    simp only [hden, ↓reduceIte, Option.some.injEq]
+    constructor
+    · intro hvalue
+      rw [← hvalue]
+      exact checked_quotient_spec_div_of_den_ne numerator hden
+    · intro hspec
+      exact (eq_div_of_checked_quotient_spec hspec).symm
+
+-- Generalization plan (G0):
+-- concept/name: inverse real-power adaptive step-size schedule; orig was
+--   `adaptiveStepsize`, renamed to `inverse_rpow_step_size`
+-- generality used: four real scalars for the numerator, offset, accumulated
+--   statistic, and exponent; no carrier, measure, convexity, smoothness,
+--   oracle, filtration, integrability, or finite-dimensional assumptions
+-- portable call pattern: AdaGrad-style, recursive-momentum, and adaptive
+--   stochastic-gradient updates vary the numerator, stabilizing offset,
+--   accumulated statistic, and exponent while retaining the quotient by a
+--   real power of offset plus accumulator
+-- counterargument checked: although the construction is a single formula, it
+--   is a named adaptive schedule used by update, positivity, and measurability
+--   arguments; the companion API preserves that boundary, whereas the
+--   separately proposed base and denominator fragments were caller-side
+--   expressions and were declined
+-- coverage search: `lean_search_symbols` queries for "stepsize equal numerator
+--   divided by real power of offset plus accumulator", "inverse real power
+--   adaptive stepsize schedule", and "numerator division Real.rpow offset
+--   accumulator exponent" found only paper-local STORM equations and unrelated
+--   real-power bounds; the closest SOptLib definition is the constant
+--   `halfLipschitzStepSizeSchedule`, and Mathlib semantic search exposes
+--   `Real.rpow` primitives but no adaptive schedule definition
+-- minimal hypotheses: the definition and unfolding theorem use only real
+--   operations; positivity needs positive numerator and base, while
+--   measurability needs no restriction on the exponent
+
+/-- The inverse real-power step size with an additive stabilizing offset.
+
+For numerator `numerator`, offset `offset`, accumulated statistic
+`accumulator`, and exponent `exponent`, this is
+`numerator / (offset + accumulator) ^ exponent` using `Real.rpow`.
+
+Layer: Model | Concept: inverse real-power adaptive step-size schedule
+Proof: (definitional construction; divide the numerator by the real power of the offset plus accumulated statistic)
+Source: Mathlib real-power and real-field operations for adaptive optimization parameter schedules
+Used in: recursive-momentum, AdaGrad-style, and adaptive stochastic-gradient updates whose step size decays with an accumulated gradient statistic
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/steps/1/math
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+noncomputable def inverse_rpow_step_size
+    (numerator offset accumulator exponent : ℝ) : ℝ :=
+  numerator / Real.rpow (offset + accumulator) exponent
+
+/-- The inverse real-power step size unfolds to its defining quotient.
+
+Layer: Model | Gap: Level 0 (inverse real-power step-size unfolding)
+Proof: by rfl after unfolding `inverse_rpow_step_size`.
+Source: Mathlib real-power and real-field definitional reduction APIs
+Used in: adaptive stochastic-gradient scalar algebra that substitutes the explicit accumulated-statistic denominator for the named step size
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/steps/1/math
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+@[simp] theorem inverse_rpow_step_size_def
+    (numerator offset accumulator exponent : ℝ) :
+    inverse_rpow_step_size numerator offset accumulator exponent =
+      numerator / Real.rpow (offset + accumulator) exponent := by
+  rfl
+
+/-- An inverse real-power step size is positive when its numerator and base are positive.
+
+Layer: Model | Gap: Level 0 (inverse real-power step-size positivity)
+Proof: unfold the schedule, use positivity of `Real.rpow` on a positive base, and apply positivity of division.
+Source: Mathlib `Real.rpow_pos_of_pos` and ordered-field division positivity APIs
+Used in: adaptive recursive-momentum and stochastic-gradient proofs establishing positive update scales from positive offsets and accumulated statistics
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/steps/1/math
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem inverse_rpow_step_size_pos_of_numerator_pos_of_base_pos
+    (numerator offset accumulator exponent : ℝ)
+    (hnumerator : 0 < numerator)
+    (hbase : 0 < offset + accumulator) :
+    0 < inverse_rpow_step_size numerator offset accumulator exponent := by
+  rw [inverse_rpow_step_size_def]
+  exact div_pos hnumerator (Real.rpow_pos_of_pos hbase exponent)
+
+/-- The inverse real-power step size is measurable in its accumulated statistic.
+
+Layer: Model | Gap: Level 0 (inverse real-power step-size measurability)
+Proof: take the measurable constant real power of the offset accumulator, then use measurability of constant division.
+Source: Mathlib `Measurable.pow_const`, `Measurable.const_div`, and measurable real-field operation APIs
+Used in: adaptive stochastic-gradient process proofs transporting measurability of accumulated gradient statistics to generated step sizes
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/steps/1/math
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem inverse_rpow_step_size_measurable
+    (numerator offset exponent : ℝ) :
+    Measurable
+      (fun accumulator : ℝ =>
+        inverse_rpow_step_size numerator offset accumulator exponent) := by
+  rw [show (fun accumulator : ℝ =>
+      inverse_rpow_step_size numerator offset accumulator exponent) =
+      fun accumulator : ℝ =>
+        numerator / Real.rpow (offset + accumulator) exponent by
+    funext accumulator
+    rw [inverse_rpow_step_size_def]]
+  have hbase : Measurable (fun accumulator : ℝ => offset + accumulator) :=
+    measurable_const.add measurable_id
+  exact (hbase.pow_const exponent).const_div numerator
+
+-- Generalization plan (G0):
+-- concept/name: quadratic momentum weight; orig was momentumWeight
+-- generality used: an arbitrary monoid for the definition and unfolding theorem;
+--   an ordered semiring with the minimal square-nonnegativity order interfaces for the
+--   nonnegativity theorem
+-- portable call pattern: recursive-momentum and variance-reduced stochastic-gradient
+--   updates choose a new coefficient and step while retaining the weight coefficient * step^2
+-- counterargument checked: although the formula is short, it is a named update parameter used
+--   by transition, measurability, continuity, and sign arguments; its unfolding and sign API
+--   preserve that mathematical boundary rather than merely renaming a caller-side expression
+-- coverage search: queries "quadratic momentum weight coefficient times squared step size" and
+--   "parameter weight coefficient multiplied by square of step size equality" found only the
+--   finite aggregate outputSquaredStepSum and the different weight gamma - L * gamma^2;
+--   Mathlib semantic search found QuadraticMap.weightedSumSquares, which is an indexed quadratic
+--   map rather than this scalar algorithm parameter, so coverage is partial and non-duplicative
+-- minimal hypotheses: Monoid supplies multiplication and natural powers; Semiring, LinearOrder,
+--   ExistsAddOfLE, PosMulMono, AddLeftMono, and coefficient nonnegativity are used only by the
+--   sign theorem
+
+/-- The quadratic momentum weight obtained by scaling the square of a step size.
+
+Layer: Model | Concept: quadratic momentum parameter choice
+Proof: (definitional construction; multiply a scalar coefficient by the square of the step)
+Source: recursive-momentum parameter schedules and Mathlib semiring natural-power operations
+Used in: recursive-momentum and variance-reduced stochastic-gradient transitions that damp the
+  previous direction by one minus a coefficient-scaled squared step size
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/steps/3
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD,
+  STOchastic Recursive Momentum -/
+def quadraticMomentumWeight {R : Type*} [Monoid R]
+    (coefficient step : R) : R :=
+  coefficient * step ^ 2
+
+/-- A quadratic momentum weight unfolds to the coefficient times the squared step size.
+
+Layer: Model | Gap: Level 0 (quadratic momentum weight unfolding)
+Proof: by rfl after unfolding `quadraticMomentumWeight`.
+Source: Mathlib semiring multiplication and natural-power APIs
+Used in: recursive-momentum transition equations and scalar algebra that substitute the displayed
+  coefficient-scaled squared-step formula for the named momentum weight
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/steps/3
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD,
+  STOchastic Recursive Momentum -/
+@[simp] theorem quadraticMomentumWeight_def
+    {R : Type*} [Monoid R] (coefficient step : R) :
+    quadraticMomentumWeight coefficient step = coefficient * step ^ 2 := by
+  rfl
+
+/-- A quadratic momentum weight is nonnegative when its coefficient is nonnegative.
+
+Layer: Model | Gap: Level 0 (quadratic momentum weight nonnegativity)
+Proof: unfold the weight, then combine coefficient nonnegativity with nonnegativity of a square.
+Source: Mathlib ordered ring multiplication and square-nonnegativity APIs
+Used in: recursive-momentum stability arguments that bound one minus the momentum weight after
+  proving the algorithmic coefficient is nonnegative
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/steps/3
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD,
+  STOchastic Recursive Momentum -/
+theorem quadraticMomentumWeight_nonneg
+    {R : Type*} [Semiring R] [LinearOrder R] [ExistsAddOfLE R]
+    [PosMulMono R] [AddLeftMono R]
+    (coefficient step : R)
+    (hcoefficient : 0 ≤ coefficient) :
+    0 ≤ quadraticMomentumWeight coefficient step := by
+  exact mul_nonneg hcoefficient (sq_nonneg step)
+
+-- Generalization plan (G0):
+-- concept/name: checked inverse real-power step-size schedule; orig was
+--   `adaptiveStepsizeSourceValue`, renamed to `checked_inverse_rpow_step_size`
+-- generality used: four real scalars for the numerator, offset, accumulated
+--   statistic, and exponent; no measure, convexity, smoothness, oracle,
+--   filtration, integrability, carrier, or finite-dimensional assumptions
+-- portable call pattern: recursive-momentum, AdaGrad-style, and adaptive
+--   stochastic-gradient algorithms validate positivity of an offset plus an
+--   accumulated statistic before selecting the corresponding inverse-power step
+-- counterargument checked: this is a short composition, but it is not a pure
+--   rename or caller-side expression: it is the partial counterpart of the
+--   named inverse-power schedule and its positive-base theorem bridges checked
+--   source semantics to the total schedule used in arithmetic and updates
+-- coverage search: searched "checked inverse real power step size some total
+--   inverse power positive base" and "Option valued real rpow positive base
+--   checked quotient numerator denominator"; Mathlib provides `Real.rpow`,
+--   while SOptLib provides `checked_quotient` and `inverse_rpow_step_size`, but
+--   neither Mathlib nor SOptLib contains their positive-base checked composition
+-- minimal hypotheses: all definition parameters are real scalars; only the
+--   bridge theorem assumes positivity of the denominator base
+
+/-- The inverse real-power step size, defined only when its denominator base is
+positive.
+
+When `offset + accumulator` is positive, this checks the resulting real-power
+denominator before returning the quotient. Otherwise it returns `none`.
+
+Layer: Model | Concept: checked inverse real-power adaptive step-size schedule
+Proof: (definitional construction; validate the real-power base and apply the Option-valued checked quotient to the resulting denominator)
+Source: Mathlib `Real.rpow`, ordered real arithmetic, and SOptLib checked quotient and inverse real-power schedule APIs
+Used in: recursive-momentum, AdaGrad-style, and adaptive stochastic-gradient updates that retain a positive denominator-base run contract before selecting a step size
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/steps/1/math
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+noncomputable def checked_inverse_rpow_step_size
+    (numerator offset accumulator exponent : ℝ) : Option ℝ :=
+  if 0 < offset + accumulator then
+    checked_quotient numerator (Real.rpow (offset + accumulator) exponent)
+  else
+    none
+
+/-- The checked inverse real-power step size unfolds to its positive-base
+conditional and checked denominator quotient.
+
+Layer: Model | Gap: Level 0 (checked inverse real-power step-size unfolding)
+Proof: by rfl after unfolding `checked_inverse_rpow_step_size`.
+Source: Mathlib decidable conditionals and real powers together with SOptLib `checked_quotient`
+Used in: simplifying a validated adaptive step-size selector to its checked real-power quotient branch
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/steps/1/math
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+@[simp] theorem checked_inverse_rpow_step_size_def
+    (numerator offset accumulator exponent : ℝ) :
+    checked_inverse_rpow_step_size numerator offset accumulator exponent =
+      if 0 < offset + accumulator then
+        checked_quotient numerator (Real.rpow (offset + accumulator) exponent)
+      else
+        none := by
+  rfl
+
+/-- A positive denominator base makes the checked inverse real-power step size
+equal to the total inverse real-power schedule.
+
+Layer: Model | Gap: Level 0 (checked-to-total inverse real-power step-size bridge)
+Proof: select the positive-base branch, use positivity of `Real.rpow` to discharge the checked quotient denominator condition, and unfold the total schedule
+Source: Mathlib `Real.rpow_pos_of_pos` and SOptLib checked quotient and inverse real-power step-size definitions
+Used in: recursive-momentum and adaptive stochastic-gradient proofs that replace a source-validated step-size value by the total scalar used in update algebra
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/steps/1/math
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+@[simp] theorem checked_inverse_rpow_step_size_eq_some_of_base_pos
+    (numerator offset accumulator exponent : ℝ)
+    (hbase : 0 < offset + accumulator) :
+    checked_inverse_rpow_step_size numerator offset accumulator exponent =
+      some (inverse_rpow_step_size numerator offset accumulator exponent) := by
+  have hden : (offset + accumulator) ^ exponent ≠ 0 := by
+    positivity
+  simp [checked_inverse_rpow_step_size, checked_quotient, inverse_rpow_step_size,
+    hbase, hden]
+
+-- Generalization plan (G0):
+-- concept/name: positive-base checked specification for an inverse real-power
+--   step-size schedule; orig was `adaptiveStepsize_source_spec_of_base_pos`,
+--   renamed to `inverseRpowStepSizeSpec_of_base_pos`
+-- generality used: four real scalars for the numerator, offset, accumulated
+--   statistic, and exponent; no carrier, measure, convexity, smoothness,
+--   oracle, filtration, integrability, or finite-dimensional assumptions
+-- portable call pattern: recursive-momentum, AdaGrad-style, and adaptive
+--   stochastic-gradient proofs vary the schedule parameters and accumulated
+--   statistic while deriving the same positive-base checked quotient contract
+-- counterargument checked: the proof composes short existing APIs, but is not
+--   a pure rename: it packages the positive source-domain condition together
+--   with the checked specification of the named total inverse-power schedule
+-- coverage search: queries for "inverse rpow step size checked quotient
+--   specification positive base" and "positive real rpow nonzero quotient
+--   multiplication specification" found the partial SOptLib results
+--   `checked_quotient_spec_div_of_den_ne` and
+--   `checked_inverse_rpow_step_size_eq_some_of_base_pos`; Mathlib semantic
+--   search found `Real.rpow_pos_of_pos`, but no theorem with this conjunction
+-- minimal hypotheses: all parameters are real scalars and the only hypothesis
+--   is pointwise positivity of the shifted denominator base
+
+/-- A positive shifted base gives the checked quotient specification for an
+inverse real-power step size.
+
+Layer: Model | Gap: Level 0 (positive-base checked inverse-power schedule specification)
+Proof: use `Real.rpow_pos_of_pos` to make the denominator nonzero, then apply the checked quotient constructor after unfolding the named schedule.
+Source: Mathlib `Real.rpow_pos_of_pos` and SOptLib checked quotient construction for nonzero denominators
+Used in: recursive-momentum, AdaGrad-style, and adaptive stochastic-gradient proofs validating displayed inverse-power step sizes before using their totalized values
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/steps/1/math
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem inverseRpowStepSizeSpec_of_base_pos
+    (numerator offset accumulator exponent : ℝ)
+    (hbase : 0 < offset + accumulator) :
+    0 < offset + accumulator ∧
+      checked_quotient_spec numerator
+        (Real.rpow (offset + accumulator) exponent)
+        (inverse_rpow_step_size numerator offset accumulator exponent) := by
+  refine ⟨hbase, ?_⟩
+  rw [inverse_rpow_step_size_def]
+  exact checked_quotient_spec_div_of_den_ne numerator
+    (ne_of_gt (Real.rpow_pos_of_pos hbase exponent))
+
+-- Generalization plan (G0):
+-- concept/name: reciprocal continuity of an inverse real-power adaptive
+--   step-size schedule; orig was
+--   `lemma2_reciprocal_stepsize_of_sumSq_continuousOn_Icc`, renamed to
+--   `inverse_rpow_step_size_reciprocal_continuousOn_Icc`
+-- generality used: real numerator, offset, exponent, accumulator, and interval
+--   endpoint; no carrier, measure, convexity, smoothness, oracle, filtration,
+--   integrability, or finite-dimensional assumptions
+-- portable call pattern: recursive-momentum, AdaGrad-style, and adaptive
+--   stochastic-gradient proofs vary the numerator, stabilizing offset,
+--   exponent, accumulated statistic, and compact range while retaining
+--   continuity of the reciprocal schedule used for compact-range bounds
+-- counterargument checked: this is not merely a paper traceability wrapper;
+--   it packages the nontrivial reciprocal-of-a-quotient rewrite with real-power
+--   continuity for the named schedule, and no existing API theorem supplies
+--   that compound conclusion
+-- coverage search: symbol queries for "reciprocal inverse rpow step size
+--   continuous on interval nonnegative exponent" and
+--   "inverse rpow step size reciprocal continuous" found the staged
+--   `inverse_rpow_step_size` definition and its measurability theorem but no
+--   continuity result; Mathlib semantic search found only the partial building
+--   blocks `Real.continuous_rpow_const` and `ContinuousWithinAt.rpow_const`
+-- minimal hypotheses: `0 ≤ exponent` is exactly what gives global continuity
+--   of real power even where the shifted accumulator vanishes; totalized
+--   division makes a nonzero-numerator assumption unnecessary
+
+/-- The reciprocal of an inverse real-power step size is continuous on a
+compact accumulator interval when the exponent is nonnegative.
+
+Layer: Model | Gap: Level 0 (reciprocal inverse-real-power schedule continuity)
+Proof: rewrite the reciprocal quotient as the shifted real power divided by the numerator, then compose affine, real-power, and constant-multiplication continuity.
+Source: Mathlib `Real.continuous_rpow_const`, continuous affine operations, and real-field quotient identities
+Used in: recursive-momentum and AdaGrad-style integrability proofs bounding reciprocal adaptive step sizes over a compact range of accumulated squared gradients
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/steps/1/math
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem inverse_rpow_step_size_reciprocal_continuousOn_Icc
+    (numerator offset exponent R : ℝ)
+    (hexponent : 0 ≤ exponent) :
+    ContinuousOn
+      (fun accumulator : ℝ =>
+        1 / inverse_rpow_step_size numerator offset accumulator exponent)
+      (Set.Icc 0 R) := by
+  have hrpow_cont :
+      ContinuousOn
+        (fun accumulator : ℝ => Real.rpow (offset + accumulator) exponent)
+        (Set.Icc 0 R) := by
+    exact
+      ((Real.continuous_rpow_const hexponent).comp
+        (continuous_const.add continuous_id)).continuousOn
+  have hrewrite :
+      (fun accumulator : ℝ =>
+          1 / inverse_rpow_step_size numerator offset accumulator exponent) =
+        fun accumulator : ℝ =>
+          Real.rpow (offset + accumulator) exponent / numerator := by
+    funext accumulator
+    rw [inverse_rpow_step_size_def]
+    exact one_div_div _ _
+  rw [hrewrite]
+  simpa [div_eq_mul_inv] using hrpow_cont.mul continuousOn_const
+
+-- Generalization plan (G0):
+-- concept/name: continuity of the complementary quadratic momentum weight for
+--   an inverse real-power step-size schedule; orig was
+--   `lemma3_one_sub_momentum_of_sumSq_continuousOn_Icc`
+-- generality used: real numerator, positive offset, arbitrary real exponent,
+--   quadratic-weight coefficient, and interval endpoint; no carrier, measure,
+--   convexity, smoothness, oracle, filtration, integrability, or
+--   finite-dimensional assumptions
+-- portable call pattern: recursive-momentum and variance-reduced stochastic-
+--   gradient proofs vary the schedule numerator, stabilizing offset, decay
+--   exponent, momentum coefficient, and accumulator range while retaining
+--   continuity of one minus the generated momentum weight
+-- counterargument checked: the result is not a paper-local rename or a pure
+--   wrapper; it composes two named parameter choices and packages the positive-
+--   base side condition needed to prove continuity for arbitrary real exponents
+-- coverage search: symbol queries for "one minus quadratic momentum weight
+--   inverse real power step size continuous on interval positive offset",
+--   "inverse rpow step size continuous on Icc positive base", and "Real rpow
+--   composition division continuousOn positive base" found no matching project
+--   declaration; Mathlib semantic search found the component theorem
+--   `ContinuousOn.rpow_const`, while the staged reciprocal-continuity theorem
+--   has a different conclusion and assumes a nonnegative exponent
+-- minimal hypotheses: positivity of the offset is sufficient on `Icc 0 R` to
+--   keep the real-power denominator nonzero; the exponent, numerator,
+--   coefficient, and endpoint are otherwise unrestricted
+
+/-- One minus the quadratic momentum weight of an inverse real-power step size
+is continuous on a nonnegative compact accumulator interval when the schedule
+offset is positive.
+
+Layer: Model | Gap: Level 0 (complementary quadratic momentum schedule continuity)
+Proof: prove the shifted base is positive on the interval, use `ContinuousOn.rpow_const` for the denominator, and preserve continuity through division, squaring, scalar multiplication, and subtraction.
+Source: Mathlib `ContinuousOn.rpow_const`, continuous real-field operations, and the SOptLib inverse-real-power step-size and quadratic-momentum parameter definitions
+Used in: recursive-momentum compact-range bounds where one minus the next momentum coefficient is composed with an accumulated squared-gradient step-size schedule
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/steps
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem one_sub_quadraticMomentumWeight_inverseRpowStepSize_continuousOn_Icc
+    (numerator offset exponent coefficient R : ℝ)
+    (hoffset : 0 < offset) :
+    ContinuousOn
+      (fun accumulator : ℝ =>
+        1 - quadraticMomentumWeight coefficient
+          (inverse_rpow_step_size numerator offset accumulator exponent))
+      (Set.Icc 0 R) := by
+  have hbase_pos :
+      ∀ accumulator ∈ Set.Icc (0 : ℝ) R, 0 < offset + accumulator := by
+    intro accumulator haccumulator
+    exact add_pos_of_pos_of_nonneg hoffset haccumulator.1
+  have hbase_ne :
+      ∀ accumulator ∈ Set.Icc (0 : ℝ) R, offset + accumulator ≠ 0 := by
+    intro accumulator haccumulator
+    exact ne_of_gt (hbase_pos accumulator haccumulator)
+  have hrpow_cont :
+      ContinuousOn
+        (fun accumulator : ℝ => Real.rpow (offset + accumulator) exponent)
+        (Set.Icc 0 R) := by
+    exact
+      (continuousOn_const.add continuousOn_id).rpow_const
+        (fun accumulator haccumulator =>
+          Or.inl (hbase_ne accumulator haccumulator))
+  have hrpow_ne :
+      ∀ accumulator ∈ Set.Icc (0 : ℝ) R,
+        Real.rpow (offset + accumulator) exponent ≠ 0 := by
+    intro accumulator haccumulator
+    exact ne_of_gt (Real.rpow_pos_of_pos (hbase_pos accumulator haccumulator) exponent)
+  have hstepsize_cont :
+      ContinuousOn
+        (fun accumulator : ℝ =>
+          inverse_rpow_step_size numerator offset accumulator exponent)
+        (Set.Icc 0 R) := by
+    simpa only [inverse_rpow_step_size_def] using
+      continuousOn_const.div hrpow_cont hrpow_ne
+  have hstepsize_sq_cont :
+      ContinuousOn
+        (fun accumulator : ℝ =>
+          inverse_rpow_step_size numerator offset accumulator exponent ^ 2)
+        (Set.Icc 0 R) :=
+    hstepsize_cont.pow 2
+  simpa only [quadraticMomentumWeight_def] using
+    continuousOn_const.sub (continuousOn_const.mul hstepsize_sq_cont)
+
+-- Generalization plan (G0):
+-- concept/name: continuity of the reciprocal inverse-rpow step size times the
+--   squared complementary quadratic momentum weight; orig was
+--   `lemma3_scalar_multiplier_of_sumSq_continuousOn_Icc`, renamed to
+--   `inverse_rpow_step_size_complementary_quadratic_momentum_multiplier_continuousOn_Icc`
+-- generality used: real numerator, positive offset, arbitrary real exponent,
+--   quadratic momentum coefficient, and interval endpoint; no carrier,
+--   measure, convexity, smoothness, oracle, filtration, integrability, or
+--   finite-dimensional assumptions
+-- portable call pattern: recursive-momentum and adaptive variance-reduction
+--   proofs vary the inverse-power schedule and quadratic momentum parameters
+--   while bounding the multiplier eta^{-1} * (1 - a(eta))^2 over a compact
+--   range of accumulated squared gradients
+-- counterargument checked: although continuity closure combines two component
+--   factors, the exact multiplier is the reusable coefficient in error-energy
+--   and compact-range bounds; unlike the existing reciprocal theorem, this
+--   statement also permits arbitrary real exponents under a positive offset
+-- coverage search: symbol queries for "inverse real power step size reciprocal
+--   times squared complementary quadratic momentum weight continuous" and
+--   "eta inverse one minus momentum squared continuousOn Icc" found only the
+--   component theorems
+--   `inverse_rpow_step_size_reciprocal_continuousOn_Icc` and
+--   `one_sub_quadraticMomentumWeight_inverseRpowStepSize_continuousOn_Icc`;
+--   Mathlib semantic search found only generic `ContinuousOn.inv₀`,
+--   `ContinuousOn.div₀`, and continuity closure results, so coverage is partial
+-- minimal hypotheses: positivity of the offset keeps every shifted base on
+--   `Icc 0 R` positive; the source nonzero-numerator hypothesis is unnecessary,
+--   and no sign restriction on the exponent is needed on a positive base
+
+/-- The reciprocal inverse-real-power step size times the square of its
+complementary quadratic momentum weight is continuous on a nonnegative compact
+accumulator interval when the schedule offset is positive.
+
+Layer: Model | Gap: Level 0 (adaptive reciprocal complementary-momentum multiplier continuity)
+Proof: use positive-base real-power continuity to control the reciprocal schedule, reuse complementary quadratic-momentum continuity, and close under squaring and multiplication.
+Source: Mathlib `ContinuousOn.rpow_const` and continuous real-field operations, composed with SOptLib inverse-real-power step-size and quadratic-momentum parameter APIs
+Used in: recursive-momentum and adaptive variance-reduction proofs obtaining compact-range bounds for the error-energy multiplier eta^{-1} times the squared complementary momentum coefficient
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/steps
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem inverse_rpow_step_size_complementary_quadratic_momentum_multiplier_continuousOn_Icc
+    (numerator offset exponent coefficient R : ℝ)
+    (hoffset : 0 < offset) :
+    ContinuousOn
+      (fun accumulator : ℝ =>
+        (1 / inverse_rpow_step_size numerator offset accumulator exponent) *
+          (1 - quadraticMomentumWeight coefficient
+            (inverse_rpow_step_size numerator offset accumulator exponent)) ^ 2)
+      (Set.Icc 0 R) := by
+  have hbase_pos :
+      ∀ accumulator ∈ Set.Icc (0 : ℝ) R, 0 < offset + accumulator := by
+    intro accumulator haccumulator
+    exact add_pos_of_pos_of_nonneg hoffset haccumulator.1
+  have hbase_ne :
+      ∀ accumulator ∈ Set.Icc (0 : ℝ) R, offset + accumulator ≠ 0 := by
+    intro accumulator haccumulator
+    exact ne_of_gt (hbase_pos accumulator haccumulator)
+  have hrpow_cont :
+      ContinuousOn
+        (fun accumulator : ℝ => Real.rpow (offset + accumulator) exponent)
+        (Set.Icc 0 R) := by
+    exact
+      (continuousOn_const.add continuousOn_id).rpow_const
+        (fun accumulator haccumulator =>
+          Or.inl (hbase_ne accumulator haccumulator))
+  have hreciprocal :
+      ContinuousOn
+        (fun accumulator : ℝ =>
+          1 / inverse_rpow_step_size numerator offset accumulator exponent)
+        (Set.Icc 0 R) := by
+    rw [show (fun accumulator : ℝ =>
+          1 / inverse_rpow_step_size numerator offset accumulator exponent) =
+        fun accumulator : ℝ =>
+          Real.rpow (offset + accumulator) exponent / numerator by
+      funext accumulator
+      rw [inverse_rpow_step_size_def]
+      exact one_div_div _ _]
+    simpa only [div_eq_mul_inv] using hrpow_cont.mul continuousOn_const
+  have hcomplement :=
+    one_sub_quadraticMomentumWeight_inverseRpowStepSize_continuousOn_Icc
+      numerator offset exponent coefficient R hoffset
+  exact hreciprocal.mul (hcomplement.pow 2)
+
+-- Generalization plan (G0):
+-- concept/name: antitonicity of an inverse real-power step-size schedule;
+--   orig was `theorem1_generated_stepsize_antitone`, renamed to
+--   `inverse_rpow_step_size_antitone_of_monotone`
+-- generality used: an arbitrary preordered index type, three real schedule
+--   parameters, and a real-valued accumulator; no measure, convexity,
+--   smoothness, oracle, filtration, integrability, or carrier assumptions
+-- portable call pattern: recursive-momentum, AdaGrad-style, and adaptive
+--   stochastic-gradient proofs vary the index type, numerator, stabilizing
+--   offset, exponent, and monotone nonnegative statistic while retaining an
+--   antitone step-size schedule
+-- counterargument checked: Mathlib supplies the component real-power and
+--   division order lemmas, but not the coherent contract for the named
+--   inverse-power adaptive schedule; this theorem adds the schedule-level API
+--   used directly by terminal-step-size and weighted-sum arguments
+-- coverage search: `lean_search_symbols` queries for "inverse real power step
+--   size antitone monotone accumulator positive offset numerator nonnegative
+--   exponent" and "Real rpow antitone positive base nonnegative numerator
+--   exponent monotone function division" found the existing schedule API but
+--   no antitonicity theorem; Mathlib semantic search found
+--   `Real.antitoneOn_rpow_Ioi_of_exponent_nonpos`, `Monotone.inv`, and
+--   `one_div_pow_anti`, which do not package this parameterized schedule
+-- minimal hypotheses: monotonicity is pointwise through `Monotone accumulator`;
+--   base positivity is required only at schedule indices, and the numerator
+--   and exponent are merely nonnegative
+
+/-- An inverse real-power step-size schedule is antitone along a monotone
+accumulator with positive shifted values.
+
+Layer: Model | Gap: Level 0 (inverse real-power adaptive schedule antitonicity)
+Proof: compare shifted accumulators, apply `Real.rpow_le_rpow` at a nonnegative exponent, then reverse the positive denominator inequality using nonnegative-numerator division.
+Source: Mathlib `Real.rpow_le_rpow`, `Real.rpow_pos_of_pos`, and linear ordered-field division APIs
+Used in: recursive-momentum and AdaGrad-style convergence proofs comparing a terminal adaptive step size with every earlier step size before bounding a weighted gradient sum
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/steps/1/math
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem inverse_rpow_step_size_antitone_of_monotone
+    {ι : Type*} [Preorder ι]
+    (numerator offset exponent : ℝ) (accumulator : ι → ℝ)
+    (haccumulator : Monotone accumulator)
+    (hbase : ∀ i, 0 < offset + accumulator i)
+    (hnumerator : 0 ≤ numerator) (hexponent : 0 ≤ exponent) :
+    Antitone
+      (fun i =>
+        inverse_rpow_step_size numerator offset (accumulator i) exponent) := by
+  intro i j hij
+  have hbase_i : 0 < offset + accumulator i := hbase i
+  have hpow_le :
+      Real.rpow (offset + accumulator i) exponent ≤
+        Real.rpow (offset + accumulator j) exponent :=
+    Real.rpow_le_rpow (le_of_lt hbase_i)
+      (by linarith [haccumulator hij]) hexponent
+  change
+    inverse_rpow_step_size numerator offset (accumulator j) exponent ≤
+      inverse_rpow_step_size numerator offset (accumulator i) exponent
+  rw [inverse_rpow_step_size_def, inverse_rpow_step_size_def]
+  exact div_le_div_of_nonneg_left hnumerator
+    (Real.rpow_pos_of_pos hbase_i exponent) hpow_le
+
+-- Generalization plan (G0):
+-- concept/name: upper bound for a one-third inverse real-power step-size
+--   schedule; orig was `theorem1_generated_stepsize_le_one_over_fourL`,
+--   renamed to `inverse_rpow_step_size_one_third_le_one_div_four_mul`
+-- generality used: four real scalars for the numerator, offset, accumulated
+--   statistic, and positive scale; no carrier, measure, convexity, smoothness,
+--   oracle, filtration, integrability, or finite-dimensional assumptions
+-- portable call pattern: recursive-momentum, AdaGrad-style, and adaptive
+--   stochastic-gradient analyses vary the numerator, stabilizing offset,
+--   nonnegative accumulated statistic, and positive smoothness scale while
+--   using the same inverse-cube-root schedule and cubic offset-floor bound
+-- counterargument checked: this is not paper-local traceability or a pure
+--   wrapper; it composes cube-root monotonicity, denominator positivity, and
+--   ordered division into a schedule-level bound absent from the existing API
+-- coverage search: `lean_search_symbols` query "inverse real power step size
+--   one third upper bound one divided four times positive scale cube lower
+--   bound" found the existing schedule and antitonicity API but no upper-bound
+--   theorem; Mathlib semantic search found `Real.le_rpow_inv_iff_of_pos`, which
+--   supplies only the root comparison and not the quotient conclusion
+-- minimal hypotheses: nonnegativity of the numerator and positivity of the
+--   scale suffice; when the numerator is positive, the cubic lower bound
+--   implies positivity of the shifted statistic, while the zero case is
+--   immediate from the schedule definition
+
+/-- A one-third inverse real-power step size is at most `1 / (4 * L)` when
+the shifted statistic dominates the cube of `4 * L * numerator`.
+
+Layer: Model | Gap: Level 0 (inverse-cube-root adaptive step-size upper bound)
+Proof: convert the cubic floor to a cube-root lower bound with `Real.le_rpow_inv_iff_of_pos`, then compare and cancel the positive real-power denominator.
+Source: Mathlib `Real.le_rpow_inv_iff_of_pos`, positive real powers, and linear ordered-field division APIs
+Used in: recursive-momentum, AdaGrad-style, and adaptive stochastic-gradient proofs discharging a smoothness-scale cap on an inverse-cube-root step size from its offset floor
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/steps/1/math
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem inverse_rpow_step_size_one_third_le_one_div_four_mul
+    (numerator offset statistic L : ℝ)
+    (hnumerator : 0 ≤ numerator) (hL : 0 < L)
+    (hcube : (4 * L * numerator) ^ 3 ≤ offset + statistic) :
+    inverse_rpow_step_size numerator offset statistic ((1 : ℝ) / 3) ≤
+      (1 : ℝ) / (4 * L) := by
+  rcases hnumerator.eq_or_lt with rfl | hnumerator_pos
+  · simp only [inverse_rpow_step_size_def, zero_div]
+    exact one_div_nonneg.mpr (mul_nonneg (by norm_num) hL.le)
+  · have hfourL_pos : 0 < 4 * L := by positivity
+    have hscaled_pos : 0 < 4 * L * numerator := by positivity
+    have hbase_pos : 0 < offset + statistic :=
+      lt_of_lt_of_le (pow_pos hscaled_pos 3) hcube
+    have hroot_inv :
+        4 * L * numerator ≤
+          Real.rpow (offset + statistic) ((3 : ℝ)⁻¹) := by
+      exact
+        (Real.le_rpow_inv_iff_of_pos
+          (le_of_lt hscaled_pos) (le_of_lt hbase_pos)
+          (by norm_num : (0 : ℝ) < 3)).2
+          (by simpa [one_div] using hcube)
+    have hroot :
+        4 * L * numerator ≤
+          Real.rpow (offset + statistic) ((1 : ℝ) / 3) := by
+      simpa [one_div] using hroot_inv
+    have hnumerator_le :
+        numerator ≤
+          Real.rpow (offset + statistic) ((1 : ℝ) / 3) / (4 * L) := by
+      exact (le_div_iff₀ hfourL_pos).2 (by
+        simpa [mul_assoc, mul_left_comm, mul_comm] using hroot)
+    have hden_pos :
+        0 < Real.rpow (offset + statistic) ((1 : ℝ) / 3) :=
+      Real.rpow_pos_of_pos hbase_pos ((1 : ℝ) / 3)
+    rw [inverse_rpow_step_size_def]
+    calc
+      numerator / Real.rpow (offset + statistic) ((1 : ℝ) / 3) ≤
+          (Real.rpow (offset + statistic) ((1 : ℝ) / 3) / (4 * L)) /
+            Real.rpow (offset + statistic) ((1 : ℝ) / 3) := by
+        exact div_le_div_of_nonneg_right hnumerator_le (le_of_lt hden_pos)
+      _ = (1 : ℝ) / (4 * L) := by
+        field_simp [ne_of_gt hden_pos, ne_of_gt hfourL_pos]
+
+-- Generalization plan (G0):
+-- concept/name: unit upper bound for a quadratic momentum weight driven by an
+--   inverse-cube-root step-size schedule; orig was
+--   `theorem1_generated_nextMomentumWeight_le_one`, renamed to
+--   `quadraticMomentumWeight_inverseRpowStepSize_le_one`
+-- generality used: five real scalars for the coefficient, numerator, offset,
+--   accumulated statistic, and positive scale; no carrier, measure,
+--   convexity, smoothness, oracle, or finite-dimensional assumptions
+-- portable call pattern: recursive-momentum and variance-reduced stochastic
+--   gradient methods vary the coefficient, schedule numerator, stabilizing
+--   offset, accumulated statistic, and scale while retaining the same
+--   quadratic weight, inverse-cube-root schedule, and two cubic offset floors
+-- counterargument checked: this is not a paper-local wrapper; the existing
+--   schedule theorem uses only the first cubic floor, while this result also
+--   converts the coefficient-dependent floor into the product bound needed to
+--   control the quadratic momentum weight
+-- coverage search: queries "quadratic momentum weight inverse cube root step
+--   size upper bound from cubic offset lower bounds" and "coefficient times
+--   inverse power step squared less than or equal one offset cube" found
+--   `inverse_rpow_step_size_one_third_le_one_div_four_mul` as partial coverage
+--   and no theorem with the compound conclusion; Mathlib semantic search found
+--   unrelated mean inequalities and no adaptive-schedule result
+-- minimal hypotheses: positivity of the coefficient, numerator, and scale and
+--   nonnegativity of the accumulated statistic are the pointwise scalar facts
+--   used; both cubic bounds are stated directly on the offset
+
+/-- A quadratic momentum weight from a one-third inverse real-power step size
+is at most one when its offset dominates the two controlling cubes.
+
+Layer: Model | Gap: Level 0 (inverse-cube-root quadratic momentum stability bound)
+Proof: use the first cubic offset floor to bound the step size by `1 / (4 * L)`, use the coefficient-dependent floor to bound `c * step` by `4 * L`, and multiply the two inequalities.
+Source: Mathlib `Real.le_rpow_inv_iff_of_pos` and ordered-field multiplication and division APIs, composed with SOptLib inverse real-power step-size and quadratic momentum definitions
+Used in: recursive-momentum and variance-reduced stochastic-gradient stability proofs showing that one minus the generated momentum weight is nonnegative
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/parameters/2/math
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem quadraticMomentumWeight_inverseRpowStepSize_le_one
+    (c numerator offset statistic L : ℝ)
+    (hc : 0 < c) (hnumerator : 0 < numerator) (hL : 0 < L)
+    (hstatistic : 0 ≤ statistic)
+    (hoffset_four : (4 * L * numerator) ^ 3 ≤ offset)
+    (hoffset_coefficient : (c * numerator / (4 * L)) ^ 3 ≤ offset) :
+    quadraticMomentumWeight c
+        (inverse_rpow_step_size numerator offset statistic ((1 : ℝ) / 3)) ≤ 1 := by
+  have hfourL_pos : 0 < 4 * L := by positivity
+  have hfourLNumerator_pos : 0 < 4 * L * numerator := by positivity
+  have hoffset_pos : 0 < offset :=
+    lt_of_lt_of_le (pow_pos hfourLNumerator_pos 3) hoffset_four
+  have hbase_pos : 0 < offset + statistic :=
+    add_pos_of_pos_of_nonneg hoffset_pos hstatistic
+  have hstep_pos :
+      0 < inverse_rpow_step_size numerator offset statistic ((1 : ℝ) / 3) :=
+    inverse_rpow_step_size_pos_of_numerator_pos_of_base_pos
+      numerator offset statistic ((1 : ℝ) / 3) hnumerator hbase_pos
+  have hstep_le :
+      inverse_rpow_step_size numerator offset statistic ((1 : ℝ) / 3) ≤
+        (1 : ℝ) / (4 * L) :=
+    inverse_rpow_step_size_one_third_le_one_div_four_mul
+      numerator offset statistic L hnumerator.le hL (by linarith)
+  have hscaled_pos : 0 < c * numerator / (4 * L) := by positivity
+  have hroot_inv :
+      c * numerator / (4 * L) ≤
+        Real.rpow (offset + statistic) ((3 : ℝ)⁻¹) := by
+    exact
+      (Real.le_rpow_inv_iff_of_pos
+        hscaled_pos.le hbase_pos.le (by norm_num : (0 : ℝ) < 3)).2
+        (by
+          simpa [one_div] using
+            (show (c * numerator / (4 * L)) ^ 3 ≤ offset + statistic by
+              linarith))
+  have hroot :
+      c * numerator / (4 * L) ≤
+        Real.rpow (offset + statistic) ((1 : ℝ) / 3) := by
+    simpa [one_div] using hroot_inv
+  have hcoefficientNumerator_le :
+      c * numerator ≤
+        Real.rpow (offset + statistic) ((1 : ℝ) / 3) * (4 * L) :=
+    (div_le_iff₀ hfourL_pos).1 hroot
+  have hdenominator_pos :
+      0 < Real.rpow (offset + statistic) ((1 : ℝ) / 3) :=
+    Real.rpow_pos_of_pos hbase_pos ((1 : ℝ) / 3)
+  have hcoefficientStep_le :
+      c * inverse_rpow_step_size numerator offset statistic ((1 : ℝ) / 3) ≤
+        4 * L := by
+    rw [inverse_rpow_step_size_def]
+    field_simp [ne_of_gt hdenominator_pos]
+    nlinarith [hcoefficientNumerator_le]
+  calc
+    quadraticMomentumWeight c
+        (inverse_rpow_step_size numerator offset statistic ((1 : ℝ) / 3)) =
+        (c * inverse_rpow_step_size numerator offset statistic ((1 : ℝ) / 3)) *
+          inverse_rpow_step_size numerator offset statistic ((1 : ℝ) / 3) := by
+      rw [quadraticMomentumWeight_def]
+      ring
+    _ ≤ (4 * L) * ((1 : ℝ) / (4 * L)) := by
+      exact mul_le_mul hcoefficientStep_le hstep_le hstep_pos.le hfourL_pos.le
+    _ = 1 := by
+      field_simp [ne_of_gt hfourL_pos]
+
+-- Generalization plan (G0):
+-- concept/name: cube identity for an inverse-cube-root adaptive step-size
+--   schedule; orig was `theorem1_stepsize_cube_eq`, renamed to
+--   `inverse_rpow_step_size_cube`
+-- generality used: three real scalars for the numerator, offset, and
+--   accumulated statistic; no carrier, measure, convexity, smoothness,
+--   oracle, filtration, integrability, or finite-dimensional assumptions
+-- portable call pattern: recursive-momentum, AdaGrad-style, and adaptive
+--   stochastic-gradient analyses vary the numerator, stabilizing offset, and
+--   accumulated statistic while cubing the same inverse-cube-root schedule
+-- counterargument checked: this is not merely paper traceability; although
+--   Mathlib supplies the root identity, the theorem composes it with the named
+--   adaptive schedule and quotient powers into the invariant used downstream
+-- coverage search: `lean_search_symbols` queries for "inverse real power step
+--   size cube equals numerator cubed divided by base nonnegative", "real rpow
+--   inverse natural cast power nonnegative", and "division power quotient
+--   denominator power" found no SOptLib schedule theorem; Mathlib's
+--   `Real.rpow_inv_natCast_pow` covers only the denominator root identity
+-- minimal hypotheses: nonnegativity of the shifted base is sufficient; the
+--   source algorithm's strict positivity assumption is not needed
+
+/-- Cubing a one-third inverse real-power step size gives the numerator cube
+divided by its shifted base.
+
+Layer: Model | Gap: Level 0 (inverse-cube-root adaptive step-size cube identity)
+Proof: unfold the named schedule, distribute the cube over division, and evaluate the denominator with `Real.rpow_inv_natCast_pow` under shifted-base nonnegativity.
+Source: Mathlib `Real.rpow_inv_natCast_pow` and real-field quotient power APIs
+Used in: recursive-momentum, AdaGrad-style, and adaptive stochastic-gradient scalar estimates that replace a cubed inverse-cube-root step size by its accumulated-statistic denominator
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/steps/1/math
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem inverse_rpow_step_size_cube
+    (numerator offset accumulator : ℝ)
+    (hbase : 0 ≤ offset + accumulator) :
+    inverse_rpow_step_size numerator offset accumulator ((1 : ℝ) / 3) ^ 3 =
+      numerator ^ 3 / (offset + accumulator) := by
+  rw [inverse_rpow_step_size_def, div_pow]
+  congr 1
+  simpa [one_div] using
+    (Real.rpow_inv_natCast_pow hbase (by norm_num : (3 : ℕ) ≠ 0))
+
+end SOptLib
+
+-- Phase 4 merged from focused staging declarations.
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: accelerated finite-window scalar step-condition predicate,
+--   renamed away from the paper section label while retaining the genuine
+--   accelerated-method role of the finite-window scalar contract.
+-- generality used: real scalar schedules `alpha`, `beta`, `lam`, a positive-time
+--   `Gamma` weight schedule, a scalar smoothness scale `L`, and a finite
+--   natural horizon `N`; no carrier, measure, independence, integrability,
+--   topology, norm, inner product, convexity, smoothness function, oracle, or
+--   finite-dimensional hypotheses are used by the predicate itself.
+-- portable call pattern: accelerated convex and nonconvex stochastic-gradient
+--   finite-window accelerated analyses instantiate the four schedules and horizon, then reuse the
+--   same monotone distance-telescope coefficient, noise absorption, and
+--   gradient-weight lower-bound consequences.
+-- counterargument checked: this is a hypothesis bundle, but not merely paper
+--   traceability because the grouped facts are consumed as one stable scalar
+--   contract by prefix restriction, distance telescoping, stopping-weight
+--   positivity, noise absorption, and gradient coefficient estimates; Mathlib
+--   has no accelerated-method schedule predicate with this shape.
+-- coverage search: searched `accelerated step condition monotone coefficient
+--   beta lambda gamma noise gradient weight lower bound`, `parameter choices
+--   alpha beta lambda Gamma monotonicity stochastic accelerated`, and `finite
+--   positive window prefix restriction bundled step size condition`; relevant
+--   hits were `acceleratedParameterRelations`,
+--   `AcceleratedVRScalarSideConditions`, positive-time step-size/window APIs,
+--   and local private finite-window helpers, none of which packages this finite-window
+--   ratio monotonicity plus beta/lambda absorption contract. LeanSearch for
+--   real scalar monotone step-size coefficient bounds returned unrelated
+--   order/convexity facts.
+-- minimal hypotheses: all already minimal for the predicate; positivity of
+--   `beta` is intentionally required only by the gradient-coefficient theorem,
+--   not bundled into the finite-window scalar step condition.
+
+/-- Finite-window scalar step-condition contract for accelerated finite-window scalar bounds.
+
+The predicate packages monotonicity of the accelerated ratio
+`alpha k / (lam k * Gamma k)`, the noise-absorption inequality
+`alpha k * lam k <= L * beta k^2`, and the strict upper bound
+`beta k < 1 / L` over the positive window `1, ..., N`.
+
+Layer: Model | Concept: accelerated finite-window scalar step-condition
+Proof: (definitional construction; bundled finite-window real scalar schedule
+  conditions for accelerated finite-window scalar telescope and coefficient estimates)
+Source: accelerated stochastic approximation parameter schedules and Mathlib
+  ordered real-field quotient notation over subtype-indexed finite windows
+Used in: randomized stochastic accelerated-gradient finite-window accelerated case
+  telescope, stopping-weight positivity, noise absorption, and gradient
+  coefficient lower-bound steps
+Book citation: book/book/FOML/NonconvexStochasticAcceleratedGD.json#/assumptions/5
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic accelerated gradient descent
+  (Algorithm 6.4 and Theorem 6.12) -/
+def AcceleratedFiniteWindowScalarStepCondition
+    (alpha beta lam : ℕ → ℝ) (Gamma : {k : ℕ // 1 ≤ k} → ℝ)
+    (L : ℝ) (N : ℕ) : Prop :=
+  (∀ k : {t : ℕ // 1 ≤ t ∧ t ≤ N}, ∀ j : {t : ℕ // 1 ≤ t ∧ t ≤ N},
+    k.1 + 1 = j.1 →
+      alpha k.1 / (lam k.1 * Gamma ⟨k.1, k.2.1⟩) ≥
+        alpha j.1 / (lam j.1 * Gamma ⟨j.1, j.2.1⟩)) ∧
+  (∀ k : {t : ℕ // 1 ≤ t ∧ t ≤ N},
+    alpha k.1 * lam k.1 ≤ L * beta k.1 ^ 2) ∧
+  (∀ k : {t : ℕ // 1 ≤ t ∧ t ≤ N}, beta k.1 < 1 / L)
+
+/-- The accelerated finite-window scalar step-condition predicate unfolds to its three
+finite-window scalar schedule conditions.
+
+Layer: Model | Gap: Level 0 (accelerated finite-window scalar step-condition unfolding)
+Proof: by rfl after unfolding `AcceleratedFiniteWindowScalarStepCondition`.
+Source: accelerated stochastic approximation parameter schedules and Mathlib
+  ordered real-field quotient notation over subtype-indexed finite windows
+Used in: exposing the randomized stochastic accelerated-gradient finite-window
+  assumptions as monotone-ratio, noise-absorption, and beta-upper-bound facts
+Book citation: book/book/FOML/NonconvexStochasticAcceleratedGD.json#/assumptions/5
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic accelerated gradient descent
+  (Algorithm 6.4 and Theorem 6.12) -/
+@[simp]
+theorem AcceleratedFiniteWindowScalarStepCondition_def
+    (alpha beta lam : ℕ → ℝ) (Gamma : {k : ℕ // 1 ≤ k} → ℝ)
+    (L : ℝ) (N : ℕ) :
+    AcceleratedFiniteWindowScalarStepCondition alpha beta lam Gamma L N ↔
+      (∀ k : {t : ℕ // 1 ≤ t ∧ t ≤ N}, ∀ j : {t : ℕ // 1 ≤ t ∧ t ≤ N},
+        k.1 + 1 = j.1 →
+          alpha k.1 / (lam k.1 * Gamma ⟨k.1, k.2.1⟩) ≥
+            alpha j.1 / (lam j.1 * Gamma ⟨j.1, j.2.1⟩)) ∧
+      (∀ k : {t : ℕ // 1 ≤ t ∧ t ≤ N},
+        alpha k.1 * lam k.1 ≤ L * beta k.1 ^ 2) ∧
+      (∀ k : {t : ℕ // 1 ≤ t ∧ t ≤ N}, beta k.1 < 1 / L) := by
+  rfl
+
+namespace AcceleratedFiniteWindowScalarStepCondition
+
+/-- Build accelerated finite-window scalar step conditions from the monotone ratio,
+noise-absorption, and beta upper-bound components.
+
+Layer: Model | Gap: Level 0 (accelerated finite-window scalar step-condition constructor)
+Proof: package the three finite-window scalar schedule facts into the
+  definitional conjunction.
+Source: accelerated stochastic approximation parameter schedules and Mathlib
+  conjunction APIs
+Used in: schedule-specialization proofs before randomized stochastic
+  accelerated-gradient finite-window telescope and coefficient estimates
+Book citation: book/book/FOML/NonconvexStochasticAcceleratedGD.json#/assumptions/5
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic accelerated gradient descent
+  (Algorithm 6.4 and Theorem 6.12) -/
+theorem of_components
+    {alpha beta lam : ℕ → ℝ} {Gamma : {k : ℕ // 1 ≤ k} → ℝ}
+    {L : ℝ} {N : ℕ}
+    (hratio :
+      ∀ k : {t : ℕ // 1 ≤ t ∧ t ≤ N}, ∀ j : {t : ℕ // 1 ≤ t ∧ t ≤ N},
+        k.1 + 1 = j.1 →
+          alpha k.1 / (lam k.1 * Gamma ⟨k.1, k.2.1⟩) ≥
+            alpha j.1 / (lam j.1 * Gamma ⟨j.1, j.2.1⟩))
+    (hnoise :
+      ∀ k : {t : ℕ // 1 ≤ t ∧ t ≤ N},
+        alpha k.1 * lam k.1 ≤ L * beta k.1 ^ 2)
+    (hbeta :
+      ∀ k : {t : ℕ // 1 ≤ t ∧ t ≤ N}, beta k.1 < 1 / L) :
+    AcceleratedFiniteWindowScalarStepCondition alpha beta lam Gamma L N :=
+  ⟨hratio, hnoise, hbeta⟩
+
+/-- The ratio monotonicity component of accelerated finite-window scalar step conditions.
+
+Layer: Model | Gap: Level 0 (accelerated finite-window scalar ratio projection)
+Proof: unfold the scalar contract and take the first conjunct.
+Source: accelerated stochastic approximation parameter schedules and Mathlib
+  conjunction APIs
+Used in: randomized stochastic accelerated-gradient finite-window squared-distance
+  telescope where adjacent coefficient monotonicity is required
+Book citation: book/book/FOML/NonconvexStochasticAcceleratedGD.json#/assumptions/5
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic accelerated gradient descent
+  (Algorithm 6.4 and Theorem 6.12) -/
+theorem ratio_mono
+    {alpha beta lam : ℕ → ℝ} {Gamma : {k : ℕ // 1 ≤ k} → ℝ}
+    {L : ℝ} {N : ℕ}
+    (h : AcceleratedFiniteWindowScalarStepCondition alpha beta lam Gamma L N) :
+    ∀ k : {t : ℕ // 1 ≤ t ∧ t ≤ N}, ∀ j : {t : ℕ // 1 ≤ t ∧ t ≤ N},
+      k.1 + 1 = j.1 →
+        alpha k.1 / (lam k.1 * Gamma ⟨k.1, k.2.1⟩) ≥
+          alpha j.1 / (lam j.1 * Gamma ⟨j.1, j.2.1⟩) :=
+  h.1
+
+/-- The noise-absorption component of accelerated finite-window scalar step conditions.
+
+Layer: Model | Gap: Level 0 (accelerated finite-window scalar noise projection)
+Proof: unfold the scalar contract and take the second conjunct.
+Source: accelerated stochastic approximation parameter schedules and Mathlib
+  conjunction APIs
+Used in: randomized stochastic accelerated-gradient finite-window replacement of the
+  one-step noise coefficient by `L * beta_k^2`
+Book citation: book/book/FOML/NonconvexStochasticAcceleratedGD.json#/assumptions/5
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic accelerated gradient descent
+  (Algorithm 6.4 and Theorem 6.12) -/
+theorem noise_absorption
+    {alpha beta lam : ℕ → ℝ} {Gamma : {k : ℕ // 1 ≤ k} → ℝ}
+    {L : ℝ} {N : ℕ}
+    (h : AcceleratedFiniteWindowScalarStepCondition alpha beta lam Gamma L N) :
+    ∀ k : {t : ℕ // 1 ≤ t ∧ t ≤ N},
+      alpha k.1 * lam k.1 ≤ L * beta k.1 ^ 2 :=
+  h.2.1
+
+/-- The beta upper-bound component of accelerated finite-window scalar step conditions.
+
+Layer: Model | Gap: Level 0 (accelerated finite-window scalar beta upper-bound projection)
+Proof: unfold the scalar contract and take the final conjunct.
+Source: accelerated stochastic approximation parameter schedules and Mathlib
+  conjunction APIs
+Used in: randomized stochastic accelerated-gradient finite-window stopping-weight
+  positivity through the factor `1 - L * beta_k`
+Book citation: book/book/FOML/NonconvexStochasticAcceleratedGD.json#/assumptions/5
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic accelerated gradient descent
+  (Algorithm 6.4 and Theorem 6.12) -/
+theorem beta_lt_inv
+    {alpha beta lam : ℕ → ℝ} {Gamma : {k : ℕ // 1 ≤ k} → ℝ}
+    {L : ℝ} {N : ℕ}
+    (h : AcceleratedFiniteWindowScalarStepCondition alpha beta lam Gamma L N) :
+    ∀ k : {t : ℕ // 1 ≤ t ∧ t ≤ N}, beta k.1 < 1 / L :=
+  h.2.2
+
+/-- Accelerated finite-window scalar step conditions restrict to any shorter positive prefix.
+
+Layer: Model | Gap: Level 0 (accelerated finite-window scalar prefix restriction)
+Proof: coerce each shorter-window index into the longer window using the
+  horizon inequality, then apply the three component facts.
+Source: Mathlib subtype indexing and natural-number order transitivity APIs
+Used in: randomized stochastic accelerated-gradient finite-window prefix arguments
+  where a stopping index inherits the horizon-wide step conditions
+Book citation: book/book/FOML/NonconvexStochasticAcceleratedGD.json#/assumptions/5
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic accelerated gradient descent
+  (Algorithm 6.4 and Theorem 6.12) -/
+theorem restrict
+    {alpha beta lam : ℕ → ℝ} {Gamma : {k : ℕ // 1 ≤ k} → ℝ}
+    {L : ℝ} {K N : ℕ} (hKN : K ≤ N)
+    (h : AcceleratedFiniteWindowScalarStepCondition alpha beta lam Gamma L N) :
+    AcceleratedFiniteWindowScalarStepCondition alpha beta lam Gamma L K := by
+  refine ⟨?_, ?_, ?_⟩
+  · intro k j hsucc
+    exact h.1
+      ⟨k.1, k.2.1, le_trans k.2.2 hKN⟩
+      ⟨j.1, j.2.1, le_trans j.2.2 hKN⟩
+      hsucc
+  · intro k
+    exact h.2.1 ⟨k.1, k.2.1, le_trans k.2.2 hKN⟩
+  · intro k
+    exact h.2.2 ⟨k.1, k.2.1, le_trans k.2.2 hKN⟩
+
+/-- The monotone ratio condition gives monotonicity of the half-scaled distance
+telescope coefficient on adjacent positive times.
+
+Layer: Model | Gap: Level 0 (accelerated finite-window scalar half-ratio coefficient monotonicity)
+Proof: instantiate the ratio monotonicity at adjacent window indices, multiply
+  by the nonnegative scalar `1 / 2`, and rewrite the quotient shape.
+Source: Mathlib ordered real-field arithmetic and subtype-indexed finite-window
+  schedule ratios
+Used in: randomized stochastic accelerated-gradient finite-window squared-distance
+  telescope after introducing the coefficient `alpha_k / (2 * lam_k * Gamma_k)`
+Book citation: book/book/FOML/NonconvexStochasticAcceleratedGD.json#/assumptions/5
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic accelerated gradient descent
+  (Algorithm 6.4 and Theorem 6.12) -/
+theorem half_ratio_succ_le
+    {alpha beta lam : ℕ → ℝ} {Gamma : {k : ℕ // 1 ≤ k} → ℝ}
+    {L : ℝ} {N n : ℕ}
+    (h : AcceleratedFiniteWindowScalarStepCondition alpha beta lam Gamma L N)
+    (hn : 1 ≤ n) (hnN : n < N) :
+    alpha (n + 1) /
+        (2 * lam (n + 1) *
+          Gamma ⟨n + 1, Nat.succ_le_succ (Nat.zero_le n)⟩) ≤
+      alpha n / (2 * lam n * Gamma ⟨n, hn⟩) := by
+  have hnN_le : n ≤ N := Nat.le_of_lt hnN
+  have hn1_le_N : n + 1 ≤ N := hnN
+  let k : {t : ℕ // 1 ≤ t ∧ t ≤ N} := ⟨n, hn, hnN_le⟩
+  let j : {t : ℕ // 1 ≤ t ∧ t ≤ N} :=
+    ⟨n + 1, Nat.succ_le_succ (Nat.zero_le n), hn1_le_N⟩
+  have hratio := h.1 k j (by rfl)
+  have hscaled :
+      (1 / 2) *
+          (alpha (n + 1) /
+            (lam (n + 1) *
+              Gamma ⟨n + 1, Nat.succ_le_succ (Nat.zero_le n)⟩)) ≤
+        (1 / 2) * (alpha n / (lam n * Gamma ⟨n, hn⟩)) :=
+    mul_le_mul_of_nonneg_left hratio (by norm_num)
+  calc
+    alpha (n + 1) /
+        (2 * lam (n + 1) *
+          Gamma ⟨n + 1, Nat.succ_le_succ (Nat.zero_le n)⟩)
+        =
+      (1 / 2) *
+        (alpha (n + 1) /
+          (lam (n + 1) *
+            Gamma ⟨n + 1, Nat.succ_le_succ (Nat.zero_le n)⟩)) := by
+          ring
+    _ ≤ (1 / 2) * (alpha n / (lam n * Gamma ⟨n, hn⟩)) := hscaled
+    _ = alpha n / (2 * lam n * Gamma ⟨n, hn⟩) := by
+          ring
+
+/-- Accelerated finite-window scalar step conditions bound the averaged one-step noise
+coefficient by `L * beta_k^2`.
+
+Layer: Model | Gap: Level 0 (accelerated finite-window scalar noise coefficient absorption)
+Proof: use the bundled inequality `alpha_k * lam_k <= L * beta_k^2` and
+  discharge the scalar average bound by ordered-ring arithmetic.
+Source: Mathlib ordered real-ring arithmetic for scalar coefficient absorption
+Used in: randomized stochastic accelerated-gradient finite-window one-step recurrence
+  after combining stochastic-noise terms
+Book citation: book/book/FOML/NonconvexStochasticAcceleratedGD.json#/assumptions/5
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic accelerated gradient descent
+  (Algorithm 6.4 and Theorem 6.12) -/
+theorem noise_coeff_half_le_Lbeta_sq
+    {alpha beta lam : ℕ → ℝ} {Gamma : {k : ℕ // 1 ≤ k} → ℝ}
+    {L : ℝ} {N : ℕ}
+    (h : AcceleratedFiniteWindowScalarStepCondition alpha beta lam Gamma L N)
+    (k : {t : ℕ // 1 ≤ t ∧ t ≤ N}) :
+    (L * beta k.1 ^ 2 + alpha k.1 * lam k.1) / 2 ≤
+      L * beta k.1 ^ 2 := by
+  have hstep := h.2.1 k
+  nlinarith
+
+/-- Accelerated finite-window scalar step conditions lower-bound the one-step gradient
+coefficient by the stopping-weight factor `beta_k * (1 - L * beta_k)`.
+
+Layer: Model | Gap: Level 0 (accelerated finite-window scalar gradient coefficient lower bound)
+Proof: use positivity of `beta_k` to clear the local quotient and combine the
+  result with `alpha_k * lam_k <= L * beta_k^2` by ordered-field arithmetic.
+Source: Mathlib ordered real-field arithmetic and denominator clearing APIs
+Used in: randomized stochastic accelerated-gradient finite-window finite-sum
+  replacement of raw gradient coefficients by stopping weights
+Book citation: book/book/FOML/NonconvexStochasticAcceleratedGD.json#/assumptions/5
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic accelerated gradient descent
+  (Algorithm 6.4 and Theorem 6.12) -/
+theorem gradient_coeff_weight_ge
+    {alpha beta lam : ℕ → ℝ} {Gamma : {k : ℕ // 1 ≤ k} → ℝ}
+    {L : ℝ} {N : ℕ}
+    (h : AcceleratedFiniteWindowScalarStepCondition alpha beta lam Gamma L N)
+    (k : {t : ℕ // 1 ≤ t ∧ t ≤ N}) (hbeta_pos : 0 < beta k.1) :
+    beta k.1 *
+        (1 - L * beta k.1 / 2 -
+          alpha k.1 * lam k.1 / (2 * beta k.1)) ≥
+      beta k.1 * (1 - L * beta k.1) := by
+  have hstep := h.2.1 k
+  have hbeta_ne : beta k.1 ≠ 0 := ne_of_gt hbeta_pos
+  field_simp [hbeta_ne]
+  nlinarith
+
+end AcceleratedFiniteWindowScalarStepCondition
+
+end SOptLib
+
+/-! Phase 4 batch 6: `cappedVarianceBalancedStepSize`. -/
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: capped variance-balanced step size with a deterministic
+--   zero-noise fallback; orig was `horizonStepsize`
+-- generality used: five real scalar parameters and positivity hypotheses only;
+--   no carrier, measure, convexity, smoothness, oracle, or dimension assumptions
+-- portable call pattern: stochastic gradient, decentralized optimization, and
+--   variance-reduced methods choose a horizon-constant step size while changing
+--   the positive cap, objective gap, variance coefficient, noise scale, and horizon
+-- counterargument checked: this is a short scalar formula, but the zero-noise
+--   totalization, cap, and reusable positivity/cap API form a stable parameter-choice
+--   object rather than paper traceability or a pure rename
+-- coverage search: symbol searches for "capped square root step size zero noise
+--   positive cap gap variance coefficient horizon" found the structurally different
+--   `SOptLib.varianceBalancedStepSize`; Mathlib semantic search found only generic
+--   piecewise and square-root infrastructure, so coverage is partial
+-- minimal hypotheses: the definition is total and assumption-free; its admissibility
+--   theorem assumes positivity only of the cap, gap, variance coefficient, and horizon
+
+/-- A capped variance-balanced step size with a deterministic zero-noise fallback.
+
+For zero noise it returns `cap`; otherwise it clips the square-root balance
+`sqrt (gap / (varianceCoeff * noise ^ 2 * horizon))` at `cap`.
+
+Layer: Model | Concept: capped variance-balanced step-size parameter choice
+Proof: (definitional construction; zero-noise branch with a capped square-root balance in the positive-noise branch)
+Source: stochastic-approximation bias-variance balancing, Mathlib real square-root, conditional, and lattice minimum APIs
+Used in: finite-horizon stochastic and decentralized gradient proofs selecting an admissible constant step size that becomes the maximal allowed step size in the deterministic regime
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/algorithm_spec/parameters/4
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+noncomputable def cappedVarianceBalancedStepSize
+    (cap gap varianceCoeff noise horizon : ℝ) : ℝ :=
+  if noise = 0 then
+    cap
+  else
+    min cap (Real.sqrt (gap / (varianceCoeff * noise ^ 2 * horizon)))
+
+/-- The capped variance-balanced step size unfolds to its conditional clipped
+square-root formula.
+
+Layer: Model | Gap: Level 0 (capped variance-balanced step-size unfolding)
+Proof: by rfl after unfolding `cappedVarianceBalancedStepSize`.
+Source: Mathlib real square-root, conditional, and lattice minimum APIs for scalar parameter choices
+Used in: rewriting a named horizon-dependent constant step size into its deterministic or stochastic branch during convergence estimates
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/algorithm_spec/parameters/4
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+@[simp]
+theorem cappedVarianceBalancedStepSize_def
+    (cap gap varianceCoeff noise horizon : ℝ) :
+    cappedVarianceBalancedStepSize cap gap varianceCoeff noise horizon =
+      if noise = 0 then
+        cap
+      else
+        min cap (Real.sqrt (gap / (varianceCoeff * noise ^ 2 * horizon))) := by
+  rfl
+
+/-- A capped variance-balanced step size is positive and at most its cap when
+the cap, gap, variance coefficient, and horizon are positive.
+
+Layer: Model | Gap: Level 0 (capped square-root step-size admissibility)
+Proof: split on zero noise; otherwise positivity of the squared noise makes the square-root branch positive, and the lattice minimum preserves positivity and is bounded by the cap.
+Source: Mathlib `Real.sqrt_pos`, positive real division and multiplication, and linear-order minimum APIs
+Used in: finite-horizon stochastic optimization proofs discharging the positivity and maximal-step-size side conditions for a clipped constant learning rate
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/main_theorem/proof/12
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem cappedVarianceBalancedStepSize_pos_le_cap
+    (cap gap varianceCoeff noise horizon : ℝ)
+    (hcap : 0 < cap) (hgap : 0 < gap)
+    (hvarianceCoeff : 0 < varianceCoeff) (hhorizon : 0 < horizon) :
+    0 < cappedVarianceBalancedStepSize cap gap varianceCoeff noise horizon ∧
+      cappedVarianceBalancedStepSize cap gap varianceCoeff noise horizon ≤ cap := by
+  by_cases hnoise : noise = 0
+  · simp [cappedVarianceBalancedStepSize, hnoise, hcap]
+  · have hnoiseSq : 0 < noise ^ 2 := sq_pos_of_ne_zero hnoise
+    have hdenominator : 0 < varianceCoeff * noise ^ 2 * horizon :=
+      mul_pos (mul_pos hvarianceCoeff hnoiseSq) hhorizon
+    have hbalance :
+        0 < Real.sqrt (gap / (varianceCoeff * noise ^ 2 * horizon)) :=
+      Real.sqrt_pos.2 (div_pos hgap hdenominator)
+    simp only [cappedVarianceBalancedStepSize, hnoise, if_false]
+    exact ⟨(lt_min_iff).2 ⟨hcap, hbalance⟩, min_le_left _ _⟩
+
+end SOptLib
+
+/-! Phase 4 batch 6: `minWithZeroDenominatorQuotient`. -/
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: minimum with a zero-denominator-safe quotient; orig was
+--   `minWithPaperInfinity`
+-- generality used: an arbitrary carrier with zero, division, minimum, and
+--   decidable equality; ordered-field structure is introduced only by the
+--   interaction lemmas that need positivity or cross-multiplication
+-- portable call pattern: distributed small-gain, adaptive-step, and stability-threshold
+--   constructions refine a current ceiling by varying quotient numerators and
+--   nonnegative denominators while retaining the same zero-denominator convention
+-- counterargument checked: although the body is a short conditional formula, repeated
+--   nested ceiling choices and their positivity, ceiling, and cross-multiplication
+--   APIs make it a stable parameter-choice object rather than paper-local bookkeeping
+-- coverage search: searches for "minimum current ceiling quotient zero denominator
+--   preserves current" and "checked quotient zero denominator optional division" found
+--   only Mathlib min/division identities and SOptLib's structurally different
+--   `checked_quotient`, which returns `Option.none` instead of preserving the ceiling
+-- minimal hypotheses: the construction itself uses only zero, division, minimum, and
+--   decidable equality
+
+/-- The minimum of a current ceiling and a quotient, with a zero denominator
+leaving the current ceiling unchanged.
+
+The zero branch realizes the convention that such a quotient is non-constraining;
+otherwise the ordinary quotient can lower the current ceiling.
+
+Layer: Model | Concept: zero-denominator-safe quotient ceiling parameter choice
+Proof: (definitional construction; branch on a zero denominator and otherwise take the minimum with the quotient)
+Source: Mathlib division, decidable conditionals, and minimum APIs
+Used in: distributed small-gain and stability-threshold constructions that successively impose quotient bounds while treating vanishing feedback coefficients as non-constraining
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/6/proof/27
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+def min_with_zero_denominator_quotient
+    {K : Type*} [Zero K] [Div K] [Min K] [DecidableEq K]
+    (current numerator denominator : K) : K :=
+  if denominator = 0 then current else min current (numerator / denominator)
+
+/-- The zero-denominator-safe quotient ceiling unfolds to its conditional
+minimum formula.
+
+Layer: Model | Gap: Level 0 (zero-denominator-safe quotient ceiling unfolding)
+Proof: by rfl after unfolding `min_with_zero_denominator_quotient`.
+Source: Mathlib division, decidable conditionals, and minimum APIs
+Used in: simplifying nested stability and small-gain ceiling choices into their zero-denominator and ordinary-quotient branches
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/6/proof/27
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+@[simp]
+theorem min_with_zero_denominator_quotient_def
+    {K : Type*} [Zero K] [Div K] [Min K] [DecidableEq K]
+    (current numerator denominator : K) :
+    min_with_zero_denominator_quotient current numerator denominator =
+      if denominator = 0 then current else min current (numerator / denominator) := by
+  rfl
+
+/-- A positive current ceiling stays positive after imposing a quotient with a
+positive numerator and a nonnegative denominator.
+
+Layer: Model | Gap: Level 0 (zero-denominator-safe quotient ceiling positivity)
+Proof: split on the zero denominator; otherwise the denominator and quotient are positive, so both arguments of `min` are positive.
+Source: Mathlib ordered-field division positivity and linear-order minimum APIs
+Used in: proving positivity of recursively imposed stochastic-optimization stability and small-gain ceilings
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/6/proof/27
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem min_with_zero_denominator_quotient_pos_of_pos_of_nonneg
+    {K : Type*} [Field K] [LinearOrder K] [IsStrictOrderedRing K]
+    {current numerator denominator : K}
+    (hcurrent : 0 < current) (hnumerator : 0 < numerator)
+    (hdenominator : 0 ≤ denominator) :
+    0 < min_with_zero_denominator_quotient current numerator denominator := by
+  unfold min_with_zero_denominator_quotient
+  by_cases hzero : denominator = 0
+  · rw [if_pos hzero]
+    exact hcurrent
+  · rw [if_neg hzero]
+    have hdenominator_pos : 0 < denominator :=
+      lt_of_le_of_ne hdenominator (Ne.symm hzero)
+    exact (lt_min_iff).2 ⟨hcurrent, div_pos hnumerator hdenominator_pos⟩
+
+/-- Imposing a zero-denominator-safe quotient never raises the current ceiling.
+
+Layer: Model | Gap: Level 0 (zero-denominator-safe quotient ceiling bound)
+Proof: split on the zero denominator; the zero branch is equality and the nonzero branch is `min_le_left`.
+Source: Mathlib decidable conditionals and linear-order minimum APIs
+Used in: propagating earlier stochastic-optimization stability constraints through nested quotient ceilings
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/6/proof/27
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem min_with_zero_denominator_quotient_le_current
+    {K : Type*} [LinearOrder K] [Zero K] [Div K]
+    (current numerator denominator : K) :
+    min_with_zero_denominator_quotient current numerator denominator ≤ current := by
+  unfold min_with_zero_denominator_quotient
+  by_cases hzero : denominator = 0
+  · rw [if_pos hzero]
+  · rw [if_neg hzero]
+    exact min_le_left _ _
+
+/-- A zero-denominator-safe quotient ceiling implies its cross-multiplied
+budget when the numerator and denominator are nonnegative.
+
+This also covers a zero denominator, where the quotient is non-constraining.
+
+Layer: Model | Gap: Level 0 (zero-denominator-safe quotient cross-multiplication)
+Proof: split on the zero denominator; otherwise compare with the quotient branch and clear the positive denominator.
+Source: Mathlib ordered-field division inequalities and linear-order minimum APIs
+Used in: turning stochastic-optimization stability and small-gain ceiling choices into multiplicative budget inequalities
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/6/proof/27
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem mul_denominator_le_of_le_min_with_zero_denominator_quotient
+    {K : Type*} [Field K] [LinearOrder K] [IsStrictOrderedRing K]
+    {current numerator denominator y : K}
+    (hnumerator : 0 ≤ numerator) (hdenominator : 0 ≤ denominator)
+    (hy : y ≤ min_with_zero_denominator_quotient current numerator denominator) :
+    y * denominator ≤ numerator := by
+  unfold min_with_zero_denominator_quotient at hy
+  by_cases hzero : denominator = 0
+  · rw [hzero, mul_zero]
+    exact hnumerator
+  · rw [if_neg hzero] at hy
+    have hdenominator_pos : 0 < denominator :=
+      lt_of_le_of_ne hdenominator (Ne.symm hzero)
+    exact (le_div_iff₀ hdenominator_pos).mp (hy.trans (min_le_right _ _))
+
+end SOptLib
+
+/-! Phase 4 batch 6: `sq_mul_le_one_of_le_minWithZeroSqrtQuotient`. -/
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: quadratic absorption from a zero-denominator-safe inverse-square-root
+--   ceiling; orig was `sq_mul_le_one_of_le_paper_inv_sqrt`
+-- generality used: three real scalars with pointwise nonnegativity assumptions on the
+--   radicand and bounded variable; no measure, convexity, or algorithmic structure
+-- portable call pattern: distributed small-gain, adaptive-step, and stability-threshold
+--   proofs vary the current ceiling, radicand, and bounded step while converting the
+--   same inverse-square-root cap into a quadratic absorption inequality
+-- counterargument checked: this is not merely a paper rename because it composes the
+--   zero-denominator convention, quotient cross-multiplication, square monotonicity,
+--   and the square-root identity into a reusable boundary absent from the existing API
+-- coverage search: searches for "zero denominator quotient inverse square root
+--   quadratic absorption", "sq_mul_le_one of le sqrt quotient", and "nonnegative y
+--   at most reciprocal square root implies y squared times x at most one" found the
+--   local source theorem, the partial SOptLib cross-multiplication lemma, and Mathlib's
+--   `Real.le_sqrt`, `Real.le_sqrt_of_sq_le`, and `Real.sq_sqrt`, but no full duplicate
+-- minimal hypotheses: `0 ≤ x` is required by `Real.sq_sqrt`, and `0 ≤ y` is
+--   required to square the product inequality; all hypotheses are pointwise and minimal
+
+/-- An upper bound by a zero-denominator-safe inverse-square-root ceiling implies
+the corresponding quadratic absorption inequality.
+
+When `x = 0`, the zero-denominator branch leaves the current ceiling unchanged;
+otherwise the quotient branch bounds `y` by `1 / √x`.
+
+Layer: Model | Gap: Level 0 (zero-denominator-safe inverse-square-root quadratic absorption)
+Proof: use the quotient ceiling's cross-multiplication theorem to bound `y * √x` by one, square this nonnegative product, and rewrite `(sqrt x)^2` as `x`.
+Source: Mathlib real square-root identities and ordered-real polynomial arithmetic, together with SOptLib's zero-denominator-safe quotient ceiling API
+Used in: distributed small-gain and stability-threshold proofs that turn inverse-square-root step-size caps into absorbable quadratic feedback coefficients
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/6/proof/27
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem sq_mul_le_one_of_le_min_with_zero_sqrt_quotient
+    {current x y : ℝ} (hx : 0 ≤ x) (hy : 0 ≤ y)
+    (hy_le :
+      y ≤ min_with_zero_denominator_quotient current 1 (Real.sqrt x)) :
+    y ^ 2 * x ≤ 1 := by
+  have hy_sqrt : y * Real.sqrt x ≤ 1 :=
+    mul_denominator_le_of_le_min_with_zero_denominator_quotient
+      (current := current) (numerator := 1) (denominator := Real.sqrt x)
+      (y := y) (by norm_num) (Real.sqrt_nonneg x) hy_le
+  have hprod_nonneg : 0 ≤ y * Real.sqrt x :=
+    mul_nonneg hy (Real.sqrt_nonneg x)
+  have hprod_sq : (y * Real.sqrt x) ^ 2 ≤ 1 := by
+    nlinarith
+  rw [mul_pow, Real.sq_sqrt hx] at hprod_sq
+  exact hprod_sq
+
+end SOptLib
+
+/-! Phase 4 batch 6: `coupledFeedbackStabilityStepsize`. -/
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: coupled-feedback stability stepsize
+-- generality used: six real scalars representing a scale and five feedback
+--   coefficients; the definitional construction requires no positivity,
+--   measure, convexity, smoothness, oracle, or finite-dimensional assumptions
+-- portable call pattern: coupled-recursion and distributed small-gain analyses
+--   vary the scale and feedback coefficients while using the same nested
+--   inverse-square-root stepsize ceiling before absorbing quadratic feedback
+-- counterargument checked: although this is a closed formula, it names the
+--   complete recurring small-gain selector and keeps its four coordinated caps
+--   together; it is not a paper-only index wrapper or a rename of one quotient
+-- coverage search: searches for "positive Lipschitz scale feedback coefficients
+--   nested inverse square root stability stepsize" and "zero denominator safe
+--   minimum quotient coupled feedback stability step size" found the reusable
+--   quotient-ceiling and quadratic-absorption components, but no definition of
+--   this complete six-parameter selector; Mathlib semantic search found only
+--   unrelated Lipschitz and minimum facts
+-- minimal hypotheses: all already minimal; this definition is total on real
+--   inputs, while positivity and nonnegativity belong to its use-site theorems
+
+/-- The scale-adjusted stability stepsize obtained by successively imposing
+three zero-denominator-safe inverse-square-root feedback caps.
+
+Layer: Model | Concept: coupled-feedback small-gain stability stepsize
+Proof: (definitional construction; multiply the inverse scale by three nested zero-denominator-safe quotient ceilings)
+Source: Mathlib real square-root and inverse operations together with SOptLib's zero-denominator-safe quotient ceiling
+Used in: coupled-recursion and distributed small-gain arguments that choose one stepsize satisfying base, consensus-feedback, displacement-feedback, and mixed-feedback absorption bounds
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/6/proof/27
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+noncomputable def coupled_feedback_stability_stepsize
+    (scale consensus_coupling gradient_response consensus_feedback
+      direct_displacement_feedback coupled_displacement_feedback : ℝ) : ℝ :=
+  let m1 := min_with_zero_denominator_quotient 1 1
+    (Real.sqrt (2 * gradient_response * consensus_feedback))
+  let m2 := min_with_zero_denominator_quotient m1 1
+    (Real.sqrt (2 * direct_displacement_feedback))
+  let m3 := min_with_zero_denominator_quotient m2 1
+    (Real.sqrt
+      (8 * consensus_coupling * gradient_response *
+        coupled_displacement_feedback))
+  scale⁻¹ * m3
+
+/-- The coupled-feedback stability stepsize unfolds to the inverse scale times
+its three successive zero-denominator-safe inverse-square-root caps.
+
+Layer: Model | Gap: Level 0 (coupled-feedback stability stepsize unfolding)
+Proof: by rfl after unfolding `coupled_feedback_stability_stepsize`.
+Source: Mathlib real square-root and inverse operations together with SOptLib's zero-denominator-safe quotient ceiling
+Used in: rewriting a coupled-recursion stability choice into the individual feedback caps needed for quadratic absorption
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/6/proof/27
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+@[simp]
+theorem coupled_feedback_stability_stepsize_def
+    (scale consensus_coupling gradient_response consensus_feedback
+      direct_displacement_feedback coupled_displacement_feedback : ℝ) :
+    coupled_feedback_stability_stepsize scale consensus_coupling
+        gradient_response consensus_feedback direct_displacement_feedback
+        coupled_displacement_feedback =
+      scale⁻¹ *
+        min_with_zero_denominator_quotient
+          (min_with_zero_denominator_quotient
+            (min_with_zero_denominator_quotient 1 1
+              (Real.sqrt (2 * gradient_response * consensus_feedback)))
+            1 (Real.sqrt (2 * direct_displacement_feedback)))
+          1 (Real.sqrt
+            (8 * consensus_coupling * gradient_response *
+              coupled_displacement_feedback)) := by
+  rfl
+
+/-- A nonnegative stepsize below the coupled-feedback selector satisfies the
+base cap and all three quadratic feedback absorption bounds.
+
+The conclusion also records that the selector itself is positive.  Vanishing
+feedback coefficients are handled by the zero-denominator-safe quotient caps.
+
+Layer: Model | Gap: Level 0 (coupled-feedback stability and quadratic absorption)
+Proof: propagate the scaled stepsize through the three nested caps, apply the inverse-square-root quadratic absorption theorem at each cap, and normalize the resulting scalar inequalities.
+Source: Mathlib ordered-real arithmetic and SOptLib's zero-denominator-safe inverse-square-root ceiling API
+Used in: coupled-recursion and distributed small-gain arguments that simultaneously impose base, consensus, displacement, and mixed-feedback stability conditions
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/6/proof/27
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem coupled_feedback_stability_stepsize_pos_and_quadratic_bounds
+    {scale consensus_coupling gradient_response consensus_feedback
+      direct_displacement_feedback coupled_displacement_feedback : ℝ}
+    (hscale : 0 < scale)
+    (hconsensus_coupling : 0 ≤ consensus_coupling)
+    (hgradient_response : 0 ≤ gradient_response)
+    (hconsensus_feedback : 0 ≤ consensus_feedback)
+    (hdirect_displacement_feedback : 0 ≤ direct_displacement_feedback)
+    (hcoupled_displacement_feedback : 0 ≤ coupled_displacement_feedback) :
+    0 < coupled_feedback_stability_stepsize scale consensus_coupling
+        gradient_response consensus_feedback direct_displacement_feedback
+        coupled_displacement_feedback ∧
+      ∀ {stepsize : ℝ}, 0 ≤ stepsize →
+        stepsize ≤ coupled_feedback_stability_stepsize scale
+          consensus_coupling gradient_response consensus_feedback
+          direct_displacement_feedback coupled_displacement_feedback →
+        stepsize ^ 2 * scale ^ 2 ≤ 1 ∧
+        stepsize ^ 2 * scale ^ 2 * gradient_response * consensus_feedback ≤
+          1 / 2 ∧
+        stepsize ^ 2 * scale ^ 2 * direct_displacement_feedback ≤ 1 / 2 ∧
+        4 * consensus_coupling * stepsize ^ 2 * gradient_response *
+            coupled_displacement_feedback * scale ^ 2 ≤ 1 / 2 := by
+  let consensus_cap := min_with_zero_denominator_quotient 1 1
+    (Real.sqrt (2 * gradient_response * consensus_feedback))
+  let displacement_cap := min_with_zero_denominator_quotient consensus_cap 1
+    (Real.sqrt (2 * direct_displacement_feedback))
+  let mixed_cap := min_with_zero_denominator_quotient displacement_cap 1
+    (Real.sqrt
+      (8 * consensus_coupling * gradient_response *
+        coupled_displacement_feedback))
+  have hconsensus_radicand :
+      0 ≤ 2 * gradient_response * consensus_feedback := by positivity
+  have hdisplacement_radicand :
+      0 ≤ 2 * direct_displacement_feedback := by positivity
+  have hmixed_radicand :
+      0 ≤ 8 * consensus_coupling * gradient_response *
+        coupled_displacement_feedback := by positivity
+  have hconsensus_cap : 0 < consensus_cap :=
+    min_with_zero_denominator_quotient_pos_of_pos_of_nonneg
+      (by norm_num) (by norm_num) (Real.sqrt_nonneg _)
+  have hdisplacement_cap : 0 < displacement_cap :=
+    min_with_zero_denominator_quotient_pos_of_pos_of_nonneg
+      hconsensus_cap (by norm_num) (Real.sqrt_nonneg _)
+  have hmixed_cap : 0 < mixed_cap :=
+    min_with_zero_denominator_quotient_pos_of_pos_of_nonneg
+      hdisplacement_cap (by norm_num) (Real.sqrt_nonneg _)
+  have hselector_eq :
+      coupled_feedback_stability_stepsize scale consensus_coupling
+          gradient_response consensus_feedback direct_displacement_feedback
+          coupled_displacement_feedback = scale⁻¹ * mixed_cap := by
+    rfl
+  constructor
+  · rw [hselector_eq]
+    exact mul_pos (inv_pos.mpr hscale) hmixed_cap
+  · intro stepsize hstepsize hstepsize_le
+    rw [hselector_eq] at hstepsize_le
+    have hscaled_nonneg : 0 ≤ stepsize * scale :=
+      mul_nonneg hstepsize hscale.le
+    have hscaled_le_mixed : stepsize * scale ≤ mixed_cap := by
+      calc
+        stepsize * scale ≤ (scale⁻¹ * mixed_cap) * scale :=
+          mul_le_mul_of_nonneg_right hstepsize_le hscale.le
+        _ = mixed_cap := by field_simp [ne_of_gt hscale]
+    have hscaled_le_displacement : stepsize * scale ≤ displacement_cap :=
+      hscaled_le_mixed.trans
+        (min_with_zero_denominator_quotient_le_current displacement_cap 1
+          (Real.sqrt
+            (8 * consensus_coupling * gradient_response *
+              coupled_displacement_feedback)))
+    have hscaled_le_consensus : stepsize * scale ≤ consensus_cap :=
+      hscaled_le_displacement.trans
+        (min_with_zero_denominator_quotient_le_current consensus_cap 1
+          (Real.sqrt (2 * direct_displacement_feedback)))
+    have hscaled_le_one : stepsize * scale ≤ 1 :=
+      hscaled_le_consensus.trans
+        (min_with_zero_denominator_quotient_le_current 1 1
+          (Real.sqrt (2 * gradient_response * consensus_feedback)))
+    have hbase : (stepsize * scale) ^ 2 ≤ 1 := by
+      nlinarith
+    have hconsensus :
+        (stepsize * scale) ^ 2 *
+            (2 * gradient_response * consensus_feedback) ≤ 1 :=
+      sq_mul_le_one_of_le_min_with_zero_sqrt_quotient
+        hconsensus_radicand hscaled_nonneg hscaled_le_consensus
+    have hdisplacement :
+        (stepsize * scale) ^ 2 *
+            (2 * direct_displacement_feedback) ≤ 1 :=
+      sq_mul_le_one_of_le_min_with_zero_sqrt_quotient
+        hdisplacement_radicand hscaled_nonneg hscaled_le_displacement
+    have hmixed :
+        (stepsize * scale) ^ 2 *
+            (8 * consensus_coupling * gradient_response *
+              coupled_displacement_feedback) ≤ 1 :=
+      sq_mul_le_one_of_le_min_with_zero_sqrt_quotient
+        hmixed_radicand hscaled_nonneg hscaled_le_mixed
+    constructor
+    · nlinarith [hbase]
+    constructor
+    · nlinarith [hconsensus]
+    constructor
+    · nlinarith [hdisplacement]
+    · nlinarith [hmixed]
 
 end SOptLib

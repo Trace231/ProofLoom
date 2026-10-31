@@ -773,6 +773,191 @@ theorem expectedSelectedOutput_eq_inv_mul_Icc_weighted_sum
 
 end SOptLib
 
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: finite average exact stationarity; orig was averagedStationarity,
+--   renamed away from the PULM-DGD paper-local mean-iterate and objective-gradient
+--   fields to expose the deterministic finite-horizon certificate metric.
+-- generality used: a carrier with `[Norm E]`, a certificate sequence `g : Nat → E`,
+--   and a natural horizon `K`; no measure, convexity, smoothness, oracle, or
+--   finite-dimensional assumptions are used.
+-- portable call pattern: deterministic, distributed, and stochastic outer-loop
+--   convergence endpoints instantiate `g` with objective-gradient or projected
+--   stationarity certificates while keeping the same `K⁻¹ ∑_{k<K} ‖g k‖²`
+--   reported quantity.
+-- counterargument checked: this is a short definitional wrapper, but it names a
+--   recurring stationarity metric rather than paper traceability; Mathlib has
+--   finite sums and Cesaro means, while SOptLib has weighted expected and
+--   finite-set squared-value variants, not this deterministic horizon average.
+-- coverage search: searched "finite horizon average squared norm stationarity
+--   certificate equality" and "finite run squared norm values norm sequence
+--   average"; top hits were `weightedExpectedExactStationarity`,
+--   `expectedRootSumSqNorm`, `finiteRunSqValues`, and
+--   `finiteRunErrorSqValues`, all adjacent but not this deterministic average.
+-- minimal hypotheses: all already minimal; `[Norm E]` suffices for squared norm
+--   certificates and `K` is allowed to be zero as a definitional scalar.
+
+/-- Finite-horizon average of squared exact stationarity certificates.
+
+For a deterministic certificate sequence `g`, this names the reported
+stationarity metric `(1 / K) * ∑ k ∈ range K, ‖g k‖ ^ 2`.
+
+Layer: Model | Concept: finite average exact stationarity
+Proof: (definitional construction; scalar normalization of a finite sum of squared certificate norms)
+Source: Mathlib finite sums over `Finset.range`, norm notation, and real scalar arithmetic
+Used in: deterministic distributed-gradient convergence endpoints that report the average squared centralized stationarity certificate over the outer-loop horizon
+Book citation: book/LiangSongYuan2025/PullWithMemoryDGD.json#/main_theorem/measure
+Origin algorithm: Liang, Song, and Yuan, Decentralized Optimization over Time-Varying Row-Stochastic Digraphs, PULM-based decentralized gradient descent -/
+noncomputable def finiteAverageExactStationarity
+    {E : Type*} [Norm E] (g : Nat → E) (K : Nat) : ℝ :=
+  (1 / (K : ℝ)) * (Finset.range K).sum (fun k => ‖g k‖ ^ (2 : Nat))
+
+/-- The finite-horizon average exact stationarity metric unfolds to its normalized
+sum of squared certificate norms.
+
+Layer: Model | Gap: Level 0 (finite average exact stationarity unfolding)
+Proof: by rfl after unfolding `finiteAverageExactStationarity`.
+Source: Mathlib finite sums over `Finset.range`, norm notation, and real scalar arithmetic
+Used in: specializing a paper-facing average stationarity expression to the generic deterministic certificate metric
+Book citation: book/LiangSongYuan2025/PullWithMemoryDGD.json#/main_theorem/measure
+Origin algorithm: Liang, Song, and Yuan, Decentralized Optimization over Time-Varying Row-Stochastic Digraphs, PULM-based decentralized gradient descent -/
+@[simp]
+theorem finiteAverageExactStationarity_def
+    {E : Type*} [Norm E] (g : Nat → E) (K : Nat) :
+    finiteAverageExactStationarity g K =
+      (1 / (K : ℝ)) * (Finset.range K).sum (fun k => ‖g k‖ ^ (2 : Nat)) := by
+  rfl
+
+/-- The finite-horizon average exact stationarity metric is nonnegative.
+
+Layer: Model | Gap: Level 0 (finite average exact stationarity nonnegativity)
+Proof: the horizon normalizer is nonnegative and each squared certificate norm
+term is nonnegative.
+Source: Mathlib finite-sum nonnegativity, square nonnegativity, and real division
+by a nonnegative natural cast
+Used in: scalar case splits and convergence endpoints that compare reported
+average stationarity certificates to nonnegative upper bounds
+Book citation: book/LiangSongYuan2025/PullWithMemoryDGD.json#/main_theorem/measure
+Origin algorithm: Liang, Song, and Yuan, Decentralized Optimization over
+Time-Varying Row-Stochastic Digraphs, PULM-based decentralized gradient descent -/
+theorem finiteAverageExactStationarity_nonneg
+    {E : Type*} [Norm E] (g : Nat → E) (K : Nat) :
+    0 ≤ finiteAverageExactStationarity g K := by
+  rw [finiteAverageExactStationarity_def]
+  exact mul_nonneg
+    (div_nonneg zero_le_one (Nat.cast_nonneg K))
+    (Finset.sum_nonneg (fun k _hk => sq_nonneg (‖g k‖)))
+
+end SOptLib
+
+namespace SOptLib
+
+/-- The expected root of the finite sum of squared certificate norms.
+
+This is the expected pathwise `ℓ²` energy of a finite certificate process; the
+square root is taken before integration.
+
+Layer: Model | Concept: finite-horizon expected certificate root energy
+Proof: (definitional construction; Bochner integral of the square root of a finite squared-norm sum)
+Source: Mathlib finite sums, normed-group norms, real square roots, and Bochner integration
+Used in: finite-horizon stationarity analyses before Cauchy--Schwarz and self-normalized root-energy bounds
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/main_theorem/proof/19
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+noncomputable def expectedRootSumSqNorm
+    {ι Ω E : Type*} [MeasurableSpace Ω] [Norm E]
+    (times : Finset ι) (μ : Measure Ω) (certificate : ι → Ω → E) : ℝ :=
+  ∫ ω, Real.sqrt (Finset.sum times (fun i => ‖certificate i ω‖ ^ 2)) ∂μ
+
+/-- The expected finite-horizon certificate root energy unfolds to its defining integral.
+
+Layer: Model | Gap: Level 0 (expected finite certificate root-energy unfolding)
+Proof: by rfl after unfolding `expectedRootSumSqNorm`.
+Source: Mathlib finite sums, normed-group norms, real square roots, and Bochner integration
+Used in: specializing abstract certificate root energy to objective-gradient trajectories in recursive-momentum stationarity proofs
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/main_theorem/proof/19
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+@[simp]
+theorem expectedRootSumSqNorm_def
+    {ι Ω E : Type*} [MeasurableSpace Ω] [Norm E]
+    (times : Finset ι) (μ : Measure Ω) (certificate : ι → Ω → E) :
+    expectedRootSumSqNorm times μ certificate =
+      ∫ ω, Real.sqrt (Finset.sum times (fun i => ‖certificate i ω‖ ^ 2)) ∂μ := by
+  rfl
+
+/-- The expected root of a finite sum of squared certificate norms is nonnegative.
+
+Layer: Model | Gap: Level 0 (expected finite certificate root-energy nonnegativity)
+Proof: the square root is pointwise nonnegative, so its Bochner integral is nonnegative.
+Source: Mathlib Bochner integral nonnegativity and real square-root nonnegativity
+Used in: scalar absorption and case splits for finite-horizon stationarity bounds
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/main_theorem/proof/19
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem expectedRootSumSqNorm_nonneg
+    {ι Ω E : Type*} [MeasurableSpace Ω] [Norm E]
+    (times : Finset ι) (μ : Measure Ω) (certificate : ι → Ω → E) :
+    0 ≤ expectedRootSumSqNorm times μ certificate := by
+  rw [expectedRootSumSqNorm_def]
+  exact integral_nonneg (fun _ => Real.sqrt_nonneg _)
+
+/-- The expected finite sum of random weights times squared certificate norms.
+
+The weights may depend on the same sample as the certificate, so the weighted
+sum is formed pointwise before integration.
+
+Layer: Model | Concept: randomly weighted expected certificate energy
+Proof: (definitional construction; Bochner integral of a finite sum of sample-dependent weights times squared norms)
+Source: Mathlib finite sums, normed-type norms, and Bochner integration of real observables
+Used in: adaptive stochastic-gradient and recursive-momentum telescope bounds for randomly step-size-weighted stationarity certificates
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/main_theorem/proof/14
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+noncomputable def expected_weighted_certificate_energy
+    {ι Ω E : Type*} [MeasurableSpace Ω] [Norm E]
+    (times : Finset ι) (μ : Measure Ω) (weight : ι → Ω → ℝ)
+    (certificate : ι → Ω → E) : ℝ :=
+  ∫ ω, Finset.sum times (fun i => weight i ω * ‖certificate i ω‖ ^ 2) ∂μ
+
+/-- The randomly weighted expected certificate energy unfolds to its defining integral.
+
+Layer: Model | Gap: Level 0 (randomly weighted expected certificate-energy unfolding)
+Proof: by rfl after unfolding `expected_weighted_certificate_energy`.
+Source: Mathlib finite sums, normed-type norms, and Bochner integration of real observables
+Used in: specializing an abstract randomly weighted energy to adaptive stepsizes and objective-gradient trajectories
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/main_theorem/proof/14
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+@[simp]
+theorem expected_weighted_certificate_energy_def
+    {ι Ω E : Type*} [MeasurableSpace Ω] [Norm E]
+    (times : Finset ι) (μ : Measure Ω) (weight : ι → Ω → ℝ)
+    (certificate : ι → Ω → E) :
+    expected_weighted_certificate_energy times μ weight certificate =
+      ∫ ω, Finset.sum times
+        (fun i => weight i ω * ‖certificate i ω‖ ^ 2) ∂μ := by
+  rfl
+
+/-- The expected weighted squared-norm energy is nonnegative when every weight
+is nonnegative almost everywhere.
+
+Layer: Model | Gap: Level 0 (randomly weighted expected certificate-energy nonnegativity)
+Proof: combine the finite family of a.e. weight bounds, then apply Bochner-integral nonnegativity to the resulting a.e. nonnegative sum.
+Source: Mathlib `Finset.eventually_all`, `Finset.sum_nonneg`, norm-square nonnegativity, and `MeasureTheory.integral_nonneg_of_ae`
+Used in: adaptive stochastic-method energy estimates before division, scaling, and telescope-bound composition
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/main_theorem/proof/14
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem expected_weighted_certificate_energy_nonneg
+    {ι Ω E : Type*} [MeasurableSpace Ω] [Norm E]
+    (times : Finset ι) (μ : Measure Ω) (weight : ι → Ω → ℝ)
+    (certificate : ι → Ω → E)
+    (hweight : ∀ i ∈ times, ∀ᵐ ω ∂μ, 0 ≤ weight i ω) :
+    0 ≤ expected_weighted_certificate_energy times μ weight certificate := by
+  rw [expected_weighted_certificate_energy_def]
+  refine integral_nonneg_of_ae ?_
+  filter_upwards [times.eventually_all.2 hweight] with ω hweightω
+  exact Finset.sum_nonneg fun i hi =>
+    mul_nonneg (hweightω i hi) (sq_nonneg _)
+
+end SOptLib
+
 /-- A scalar upper certificate gives the negative reversed-displacement bound.
 
 If `m` is bounded above by the inner product in the `x - y` orientation,
@@ -1356,4 +1541,3 @@ theorem normalConeGap_sq_le_sq_mul_norm_sub_sq_of_affine_certificate
       rw [mul_pow, sq_abs]
 
 end SOptLib
-

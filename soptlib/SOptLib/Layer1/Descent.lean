@@ -3,11 +3,14 @@ import SOptLib.Layer0.Objective
 import Mathlib.Analysis.InnerProductSpace.Basic
 import Mathlib.Tactic
 import SOptLib.Glue.Algebra
+import SOptLib.Glue.Martingale
 import SOptLib.Glue.Probability
 import SOptLib.Model.Bregman
 import SOptLib.Model.Filtration
 import SOptLib.Model.ConditionalGradient
 import SOptLib.Model.Iterates
+import SOptLib.Model.Iterates.gradientStep
+import SOptLib.Model.NetworkMatrix
 import SOptLib.Model.Saddle
 import SOptLib.Model.StochasticOracle
 import Mathlib.MeasureTheory.Integral.Bochner.Basic
@@ -1204,6 +1207,818 @@ theorem recursive_estimator_residual_global_index_eq_prev_add_centered_batch_dif
   exact ⟨hraw, hcenter⟩
 
 end SOptLib
+
+/-! Phase 4 batch 19: `integral_sq_next_ge_scaled_innovation_of_predictable_split.lean`. -/
+
+open MeasureTheory
+open scoped InnerProductSpace
+
+-- Generalization plan (G0):
+-- concept/name: next-state second-moment floor from an orthogonal
+--   predictable--innovation split; orig was
+--   `homogeneous_averageIterate_succ_fresh_noise_secondMoment_floor`
+-- generality used: arbitrary measure on a measurable sample type and an
+--   arbitrary real inner-product space; no probability, finite-measure,
+--   completeness, finite-dimensionality, convexity, smoothness, or oracle assumptions
+-- portable call pattern: stochastic recursions change the next-state process,
+--   predictable component, innovation, two scalar scales, and exact innovation
+--   variance while retaining the same one-step second-moment lower bound
+-- counterargument checked: the existing orthogonal L2 lower bound is partial
+--   coverage, but it does not consume an update split or substitute an exact
+--   innovation variance; packaging those contracts gives a direct Layer1 call
+-- coverage search: queries `integral squared next state lower bound scaled
+--   innovation exact second moment predictable orthogonal split`, `second moment
+--   affine update lower bound zero cross integral MemLp`, and `L2 norm squared of
+--   an orthogonal sum is at least the squared norm of one component` found partial
+--   coverage in `integral_sq_smul_sub_ge_of_cross_integral_eq_zero` and Mathlib's
+--   pointwise Pythagorean identities, but no theorem with this full update contract
+-- minimal hypotheses: `MemLp` supplies exactly the L2 regularity used by the
+--   orthogonal lower bound; the almost-everywhere split, zero cross integral,
+--   and exact innovation second moment are precisely the three source facts used
+
+/-- An affine predictable--innovation split gives a scaled next-state
+second-moment floor equal to the scaled innovation variance.
+
+Layer: Layer1 | Gap: Level 1 (orthogonal innovation floor for an affine stochastic update)
+Proof: rewrite the next state by the supplied split, apply `integral_sq_smul_sub_ge_of_cross_integral_eq_zero`, and substitute the exact innovation second moment.
+Source: SOptLib orthogonal L2-process lower bounds and Mathlib real inner-product scalar-action algebra
+Used in: one-step fresh-noise floors for stochastic recursions after the past-dependent term is proved square-integrable and orthogonal to the current innovation
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/17/proof/10
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem integral_sq_next_ge_scaled_innovation_of_predictable_split
+    {Omega E : Type*} [MeasurableSpace Omega]
+    [NormedAddCommGroup E] [InnerProductSpace Real E]
+    (mu : Measure Omega) (xNext P N : Omega -> E)
+    (lambda alpha innovationVariance : Real)
+    (hsplit : ∀ᵐ omega ∂mu, xNext omega = P omega - alpha • N omega)
+    (hP : MemLp P 2 mu) (hN : MemLp N 2 mu)
+    (hcross : (∫ omega, ⟪P omega, N omega⟫_Real ∂mu) = 0)
+    (hinnovation : (∫ omega, ‖N omega‖ ^ 2 ∂mu) = innovationVariance) :
+    lambda ^ 2 * alpha ^ 2 * innovationVariance <=
+      ∫ omega, ‖lambda • xNext omega‖ ^ 2 ∂mu := by
+  have hfloor :=
+    integral_sq_smul_sub_ge_of_cross_integral_eq_zero
+      mu lambda (lambda * alpha) hP hN hcross
+  rw [hinnovation] at hfloor
+  have hnext :
+      (∫ omega, ‖lambda • xNext omega‖ ^ 2 ∂mu) =
+        ∫ omega, ‖lambda • (P omega - alpha • N omega)‖ ^ 2 ∂mu :=
+    integral_congr_ae (hsplit.mono fun omega hsplit_omega => by
+      simpa only using
+        congrArg (fun x => ‖lambda • x‖ ^ 2) hsplit_omega)
+  rw [hnext]
+  simpa [smul_sub, smul_smul, mul_pow] using hfloor
+
+/-! Phase 4 batch 19: `correctedWeightedCenter_succ_of_tracking_update.lean`. -/
+
+open scoped BigOperators
+
+namespace FiniteNetwork
+
+-- Generalization plan (G0):
+-- concept/name: exact successor recursion for a corrected weighted center under a tracking update; orig was `liftedCenter_succ`.
+-- generality used: arbitrary finite node carrier and additive commutative real module, primal/tracker/forcing state sequences, weight and influence rows, current transported and innovation zero-sum states, a zero-sum error sequence, a time-indexed correction map, and a scalar step; no matrix representation, nonempty-node, stochasticity, positivity, periodicity, norm, topology, inner product, completeness, finite-dimensionality, measure, convexity, smoothness, or oracle assumptions are used.
+-- portable call pattern: push-pull, push-sum, and directed gradient-tracking proofs change the primal mechanism, transport operator, weights, forcing table, tracker-error recursion, and Poisson correction while supplying the same weighted primal update, tracker decomposition, correction identity, and influence identity to obtain the corrected-center step.
+-- counterargument checked: `FiniteNetwork.correctedWeightedState_pull_step_eq` is nearby but hard-codes a push-matrix affine state update and Perron row transport; this theorem instead starts from an already-established weighted primal update and an arbitrary state sequence, so it is neither alpha-equivalent nor a paper-local wrapper and applies to primal mechanisms not represented by that matrix formula.
+-- coverage search: `lean_search_symbols` queries "corrected weighted center exact successor update tracking innovation poisson influence", "weighted center recursion of tracker update", and "correctedWeightedCenter successor equality" found the corrected-center Model API, corrected-lift Poisson and influence components, and `FiniteNetwork.correctedWeightedState_pull_step_eq`, but no theorem with this update-hypothesis contract; Mathlib semantic search found only generic weighted-sum algebra, so coverage is partial rather than full.
+-- minimal hypotheses: `[Fintype Node]` supports finite weighted sums, `[AddCommGroup E] [Module ℝ E]` support the affine cancellation, the transport and innovation are required only as zero-sum states satisfying the displayed recurrence contracts, and correction additivity is required only at that single pair.
+
+/-- A corrected weighted center follows the influence-weighted forcing under a
+weighted primal update and a transported-plus-innovation tracking recursion.
+
+The correction need only satisfy its Poisson identity at the current error and
+additivity at the transported and forcing-innovation states used in this step.
+
+Layer: Layer1 | Gap: Level 1 (corrected weighted-center tracking recurrence)
+Proof: unfold the corrected center, substitute the weighted primal and tracker-error updates, split the next correction at the transported and innovation states, and cancel terms using the Poisson and influence identities.
+Source: finite-state gradient-tracking Poisson-correction algebra, Mathlib finite module-valued sums, subtype invariants, and real-module identities
+Used in: push-pull, push-sum, and directed gradient-tracking analyses after the weighted primal recursion and zero-sum tracker-error innovation recursion have been established, immediately before telescoping the corrected center
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/3/proof/2
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem correctedWeightedCenter_succ_of_tracking_update
+    {Node E : Type*} [Fintype Node]
+    [AddCommGroup E] [Module Real E]
+    (X Y G : Nat -> Node -> E)
+    (pi influence : Nat -> Node -> Real)
+    (error : Nat -> ZeroSumState Node E)
+    (D : Nat -> ZeroSumState Node E -> E) (alpha : Real) (t : Nat)
+    (transported innovation : ZeroSumState Node E)
+    (hprimal :
+      (∑ i : Node, pi (t + 1) i • X (t + 1) i) =
+        (∑ i : Node, pi t i • X t i) -
+          alpha • ∑ i : Node, pi (t + 1) i • Y t i)
+    (herror :
+      error (t + 1) = transported + innovation)
+    (htracker : Y t = (error t).1 + G t)
+    (hpoisson :
+      D t (error t) =
+        (∑ i : Node, pi (t + 1) i • (error t).1 i) +
+          D (t + 1) transported)
+    (hinfluence :
+      (∑ i : Node, influence t i • G t i) =
+        (∑ i : Node, pi (t + 1) i • G t i) +
+          D (t + 1) innovation)
+    (hD_add :
+      D (t + 1) (transported + innovation) =
+        D (t + 1) transported + D (t + 1) innovation) :
+    correctedWeightedCenter (pi (t + 1)) (X (t + 1)) alpha (D (t + 1))
+        (error (t + 1)) =
+      correctedWeightedCenter (pi t) (X t) alpha (D t) (error t) -
+        alpha • ∑ i : Node, influence t i • G t i := by
+  have hweighted_tracker :
+      (∑ i : Node, pi (t + 1) i • Y t i) =
+        (∑ i : Node, pi (t + 1) i • (error t).1 i) +
+          ∑ i : Node, pi (t + 1) i • G t i := by
+    rw [htracker]
+    simp only [Pi.add_apply, smul_add, Finset.sum_add_distrib]
+  simp only [correctedWeightedCenter_def, hprimal, herror, hD_add,
+    hweighted_tracker, hpoisson, hinfluence]
+  module
+
+end FiniteNetwork
+
+/-! Phase 4 batch 19: `norm_response_le_geometric_convolution_of_product_contraction.lean`. -/
+
+-- Generalization plan (G0):
+-- concept/name: geometric-convolution seminorm bound for a nonautonomous product
+--   response with bounded innovations; orig was
+--   `meanJointCoordinate_norm_convolution_source`
+-- generality used: two arbitrary additive commutative groups with bundled additive
+--   seminorms, an invariant-carrier predicate, response, source, innovation, and input
+--   sequences, a propagated-product action, and nonnegative geometric constants; no
+--   topology, scalar action, inner product, completeness, finite-dimensionality,
+--   measure, probability, convexity, smoothness, independence, or integrability is used
+-- portable call pattern: time-varying consensus, gradient tracking, switched linear
+--   systems, and stable stochastic filters change the product family, invariant
+--   carrier, contraction constants, innovation map, and input increments while using
+--   the same initial-plus-geometric-convolution conclusion
+-- counterargument checked: this is not paper-local traceability or a one-line wrapper;
+--   it composes an exact nonautonomous response, invariant-carrier product contraction,
+--   finite-sum seminorm control, and two successive innovation-to-input bounds.  The
+--   fixed-operator Duhamel theorem and zero-initial finite-network consensus theorem
+--   each cover only a strict specialization of this contract
+-- coverage search: queries "geometric convolution norm response contraction" and
+--   "time varying product response norm upper bound geometric contraction bounded
+--   innovations convolution" found `linearDuhamelResponse_norm_le_geometric_convolution`,
+--   `FiniteNetwork.consensusError_affine_matrix_recurrence_norm_le_geometric_convolution`,
+--   and `linearRecurrence_eq_consecutiveProduct_response`; their full signatures are
+--   respectively fixed-operator, network-specific zero-initial, and equality-only, so
+--   coverage is partial rather than duplicative
+-- minimal hypotheses: contraction is required only on the supplied invariant carrier;
+--   only the initial response and innovations must lie in it, while nonnegativity is
+--   assumed only for coefficients that scale inequalities
+
+open scoped BigOperators
+
+/-- An exact nonautonomous response is bounded by a homogeneous geometric term plus
+the geometric convolution of input increments when its product action contracts an
+invariant carrier and two successive seminorm bounds control every innovation.
+
+Layer: Layer1 | Gap: Level 1 (nonautonomous contractive-product response convolution bound)
+Proof: rewrite by the exact response, use additive-seminorm subadditivity on the finite response, apply product contraction on the invariant carrier, and compose the innovation and source bounds under nonnegative coefficients.
+Source: discrete variation-of-constants for nonautonomous systems and Mathlib bundled additive-group seminorm inequalities for finite sums
+Used in: pathwise consensus and gradient-tracking estimates after unrolling a time-varying recurrence and before applying a scalar convolution-energy bound
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/6/proof/3
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem norm_response_le_geometric_convolution_of_product_contraction
+    {E F : Type*} [AddCommGroup E] [AddGroup F]
+    (p : AddGroupSeminorm E) (q : AddGroupSeminorm F)
+    (response source innovation : ℕ → E) (input : ℕ → F)
+    (propagate : ℕ → ℕ → E → E) (admissible : E → Prop)
+    (M r A B : ℝ)
+    (hresponse : ∀ t : ℕ,
+      response t =
+        propagate 0 t (response 0) +
+          ∑ j ∈ Finset.range t,
+            propagate (j + 1) (t - 1 - j) (innovation j))
+    (hresponse_mem : admissible (response 0))
+    (hinnovation_mem : ∀ j : ℕ, admissible (innovation j))
+    (hcontract : ∀ (s k : ℕ) (x : E), admissible x →
+      p (propagate s k x) ≤ M * r ^ k * p x)
+    (hinnovation : ∀ j : ℕ, p (innovation j) ≤ A * p (source j))
+    (hsource : ∀ j : ℕ,
+      p (source j) ≤ B * q (input (j + 1) - input j))
+    (hM : 0 ≤ M) (hr : 0 ≤ r) (hA : 0 ≤ A) (t : ℕ) :
+    p (response t) ≤
+      M * r ^ t * p (response 0) +
+        ∑ j ∈ Finset.range t,
+          M * r ^ (t - 1 - j) *
+            (A * B * q (input (j + 1) - input j)) := by
+  have hsum (s : Finset ℕ) (f : ℕ → E) :
+      p (∑ i ∈ s, f i) ≤ ∑ i ∈ s, p (f i) := by
+    classical
+    induction s using Finset.induction_on with
+    | empty => simp
+    | @insert i s hi ih =>
+        simp only [Finset.sum_insert hi]
+        exact (map_add_le_add p _ _).trans (add_le_add le_rfl ih)
+  rw [hresponse t]
+  calc
+    p (propagate 0 t (response 0) +
+        ∑ j ∈ Finset.range t,
+          propagate (j + 1) (t - 1 - j) (innovation j)) ≤
+        p (propagate 0 t (response 0)) +
+          p (∑ j ∈ Finset.range t,
+            propagate (j + 1) (t - 1 - j) (innovation j)) :=
+      map_add_le_add p _ _
+    _ ≤ M * r ^ t * p (response 0) +
+          ∑ j ∈ Finset.range t,
+            p (propagate (j + 1) (t - 1 - j) (innovation j)) :=
+      add_le_add (hcontract 0 t (response 0) hresponse_mem)
+        (hsum (Finset.range t) fun j =>
+          propagate (j + 1) (t - 1 - j) (innovation j))
+    _ ≤ M * r ^ t * p (response 0) +
+          ∑ j ∈ Finset.range t,
+            M * r ^ (t - 1 - j) *
+              (A * B * q (input (j + 1) - input j)) := by
+      apply add_le_add le_rfl
+      apply Finset.sum_le_sum
+      intro j _hj
+      exact (hcontract (j + 1) (t - 1 - j) (innovation j)
+        (hinnovation_mem j)).trans
+          (mul_le_mul_of_nonneg_left
+            ((hinnovation j).trans
+              (by simpa only [mul_assoc] using
+                (mul_le_mul_of_nonneg_left (hsource j) hA)))
+            (mul_nonneg hM (pow_nonneg hr _)))
+
+/-! Phase 4 batch 19: `linearRecurrence_eq_consecutiveProduct_response.lean`. -/
+
+-- Generalization plan (G0):
+-- concept/name: discrete variation-of-constants formula for a zero-initial
+--   time-varying linear recurrence; orig was `noiseTrackerError_unroll_source`
+-- generality used: an arbitrary nontrivially normed field, seminormed additive
+--   commutative group, normed space, time-varying continuous linear endomorphisms,
+--   innovation sequence, and candidate recurrence; no completeness, inner product,
+--   finite-dimensionality, measure, probability, or optimization assumptions are used
+-- portable call pattern: switched linear systems, gradient trackers, consensus errors,
+--   and stochastic approximation recurrences call the same exact unrolling step while
+--   changing the state space, transition schedule, innovations, and horizon
+-- counterargument checked: this is not paper-local traceability or a one-line wrapper;
+--   it proves the noncommutative time-varying Duhamel expansion, whereas the existing
+--   `linearDuhamelResponse` API covers only a single fixed endomorphism
+-- coverage search: symbol and semantic searches for "time varying linear recurrence
+--   equality consecutive product response zero initial innovations" found Mathlib
+--   `LinearRecurrence` for homogeneous scalar recurrences, the fixed-operator staged
+--   `linearDuhamelResponse`, and the network-specific `trackerInnovationResponse`; all
+--   are partial rather than full coverage of this time-varying operator statement
+-- minimal hypotheses: only the zero value and pointwise successor recurrence are
+--   assumed about `error`; all analytic, stochastic, and finite-dimensional hypotheses
+--   from the source algorithm were removed
+
+open scoped BigOperators
+
+/-- A zero-initial time-varying linear recurrence equals the sum of its
+innovations propagated by the consecutive products of later transitions.
+
+Layer: Layer1 | Gap: Level 1 (time-varying discrete variation-of-constants formula)
+Proof: induct on the horizon, distribute the newest continuous linear map over the finite response sum, and identify each extended propagation window with the successor equation for the newest-on-the-left consecutive product.
+Source: discrete variation-of-constants for nonautonomous linear systems, Mathlib continuous linear endomorphisms and finite sums, and `FiniteNetwork.consecutiveProduct`
+Used in: unrolling the zero-initial noise-driven tracker error before bounding the propagated matrix-minus-identity innovations, and in analogous switched consensus or stochastic linear recurrences
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/6/proof/4
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem linearRecurrence_eq_consecutiveProduct_response
+    {𝕜 E : Type*} [NontriviallyNormedField 𝕜]
+    [SeminormedAddCommGroup E] [NormedSpace 𝕜 E]
+    (A : ℕ → E →L[𝕜] E) (innovation error : ℕ → E)
+    (hzero : error 0 = 0)
+    (hsucc : ∀ k : ℕ, error (k + 1) = A k (error k) + innovation k)
+    (t : ℕ) :
+    error t =
+      ∑ j ∈ Finset.range t,
+        (FiniteNetwork.consecutiveProduct A (j + 1) (t - 1 - j))
+          (innovation j) := by
+  classical
+  induction t with
+  | zero => simpa using hzero
+  | succ t ih =>
+      rw [hsucc t, ih, map_sum, Finset.sum_range_succ]
+      have hterms :
+          (∑ j ∈ Finset.range t,
+              A t
+                ((FiniteNetwork.consecutiveProduct A (j + 1) (t - 1 - j))
+                  (innovation j))) =
+            ∑ j ∈ Finset.range t,
+              (FiniteNetwork.consecutiveProduct A (j + 1) (t - j))
+                (innovation j) := by
+        apply Finset.sum_congr rfl
+        intro j hj
+        have hjt : j < t := Finset.mem_range.mp hj
+        rw [show t - j = (t - 1 - j) + 1 by omega,
+          FiniteNetwork.consecutiveProduct_succ,
+          ContinuousLinearMap.mul_apply]
+        congr 2
+        omega
+      rw [hterms]
+      have hsum_succ :
+          (∑ j ∈ Finset.range t,
+              (FiniteNetwork.consecutiveProduct A (j + 1) (t - j))
+                (innovation j)) =
+            ∑ j ∈ Finset.range t,
+              (FiniteNetwork.consecutiveProduct A (j + 1) ((t + 1) - 1 - j))
+                (innovation j) := by
+        apply Finset.sum_congr rfl
+        intro j hj
+        congr 3
+      rw [hsum_succ]
+      simp
+
+/-! Phase 4 batch 19: `FiniteNetwork_displacement_eq_sub_one_smulVec_consensusError_sub_direction_of_rowStochastic.lean`. -/
+
+noncomputable section
+
+open scoped BigOperators
+
+namespace FiniteNetwork
+
+-- Generalization plan (G0):
+-- concept/name: displacement identity for an affine row-sum-one matrix update in consensus-error coordinates; orig was `primalDisplacement_eq_pushConsensus_sub_tracker_source`.
+-- generality used: an arbitrary finite node type with decidable equality and an additive commutative real module; the update is an explicit pointwise algebraic hypothesis, with no entrywise nonnegativity, norm, topology, inner product, completeness, finite-dimensionality, measure, probability, convexity, smoothness, or oracle assumptions.
+-- portable call pattern: distributed gradient, gradient-tracking, gossip, and consensus methods change the row-normalized mixing matrix, current and next states, direction, and stepsize while reusing the same conversion of an affine update into disagreement-action plus direction form.
+-- counterargument checked: this is not paper-local traceability or a pure caller-side rename because it composes the affine update, removal of the consensus component under the exact row-sum-one contract, and the matrix-minus-identity action into the displacement contract consumed by energy estimates; the available component lemmas do not state that contract.
+-- coverage search: symbol queries "displacement equals matrix minus identity action on consensus error minus scaled direction row sums one affine update", "affine matrix recurrence increment consensus error row stochastic", and "Matrix sub identity smulVec consensusError displacement direction", plus LeanSearch for the full semantic statement, found `Matrix.sub_one_smulVec`, `FiniteNetwork.consensusError_smulVec_consensusError_of_sum_row_eq_one`, recurrence-unrolling results, and scalar-valued `Matrix.sub_mulVec`, but no declaration with this one-step displacement equality.
+-- minimal hypotheses: `[Fintype Node] [DecidableEq Node]` support the square matrix action and finite-network mean, `[AddCommGroup E] [Module ℝ E]` are exactly the algebraic state assumptions, and `∀ i, ∑ j, A i j = 1` is precisely the matrix property consumed by the proof; no nonemptiness, entrywise nonnegativity, or analytic hypothesis is used.
+
+/-- An affine update by a matrix whose rows sum to one has displacement equal to the
+matrix-minus-identity action on the consensus error minus the scaled direction.
+
+Layer: Layer1 | Gap: Level 1 (row-sum-one affine-update displacement in disagreement coordinates)
+Proof: rewrite the supplied affine update, use row-sum preservation to remove the constant mean from the matrix innovation, and identify that innovation with the action of `A - 1` via `Matrix.sub_one_smulVec`.
+Source: finite-state matrix algebra and discrete consensus decompositions, using the row-sum-one contract, SOptLib `FiniteNetwork.consensusError`, and the module-valued matrix-action API
+Used in: distributed gradient and push-pull tracking energy estimates that replace each primal increment by a mixing action on disagreement plus a stepsize-scaled tracker or search direction
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/6/proof/23
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem displacement_eq_sub_one_smulVec_consensusError_sub_direction_of_sum_row_eq_one
+    {Node E : Type*} [Fintype Node] [DecidableEq Node]
+    [AddCommGroup E] [Module ℝ E]
+    (A : Matrix Node Node ℝ) (X Xnext Y : Node → E) (alpha : ℝ)
+    (hrow : ∀ i, ∑ j, A i j = 1)
+    (h_update : Xnext = Matrix.smulVec A X - alpha • Y) :
+    Xnext - X =
+      Matrix.smulVec (A - 1) (consensusError X) - alpha • Y := by
+  have hinnovation :
+      Matrix.smulVec A X - X =
+        Matrix.smulVec A (consensusError X) - consensusError X := by
+    funext i
+    simp only [Matrix.smulVec_apply, consensusError_apply, Pi.sub_apply,
+      smul_sub, Finset.sum_sub_distrib]
+    rw [← Finset.sum_smul, hrow i]
+    simp
+  rw [h_update, Matrix.sub_one_smulVec]
+  calc
+    (Matrix.smulVec A X - alpha • Y) - X =
+        (Matrix.smulVec A X - X) - alpha • Y := by abel
+    _ = (Matrix.smulVec A (consensusError X) - consensusError X) -
+        alpha • Y := by rw [hinnovation]
+
+end FiniteNetwork
+
+/-! Phase 4 batch 19: `FiniteNetwork_correctedWeightedState_pull_step_eq.lean`. -/
+
+open scoped BigOperators
+
+namespace FiniteNetwork
+
+-- Generalization plan (G0):
+-- concept/name: corrected weighted-state identity for one coupled push/pull step; orig was `quadraticRestrictedCorrectedFunctional_homogeneousStep_eq`.
+-- generality used: arbitrary finite node carrier and additive commutative real module, two real mixing matrices, current/next weight rows, an influence row, current/next correction maps on zero-sum states, primal/tracker/forcing states, and a scalar step; no nonempty-node, stochasticity, positivity, periodicity, norm, topology, inner product, completeness, finite-dimensionality, measure, convexity, smoothness, or oracle assumptions are used.
+-- portable call pattern: periodic push-pull, push-sum, and directed gradient-tracking proofs change the push and pull matrices, transported Perron rows, correction-map family, influence row, primal/tracker state, and forcing state while retaining the same coupled affine update and corrected-center one-step identity.
+-- counterargument checked: the corrected center and row-action associativity are existing components, but neither combines Perron transport, the correction Poisson equation, the forcing influence decomposition, and correction additivity; this theorem is the reusable recurrence edge rather than a paper-local label or a pure wrapper.
+-- coverage search: `lean_search_symbols` queries "corrected weighted state pull step equality Perron transported row Poisson corrected lift influence forcing", "weighted aggregate minus corrected lift affine push pull update equality", and "weighted state row matrix transport corrected functional one step" found `FiniteNetwork.correctedWeightedCenter`, `FiniteNetwork.correctedWeightedCenter_add_state`, and `Matrix.sum_vecMul_smul_eq_sum_smul_smulVec`, but no theorem with the combined transition; Mathlib semantic search returned no matching recurrence, so coverage is partial rather than full.
+-- minimal hypotheses: `[Fintype Node] [DecidableEq Node]` support finite matrix contractions and the identity matrix, `[AddCommGroup E] [Module Real E]` support the affine update, `htransport` and `hinnovation` are exactly the witnesses needed for the two zero-sum states, and each remaining equality is one of the four contracts consumed by the proof.
+
+/-- A Perron-weighted state minus a scaled correction advances through one
+coupled push/pull step by exactly the negative influence-weighted forcing.
+
+The conclusion packages the primal push update and the transported-plus-
+innovation tracker update as a recurrence for `correctedWeightedCenter`.
+
+Layer: Layer1 | Gap: Level 2 (corrected finite-network push/pull one-step identity)
+Proof: reassociate the transported weight row through the push matrix, expand the affine primal update, and cancel the tracker terms using correction additivity, the correction Poisson equation, and the influence decomposition.
+Source: finite-state nonhomogeneous Markov-chain Poisson correction algebra, Mathlib finite matrix actions, and real-module affine identities
+Used in: periodic push-pull and directed gradient-tracking analyses that project a coupled primal/tracker update onto a corrected Perron center before telescoping its forcing response
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/3
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem correctedWeightedState_pull_step_eq
+    {Node E : Type*} [Fintype Node] [DecidableEq Node]
+    [AddCommGroup E] [Module Real E]
+    (R C : Matrix Node Node Real)
+    (pi piNext influence : Node -> Real)
+    (D Dnext : ZeroSumState Node E -> E)
+    (X Z : Node -> E) (W : ZeroSumState Node E) (alpha : Real)
+    (htransport :
+      ∑ i : Node, Matrix.smulVec C W.1 i = 0)
+    (hinnovation :
+      ∑ i : Node, Matrix.smulVec (C - 1) Z i = 0)
+    (hperron : Matrix.vecMul piNext R = pi)
+    (hpoisson :
+      D W =
+        (∑ i : Node, piNext i • W.1 i) +
+          Dnext ⟨Matrix.smulVec C W.1, htransport⟩)
+    (hinfluence :
+      (∑ i : Node, influence i • Z i) =
+        (∑ i : Node, piNext i • Z i) +
+          Dnext ⟨Matrix.smulVec (C - 1) Z, hinnovation⟩)
+    (hDnext_add :
+      Dnext
+          (⟨Matrix.smulVec C W.1, htransport⟩ +
+            ⟨Matrix.smulVec (C - 1) Z, hinnovation⟩) =
+        Dnext ⟨Matrix.smulVec C W.1, htransport⟩ +
+          Dnext ⟨Matrix.smulVec (C - 1) Z, hinnovation⟩) :
+    let transported : ZeroSumState Node E :=
+      ⟨Matrix.smulVec C W.1, htransport⟩
+    let innovation : ZeroSumState Node E :=
+      ⟨Matrix.smulVec (C - 1) Z, hinnovation⟩
+    correctedWeightedCenter piNext
+        (Matrix.smulVec R X - alpha • (W.1 + Z)) alpha Dnext
+        (transported + innovation) =
+      correctedWeightedCenter pi X alpha D W -
+        alpha • ∑ i : Node, influence i • Z i := by
+  dsimp only
+  have hweighted_push :
+      (∑ i : Node, piNext i • Matrix.smulVec R X i) =
+        ∑ i : Node, pi i • X i := by
+    rw [← hperron]
+    exact (Matrix.sum_vecMul_smul_eq_sum_smul_smulVec piNext R X).symm
+  have hweighted_step :
+      (∑ i : Node,
+          piNext i •
+            (Matrix.smulVec R X - alpha • (W.1 + Z)) i) =
+        (∑ i : Node, piNext i • Matrix.smulVec R X i) -
+          alpha •
+            ((∑ i : Node, piNext i • W.1 i) +
+              ∑ i : Node, piNext i • Z i) := by
+    calc
+      (∑ i : Node,
+          piNext i •
+            (Matrix.smulVec R X - alpha • (W.1 + Z)) i) =
+          (∑ i : Node, piNext i • Matrix.smulVec R X i) -
+            ∑ i : Node, piNext i • (alpha • (W.1 + Z) i) := by
+        simp only [Pi.sub_apply, Pi.smul_apply, smul_sub,
+          Finset.sum_sub_distrib]
+      _ = (∑ i : Node, piNext i • Matrix.smulVec R X i) -
+            alpha • ∑ i : Node, piNext i • (W.1 + Z) i := by
+        congr 1
+        rw [Finset.smul_sum]
+        apply Finset.sum_congr rfl
+        intro i _
+        simp only [smul_smul]
+        rw [mul_comm]
+      _ = (∑ i : Node, piNext i • Matrix.smulVec R X i) -
+          alpha •
+            ((∑ i : Node, piNext i • W.1 i) +
+              ∑ i : Node, piNext i • Z i) := by
+        simp only [Pi.add_apply, smul_add, Finset.sum_add_distrib]
+  simp only [correctedWeightedCenter_def, hweighted_step, hweighted_push,
+    hDnext_add, hpoisson, hinfluence]
+  module
+
+end FiniteNetwork
+
+/-! Phase 4 batch 19: `memLp_two_of_affine_recurrence.lean`. -/
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: L2 closure of a time-varying affine recurrence; orig was
+--   quadraticScalarComparisonProcess_memLp_two
+-- generality used: arbitrary measurable sample space, real normed additive
+--   commutative group, real normed space, measure, state and forcing processes,
+--   and time-varying real coefficients; no finite-measure assumption is needed
+-- portable call pattern: SGD momentum states, tracking errors, and stochastic
+--   linear systems use the same L2 propagation step while changing the state
+--   space, coefficient schedules, forcing process, measure, and update rule
+-- counterargument checked: this is not paper-local traceability or a pure
+--   wrapper; it packages induction through a time-varying affine update, and
+--   differs from the explicit fixed-operator finite Duhamel-response theorem
+-- coverage search: searches for "affine recurrence every state MemLp initial
+--   forcing term", "L2 process affine recurrence square integrable initial
+--   innovation", and "MemLp add scalar multiplication recurrence" found
+--   Mathlib's MemLp.const_smul and MemLp.add as components and SOptLib's
+--   linearDuhamelResponse_memLp for a fixed operator and explicit response, but
+--   no theorem with this supplied time-varying recurrence contract
+-- minimal hypotheses: the initial state and each forcing term are assumed L2
+--   pointwise in time; no probability, independence, mean-zero, completeness,
+--   inner-product, finite-dimensionality, measurability, or coefficient bounds
+--   beyond those already contained in MemLp are used
+
+/-- Every state of a time-varying affine recurrence is in `L²` when its
+initial state and every forcing term are in `L²`.
+
+Layer: Layer1 | Gap: Level 1 (L2 closure under a time-varying affine recurrence)
+Proof: induct on time, close each deterministic scalar multiple with `MemLp.const_smul`, combine the two terms with `MemLp.add`, and transport along the pointwise recurrence.
+Source: Mathlib measure-theoretic `MemLp` closure under bounded scalar multiplication, addition, and almost-everywhere equality in `MeasureTheory.Function.LpSeminorm`
+Used in: square-integrability propagation for scalar comparison states, stochastic-gradient momentum recursions, distributed tracking errors, and forced stochastic linear systems
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/17/proof/4
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem memLp_two_of_affine_recurrence
+    {Ω E : Type*} [MeasurableSpace Ω]
+    [NormedAddCommGroup E] [NormedSpace ℝ E]
+    {μ : Measure Ω} (X ξ : ℕ → Ω → E) (a b : ℕ → ℝ)
+    (hX0 : MemLp (X 0) 2 μ) (hξ : ∀ n, MemLp (ξ n) 2 μ)
+    (hrec : ∀ n ω, X (n + 1) ω = a n • X n ω + b n • ξ n ω) :
+    ∀ n, MemLp (X n) 2 μ := by
+  intro n
+  induction n with
+  | zero => exact hX0
+  | succ n hn =>
+      have hstep :
+          MemLp (fun ω => a n • X n ω + b n • ξ n ω) 2 μ :=
+        (hn.const_smul (a n)).add ((hξ n).const_smul (b n))
+      refine MemLp.ae_eq ?_ hstep
+      exact Filter.Eventually.of_forall fun ω => (hrec n ω).symm
+
+/-! Phase 4 batch 19: `ContinuousLinearMap_apply_projected_affine_step_of_spectral_split.lean`. -/
+
+-- Generalization plan (G0):
+-- concept/name: scalar observation of an idempotent component of an affine
+--   step under an annihilating endomorphism split; orig was
+--   `quadratic_restricted_projected_slow_boundary_recursion`
+-- generality used: an arbitrary commutative semiring, additive commutative
+--   module, three linear endomorphisms, and a linear functional; no norm,
+--   topology, completeness, inner product, finite-dimensional, spectral,
+--   measure, probability, convexity, smoothness, or oracle assumptions are used
+-- portable call pattern: linear stochastic approximation, invariant-component,
+--   and consensus proofs change the scalar semiring, module, idempotent
+--   endomorphism, annihilated remainder, multiplier, scalar observation, current
+--   state, and forcing while reusing the same scalar one-step recursion
+-- counterargument checked: the closest staged theorem controls the complementary
+--   action `(1 - P)`, requires both annihilation directions, and has a vector
+--   conclusion; it does not cover this scalar recursion for the idempotent
+--   component, which uses only left annihilation and is not a notation wrapper
+-- coverage search: symbol queries "projected affine update scalar recursion
+--   idempotent projection", "linear functional projection affine step equality
+--   composition remainder annihilation", and "continuous linear map comp
+--   idempotent scalar plus remainder" found
+--   `Module.End.projectionComplementAction_split_step` and generic affine
+--   recurrence lemmas but no theorem with this contract; Mathlib LeanSearch found
+--   idempotent linear-map range/ker APIs but no scalarized affine-step theorem
+-- minimal hypotheses: the source's matrix coordinates, finite index type, and
+--   Riesz-projection interpretation are eliminated; idempotence, the operator
+--   split, left annihilation, and the pointwise affine update are all used, while
+--   right annihilation is not assumed
+
+namespace Module.End
+
+/-- Applying a scalar observation to the idempotent component of an affine step
+gives the corresponding scalar affine recursion under an annihilating split.
+
+Layer: Layer1 | Gap: Level 1 (scalar recurrence for an idempotent component under an annihilating endomorphism split)
+Proof: expand the affine update and endomorphism split, use linearity of the idempotent map and observation, then cancel the repeated action by idempotence and the remainder by left annihilation.
+Source: Mathlib linear-endomorphism composition, scalar action, and evaluation algebra
+Used in: invariant-mode recurrences for linear stochastic approximation, distributed consensus, and gradient tracking before comparison with a scalar affine process
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/5
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem apply_idempotent_affine_step_of_split
+    {R V : Type*} [CommSemiring R] [AddCommMonoid V] [Module R V]
+    (P F A : Module.End R V) (ell : V →ₗ[R] R) (gamma : R)
+    (hPP : P * P = P)
+    (hA : A = gamma • P + F)
+    (hPF : P * F = 0)
+    (y xi yNext : V)
+    (hyNext : yNext = A y + xi) :
+    ell (P yNext) = gamma * ell (P y) + ell (P xi) := by
+  have hPPy : P (P y) = P y := by
+    simpa only [mul_apply] using
+      congrArg (fun G : Module.End R V => G y) hPP
+  have hPFy : P (F y) = 0 := by
+    simpa only [mul_apply, LinearMap.zero_apply] using
+      congrArg (fun G : Module.End R V => G y) hPF
+  have hPAy : P (A y) = gamma • P y := by
+    calc
+      P (A y) = P ((gamma • P + F) y) := by rw [hA]
+      _ = P (gamma • P y + F y) := by rfl
+      _ = gamma • P (P y) + P (F y) := by rw [map_add, map_smul]
+      _ = gamma • P y + 0 := by rw [hPPy, hPFy]
+      _ = gamma • P y := add_zero _
+  calc
+    ell (P yNext) = ell (P (A y + xi)) := by rw [hyNext]
+    _ = ell (P (A y)) + ell (P xi) := by rw [map_add, map_add]
+    _ = ell (gamma • P y) + ell (P xi) := by rw [hPAy]
+    _ = gamma * ell (P y) + ell (P xi) := by rw [map_smul]; rfl
+
+end Module.End
+
+/-! Phase 4 batch 19: `FiniteNetwork_gradientTrackingError_eq_innovationResponse_add.lean`. -/
+
+-- Generalization plan (G0):
+-- concept/name: additive superposition of two finite-network innovation responses;
+--   orig was `trackerError_eq_mean_add_noise`
+-- generality used: an arbitrary ring of matrix scalars, finite node type, additive
+--   commutative group, and module; no norm, topology, inner product, completeness,
+--   finite-dimensionality, measure, probability, convexity, smoothness, oracle, or
+--   stochastic-matrix assumptions are used
+-- portable call pattern: push-pull, gradient-tracking, compressed-gradient, and
+--   dynamic-consensus analyses change the mixing schedule and the deterministic,
+--   oracle-noise, compression-error, or perturbation drivers while retaining the
+--   zero-initial response decomposition
+-- counterargument checked: this is not a paper-local rename or caller-side
+--   expression; it proves uniqueness and additive superposition for an arbitrary
+--   error path satisfying the combined time-varying recurrence, while the response
+--   API only supplies each individual generated process and its one-step equation
+-- coverage search: symbol queries "zero initial time varying linear recurrence
+--   response additive sum of two innovations", "gradient tracking error equals sum
+--   innovation responses deterministic noise", "recursive iterate process additive
+--   decomposition matrix mixing", and "tracker innovation response add input", plus
+--   LeanSearch for the full superposition contract, found Mathlib's fixed scalar
+--   `LinearRecurrence` API and the individual `trackerInnovationResponse_zero` and
+--   `trackerInnovationResponse_succ_sub_one` specifications; all are partial and no
+--   declaration identifies an arbitrary combined recurrence with the two responses
+-- minimal hypotheses: the literal matrix deviation `C t - 1` requires a ring and
+--   decidable finite node type; the proof otherwise uses only an additive commutative
+--   group, a compatible module, zero initialization, and the pointwise recurrence
+
+namespace FiniteNetwork
+
+/-- A zero-initial gradient-tracking error driven by the sum of two input tables
+is the sum of their two zero-initial matrix-innovation responses.
+
+The mixing schedule may vary with time; no stochasticity or contraction property
+of its matrices is needed for this algebraic superposition identity.
+
+Layer: Layer1 | Gap: Level 1 (time-varying gradient-tracking response superposition)
+Proof: induct on time, rewrite the combined error and the two canonical responses by their successor recurrences, distribute each matrix action over addition, and reassociate the additive terms.
+Source: discrete variation-of-constants superposition for nonautonomous linear recurrences, Mathlib finite matrices and modules, and `FiniteNetwork.trackerInnovationResponse_succ_sub_one`
+Used in: splitting push-pull, gradient-tracking, compressed-gradient, and dynamic-consensus errors into deterministic and oracle-noise or perturbation responses before bounding the components separately
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/3/proof/4
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem gradientTrackingError_eq_innovationResponse_add
+    {R Node E : Type*} [Ring R] [Fintype Node] [DecidableEq Node]
+    [AddCommGroup E] [Module R E]
+    (C : Nat → Matrix Node Node R) (Z eps Y : Nat → Node → E) (t : Nat)
+    (hzero : Y 0 = 0)
+    (hsucc : ∀ k : Nat,
+      Y (k + 1) = Matrix.smulVec (C k) (Y k) +
+        Matrix.smulVec (C k - 1) (Z k + eps k)) :
+    Y t = trackerInnovationResponse C Z t +
+      trackerInnovationResponse C eps t := by
+  induction t with
+  | zero =>
+      rw [trackerInnovationResponse_zero, trackerInnovationResponse_zero, add_zero]
+      exact hzero
+  | succ t ih =>
+      rw [hsucc t, ih, trackerInnovationResponse_succ_sub_one,
+        trackerInnovationResponse_succ_sub_one]
+      funext i
+      simp only [Matrix.smulVec_apply, Pi.add_apply, smul_add,
+        Finset.sum_add_distrib]
+      abel
+
+end FiniteNetwork
+
+/-! Phase 4 batch 19: `FiniteNetwork_gradientTrackingError_succ.lean`. -/
+
+-- Generalization plan (G0):
+-- concept/name: successor recurrence for the error of a gradient-tracking update;
+--   orig was `trackerError_succ_innovation`
+-- generality used: an arbitrary ring of matrix scalars, finite node type,
+--   additive commutative group, and module; no norm, topology, inner product,
+--   completeness, finite-dimensionality, measure, convexity, smoothness, oracle,
+--   or stochastic-matrix assumptions are used
+-- portable call pattern: push-pull, gradient-tracking, compressed-gradient, and
+--   dynamic-consensus analyses change the mixing schedule, tracker path, and
+--   reference-table path while retaining the same affine tracker update and error
+--   recurrence
+-- counterargument checked: although the proof is short matrix/module algebra, it
+--   is not a caller-side rename: it composes an arbitrary tracker update with the
+--   matrix-minus-identity innovation law; the existing zero-initial tracker response
+--   theorem fixes a particular generated process and does not cover this transition
+-- coverage search: symbol queries "gradient tracking error successor affine tracker
+--   update matrix subtract identity oracle table", "subtract current table from
+--   tracker update equals propagated error plus matrix innovation", and "smulVec sub
+--   identity recurrence error", plus LeanSearch for the full update-to-error relation,
+--   found `Matrix.sub_one_smulVec`, scalar-only `Matrix.mulVec_sub`, and
+--   `FiniteNetwork.trackerInnovationResponse_succ_sub_one`; all are partial and no
+--   declaration derives this error recurrence from an arbitrary update hypothesis
+-- minimal hypotheses: the update and conclusion require subtraction in the state,
+--   while the literal matrix deviation `C t - 1` and its action require a ring,
+--   finite square index type with decidable equality, and a compatible module
+
+namespace FiniteNetwork
+
+/-- Subtracting the current reference table from a gradient-tracker update gives
+the mixed previous error plus the matrix-minus-identity innovation of that table.
+
+Layer: Layer1 | Gap: Level 1 (gradient-tracking update-to-error recurrence)
+Proof: rewrite by the supplied tracker update, distribute the module-valued matrix action over subtraction, and identify the remaining action-minus-state term with `Matrix.sub_one_smulVec`.
+Source: finite-network gradient-tracking recurrence algebra, Mathlib additive commutative groups and modules, and the module-valued `Matrix.sub_one_smulVec` identity
+Used in: one-step error recurrences for push-pull, gradient-tracking, compressed-gradient, and dynamic-consensus algorithms with changing mixing and reference-table paths
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/algorithm_spec/steps/1
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem gradientTrackingError_succ
+    {R Node E : Type*} [Ring R] [Fintype Node] [DecidableEq Node]
+    [AddCommGroup E] [Module R E]
+    (C : Nat → Matrix Node Node R) (Y G : Nat → Node → E) (t : Nat)
+    (h_update :
+      Y (t + 1) = Matrix.smulVec (C t) (Y t) + G (t + 1) - G t) :
+    Y (t + 1) - G (t + 1) =
+      Matrix.smulVec (C t) (Y t - G t) +
+        Matrix.smulVec (C t - 1) (G t) := by
+  rw [h_update, Matrix.sub_one_smulVec]
+  funext i
+  simp only [Matrix.smulVec_apply, Pi.add_apply, Pi.sub_apply, smul_sub,
+    Finset.sum_sub_distrib]
+  abel
+
+end FiniteNetwork
+
+/-! Phase 4 batch 19: `FiniteNetwork_tracker_sum_eq_oracle_sum_of_columnStochastic.lean`. -/
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: total-mass tracking invariant for a column-normalized difference-update recurrence; orig was `trackerState_sum_eq_oracleTable_sum`.
+-- generality used: arbitrary semiring of matrix coefficients, finite node type, additive commutative module-valued tracker and source trajectories, a matrix schedule whose columns sum to one, equality of the initial total masses, and the pointwise tracker difference update; no entrywise nonnegativity, decidable node equality, order, nonempty-node, norm, topology, inner product, completeness, finite-dimensionality, measure, convexity, smoothness, independence, integrability, or stochastic-oracle assumptions are used.
+-- portable call pattern: gradient tracking, dynamic average consensus, push-sum tracking, and decentralized variance-reduction proofs change the finite node type, column-normalized schedule, source table, and tracker trajectory while retaining equality of the initial total masses, the source-difference update, and equality of their total masses.
+-- counterargument checked: `FiniteNetwork.trackerInnovationResponse_sum_eq_zero` proves a zero-sum invariant for one named response driven by `(C_t-I)U_t`, while the closest one-step matrix sum-preservation theorem requires the stronger full column-stochasticity predicate; neither packages the arbitrary initialized tracker/source trajectory invariant at the column-normalization contract needed here, so this is not a paper-local rename or caller-side wrapper.
+-- coverage search: symbol queries for "finite network tracker total sum equals oracle total sum column normalization initialization difference update" and "matrix smulVec total coordinate sum equals input total sum when every column sums to one module" found the nearby zero-sum proof pattern and the stronger column-stochastic one-step theorem, but no Mathlib or SOptLib declaration with this complete signature.
+-- minimal hypotheses: `AddCommGroup E` is needed for source differences and cancellation, `Module R E` for matrix action, `Fintype Node` for coordinate sums, and the pointwise column-sum hypothesis is exactly the normalization used by the proof; all order, decidable-equality, entrywise-nonnegativity, analytic, and probabilistic source assumptions are removed.
+
+namespace FiniteNetwork
+
+/-- A column-normalized gradient-tracking difference recursion preserves equality
+of the tracker and source-table coordinate sums.
+
+Layer: Layer1 | Gap: Level 1 (column-normalized tracker total-mass invariant)
+Proof: induct on time, commute the finite sums to prove module-valued sum preservation directly from column normalization, distribute the finite coordinate sum over the source difference, and cancel with the induction hypothesis.
+Source: Mathlib finite big operators and modules, together with `Matrix.smulVec`
+Used in: gradient-tracking and dynamic-average-consensus recurrences where column-normalized mixing, equal initial tracker/source masses, and successive source differences keep the aggregate tracker equal to the aggregate source table
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/3/proof/0
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem tracker_sum_eq_oracle_sum_of_column_normalized
+    {R Node E : Type*} [Fintype Node] [Semiring R]
+    [AddCommGroup E] [Module R E]
+    (C : Nat → Matrix Node Node R) (Y G : Nat → Node → E)
+    (hC : ∀ k j, ∑ i, C k i j = 1)
+    (hzero_sum : (∑ i : Node, Y 0 i) = ∑ i : Node, G 0 i)
+    (hsucc : ∀ k, Y (k + 1) = Matrix.smulVec (C k) (Y k) + G (k + 1) - G k)
+    (t : Nat) :
+    ∑ i : Node, Y t i = ∑ i : Node, G t i := by
+  induction t with
+  | zero =>
+      exact hzero_sum
+  | succ t ih =>
+      rw [hsucc]
+      simp only [Pi.add_apply, Pi.sub_apply, Finset.sum_add_distrib,
+        Finset.sum_sub_distrib]
+      have hsum (X : Node → E) :
+          ∑ i : Node, Matrix.smulVec (C t) X i = ∑ j : Node, X j := by
+        simp only [Matrix.smulVec_apply]
+        rw [Finset.sum_comm]
+        apply Finset.sum_congr rfl
+        intro j _
+        rw [← Finset.sum_smul, hC t j, one_smul]
+      rw [hsum, ih]
+      rw [add_sub_cancel_left]
+
+end FiniteNetwork
+
+/-! Phase 4 batch 19: `weightedState_update_eq_of_left_weight_transport.lean`. -/
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: weighted-state affine update under left-weight transport; orig was `weightedPrimal_succ`.
+-- generality used: arbitrary finite node carrier and additive commutative real module, a real square matrix, current and next left weights, current and next distributed states, a direction state, and a real step scalar; no nonempty-node, stochasticity, positivity, normalization, norm, topology, inner product, completeness, finite-dimensionality, measure, convexity, smoothness, or oracle assumptions are used.
+-- portable call pattern: consensus, push-sum, push-pull, and directed gradient-tracking proofs change the mixing matrix, transported Perron or absolute-probability rows, state, direction, and step scalar while reusing the same weighted-state recurrence after an affine network update.
+-- counterargument checked: the proof is short after the rectangular row-action bridge, but the result is not a pure rename or caller-side expression: it packages the recurring transition from a distributed affine update and left-weight transport law to the scalar weighted-state recurrence consumed by algorithm-level center analyses.
+-- coverage search: `lean_search_symbols` queries "weighted state affine update equality left weight transport", "matrix affine recurrence weighted sum row vector multiplication", and "sum scalar weighted matrix action equals transported row weighted state", plus LeanSearch for a left-row-transported affine module-valued matrix update, found `Matrix.sum_vecMul_smul_eq_sum_smul_smulVec`, scalar matrix row identities, and broader corrected-center recurrences, but no theorem with this exact affine weighted-state contract; coverage is partial rather than full.
+-- minimal hypotheses: `[Fintype Node]` supplies the finite contractions, `[AddCommGroup E] [Module Real E]` supplies subtraction and the real scalar action, `h_update` is exactly the affine state recursion, and `h_transport` is exactly the left-weight transport equation used by the proof.
+
+/-- A left-weighted affine matrix update equals the transported weighted state
+minus the same left weight applied to the scaled direction.
+
+Layer: Layer1 | Gap: Level 1 (left-weighted affine network-state recurrence)
+Proof: rewrite by the affine update, distribute the finite weighted sum over subtraction and scalar multiplication, and reassociate the matrix action with the transported row using `Matrix.sum_vecMul_smul_eq_sum_smul_smulVec`.
+Source: Mathlib finite module-valued sums and matrix row multiplication, together with the rectangular module-valued matrix action associativity bridge
+Used in: consensus, push-sum, push-pull, and gradient-tracking analyses that project a distributed primal update onto a transported Perron or absolute-probability row before deriving a center recurrence
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/3
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem weightedState_update_eq_of_left_weight_transport
+    {Node E : Type*} [Fintype Node] [AddCommGroup E] [Module Real E]
+    (R : Matrix Node Node Real) (pi piNext : Node -> Real)
+    (X Xnext Y : Node -> E) (alpha : Real)
+    (h_update : Xnext = Matrix.smulVec R X - alpha • Y)
+    (h_transport : Matrix.vecMul piNext R = pi) :
+    (∑ i : Node, piNext i • Xnext i) =
+      (∑ i : Node, pi i • X i) - alpha • (∑ i : Node, piNext i • Y i) := by
+  rw [h_update]
+  calc
+    (∑ i : Node, piNext i • (Matrix.smulVec R X - alpha • Y) i) =
+        (∑ i : Node, piNext i • Matrix.smulVec R X i) -
+          alpha • (∑ i : Node, piNext i • Y i) := by
+      simp only [Pi.sub_apply, Pi.smul_apply, smul_sub,
+        Finset.sum_sub_distrib]
+      congr 1
+      rw [Finset.smul_sum]
+      apply Finset.sum_congr rfl
+      intro i _
+      simp only [smul_smul]
+      rw [mul_comm]
+    _ = (∑ i : Node, pi i • X i) -
+          alpha • (∑ i : Node, piNext i • Y i) := by
+      rw [← Matrix.sum_vecMul_smul_eq_sum_smul_smulVec piNext R X,
+        h_transport]
 
 -- Generalization plan (G0):
 -- concept/name: selected-coordinate inner-product extrapolation split; orig was
@@ -7881,3 +8696,2491 @@ theorem terminal_residual_young_split_le_stale_residual
           rw [hcur_zero]
           ring
       _ ≤ (2 * theta / M) * Estale := hbase_zero
+
+
+-- Promoted from Staging/smooth_descent_affine_update_with_direction_error.lean
+open scoped InnerProductSpace
+
+-- Generalization plan (G0):
+-- concept/name: smooth descent for an affine direction update with direction
+--   error; orig was `lemma1_pointwise_descent_bound_of_generated_quotient_boundary`
+-- generality used: arbitrary real inner-product seminormed additive commutative
+--   group, an objective and selected gradient, two points, a direction and its
+--   pointwise error, and real smoothness/stepsize scalars; no measure,
+--   probability, completeness, finite-dimensionality, or convexity is used
+-- portable call pattern: biased SGD, stochastic recursive momentum,
+--   variance-reduced gradient, and learned-direction methods supply their own
+--   pointwise smooth upper model, affine update, and direction-error identity
+--   while reusing the same objective-decrease conclusion
+-- counterargument checked: not paper-local traceability or a caller-side
+--   expression because it composes three independently supplied algorithm
+--   contracts with nontrivial Hilbert coefficient absorption; existing prox
+--   descent lemmas use a variational certificate and conclude in displacement
+--   form, while the existing staged algebra helper does not mention objectives
+--   or affine updates
+-- coverage search: symbol queries `smooth function affine update objective
+--   decrease upper bound direction estimator error stepsize` and `objective
+--   difference affine update negative stepsize direction squared gradient
+--   squared direction error`, plus Mathlib LeanSearch for the full approximate
+--   gradient descent bound, found only partial hits
+--   `smooth_descent_of_approx_variational_step_with_estimator_error`,
+--   `smooth_descent_of_approx_variational_step_with_estimator_error_raw`, and
+--   `inner_neg_smul_add_half_mul_norm_sq_le_of_le_inv_four_mul`
+-- minimal hypotheses: the global smoothness and algorithm recurrences are
+--   reduced to the pointwise upper model, affine-update equality, error
+--   equality, positivity of `L`, and the exact nonnegative stepsize interval
+
+/-- A smooth quadratic upper model along an affine direction update yields a
+gradient decrease bound with a squared direction-error penalty.
+
+For `xNext = x - eta • d` and `epsilon = d - grad x`, positivity of `L` and
+`0 ≤ eta ≤ 1 / (4 * L)` turn the smooth upper model into the standard
+`-eta / 4` gradient-square decrease plus `3 * eta / 4` error-square penalty.
+
+Layer: Layer1 | Gap: Level 1 (affine-direction smooth descent with direction error)
+Proof: rewrite the smooth-model displacement using the affine update, then apply the Hilbert inner-product and norm-square coefficient collection bound.
+Source: smooth first-order descent calculus in real Hilbert spaces, Mathlib inner-product algebra, and ordered-field Young absorption
+Used in: biased SGD and stochastic recursive-momentum one-step descent before integrating the pointwise gradient/error estimate
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/key_lemmas/0/proof
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem smooth_descent_affine_update_with_direction_error
+    {E : Type*} [SeminormedAddCommGroup E] [InnerProductSpace ℝ E]
+    (f : E → ℝ) (grad : E → E) (x xNext d epsilon : E) (L eta : ℝ)
+    (hsmooth :
+      f xNext ≤
+        f x + inner ℝ (grad x) (xNext - x) + (L / 2) * ‖xNext - x‖ ^ 2)
+    (hupdate : xNext = x - eta • d)
+    (hepsilon : epsilon = d - grad x)
+    (hL_pos : 0 < L)
+    (heta_nonneg : 0 ≤ eta)
+    (heta_le : eta ≤ (1 : ℝ) / (4 * L)) :
+    f xNext - f x ≤
+      (-eta / 4) * ‖grad x‖ ^ 2 + (3 * eta / 4) * ‖epsilon‖ ^ 2 := by
+  have hmodel :
+      f xNext - f x ≤
+        inner ℝ (grad x) (xNext - x) + (L / 2) * ‖xNext - x‖ ^ 2 := by
+    linarith
+  have hdiff : xNext - x = -eta • d := by
+    rw [hupdate]
+    simp [sub_eq_add_neg, add_comm, add_left_comm]
+  have halgebra :
+      inner ℝ (grad x) (-eta • d) + (L / 2) * ‖-eta • d‖ ^ 2 ≤
+        (-eta / 4) * ‖grad x‖ ^ 2 + (3 * eta / 4) * ‖epsilon‖ ^ 2 := by
+    exact inner_neg_smul_add_half_mul_norm_sq_le_of_le_inv_four_mul
+      (grad x) d epsilon hL_pos heta_nonneg heta_le hepsilon
+  exact le_trans (by simpa [hdiff] using hmodel) halgebra
+
+
+-- Promoted from Staging/recursiveMomentumResidual_eq_three_term.lean
+
+-- Generalization plan (G0):
+-- concept/name: recursive_momentum_residual_eq_three_term_of_update exposes the three-term
+--   residual decomposition of an affine recursive-momentum estimator update;
+--   orig was `lemma2_error_succ_three_term_decomposition`.
+-- generality used: arbitrary additive commutative group `E` with a real module
+--   structure; no norm, topology, inner product, completeness, measure,
+--   independence, integrability, convexity, smoothness, or oracle assumptions.
+-- portable call pattern: STORM, SARAH-style, and control-variate estimator
+--   proofs use this after a pointwise affine recursive update; the estimator
+--   values, oracle values, targets, residuals, and momentum coefficient vary
+--   while the three-term residual identity stays unchanged.
+-- counterargument checked: although the proof is algebraic, this is not merely
+--   paper traceability or a caller-side rename: it packages the recurring
+--   transition from an affine estimator update to the fresh-noise,
+--   centered-difference, and previous-residual split used by moment recurrences.
+-- coverage search: symbol searches for `recursive estimator residual`, `affine
+--   recursive momentum estimator residual`, and `momentum residual equality`
+--   found `estimatorResidualProcess_succ_eq_of_estimator_update` and
+--   `recursive_estimator_residual_eq_prev_add_centered_batch_diff_of_not_epoch_start`;
+--   their full signatures give unweighted finite-batch two-term recursions and
+--   do not cover this weighted three-term decomposition. Mathlib semantic search
+--   returned only general module-algebra infrastructure.
+-- minimal hypotheses: the algorithm update is reduced to one pointwise equality;
+--   all remaining typeclasses are used by additive and scalar-module algebra.
+
+/-- The residual of an affine recursive-momentum update splits into three terms.
+
+The terms are the weighted fresh residual, the complementary-weight centered
+two-point oracle difference, and the complementary-weight previous residual.
+
+Layer: Layer1 | Gap: Level 0 (recursive-momentum residual affine decomposition)
+Proof: rewrite the next estimator with the supplied affine update and normalize
+  the resulting real-module expression with module algebra.
+Source: Mathlib additive commutative group and real module identities
+Used in: recursive-momentum, SARAH-style, and control-variate estimator analyses before bounding the next residual moment
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/steps/5
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem recursive_momentum_residual_eq_three_term_of_update
+    {E : Type*} [AddCommGroup E] [Module ℝ E]
+    (dPrev dNext gNextAtNext gNextAtPrev targetNext targetPrev : E)
+    (a : ℝ)
+    (h_update :
+      dNext = gNextAtNext + (1 - a) • (dPrev - gNextAtPrev)) :
+    dNext - targetNext =
+      a • (gNextAtNext - targetNext) +
+        (1 - a) •
+          (gNextAtNext - gNextAtPrev - targetNext + targetPrev) +
+        (1 - a) • (dPrev - targetPrev) := by
+  rw [h_update]
+  module
+
+
+-- Promoted from Staging/weighted_smooth_difference_add_error_sq_le_of_affine_update.lean
+
+-- Generalization plan (G0):
+-- concept/name: weighted smooth-difference and previous-error square bound under
+--   an affine update; orig was
+--   `lemma2_uncentered_gradient_difference_plus_error_pointwise_le`
+-- generality used: arbitrary seminormed additive commutative group with a real
+--   normed-space structure, real weights, and pointwise smooth-difference,
+--   affine-displacement, and direction-splitting hypotheses; no measure,
+--   probability, completeness, inner product, convexity, or finite dimension
+-- portable call pattern: recursive-gradient, SARAH/SPIDER, and momentum methods
+--   substitute their step size, momentum weight, smooth estimator difference,
+--   consecutive iterates, direction error, and target gradient while preserving
+--   the affine update and direction decomposition
+-- counterargument checked: this is not a paper-local expression or pure wrapper;
+--   it composes smoothness, update transport, a norm-square Young split, positive
+--   weighting, and coefficient normalization into the recurring estimator-error
+--   bound, whereas the available library result covers only the Young split
+-- coverage search: symbol queries `weighted smooth difference squared error
+--   upper bound affine update direction decomposition` and `affine update norm
+--   square error`, plus Mathlib LeanSearch for the norm-square split, found only
+--   `SOptLib.norm_add_sq_le_two_mul_norm_sq_add_two_mul_norm_sq`, Mathlib
+--   `add_sq_le`, and unrelated affine-update integrability/descent results
+-- minimal hypotheses: the algorithm recurrence and samplewise smoothness are
+--   reduced to pointwise equalities/inequality; positivity is required only of
+--   the step size, and no separate sign assumption on the smoothness factor or
+--   momentum weight is used
+
+/-- A weighted smooth estimator difference plus a previous-error square is
+bounded after an affine update and a direction-error split.
+
+If the estimator difference is `L`-Lipschitz along an update displacement,
+the displacement is `-eta • dir`, and `dir = err + target`, then the weighted
+difference square is absorbed into explicit error and target squares.
+
+Layer: Layer1 | Gap: Level 1 (weighted smooth-difference affine-update error split)
+Proof: transport the smooth-difference bound through the affine update, square it, split the direction square by the two-term norm Young inequality, and normalize the positive-step coefficients.
+Source: Mathlib normed-module scalar-norm identities and ordered-field power arithmetic, together with SOptLib's binary norm-square Young inequality
+Used in: recursive-momentum and variance-reduced gradient recurrences when a same-sample gradient difference and the previous estimator error are converted into target-gradient and error-square terms
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/key_lemmas/3/proof/15/math
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem weighted_smooth_difference_add_error_sq_le_of_affine_update
+    {E : Type*} [SeminormedAddCommGroup E] [NormedSpace ℝ E]
+    {eta a L : ℝ} {g xNext xPrev dir err target : E}
+    (heta_pos : 0 < eta)
+    (hdiff : ‖g‖ ≤ L * ‖xNext - xPrev‖)
+    (hupdate : xNext - xPrev = -eta • dir)
+    (hdir : dir = err + target) :
+    2 * (1 - a) ^ 2 / eta * ‖g‖ ^ 2 +
+        (1 - a) ^ 2 * ‖err‖ ^ 2 / eta ≤
+      (1 - a) ^ 2 * (1 + 4 * L ^ 2 * eta ^ 2) * ‖err‖ ^ 2 / eta +
+        4 * (1 - a) ^ 2 * L ^ 2 * eta * ‖target‖ ^ 2 := by
+  have heta_nonneg : 0 ≤ eta := le_of_lt heta_pos
+  have hweight_nonneg : 0 ≤ 2 * (1 - a) ^ 2 / eta := by positivity
+  have hdisp_norm : ‖xNext - xPrev‖ = eta * ‖dir‖ := by
+    rw [hupdate, norm_smul, norm_neg, Real.norm_of_nonneg heta_nonneg]
+  have hg_sq_le : ‖g‖ ^ 2 ≤ L ^ 2 * eta ^ 2 * ‖dir‖ ^ 2 := by
+    have hbase : ‖g‖ ≤ L * (eta * ‖dir‖) := by
+      simpa [hdisp_norm, mul_assoc] using hdiff
+    have hsq := pow_le_pow_left₀ (norm_nonneg g) hbase 2
+    calc
+      ‖g‖ ^ 2 ≤ (L * (eta * ‖dir‖)) ^ 2 := hsq
+      _ = L ^ 2 * eta ^ 2 * ‖dir‖ ^ 2 := by ring
+  have hdir_sq_le : ‖dir‖ ^ 2 ≤ 2 * ‖err‖ ^ 2 + 2 * ‖target‖ ^ 2 := by
+    simpa [hdir] using
+      SOptLib.norm_add_sq_le_two_mul_norm_sq_add_two_mul_norm_sq err target
+  have hg_sq_split :
+      ‖g‖ ^ 2 ≤ L ^ 2 * eta ^ 2 * (2 * ‖err‖ ^ 2 + 2 * ‖target‖ ^ 2) := by
+    exact hg_sq_le.trans
+      (mul_le_mul_of_nonneg_left hdir_sq_le (by positivity))
+  have hweighted_le :
+      2 * (1 - a) ^ 2 / eta * ‖g‖ ^ 2 ≤
+        2 * (1 - a) ^ 2 / eta *
+          (L ^ 2 * eta ^ 2 * (2 * ‖err‖ ^ 2 + 2 * ‖target‖ ^ 2)) :=
+    mul_le_mul_of_nonneg_left hg_sq_split hweight_nonneg
+  have heta_ne : eta ≠ 0 := ne_of_gt heta_pos
+  calc
+    2 * (1 - a) ^ 2 / eta * ‖g‖ ^ 2 +
+        (1 - a) ^ 2 * ‖err‖ ^ 2 / eta ≤
+      2 * (1 - a) ^ 2 / eta *
+          (L ^ 2 * eta ^ 2 * (2 * ‖err‖ ^ 2 + 2 * ‖target‖ ^ 2)) +
+        (1 - a) ^ 2 * ‖err‖ ^ 2 / eta := by
+          simpa [add_comm, add_left_comm, add_assoc] using
+            add_le_add_right hweighted_le ((1 - a) ^ 2 * ‖err‖ ^ 2 / eta)
+    _ =
+      (1 - a) ^ 2 * (1 + 4 * L ^ 2 * eta ^ 2) * ‖err‖ ^ 2 / eta +
+        4 * (1 - a) ^ 2 * L ^ 2 * eta * ‖target‖ ^ 2 := by
+          field_simp [heta_ne]
+          ring
+
+
+-- Promoted from Staging/recursive_momentum_error_integral_recurrence.lean
+open MeasureTheory
+open scoped InnerProductSpace
+
+-- Generalization plan (G0):
+-- concept/name: recursive-momentum error integral recurrence; orig was
+--   `lemma2_error_recurrence_of_generated_quotient_boundary`
+-- generality used: arbitrary measurable sample space and measure, arbitrary real
+--   inner-product seminormed additive commutative group, random positive step and
+--   momentum weights, pointwise estimator decomposition/update contracts, and
+--   only the integrability and centered-moment comparisons used by the proof
+-- portable call pattern: STORM, SARAH, SPIDER, and recursive-gradient analyses
+--   substitute their iterate, estimator-error, paired sample-gradient, target,
+--   stepsize, and momentum processes while retaining the same one-step recurrence
+-- counterargument checked: the theorem is not paper-local traceability or a thin
+--   wrapper; it composes an asymmetric three-term Hilbert expansion, two centered
+--   cross cancellations, two second-moment contractions, and an affine-update
+--   smooth-difference absorption into a reusable expected-error recurrence
+-- coverage search: symbol queries for recursive estimator expected squared-error
+--   recurrences and centered cross-term integral bounds found the partial results
+--   `norm_three_term_sq_div_le_of_first_coeff_eq`,
+--   `integral_le_integral_of_ae_le_add_of_integral_eq_zero`, and
+--   `weighted_smooth_difference_add_error_sq_le_of_affine_update`, but no theorem
+--   with this complete recurrence contract
+-- minimal hypotheses: probability, finite measure, completeness, finite dimension,
+--   convexity, filtration, and oracle structures are unused; global algorithm
+--   assumptions are reduced to pointwise/a.e. identities and exact integrability
+
+/-- A recursive momentum estimator satisfies its one-step weighted error recurrence.
+
+The next error is decomposed into a fresh centered residual, a centered paired
+gradient difference, and the previous error.  Vanishing expected cross terms
+remove the previous-error interactions, centering contracts the two square
+terms, and smoothness along an affine iterate update absorbs the paired square.
+
+Layer: Layer1 | Gap: Level 1 (recursive-momentum expected squared-error recurrence)
+Proof: apply the asymmetric three-term Hilbert norm-square bound pointwise, cancel the two integrable zero-mean crosses, contract the centered square terms, and use the affine-update smooth-difference bound for the remaining paired term.
+Source: Hilbert-space polarization, Bochner integral monotonicity and linearity, and the standard STORM/SARAH recursive-estimator second-moment argument
+Used in: one-step variance recurrences for recursive momentum and paired-gradient estimators before Lyapunov or finite-window aggregation
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/key_lemmas/3
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem recursive_momentum_error_integral_recurrence
+    {Ω E : Type*} [MeasurableSpace Ω]
+    [SeminormedAddCommGroup E] [InnerProductSpace ℝ E]
+    (μ : Measure Ω)
+    (x xNext err errNext sampleGradNext sampleGradPrev targetNext targetPrev dir : Ω → E)
+    (eta momentum : Ω → ℝ) (c L : ℝ)
+    (heta_pos : ∀ ω, 0 < eta ω)
+    (hmomentum : ∀ ω, momentum ω = c * eta ω ^ 2)
+    (hdecomp : ∀ ω,
+      errNext ω =
+        momentum ω • (sampleGradNext ω - targetNext ω) +
+          (1 - momentum ω) •
+            (sampleGradNext ω - sampleGradPrev ω - targetNext ω + targetPrev ω) +
+          (1 - momentum ω) • err ω)
+    (hupdate : ∀ ω, xNext ω - x ω = -(eta ω) • dir ω)
+    (hdir : ∀ ω, dir ω = err ω + targetPrev ω)
+    (hsmooth : ∀ᵐ ω ∂μ,
+      ‖sampleGradNext ω - sampleGradPrev ω‖ ≤
+        L * ‖xNext ω - x ω‖)
+    (hlhs_int : Integrable (fun ω => ‖errNext ω‖ ^ 2 / eta ω) μ)
+    (hfresh_centered_int : Integrable (fun ω =>
+      2 * c ^ 2 * eta ω ^ 3 * ‖sampleGradNext ω - targetNext ω‖ ^ 2) μ)
+    (hpaired_centered_int : Integrable (fun ω =>
+      2 * (1 - momentum ω) ^ 2 / eta ω *
+        ‖sampleGradNext ω - sampleGradPrev ω - targetNext ω + targetPrev ω‖ ^ 2) μ)
+    (hprev_int : Integrable (fun ω =>
+      (1 - momentum ω) ^ 2 * ‖err ω‖ ^ 2 / eta ω) μ)
+    (hfresh_int : Integrable (fun ω =>
+      2 * c ^ 2 * eta ω ^ 3 * ‖sampleGradNext ω‖ ^ 2) μ)
+    (hpaired_int : Integrable (fun ω =>
+      2 * (1 - momentum ω) ^ 2 / eta ω *
+        ‖sampleGradNext ω - sampleGradPrev ω‖ ^ 2) μ)
+    (hrhs_int : Integrable (fun ω =>
+      2 * c ^ 2 * eta ω ^ 3 * ‖sampleGradNext ω‖ ^ 2 +
+        (1 - momentum ω) ^ 2 * (1 + 4 * L ^ 2 * eta ω ^ 2) *
+            ‖err ω‖ ^ 2 / eta ω +
+          4 * (1 - momentum ω) ^ 2 * L ^ 2 * eta ω * ‖targetPrev ω‖ ^ 2) μ)
+    (hfresh_cross :
+      Integrable (fun ω => inner ℝ (sampleGradNext ω - targetNext ω)
+        ((2 * momentum ω * (1 - momentum ω) / eta ω) • err ω)) μ ∧
+      ∫ ω, inner ℝ (sampleGradNext ω - targetNext ω)
+        ((2 * momentum ω * (1 - momentum ω) / eta ω) • err ω) ∂μ = 0)
+    (hpaired_cross :
+      Integrable (fun ω =>
+        inner ℝ
+          (sampleGradNext ω - sampleGradPrev ω - targetNext ω + targetPrev ω)
+          ((2 * (1 - momentum ω) ^ 2 / eta ω) • err ω)) μ ∧
+      ∫ ω,
+        inner ℝ
+          (sampleGradNext ω - sampleGradPrev ω - targetNext ω + targetPrev ω)
+          ((2 * (1 - momentum ω) ^ 2 / eta ω) • err ω) ∂μ = 0)
+    (hfresh_centered_le :
+      (∫ ω, 2 * c ^ 2 * eta ω ^ 3 *
+        ‖sampleGradNext ω - targetNext ω‖ ^ 2 ∂μ) ≤
+      ∫ ω, 2 * c ^ 2 * eta ω ^ 3 * ‖sampleGradNext ω‖ ^ 2 ∂μ)
+    (hpaired_centered_le :
+      (∫ ω, 2 * (1 - momentum ω) ^ 2 / eta ω *
+        ‖(sampleGradNext ω - sampleGradPrev ω) -
+          (targetNext ω - targetPrev ω)‖ ^ 2 ∂μ) ≤
+      ∫ ω, 2 * (1 - momentum ω) ^ 2 / eta ω *
+        ‖sampleGradNext ω - sampleGradPrev ω‖ ^ 2 ∂μ) :
+    (∫ ω, ‖errNext ω‖ ^ 2 / eta ω ∂μ) ≤
+      ∫ ω,
+        2 * c ^ 2 * eta ω ^ 3 * ‖sampleGradNext ω‖ ^ 2 +
+          (1 - momentum ω) ^ 2 * (1 + 4 * L ^ 2 * eta ω ^ 2) *
+              ‖err ω‖ ^ 2 / eta ω +
+            4 * (1 - momentum ω) ^ 2 * L ^ 2 * eta ω *
+              ‖targetPrev ω‖ ^ 2 ∂μ := by
+  let lhs : Ω → ℝ := fun ω => ‖errNext ω‖ ^ 2 / eta ω
+  let freshCentered : Ω → ℝ := fun ω =>
+    2 * c ^ 2 * eta ω ^ 3 * ‖sampleGradNext ω - targetNext ω‖ ^ 2
+  let pairedCentered : Ω → ℝ := fun ω =>
+    2 * (1 - momentum ω) ^ 2 / eta ω *
+      ‖sampleGradNext ω - sampleGradPrev ω - targetNext ω + targetPrev ω‖ ^ 2
+  let previous : Ω → ℝ := fun ω =>
+    (1 - momentum ω) ^ 2 * ‖err ω‖ ^ 2 / eta ω
+  let fresh : Ω → ℝ := fun ω =>
+    2 * c ^ 2 * eta ω ^ 3 * ‖sampleGradNext ω‖ ^ 2
+  let paired : Ω → ℝ := fun ω =>
+    2 * (1 - momentum ω) ^ 2 / eta ω *
+      ‖sampleGradNext ω - sampleGradPrev ω‖ ^ 2
+  let crossFresh : Ω → ℝ := fun ω =>
+    inner ℝ (sampleGradNext ω - targetNext ω)
+      ((2 * momentum ω * (1 - momentum ω) / eta ω) • err ω)
+  let crossPaired : Ω → ℝ := fun ω =>
+    inner ℝ
+      (sampleGradNext ω - sampleGradPrev ω - targetNext ω + targetPrev ω)
+      ((2 * (1 - momentum ω) ^ 2 / eta ω) • err ω)
+  let rhs : Ω → ℝ := fun ω =>
+    fresh ω +
+      (1 - momentum ω) ^ 2 * (1 + 4 * L ^ 2 * eta ω ^ 2) *
+          ‖err ω‖ ^ 2 / eta ω +
+        4 * (1 - momentum ω) ^ 2 * L ^ 2 * eta ω * ‖targetPrev ω‖ ^ 2
+  have hpoint : ∀ᵐ ω ∂μ,
+      lhs ω ≤ freshCentered ω + pairedCentered ω + previous ω +
+        crossFresh ω + crossPaired ω := by
+    filter_upwards with ω
+    have hbase := norm_three_term_sq_div_le_of_first_coeff_eq
+      (b := 1 - momentum ω)
+      (heta_pos ω) (hmomentum ω)
+      (sampleGradNext ω - targetNext ω)
+      (sampleGradNext ω - sampleGradPrev ω - targetNext ω + targetPrev ω)
+      (err ω)
+    simpa [lhs, freshCentered, pairedCentered, previous, crossFresh, crossPaired,
+      hdecomp ω] using hbase
+  have hcross_removed :
+      (∫ ω, lhs ω ∂μ) ≤
+        ∫ ω, freshCentered ω + pairedCentered ω + previous ω ∂μ := by
+    have hfreshCentered_int : Integrable freshCentered μ := by
+      simpa [freshCentered] using hfresh_centered_int
+    have hpairedCentered_int : Integrable pairedCentered μ := by
+      simpa [pairedCentered] using hpaired_centered_int
+    have hprevious_int : Integrable previous μ := by
+      simpa [previous] using hprev_int
+    have hcrossFresh_int : Integrable crossFresh μ := by
+      simpa [crossFresh] using hfresh_cross.1
+    have hcrossPaired_int : Integrable crossPaired μ := by
+      simpa [crossPaired] using hpaired_cross.1
+    have hretained_int :
+        Integrable (fun ω => freshCentered ω + pairedCentered ω + previous ω) μ :=
+      (hfreshCentered_int.add hpairedCentered_int).add hprevious_int
+    have hcorrection_int :
+        Integrable (fun ω => crossFresh ω + crossPaired ω) μ :=
+      hcrossFresh_int.add hcrossPaired_int
+    refine integral_le_integral_of_ae_le_add_of_integral_eq_zero
+      (lhs := lhs)
+      (retained := fun ω => freshCentered ω + pairedCentered ω + previous ω)
+      (correction := fun ω => crossFresh ω + crossPaired ω)
+      (by simpa [lhs] using hlhs_int)
+      hretained_int hcorrection_int
+      (by
+        filter_upwards [hpoint] with ω hω
+        simpa only [Pi.add_apply, add_assoc] using hω)
+      (by
+        rw [integral_add hcrossFresh_int hcrossPaired_int]
+        simp [crossFresh, crossPaired, hfresh_cross.2, hpaired_cross.2])
+  have hpaired_centered_le' :
+      (∫ ω, pairedCentered ω ∂μ) ≤ ∫ ω, paired ω ∂μ := by
+    have heq : (fun ω => pairedCentered ω) = fun ω =>
+        2 * (1 - momentum ω) ^ 2 / eta ω *
+          ‖(sampleGradNext ω - sampleGradPrev ω) -
+            (targetNext ω - targetPrev ω)‖ ^ 2 := by
+      funext ω
+      simp only [pairedCentered]
+      congr 2
+      abel
+    rw [heq]
+    simpa [paired] using hpaired_centered_le
+  have hpoint_final : ∀ᵐ ω ∂μ,
+      fresh ω + paired ω + previous ω ≤ rhs ω := by
+    filter_upwards [hsmooth] with ω hsmoothω
+    have hbound := weighted_smooth_difference_add_error_sq_le_of_affine_update
+      (eta := eta ω) (a := momentum ω) (L := L)
+      (g := sampleGradNext ω - sampleGradPrev ω)
+      (xNext := xNext ω) (xPrev := x ω) (dir := dir ω)
+      (err := err ω) (target := targetPrev ω)
+      (heta_pos ω) hsmoothω (hupdate ω) (hdir ω)
+    dsimp [fresh, paired, previous, rhs]
+    linarith
+  have hretained_le :
+      (∫ ω, freshCentered ω + pairedCentered ω + previous ω ∂μ) ≤
+        ∫ ω, rhs ω ∂μ := by
+    have hfreshCentered_int : Integrable freshCentered μ := by
+      simpa [freshCentered] using hfresh_centered_int
+    have hpairedCentered_int : Integrable pairedCentered μ := by
+      simpa [pairedCentered] using hpaired_centered_int
+    have hprevious_int : Integrable previous μ := by
+      simpa [previous] using hprev_int
+    have hfreshInt : Integrable fresh μ := by simpa [fresh] using hfresh_int
+    have hpairedInt : Integrable paired μ := by simpa [paired] using hpaired_int
+    have hrhsInt : Integrable rhs μ := by simpa [rhs, fresh] using hrhs_int
+    have hcentered_add :
+        (∫ ω, freshCentered ω + pairedCentered ω ∂μ) =
+          (∫ ω, freshCentered ω ∂μ) + ∫ ω, pairedCentered ω ∂μ := by
+      simpa only [Pi.add_apply] using
+        integral_add hfreshCentered_int hpairedCentered_int
+    have hcentered_add_previous :
+        (∫ ω, (freshCentered ω + pairedCentered ω) + previous ω ∂μ) =
+          (∫ ω, freshCentered ω + pairedCentered ω ∂μ) +
+            ∫ ω, previous ω ∂μ := by
+      simpa only [Pi.add_apply] using
+        integral_add (hfreshCentered_int.add hpairedCentered_int) hprevious_int
+    have hfresh_add_paired :
+        (∫ ω, fresh ω + paired ω ∂μ) =
+          (∫ ω, fresh ω ∂μ) + ∫ ω, paired ω ∂μ := by
+      simpa only [Pi.add_apply] using integral_add hfreshInt hpairedInt
+    have huncentered_add_previous :
+        (∫ ω, (fresh ω + paired ω) + previous ω ∂μ) =
+          (∫ ω, fresh ω + paired ω ∂μ) + ∫ ω, previous ω ∂μ := by
+      simpa only [Pi.add_apply] using
+        integral_add (hfreshInt.add hpairedInt) hprevious_int
+    calc
+      (∫ ω, freshCentered ω + pairedCentered ω + previous ω ∂μ) =
+          (∫ ω, freshCentered ω ∂μ) + (∫ ω, pairedCentered ω ∂μ) +
+            ∫ ω, previous ω ∂μ := by
+        calc
+          _ = (∫ ω, freshCentered ω + pairedCentered ω ∂μ) +
+                ∫ ω, previous ω ∂μ := hcentered_add_previous
+          _ = _ := by rw [hcentered_add]
+      _ ≤ (∫ ω, fresh ω ∂μ) + (∫ ω, paired ω ∂μ) +
+            ∫ ω, previous ω ∂μ := by
+        linarith [hfresh_centered_le, hpaired_centered_le']
+      _ = ∫ ω, fresh ω + paired ω + previous ω ∂μ := by
+        calc
+          _ = (∫ ω, fresh ω + paired ω ∂μ) + ∫ ω, previous ω ∂μ := by
+            rw [hfresh_add_paired]
+          _ = _ := huncentered_add_previous.symm
+      _ ≤ ∫ ω, rhs ω ∂μ :=
+        integral_mono_ae ((hfreshInt.add hpairedInt).add hprevious_int)
+          hrhsInt hpoint_final
+  exact hcross_removed.trans hretained_le
+
+
+-- Promoted from Staging/recursiveMomentumDirection_eventually_bounded.lean
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: finite-time a.e. boundedness of a recursive momentum direction;
+--   orig was lemma3_generated_direction_eventually_bound
+-- generality used: arbitrary measure on a measurable space and any real seminormed additive
+--   commutative group; no probability, measurability, integrability, inner product,
+--   smoothness, oracle structure, or finite-dimensionality is used
+-- portable call pattern: recursive-momentum, SARAH, and related corrected-estimator proofs
+--   supply an initial direction bound, bounds for the fresh and correction oracle terms,
+--   finite-time coefficient bounds, and the affine correction recurrence; the processes,
+--   coefficients, measure, and time may change while the conclusion remains unchanged
+-- counterargument checked: this is not paper-local traceability or a caller-side wrapper;
+--   it packages the nontrivial finite-time induction through random coefficients and a.e.
+--   intersections, and neither Mathlib nor SOptLib exposes this recurrence contract
+-- coverage search: searches for "recursive affine direction norm eventually bounded from
+--   bounded inputs and coefficient bounds", "exists constant almost everywhere norm bounded
+--   sequence recurrence", and "bounded recursive process norm bounded input scalar
+--   coefficient" found only linear-recurrence/asymptotic APIs and
+--   exists_nonneg_ae_bound_accumulator_of_ae_bounded_increments; coverage is partial because
+--   the latter has an ordered additive accumulator rather than a normed affine correction
+-- minimal hypotheses: probability was weakened to an arbitrary measure, all oracle and
+--   continuity assumptions were replaced by the a.e. bounds actually consumed, and the
+--   recursive update is retained only as a pointwise equation
+
+/-- Every fixed iterate of a recursive momentum direction is almost everywhere norm bounded
+when its initial value, two input processes, and complementary coefficients have finite bounds.
+
+The recurrence has the corrected-estimator form
+`d_(n+1) = gNext_n + coeff_n • (d_n - gCorr_n)`; the resulting bound may grow
+with the requested finite time, so no contraction assumption on `coeff` is required.
+
+Layer: Layer1 | Gap: Level 1 (finite-time recursive-momentum direction boundedness)
+Proof: induct on time, intersect the preceding direction bound with the two input bounds and
+  the current coefficient bound, then apply the norm triangle, subtraction, and smul bounds.
+Source: Mathlib normed-space inequalities and almost-everywhere filter intersections
+Used in: recursive-momentum and SARAH-style estimator proofs establishing bounded generated
+  directions before proving finite-measure integrability of descent and error terms
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/steps/5
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD,
+  STOchastic Recursive Momentum -/
+theorem exists_nonneg_ae_norm_bound_of_recursive_affine_correction
+    {Ω E : Type*} [MeasurableSpace Ω] [SeminormedAddCommGroup E] [NormedSpace ℝ E]
+    (μ : Measure Ω) (direction gNext gCorr : ℕ → Ω → E)
+    (coeff : ℕ → Ω → ℝ) (G : ℝ)
+    (hG_nonneg : 0 ≤ G)
+    (hzero : ∀ᵐ ω ∂μ, ‖direction 0 ω‖ ≤ G)
+    (hgNext : ∀ n, ∀ᵐ ω ∂μ, ‖gNext n ω‖ ≤ G)
+    (hgCorr : ∀ n, ∀ᵐ ω ∂μ, ‖gCorr n ω‖ ≤ G)
+    (hcoeff : ∀ n, ∃ A : ℝ, 0 ≤ A ∧ ∀ᵐ ω ∂μ, ‖coeff n ω‖ ≤ A)
+    (hrec : ∀ n ω,
+      direction (n + 1) ω =
+        gNext n ω + coeff n ω • (direction n ω - gCorr n ω))
+    (t : ℕ) :
+    ∃ D : ℝ, 0 ≤ D ∧ ∀ᵐ ω ∂μ, ‖direction t ω‖ ≤ D := by
+  induction t with
+  | zero =>
+      exact ⟨G, hG_nonneg, hzero⟩
+  | succ n ih =>
+      rcases ih with ⟨D, hD_nonneg, hD⟩
+      rcases hcoeff n with ⟨A, hA_nonneg, hA⟩
+      refine
+        ⟨G + A * (D + G),
+          add_nonneg hG_nonneg
+            (mul_nonneg hA_nonneg (add_nonneg hD_nonneg hG_nonneg)), ?_⟩
+      filter_upwards [hD, hA, hgNext n, hgCorr n] with
+        ω hDω hAω hNextω hCorrω
+      have hdiff : ‖direction n ω - gCorr n ω‖ ≤ D + G :=
+        (norm_sub_le (direction n ω) (gCorr n ω)).trans
+          (add_le_add hDω hCorrω)
+      have hsmul :
+          ‖coeff n ω • (direction n ω - gCorr n ω)‖ ≤ A * (D + G) := by
+        rw [norm_smul]
+        exact mul_le_mul hAω hdiff (norm_nonneg _) hA_nonneg
+      rw [hrec]
+      exact (norm_add_le _ _).trans (add_le_add hNextω hsmul)
+
+
+-- Promoted from Staging/recursiveMomentumProcess_prefixAEMeasurable.lean
+open MeasureTheory
+
+namespace SOptLib
+
+private theorem aestronglyMeasurable_comp_measurable
+    {Ω α β : Type*} [mΩ : MeasurableSpace Ω]
+    [MeasurableSpace α] [TopologicalSpace α] [TopologicalSpace.PseudoMetrizableSpace α]
+    [BorelSpace α]
+    [MeasurableSpace β] [TopologicalSpace β] [TopologicalSpace.PseudoMetrizableSpace β]
+    [SecondCountableTopology β] [BorelSpace β]
+    {m : MeasurableSpace Ω} {f : Ω → α} {g : α → β} {μ : @Measure Ω mΩ}
+    (hf : AEStronglyMeasurable[m] f μ) (hg : Measurable g) :
+    AEStronglyMeasurable[m] (fun ω => g (f ω)) μ := by
+  exact (hg.comp hf.measurable_mk).aestronglyMeasurable.congr
+    (hf.ae_eq_mk.fun_comp g).symm
+
+-- Generalization plan (G0):
+-- concept/name: sample-prefix adaptedness of a recursive-momentum process; orig was
+--   `lemma3_generated_history_prefixAEMeasurable_early`
+-- generality used: arbitrary path and sample types, a second-countable real normed
+--   additive group, an arbitrary measure, measurable sample coordinates, measurable
+--   scalar schedules, and a law-scoped adaptive-oracle measurability contract; no
+--   probability, independence, integrability, convexity, smoothness, or inner product
+--   assumptions are used
+-- portable call pattern: STORM-family and same-sample recursive-momentum analyses prove
+--   that the current/next iterates, current direction, and accumulated squared oracle
+--   norm are `AEStronglyMeasurable` in the pre-fresh-sample filtration; the oracle,
+--   sample law, initial point, and scalar schedules may all change
+-- counterargument checked: generic recursive-process measurability lemmas require an
+--   exactly measurable driver and globally measurable update, while this theorem
+--   propagates only law-scoped `AEStronglyMeasurable` facts and uses the transition ordering to
+--   expose the next iterate before the fresh oracle response
+-- coverage search: queries "recursive momentum process prefix a.e. measurable sample
+--   transition", "adapted recursive process measurable sample kernel coordinates",
+--   and "recursive process prefix a.e. measurable representative oracle query" found
+--   `recursive_process_measurable_wrt_sample_prefix`,
+--   `process_prefix_measurable_wrt_sampleBlock`, and
+--   `recursive_process_measurable_of_measurable_update_oracle`; all require exact
+--   measurability and therefore only partially cover the law-scoped statement
+-- minimal hypotheses: removed the source probability, independence, finite-dimensional,
+--   complete, Hilbert, objective, smoothness, and moment assumptions; retained only the
+--   adaptive-oracle representative property actually consumed by the induction
+
+/-- The iterate pair, direction, and accumulated sampled-oracle square of a
+recursive-momentum process are `AEStronglyMeasurable` in the exact sample prefix.
+
+The oracle premise is deliberately law-scoped: evaluating the next sample at any
+query that is a.e.-strongly measurable for the prefix must again be
+a.e.-strongly measurable after adjoining that sample. This supports product-law or conditional
+regularity arguments that do not provide a globally measurable oracle kernel.
+
+Layer: Layer1 | Gap: Level 1 (law-scoped recursive-momentum prefix adaptedness)
+Proof: induct on time, lift representatives along the sample-prefix filtration, apply
+  the adaptive-oracle premise at the new and correction queries, and close under the
+  continuous recursive-momentum coordinate operations
+Source: Mathlib measurable-space monotonicity and continuous normed-space operations,
+  together with `recursive_momentum_step_from_sample` and the sample-prefix filtration
+Used in: STORM-family pre-fresh-sample conditioning, where the next iterate is adapted
+  before the fresh oracle response while the direction and accumulator update afterward
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/key_lemmas/1
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum (STORM) -/
+theorem recursive_momentum_process_prefix_aestronglyMeasurable
+    {Ω Sample E : Type*}
+    [mΩ : MeasurableSpace Ω] [MeasurableSpace Sample]
+    [NormedAddCommGroup E] [NormedSpace ℝ E]
+    [MeasurableSpace E] [BorelSpace E] [SecondCountableTopology E]
+    (μ : @Measure Ω mΩ)
+    (sample : ℕ → Ω → Sample) (hsample : ∀ n, Measurable (sample n))
+    (oracle : E → Sample → E) (x0 : E)
+    (stepSize momentumWeight : ℝ → ℝ)
+    (hstepSize : Measurable stepSize) (hmomentumWeight : Measurable momentumWeight)
+    (horacle :
+      ∀ n (query : Ω → E),
+        AEStronglyMeasurable[(filtration sample hsample).seq n] query μ →
+          AEStronglyMeasurable[(filtration sample hsample).seq (n + 1)]
+            (fun ω => oracle (query ω) (sample n ω)) μ)
+    (t : ℕ) :
+    let process :=
+      recursive_process_from_random_initial
+        (recursiveMomentumInitialState x0 oracle (sample 0))
+        (fun n state ω =>
+          recursive_momentum_step_from_sample oracle stepSize momentumWeight state
+            (sample (n + 1) ω))
+    AEStronglyMeasurable[(filtration sample hsample).seq (t + 1)]
+        (fun ω => (process t ω).x) μ ∧
+      AEStronglyMeasurable[(filtration sample hsample).seq (t + 1)]
+        (fun ω => (process (t + 1) ω).x) μ ∧
+      AEStronglyMeasurable[(filtration sample hsample).seq (t + 1)]
+        (fun ω => (process t ω).direction) μ ∧
+      AEStronglyMeasurable[(filtration sample hsample).seq (t + 1)]
+        (fun ω => (process t ω).gradNormSqSum) μ := by
+  classical
+  let process :=
+    recursive_process_from_random_initial
+      (recursiveMomentumInitialState x0 oracle (sample 0))
+      (fun n state ω =>
+        recursive_momentum_step_from_sample oracle stepSize momentumWeight state
+          (sample (n + 1) ω))
+  induction t with
+  | zero =>
+      have hx0 :
+          AEStronglyMeasurable[(filtration sample hsample).seq 1]
+            (fun ω => (process 0 ω).x) μ := by
+        refine
+          (aestronglyMeasurable_const :
+            AEStronglyMeasurable[(filtration sample hsample).seq 1]
+              (fun _ω : Ω => x0) μ).congr ?_
+        filter_upwards with ω
+        rfl
+      have hquery0 :
+          AEStronglyMeasurable[(filtration sample hsample).seq 0]
+            (fun _ω : Ω => x0) μ :=
+        (aestronglyMeasurable_const :
+          AEStronglyMeasurable[(filtration sample hsample).seq 0]
+            (fun _ω : Ω => x0) μ)
+      have hgrad0 := horacle 0 (fun _ω : Ω => x0) hquery0
+      have hdir0 :
+          AEStronglyMeasurable[(filtration sample hsample).seq 1]
+            (fun ω => (process 0 ω).direction) μ := by
+        refine hgrad0.congr ?_
+        filter_upwards with ω
+        rfl
+      have hsum0 :
+          AEStronglyMeasurable[(filtration sample hsample).seq 1]
+            (fun ω => (process 0 ω).gradNormSqSum) μ := by
+        refine ((continuous_norm.pow 2).comp_aestronglyMeasurable hgrad0).congr ?_
+        filter_upwards with ω
+        rfl
+      have hη0 :
+          AEStronglyMeasurable[(filtration sample hsample).seq 1]
+            (fun ω => stepSize (process 0 ω).gradNormSqSum) μ :=
+        aestronglyMeasurable_comp_measurable hsum0 hstepSize
+      have hx1 :
+          AEStronglyMeasurable[(filtration sample hsample).seq 1]
+            (fun ω => (process 1 ω).x) μ := by
+        refine (hx0.sub (hη0.smul hdir0)).congr ?_
+        filter_upwards with ω
+        rfl
+      exact ⟨hx0, hx1, hdir0, hsum0⟩
+  | succ t ih =>
+      rcases ih with ⟨hxCurr, hxNext, hdirCurr, hsumCurr⟩
+      have hle : t + 1 ≤ t + 2 := Nat.le_succ (t + 1)
+      have hxCurr' :=
+        AEStronglyMeasurable.mono ((filtration sample hsample).mono hle) hxCurr
+      have hxNext' :=
+        AEStronglyMeasurable.mono ((filtration sample hsample).mono hle) hxNext
+      have hdirCurr' :=
+        AEStronglyMeasurable.mono ((filtration sample hsample).mono hle) hdirCurr
+      have hsumCurr' :=
+        AEStronglyMeasurable.mono ((filtration sample hsample).mono hle) hsumCurr
+      have hη := aestronglyMeasurable_comp_measurable hsumCurr' hstepSize
+      have hgNext := horacle (t + 1) (fun ω => (process (t + 1) ω).x) hxNext
+      have hcorr := horacle (t + 1) (fun ω => (process t ω).x) hxCurr
+      have haBase := aestronglyMeasurable_comp_measurable hη hmomentumWeight
+      have ha :
+          AEStronglyMeasurable[(filtration sample hsample).seq (t + 2)]
+            (fun ω => 1 - momentumWeight (stepSize (process t ω).gradNormSqSum)) μ := by
+        exact
+          (aestronglyMeasurable_const :
+            AEStronglyMeasurable[(filtration sample hsample).seq (t + 2)]
+              (fun _ω : Ω => (1 : ℝ)) μ).sub haBase
+      have hdirNext :
+          AEStronglyMeasurable[(filtration sample hsample).seq (t + 2)]
+            (fun ω => (process (t + 1) ω).direction) μ := by
+        refine (hgNext.add (ha.smul (hdirCurr'.sub hcorr))).congr ?_
+        filter_upwards with ω
+        rfl
+      have hsumNext :
+          AEStronglyMeasurable[(filtration sample hsample).seq (t + 2)]
+            (fun ω => (process (t + 1) ω).gradNormSqSum) μ := by
+        refine (hsumCurr'.add ((continuous_norm.pow 2).comp_aestronglyMeasurable hgNext)).congr ?_
+        filter_upwards with ω
+        rfl
+      have hηNext := aestronglyMeasurable_comp_measurable hsumNext hstepSize
+      have hxAfterNext :
+          AEStronglyMeasurable[(filtration sample hsample).seq (t + 2)]
+            (fun ω => (process (t + 2) ω).x) μ := by
+        refine (hxNext'.sub (hηNext.smul hdirNext)).congr ?_
+        filter_upwards with ω
+        rfl
+      exact ⟨hxNext', hxAfterNext, hdirNext, hsumNext⟩
+
+end SOptLib
+
+-- Phase 4 merged from focused staging declarations.
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: inner_update_eq_sq_dist_sub_sq_dist_add_norm_sq exposes the
+--   Hilbert-space distance-drop identity obtained from an explicit affine
+--   update rule; orig was stochastic_three_point_identity_of_update, renamed
+--   away from stochastic and paper-local algorithm language.
+-- generality used: a real inner-product space with a seminormed additive group,
+--   four points/vectors, two real scalars, a nonzero step size, and the
+--   pointwise affine update equality; no measure, independence, integrability,
+--   convexity, smoothness, oracle, or finite-dimensional assumptions are used.
+-- portable call pattern: accelerated stochastic-gradient, plain gradient
+--   descent, variance-reduced, and learned-direction proofs can call this when
+--   an update `xNext = xPrev - lam • v` must convert an inner product against a
+--   comparison displacement into a squared-distance telescope plus `‖v‖^2`.
+-- counterargument checked: this is not paper-local traceability because the
+--   same update-to-distance-drop bridge recurs across first-order methods; it
+--   is not a pure Mathlib rename because Mathlib provides norm-square
+--   polarization but not this update-specialized scaled identity.
+-- coverage search: searched `inner product update squared distance difference
+--   norm squared`, `xNext = xPrev - lambda v inner equals distance drop`, and
+--   LeanSearch for the full update identity; closest hits were Mathlib
+--   `norm_sub_sq_real`, SOptLib's projected-gradient inequality
+--   `inner_le_eta_add_half_smul_norm_sub_sq_sub_of_add_smul_inner_le`, and
+--   mirror-descent three-point transport lemmas, all partial rather than full.
+-- minimal hypotheses: all hypotheses are pointwise algebraic assumptions; the
+--   carrier is generalized from Euclidean space to a seminormed real
+--   inner-product space and the step-size condition is exactly `lam ≠ 0`.
+
+open scoped InnerProductSpace
+
+/-- An affine update converts a scaled inner product into a distance drop plus
+a squared-direction term.
+
+If `xNext = xPrev - lam • v` with `lam ≠ 0`, then the comparison inner product
+`alpha * ⟪v, xPrev - xRef⟫_ℝ` is exactly the standard Hilbert-space
+three-point distance identity for the update.
+
+Layer: Layer1 | Gap: Level 1 (Hilbert update distance-drop identity)
+Proof: rewrite the update into the norm-square of `(xPrev - xRef) - lam • v`,
+  expand with `norm_sub_sq_real`, and rearrange by real field arithmetic.
+Source: Mathlib real inner-product norm-square polarization and scalar-norm APIs
+Used in: nonconvex stochastic accelerated gradient descent converting the
+  stochastic update inner product into the squared-distance telescope in the
+  convex-case one-step recurrence
+Book citation: book/FOML/NonconvexStochasticAcceleratedGD.json#/components/Stochastic_three_point_identity
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, nonconvex stochastic accelerated gradient descent -/
+theorem inner_update_eq_sq_dist_sub_sq_dist_add_norm_sq
+    {E : Type*} [SeminormedAddCommGroup E] [InnerProductSpace ℝ E]
+    (xPrev xNext xRef v : E) (alpha lam : ℝ) (hlam : lam ≠ 0)
+    (hupdate : xNext = xPrev - lam • v) :
+    alpha * inner ℝ v (xPrev - xRef) =
+      alpha / (2 * lam) *
+          (‖xPrev - xRef‖ ^ 2 - ‖xNext - xRef‖ ^ 2) +
+        alpha * lam / 2 * ‖v‖ ^ 2 := by
+  subst xNext
+  have hnorm :
+      ‖xPrev - lam • v - xRef‖ ^ 2 =
+        ‖xPrev - xRef‖ ^ 2 - 2 * lam * inner ℝ v (xPrev - xRef) +
+          lam ^ 2 * ‖v‖ ^ 2 := by
+    have hvec : xPrev - lam • v - xRef = (xPrev - xRef) - lam • v := by
+      module
+    rw [hvec, norm_sub_sq_real, norm_smul]
+    simp [inner_smul_right, real_inner_comm, Real.norm_eq_abs, mul_comm,
+      mul_left_comm, mul_assoc]
+    rw [mul_pow, sq_abs]
+  rw [hnorm]
+  field_simp [hlam]
+  ring
+
+
+-- Generalization plan (G0):
+-- concept/name: accelerated_two_state_adapted_of_observable_error exposes the
+--   adaptedness induction for two accelerated state coordinates driven by an
+--   observable error and affine update rules; orig was
+--   generated_state_adapted_from_error_observable, renamed away from generated
+--   sample-stream setup fields.
+-- generality used: arbitrary measurable sample space, a natural-number
+--   filtration, an abstract measurable additive/scalar state space, two state
+--   coordinates, a search coordinate, an observable error, a measurable target
+--   map, and pointwise affine update laws; no measure, independence,
+--   integrability, convexity, smoothness, Hilbert, probability, or
+--   finite-dimensional assumptions are used.
+-- portable call pattern: accelerated stochastic-gradient, accelerated
+--   mirror-style, and variance-reduced two-sequence proofs can call this after
+--   proving the innovation/error is observable at the next filtration level
+--   and the two recursive coordinates satisfy affine update equations.
+-- counterargument checked: this is not only paper-local traceability because
+--   the same two-coordinate adaptedness induction recurs whenever a search
+--   point is an affine blend of previous coordinates and both next coordinates
+--   use a shared observable direction; it is not covered by a one-line Mathlib
+--   adaptedness projection or by the existing one-coordinate recursive update
+--   lemmas.
+-- coverage search: searched `adaptedness two state affine update observable
+--   error filtration measurable previous coordinates`, `Adapted recursive
+--   process affine update measurable filtration`, `two coordinate adaptedness
+--   affine update error gradient measurable filtration conclusion both
+--   coordinates`, and LeanSearch `measurable adapted recursive two coordinate
+--   affine update filtration`; closest hits were Mathlib
+--   `MeasureTheory.Adapted.measurable`, SOptLib
+--   `adapted_iterate_of_recursive_adapted_update`,
+--   `recursive_process_measurable_wrt_sample_prefix`, and
+--   `TwoCoordinateProcessAdapted`, all partial rather than this explicit
+--   two-coordinate affine adaptedness contract.
+-- minimal hypotheses: all hypotheses are already pointwise or measurability
+--   assumptions; the carrier is generalized from Euclidean space to measurable
+--   algebra with `Add`, `Sub`, and real scalar multiplication closure.
+
+/-- Two accelerated affine state coordinates are adapted when the shared error is observable.
+
+If the search coordinate is an affine blend of the previous two coordinates,
+the next state and averaged state are affine updates by the same measurable
+target-plus-error direction, and each successor error at time `t + 1` is
+measurable at filtration level `(t + 1) + 1`, then both coordinates are adapted
+at level `t + 1`.
+
+Layer: Layer1 | Gap: Level 1 (two-coordinate affine adaptedness induction)
+Proof: induct on time, lift previous-coordinate measurability by filtration
+  monotonicity, close the affine search and update coordinates under measurable
+  add/sub/scalar operations, and compose the measurable target map with the
+  measurable search coordinate.
+Source: Mathlib filtration monotonicity and measurable algebra closure APIs
+Used in: nonconvex stochastic accelerated gradient descent proving generated
+  iterate and averaged-iterate adaptedness before martingale cancellation and
+  finite-window expectation bounds
+Book citation: book/FOML/NonconvexStochasticAcceleratedGD.json#/algorithm_spec
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, nonconvex stochastic accelerated gradient descent
+  (Algorithm 6.4 and Theorem 6.12) -/
+theorem accelerated_two_state_adapted_of_observable_error
+    {Ω E : Type*} [MeasurableSpace Ω] [MeasurableSpace E]
+    [Add E] [Sub E] [SMul ℝ E]
+    [MeasurableAdd₂ E] [MeasurableSub₂ E] [MeasurableConstSMul ℝ E]
+    (filt : Filtration ℕ (by infer_instance : MeasurableSpace Ω))
+    (x xBar xUnder err : ℕ → Ω → E) (target : E → E)
+    (alpha beta lam : ℕ → ℝ)
+    (htarget : Measurable target)
+    (hx_zero : Measurable[filt.seq 1] (x 0))
+    (hxBar_zero : Measurable[filt.seq 1] (xBar 0))
+    (herr_observable :
+      ∀ t : ℕ, Measurable[filt.seq ((t + 1) + 1)] (err (t + 1)))
+    (hxUnder_update :
+      ∀ t : ℕ,
+        xUnder (t + 1) =
+          fun ω => (1 - alpha (t + 1)) • xBar t ω + alpha (t + 1) • x t ω)
+    (hx_update :
+      ∀ t : ℕ,
+        x (t + 1) =
+          fun ω =>
+            x t ω - lam (t + 1) • (target (xUnder (t + 1) ω) + err (t + 1) ω))
+    (hxBar_update :
+      ∀ t : ℕ,
+        xBar (t + 1) =
+          fun ω =>
+            xUnder (t + 1) ω -
+              beta (t + 1) • (target (xUnder (t + 1) ω) + err (t + 1) ω)) :
+    ∀ t : ℕ,
+      Measurable[filt.seq (t + 1)] (x t) ∧
+        Measurable[filt.seq (t + 1)] (xBar t) := by
+  intro t
+  induction t with
+  | zero =>
+      exact ⟨hx_zero, hxBar_zero⟩
+  | succ t ih =>
+      have hpast_le_current : filt.seq (t + 1) ≤ filt.seq ((t + 1) + 1) :=
+        filt.mono (Nat.le_succ (t + 1))
+      have hx_prev_current : Measurable[filt.seq ((t + 1) + 1)] (x t) :=
+        ih.1.mono hpast_le_current le_rfl
+      have hxBar_prev_current : Measurable[filt.seq ((t + 1) + 1)] (xBar t) :=
+        ih.2.mono hpast_le_current le_rfl
+      have hxUnder_past : Measurable[filt.seq (t + 1)] (xUnder (t + 1)) := by
+        rw [hxUnder_update t]
+        exact (ih.2.const_smul (1 - alpha (t + 1))).add
+          (ih.1.const_smul (alpha (t + 1)))
+      have hxUnder_current :
+          Measurable[filt.seq ((t + 1) + 1)] (xUnder (t + 1)) :=
+        hxUnder_past.mono hpast_le_current le_rfl
+      have htarget_current :
+          Measurable[filt.seq ((t + 1) + 1)]
+            (fun ω => target (xUnder (t + 1) ω)) :=
+        htarget.comp hxUnder_current
+      have herr_current : Measurable[filt.seq ((t + 1) + 1)] (err (t + 1)) :=
+        herr_observable t
+      have hx_succ :
+          Measurable[filt.seq ((t + 1) + 1)] (x (t + 1)) := by
+        rw [hx_update t]
+        exact hx_prev_current.sub
+          ((htarget_current.add herr_current).const_smul (lam (t + 1)))
+      have hxBar_succ :
+          Measurable[filt.seq ((t + 1) + 1)] (xBar (t + 1)) := by
+        rw [hxBar_update t]
+        exact hxUnder_current.sub
+          ((htarget_current.add herr_current).const_smul (beta (t + 1)))
+      exact ⟨hx_succ, hxBar_succ⟩
+
+
+-- Generalization plan (G0):
+-- concept/name: accelerated_two_state_l2_of_oracle_error_l2 exposes the
+--   square-integrability induction for two accelerated state coordinates driven
+--   by a shared gradient-plus-oracle-error direction; orig was
+--   generated_state_l2_of_adaptiveOracleProcess, renamed away from generated
+--   sample-stream setup fields.
+-- generality used: arbitrary finite measure space, an abstract real normed
+--   vector group, a base point, two state coordinates, a search coordinate, an
+--   oracle-error process, a gradient-like map, scalar schedules, a gradient L2
+--   bridge from centered search-point L2, pointwise oracle-error L2, and a.e.
+--   affine update laws; no convexity, smoothness statement, probability class,
+--   Hilbert structure, independence, or finite-dimensional assumption is used.
+-- portable call pattern: accelerated stochastic-gradient, accelerated
+--   mirror-style, and variance-reduced two-sequence proofs can call this after
+--   adaptedness/measurability is established, centered L2 at the search point is
+--   converted to gradient L2, and each centered oracle error has a second
+--   moment bound.
+-- counterargument checked: this is not only paper-local traceability because
+--   the same induction recurs for any two-coordinate accelerated recursion with
+--   a search affine blend and two affine updates by a shared noisy direction;
+--   it is larger than a caller-side expression and not a pure wrapper around a
+--   single existing affine L2 transport lemma.
+-- coverage search: searched `MemLp affine update square integrable two state
+--   oracle error`, `integrable squared norm const sub affine combination MemLp`,
+--   and `two accelerated state l2 induction affine updates gradient error
+--   integrable squared norm`; closest hits were SOptLib
+--   `integrable_sq_norm_const_sub_two_stage_affine`,
+--   `integrable_sq_norm_const_sub_affine_update`,
+--   `accelerated_two_state_adapted_of_observable_error`, and
+--   `integrable_sq_norm_grad_of_lipschitz_grad_centered_l2`, all component
+--   lemmas rather than this full two-state L2 induction.
+-- minimal hypotheses: global setup assumptions are replaced by pointwise
+--   measurability, a gradient L2 bridge, error L2, and a.e. update equations;
+--   the finite-measure frame is retained from the stochastic-optimization
+--   probability setting and makes constant integrability available directly.
+
+/-- Two accelerated affine state coordinates remain centered square-integrable
+when the shared oracle error is square-integrable.
+
+If the search point is an affine blend of the previous raw and averaged
+coordinates, the gradient-like direction is L2 whenever the search point is
+centered L2, and both next coordinates are affine updates by the same
+gradient-plus-error direction, then both state coordinates have integrable
+squared distance from the fixed base point at every time.
+
+Layer: Layer1 | Gap: Level 1 (two-coordinate accelerated L2 induction)
+Proof: induct on time, convert centered squared integrability to `MemLp` at
+  exponent two, close the search blend and noisy update directions under
+  addition and scalar multiplication, and transport through the three a.e.
+  update identities.
+Source: Mathlib Lp-space closure and Bochner squared-norm integrability APIs
+Used in: nonconvex stochastic accelerated gradient descent proving generated
+  raw and averaged iterates are square-integrable before gradient, value-gap,
+  and martingale-integrability steps
+Book citation: book/FOML/NonconvexStochasticAcceleratedGD.json#/algorithm_spec
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, nonconvex stochastic accelerated gradient descent
+  (Algorithm 6.4 and Theorem 6.12) -/
+theorem accelerated_two_state_l2_of_oracle_error_l2
+    {Ω E : Type*} [MeasurableSpace Ω]
+    [NormedAddCommGroup E] [NormedSpace ℝ E]
+    {P : Measure Ω} [IsFiniteMeasure P]
+    (base : E) (x xBar xUnder err : ℕ → Ω → E) (grad : E → E)
+    (alpha beta lam : ℕ → ℝ)
+    (hx_meas : ∀ t : ℕ, AEStronglyMeasurable (x t) P)
+    (hxBar_meas : ∀ t : ℕ, AEStronglyMeasurable (xBar t) P)
+    (hgrad_meas :
+      ∀ t : ℕ, AEStronglyMeasurable (fun ω => grad (xUnder t ω)) P)
+    (herr_meas : ∀ t : ℕ, AEStronglyMeasurable (err t) P)
+    (hgrad_sq :
+      ∀ t : ℕ,
+        Integrable (fun ω => ‖base - xUnder t ω‖ ^ 2) P →
+          Integrable (fun ω => ‖grad (xUnder t ω)‖ ^ 2) P)
+    (herr_sq : ∀ t : ℕ, Integrable (fun ω => ‖err t ω‖ ^ 2) P)
+    (hx_zero : x 0 =ᵐ[P] fun _ => base)
+    (hxBar_zero : xBar 0 =ᵐ[P] fun _ => base)
+    (hxUnder_update :
+      ∀ t : ℕ,
+        xUnder (t + 1) =ᵐ[P]
+          fun ω => (1 - alpha (t + 1)) • xBar t ω + alpha (t + 1) • x t ω)
+    (hx_update :
+      ∀ t : ℕ,
+        x (t + 1) =ᵐ[P]
+          fun ω =>
+            x t ω - lam (t + 1) • (grad (xUnder (t + 1) ω) + err (t + 1) ω))
+    (hxBar_update :
+      ∀ t : ℕ,
+        xBar (t + 1) =ᵐ[P]
+          fun ω =>
+            xUnder (t + 1) ω -
+              beta (t + 1) • (grad (xUnder (t + 1) ω) + err (t + 1) ω)) :
+    ∀ t : ℕ,
+      Integrable (fun ω => ‖base - x t ω‖ ^ 2) P ∧
+        Integrable (fun ω => ‖base - xBar t ω‖ ^ 2) P := by
+  intro t
+  induction t with
+  | zero =>
+      constructor
+      · exact
+          (integrable_const (c := (0 : ℝ))).congr
+            (by
+              filter_upwards [hx_zero] with ω hω
+              rw [hω]
+              simp)
+      · exact
+          (integrable_const (c := (0 : ℝ))).congr
+            (by
+              filter_upwards [hxBar_zero] with ω hω
+              rw [hω]
+              simp)
+  | succ t ih =>
+      have hx_disp_l2 : MemLp (fun ω => base - x t ω) 2 P :=
+        (memLp_two_iff_integrable_sq_norm
+          (aestronglyMeasurable_const.sub (hx_meas t))).2 ih.1
+      have hxBar_disp_l2 : MemLp (fun ω => base - xBar t ω) 2 P :=
+        (memLp_two_iff_integrable_sq_norm
+          (aestronglyMeasurable_const.sub (hxBar_meas t))).2 ih.2
+      have hxUnder_raw_l2 :
+          MemLp
+            (fun ω =>
+              (1 - alpha (t + 1)) • (base - xBar t ω) +
+                alpha (t + 1) • (base - x t ω))
+            2 P :=
+        (hxBar_disp_l2.const_smul (1 - alpha (t + 1))).add
+          (hx_disp_l2.const_smul (alpha (t + 1)))
+      have hxUnder_l2 : MemLp (fun ω => base - xUnder (t + 1) ω) 2 P := by
+        refine MemLp.ae_eq ?_ hxUnder_raw_l2
+        filter_upwards [hxUnder_update t] with ω hω
+        rw [hω]
+        module
+      have hxUnder_sq :
+          Integrable (fun ω => ‖base - xUnder (t + 1) ω‖ ^ 2) P :=
+        (memLp_two_iff_integrable_sq_norm hxUnder_l2.aestronglyMeasurable).1
+          hxUnder_l2
+      have hgrad_l2 : MemLp (fun ω => grad (xUnder (t + 1) ω)) 2 P :=
+        (memLp_two_iff_integrable_sq_norm (hgrad_meas (t + 1))).2
+          (hgrad_sq (t + 1) hxUnder_sq)
+      have herr_l2 : MemLp (err (t + 1)) 2 P :=
+        (memLp_two_iff_integrable_sq_norm (herr_meas (t + 1))).2
+          (herr_sq (t + 1))
+      have hxUnder_disp_l2 : MemLp (fun ω => base - xUnder (t + 1) ω) 2 P :=
+        hxUnder_l2
+      have hdirection_l2 :
+          MemLp (fun ω => grad (xUnder (t + 1) ω) + err (t + 1) ω) 2 P :=
+        hgrad_l2.add herr_l2
+      have hx_succ_l2 : MemLp (fun ω => base - x (t + 1) ω) 2 P := by
+        have hraw :=
+          hx_disp_l2.add (hdirection_l2.const_smul (lam (t + 1)))
+        refine MemLp.ae_eq ?_ hraw
+        filter_upwards [hx_update t] with ω hω
+        rw [hω]
+        change
+          (base - x t ω) +
+              lam (t + 1) • (grad (xUnder (t + 1) ω) + err (t + 1) ω) =
+            base -
+              (x t ω -
+                lam (t + 1) • (grad (xUnder (t + 1) ω) + err (t + 1) ω))
+        module
+      have hxBar_succ_l2 : MemLp (fun ω => base - xBar (t + 1) ω) 2 P := by
+        have hraw :=
+          hxUnder_disp_l2.add (hdirection_l2.const_smul (beta (t + 1)))
+        refine MemLp.ae_eq ?_ hraw
+        filter_upwards [hxBar_update t] with ω hω
+        rw [hω]
+        change
+          (base - xUnder (t + 1) ω) +
+              beta (t + 1) • (grad (xUnder (t + 1) ω) + err (t + 1) ω) =
+            base -
+              (xUnder (t + 1) ω -
+                beta (t + 1) • (grad (xUnder (t + 1) ω) + err (t + 1) ω))
+        module
+      constructor
+      · exact
+          (memLp_two_iff_integrable_sq_norm hx_succ_l2.aestronglyMeasurable).1
+            hx_succ_l2
+      · exact
+          (memLp_two_iff_integrable_sq_norm hxBar_succ_l2.aestronglyMeasurable).1
+            hxBar_succ_l2
+
+
+-- Generalization plan (G0):
+-- concept/name: accelerated search-point convex linearization; orig was
+--   partB_convex_search_point_linearization, renamed away from the local Part B
+--   theorem boundary while keeping the accelerated search-point concept.
+-- generality used: deterministic complete real Hilbert space
+--   [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E], an
+--   arbitrary convex feasible set X, scalar objective f, selected gradient
+--   vector g at the search point, scalar a in [0,1], points z, b, xp, and
+--   xRef, and the pointwise identity z = (1-a)b + a xp; no measure,
+--   filtration, oracle, independence, integrability, smoothness, or
+--   finite-dimensional assumptions are used.
+-- portable call pattern: accelerated convex stochastic-gradient,
+--   variance-reduced accelerated-gradient, and accelerated proximal proofs use
+--   the same search-point step when z is the convex combination of the previous
+--   averaged point b and the previous main iterate xp; f, grad, a, and the
+--   comparison point xRef vary while the conclusion stays unchanged.
+-- counterargument checked: this is more than paper-local traceability because
+--   it packages the standard accelerated convex linearization used before a
+--   one-step recurrence; it is not a pure wrapper because existing SOptLib
+--   gives the one-endpoint support inequality but not the two-endpoint
+--   weighted assembly and search-point algebra.
+-- coverage search: searched `convex function linearization at convex
+--   combination weighted inner product`, `ConvexOn HasGradientAt convex linear
+--   lower bound inner`, and LeanSearch for the full weighted search-point
+--   inequality. Top hits were
+--   `ConvexOn.firstOrderLinearModel_le_of_hasGradientWithinAt`,
+--   `ConvexOn.map_sum_le`, and smooth upper-model lemmas; these are partial
+--   ingredients and none states the accelerated two-endpoint conclusion.
+-- minimal hypotheses: the proof uses only pointwise support at z for xRef and
+--   b, nonnegativity of a and 1-a, and the affine search-point equality; xp
+--   need not be feasible because it only appears through that equality.
+
+/-- Convexity at an accelerated search point gives the weighted linearization.
+
+If `z = (1 - a) • b + a • xp` with `0 ≤ a ≤ 1`, and `f` is convex with
+gradient `g` at `z`, then the gap from `f z` to the weighted endpoint
+values is bounded by `a` times the linear model from `xp` to `xRef`.
+
+Layer: Layer1 | Gap: Level 1 (accelerated search-point convex linearization)
+Proof: apply the convex first-order support inequality from `z` to `xRef` and
+  from `z` to `b`, scale them by `a` and `1-a`, and use the affine
+  search-point identity to collapse the two inner products.
+Source: SOptLib convex first-order support inequality, Mathlib convex-set
+  within-gradient calculus, and Hilbert-space inner-product algebra
+Used in: nonconvex stochastic accelerated gradient descent convex-case
+  one-step recursion, converting the search-point value into an accelerated
+  comparison-point linearization before the distance telescope
+Book citation: book/FOML/NonconvexStochasticAcceleratedGD.json#/key_lemmas/6
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, nonconvex stochastic accelerated gradient descent -/
+theorem convex_accelerated_search_point_linearization
+    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
+    (X : Set E) (f : E → ℝ) (g : E)
+    (a : ℝ) (z b xp xRef : E)
+    (hf : ConvexOn ℝ X f) (hz : z ∈ X) (hb : b ∈ X) (hxRef : xRef ∈ X)
+    (ha_nonneg : 0 ≤ a) (ha_le_one : a ≤ 1)
+    (hgrad : HasGradientWithinAt f g X z)
+    (hz_eq : z = (1 - a) • b + a • xp) :
+    f z - ((1 - a) * f b + a * f xRef) ≤
+      a * inner ℝ g (xp - xRef) := by
+  have hone_minus_nonneg : 0 ≤ 1 - a := by linarith
+  have hsupport_ref :
+      f z - f xRef ≤ inner ℝ g (z - xRef) := by
+    have hsupport :=
+      ConvexOn.first_order_linear_model_le_of_hasGradientWithinAt
+        (E := E) (X := X) (f := f) (g := g) (z := z) (x := xRef)
+        hf hz hxRef hgrad
+    have hinner : inner ℝ g (xRef - z) =
+        - inner ℝ g (z - xRef) := by
+      rw [← inner_neg_right]
+      simp
+    linarith
+  have hsupport_bar :
+      f z - f b ≤ inner ℝ g (z - b) := by
+    have hsupport :=
+      ConvexOn.first_order_linear_model_le_of_hasGradientWithinAt
+        (E := E) (X := X) (f := f) (g := g) (z := z) (x := b)
+        hf hz hb hgrad
+    have hinner : inner ℝ g (b - z) =
+        - inner ℝ g (z - b) := by
+      rw [← inner_neg_right]
+      simp
+    linarith
+  have hcomb :
+      a * (f z - f xRef) + (1 - a) * (f z - f b) ≤
+        a * inner ℝ g (z - xRef) +
+          (1 - a) * inner ℝ g (z - b) := by
+    exact add_le_add
+      (mul_le_mul_of_nonneg_left hsupport_ref ha_nonneg)
+      (mul_le_mul_of_nonneg_left hsupport_bar hone_minus_nonneg)
+  have hright :
+      a * inner ℝ g (z - xRef) +
+          (1 - a) * inner ℝ g (z - b) =
+        a * inner ℝ g (xp - xRef) := by
+    rw [hz_eq]
+    simp [sub_eq_add_neg, inner_add_right, inner_smul_right, inner_neg_right,
+      add_comm, add_left_comm]
+    ring
+  calc
+    f z - ((1 - a) * f b + a * f xRef) =
+        a * (f z - f xRef) + (1 - a) * (f z - f b) := by
+      ring
+    _ ≤ a * inner ℝ g (z - xRef) +
+          (1 - a) * inner ℝ g (z - b) := hcomb
+    _ = a * inner ℝ g (xp - xRef) := hright
+
+
+-- Generalization plan (G0):
+-- concept/name: accelerated_sgd_convex_one_step_recursion exposes the
+--   accelerated stochastic-gradient convex one-step recurrence assembled from
+--   a smooth upper model, convex search-point linearization, and Hilbert update
+--   identity; orig was partB_one_step_convex_recursion, renamed away from the
+--   local Part B proof boundary.
+-- generality used: a deterministic real Hilbert space, an objective f with a
+--   selected gradient map, seven point variables, the local step-size scalars,
+--   nonzero stochastic-gradient and main stepsizes beta and lam,
+--   two affine update equalities, and the exact pointwise smooth and convex
+--   linearization inequalities; no measure, filtration, oracle law,
+--   integrability, global convexity class, or finite-dimensional assumption is
+--   used by this assembly lemma.
+-- portable call pattern: accelerated stochastic-gradient, variance-reduced
+--   accelerated-gradient, and randomized accelerated proximal-gradient proofs
+--   call this after deriving the local smooth model and convex search-point
+--   support inequality, while changing f, grad, the iterates, reference point,
+--   step sizes, and centered residual.
+-- counterargument checked: this is not merely paper-local traceability because
+--   the same pathwise recurrence is the reusable boundary before Gamma
+--   telescoping in accelerated stochastic-gradient analyses; existing SOptLib
+--   `accelerated_composite_one_step_recursion` is prox/Bregman-composite and
+--   does not expose this smooth convex gradient-step residual formula.
+-- coverage search: searched `accelerated stochastic gradient convex one step
+--   recursion noise inner update squared distance`, `convex accelerated search
+--   point linearization`, and `smooth upper bound function value gradient
+--   lipschitz norm square`. Top hits were SOptLib
+--   `accelerated_composite_one_step_recursion`, staged
+--   `convex_accelerated_search_point_linearization`, staged
+--   `inner_update_eq_sq_dist_sub_sq_dist_add_norm_sq`, and smooth upper-model
+--   lemmas; these are partial ingredients rather than the full recurrence.
+-- minimal hypotheses: global convexity and Lipschitz-gradient assumptions are
+--   weakened to the exact local inequalities they provide; beta nonzeroness is
+--   exactly what the scalar coefficient collection needs and lam nonzeroness is
+--   exactly what the distance-drop identity needs.
+
+/-- A smooth convex accelerated stochastic-gradient step satisfies the pathwise
+one-step recursion.
+
+If the averaged point is updated by `z - beta • (grad z + delta)`, the main
+iterate by `xPrev - lam • (grad z + delta)`, a smooth upper model holds from
+`z` to the averaged point, and convexity has already supplied the accelerated
+search-point linearization, then the usual squared-distance recursion with the
+explicit residual cross term follows.
+
+Layer: Layer1 | Gap: Level 1 (accelerated stochastic-gradient convex one-step recurrence)
+Proof: expand the smooth model along the stochastic averaged update, insert the
+  convex search-point linearization, convert the main-update inner product with
+  the Hilbert distance-drop identity, and collect the gradient, residual, and
+  cross terms by real field arithmetic.
+Source: accelerated stochastic-gradient estimate-sequence algebra, Mathlib
+  real Hilbert-space norm-square identities, and ordered real-field arithmetic
+Used in: nonconvex stochastic accelerated gradient descent convex branch before
+  Gamma normalization, distance telescoping, and martingale residual cancellation
+Book citation: book/FOML/NonconvexStochasticAcceleratedGD.json#/key_lemmas/Convex_search_point_linearization
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic accelerated gradient descent
+  (Algorithm 6.4 and Theorem 6.12) -/
+theorem accelerated_sgd_convex_one_step_recursion
+    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+    (f : E → ℝ) (grad : E → E)
+    (xPrev xNext bPrev bNext z xRef delta : E)
+    (alpha beta lam L : ℝ)
+    (hbeta_ne : beta ≠ 0)
+    (hlam_ne : lam ≠ 0)
+    (hb_update : bNext = z - beta • (grad z + delta))
+    (hx_update : xNext = xPrev - lam • (grad z + delta))
+    (hsmooth :
+      f bNext ≤
+        f z + inner ℝ (grad z) (bNext - z) +
+          (L / 2) * ‖bNext - z‖ ^ 2)
+    (hconv :
+      f z ≤
+        (1 - alpha) * f bPrev + alpha * f xRef +
+          alpha * inner ℝ (grad z) (xPrev - xRef)) :
+    f bNext - f xRef ≤
+      (1 - alpha) * (f bPrev - f xRef) +
+        alpha / (2 * lam) *
+          (‖xPrev - xRef‖ ^ 2 - ‖xNext - xRef‖ ^ 2) -
+        beta * (1 - L * beta / 2 - alpha * lam / (2 * beta)) *
+          ‖grad z‖ ^ 2 +
+        (L * beta ^ 2 + alpha * lam) / 2 * ‖delta‖ ^ 2 +
+        inner ℝ delta
+          (((L * beta ^ 2 + alpha * lam - beta) • grad z) +
+            alpha • (xRef - xPrev)) := by
+  let g : E := grad z
+  have hb_disp : bNext - z = (-beta) • (g + delta) := by
+    rw [hb_update]
+    simp [g, sub_eq_add_neg, neg_smul]
+    abel
+  have hnorm_bar :
+      ‖bNext - z‖ ^ 2 = beta ^ 2 * ‖g + delta‖ ^ 2 := by
+    rw [hb_disp, norm_smul, mul_pow]
+    have hnorm_neg_beta_sq : ‖(-beta)‖ ^ 2 = beta ^ 2 := by
+      rw [Real.norm_eq_abs, sq_abs, neg_sq]
+    rw [hnorm_neg_beta_sq]
+  have hsmooth_exp :
+      f bNext ≤
+        f z -
+          beta * (1 - L * beta / 2) * ‖g‖ ^ 2 +
+          (L * beta ^ 2 / 2) * ‖delta‖ ^ 2 +
+          (L * beta ^ 2 - beta) * inner ℝ g delta := by
+    have halg :
+        f z + inner ℝ (grad z) (bNext - z) +
+            (L / 2) * ‖bNext - z‖ ^ 2 =
+          f z -
+            beta * (1 - L * beta / 2) * ‖g‖ ^ 2 +
+            (L * beta ^ 2 / 2) * ‖delta‖ ^ 2 +
+            (L * beta ^ 2 - beta) * inner ℝ g delta := by
+      rw [hnorm_bar, hb_disp]
+      simp [g, norm_add_sq_real, inner_add_right, inner_smul_right]
+      ring
+    exact le_trans hsmooth (le_of_eq halg)
+  have hpre :
+      f bNext - f xRef ≤
+        (1 - alpha) * (f bPrev - f xRef) +
+          alpha * inner ℝ g (xPrev - xRef) -
+          beta * (1 - L * beta / 2) * ‖g‖ ^ 2 +
+          (L * beta ^ 2 / 2) * ‖delta‖ ^ 2 +
+          (L * beta ^ 2 - beta) * inner ℝ g delta := by
+    nlinarith [hsmooth_exp, hconv]
+  have hthree :
+      alpha * inner ℝ (g + delta) (xPrev - xRef) =
+        alpha / (2 * lam) *
+            (‖xPrev - xRef‖ ^ 2 - ‖xNext - xRef‖ ^ 2) +
+          alpha * lam / 2 * ‖g + delta‖ ^ 2 := by
+    exact inner_update_eq_sq_dist_sub_sq_dist_add_norm_sq
+      xPrev xNext xRef (g + delta) alpha lam hlam_ne (by simpa [g] using hx_update)
+  have hsplit :
+      alpha * inner ℝ g (xPrev - xRef) =
+        alpha / (2 * lam) *
+            (‖xPrev - xRef‖ ^ 2 - ‖xNext - xRef‖ ^ 2) +
+          alpha * lam / 2 * ‖g + delta‖ ^ 2 -
+          alpha * inner ℝ delta (xPrev - xRef) := by
+    have hadd :
+        alpha * inner ℝ (g + delta) (xPrev - xRef) =
+          alpha * inner ℝ g (xPrev - xRef) +
+            alpha * inner ℝ delta (xPrev - xRef) := by
+      simp [inner_add_left, mul_add]
+    nlinarith [hthree, hadd]
+  have halg_final :
+      (1 - alpha) * (f bPrev - f xRef) +
+          alpha * inner ℝ g (xPrev - xRef) -
+          beta * (1 - L * beta / 2) * ‖g‖ ^ 2 +
+          (L * beta ^ 2 / 2) * ‖delta‖ ^ 2 +
+          (L * beta ^ 2 - beta) * inner ℝ g delta =
+        (1 - alpha) * (f bPrev - f xRef) +
+          alpha / (2 * lam) *
+            (‖xPrev - xRef‖ ^ 2 - ‖xNext - xRef‖ ^ 2) -
+          beta * (1 - L * beta / 2 - alpha * lam / (2 * beta)) * ‖g‖ ^ 2 +
+          (L * beta ^ 2 + alpha * lam) / 2 * ‖delta‖ ^ 2 +
+          inner ℝ delta
+            (((L * beta ^ 2 + alpha * lam - beta) • g) +
+              alpha • (xRef - xPrev)) := by
+    rw [hsplit, norm_add_sq_real]
+    simp [inner_add_right, inner_smul_right, real_inner_comm]
+    have hxref : inner ℝ delta (xRef - xPrev) =
+        -inner ℝ delta (xPrev - xRef) := by
+      rw [← inner_neg_right]
+      congr 1
+      abel
+    rw [hxref]
+    field_simp [hbeta_ne]
+    ring
+  calc
+    f bNext - f xRef
+        ≤
+        (1 - alpha) * (f bPrev - f xRef) +
+          alpha * inner ℝ g (xPrev - xRef) -
+          beta * (1 - L * beta / 2) * ‖g‖ ^ 2 +
+          (L * beta ^ 2 / 2) * ‖delta‖ ^ 2 +
+          (L * beta ^ 2 - beta) * inner ℝ g delta := hpre
+    _ =
+        (1 - alpha) * (f bPrev - f xRef) +
+          alpha / (2 * lam) *
+            (‖xPrev - xRef‖ ^ 2 - ‖xNext - xRef‖ ^ 2) -
+          beta * (1 - L * beta / 2 - alpha * lam / (2 * beta)) * ‖g‖ ^ 2 +
+          (L * beta ^ 2 + alpha * lam) / 2 * ‖delta‖ ^ 2 +
+          inner ℝ delta
+            (((L * beta ^ 2 + alpha * lam - beta) • g) +
+              alpha • (xRef - xPrev)) := halg_final
+    _ =
+      (1 - alpha) * (f bPrev - f xRef) +
+        alpha / (2 * lam) *
+          (‖xPrev - xRef‖ ^ 2 - ‖xNext - xRef‖ ^ 2) -
+        beta * (1 - L * beta / 2 - alpha * lam / (2 * beta)) *
+          ‖grad z‖ ^ 2 +
+        (L * beta ^ 2 + alpha * lam) / 2 * ‖delta‖ ^ 2 +
+        inner ℝ delta
+          (((L * beta ^ 2 + alpha * lam - beta) • grad z) +
+            alpha • (xRef - xPrev)) := by
+      rfl
+
+end SOptLib
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: selected-block composite pathwise descent from update and prox;
+--   orig was `theorem69_selected_block_pathwise_stochastic_descent`, renamed
+--   away from theorem numbering and paper setup names while retaining the
+--   stochastic-optimization selected-block descent concept.
+-- generality used: a finite decidable block index type, an abstract state, and
+--   one real Hilbert selected-block direction space.  No measure, filtration,
+--   independence, integrability, convexity, or finite-dimensional assumption is
+--   used; the proof consumes only pointwise smooth descent, off-block simple
+--   term preservation, a selected-block prox inequality, and the residual
+--   identity.
+-- portable call pattern: randomized block coordinate, stochastic block mirror,
+--   and coordinate proximal-gradient proofs call this after establishing the
+--   local smooth upper model and selected-block prox inequality; the state
+--   representation, selected coordinate map, oracle vector, gradient block,
+--   simple terms, and update rule vary while the composite descent conclusion
+--   stays unchanged.
+-- counterargument checked: not paper-local traceability because it packages
+--   the recurring one-step composite descent assembly above the smooth-model
+--   and prox-inequality APIs; not a pure wrapper because existing SOptLib hits
+--   cover the smooth model and prox projected-gradient lower bound separately,
+--   but not their selected-block composite objective assembly.
+-- coverage search: queried `selected block composite pathwise descent update
+--   prox inequality smooth upper bound`, `composite objective descent of block
+--   smooth upper model prox inequality unchanged coordinates`, `smooth decrease
+--   plus simple term prox inequality composite descent`, and LeanSearch
+--   `one step composite descent from smooth upper bound and proximal gradient
+--   inequality`; relevant partial hits were
+--   `block_smooth_upper_bound_of_coordinate_gradient_lipschitz`,
+--   `composite_prox_projectedGradient_inner_ge_norm_sq_add_hdiff_of_isMinOn`,
+--   and accelerated composite recurrences, but no full selected-block
+--   composite descent assembler with this conclusion.
+-- minimal hypotheses: the update rule is represented by the already-derived
+--   pointwise smooth descent inequality, and unchanged off-coordinates are
+--   represented only as equality of off-block simple terms; all hypotheses are
+--   pointwise at the selected step.
+
+/-- A selected-block smooth decrease and prox inequality give one-step
+composite pathwise descent.
+
+If the smooth part decreases according to the selected block displacement, all
+non-selected simple terms are unchanged, and the selected prox step controls
+the selected simple-term change, then the composite objective decreases up to
+the selected residual inner product.
+
+Layer: Layer1 | Gap: Level 1 (selected-block composite descent assembly)
+Proof: split the finite simple-term sum into selected and off-selected parts,
+  scale the prox lower bound by the positive stepsize, rewrite the residual
+  inner product, and collect the smooth and simple-term inequalities.
+Source: coordinate proximal-gradient descent algebra, Mathlib finite-sum
+  erase identities, real inner-product algebra, and ordered-field arithmetic
+Used in: nonconvex stochastic block mirror descent selected-block pathwise
+  descent after the block smooth model and selected-block prox inequality
+Book citation: book/FOML/NonconvexStochasticBlockMirrorDescent.json#/key_lemmas/1/proof
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, nonconvex stochastic block mirror descent -/
+theorem selected_block_composite_pathwise_descent_of_update_prox
+    {I State E : Type*} [Fintype I] [DecidableEq I]
+    [SeminormedAddCommGroup E] [InnerProductSpace ℝ E]
+    (smoothPart : State → ℝ) (simple : I → State → ℝ)
+    (x xNext : State) (i : I) (gamma L : ℝ)
+    (gradBlock y spg delta : E)
+    (hgamma : 0 < gamma)
+    (hsmooth :
+      smoothPart xNext ≤
+        smoothPart x - gamma * ⟪gradBlock, spg⟫_ℝ +
+          (L / 2) * gamma ^ 2 * ‖spg‖ ^ 2)
+    (hsimple_other : ∀ j, j ≠ i → simple j xNext = simple j x)
+    (hprox :
+      ‖spg‖ ^ 2 + gamma⁻¹ * (simple i xNext - simple i x) ≤
+        ⟪y, spg⟫_ℝ)
+    (hdelta : delta = y - gradBlock) :
+    gamma * (1 - L / 2 * gamma) * ‖spg‖ ^ 2 ≤
+      (smoothPart x + ∑ j, simple j x) -
+        (smoothPart xNext + ∑ j, simple j xNext) +
+          gamma * ⟪delta, spg⟫_ℝ := by
+  classical
+  have hsimple_erase :
+      (Finset.univ.erase i).sum (fun j => simple j xNext) =
+        (Finset.univ.erase i).sum (fun j => simple j x) := by
+    refine Finset.sum_congr rfl ?_
+    intro j hj
+    exact hsimple_other j (Finset.mem_erase.mp hj).1
+  have hsimple_sum :
+      (∑ j, simple j xNext) =
+        (∑ j, simple j x) + (simple i xNext - simple i x) := by
+    have hnew_split :
+        (∑ j, simple j xNext) =
+          simple i xNext + (Finset.univ.erase i).sum (fun j => simple j xNext) := by
+      exact
+        (Finset.add_sum_erase (s := Finset.univ) (f := fun j => simple j xNext)
+          (a := i) (Finset.mem_univ i)).symm
+    have hold_split :
+        (∑ j, simple j x) =
+          simple i x + (Finset.univ.erase i).sum (fun j => simple j x) := by
+      exact
+        (Finset.add_sum_erase (s := Finset.univ) (f := fun j => simple j x)
+          (a := i) (Finset.mem_univ i)).symm
+    calc
+      (∑ j, simple j xNext)
+          = simple i xNext + (Finset.univ.erase i).sum (fun j => simple j xNext) :=
+            hnew_split
+      _ = simple i xNext + (Finset.univ.erase i).sum (fun j => simple j x) := by
+            rw [hsimple_erase]
+      _ = (simple i x + (Finset.univ.erase i).sum (fun j => simple j x)) +
+            (simple i xNext - simple i x) := by
+            ring
+      _ = (∑ j, simple j x) + (simple i xNext - simple i x) := by
+            rw [hold_split]
+  have hprox_scaled :
+      gamma * ‖spg‖ ^ 2 + (simple i xNext - simple i x) ≤
+        gamma * ⟪y, spg⟫_ℝ := by
+    have hmul := mul_le_mul_of_nonneg_left hprox hgamma.le
+    calc
+      gamma * ‖spg‖ ^ 2 + (simple i xNext - simple i x)
+          = gamma * (‖spg‖ ^ 2 + gamma⁻¹ * (simple i xNext - simple i x)) := by
+            field_simp [hgamma.ne']
+      _ ≤ gamma * ⟪y, spg⟫_ℝ := hmul
+  have hdelta_inner :
+      ⟪delta, spg⟫_ℝ = ⟪y, spg⟫_ℝ - ⟪gradBlock, spg⟫_ℝ := by
+    subst delta
+    simp [inner_sub_left]
+  rw [hsimple_sum]
+  nlinarith [hsmooth, hprox_scaled, hdelta_inner]
+
+end SOptLib
+
+
+-- Phase 4 batch 2 merge from Staging/auxiliaryResidualProcess_measurable_wrt_strictPast.lean
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: strict-past measurability of an auxiliary residual-driven
+--   recursive process; orig was `auxiliaryIterate_strictPast_measurable`,
+--   renamed away from the saddle-point iterate label to expose the reusable
+--   residual-process adaptedness step.
+-- generality used: arbitrary source type and strict-past sigma-algebra family,
+--   arbitrary measurable current-query, sample, residual, auxiliary-state, and
+--   output spaces; no measure, independence, convexity, Hilbert, norm, or
+--   finite-dimensional assumptions are used.
+-- portable call pattern: mirror-descent, variance-reduction, and auxiliary
+--   sequence proofs where an auxiliary recursion is updated by a residual
+--   `G (current j) (sample j) - target (current j)` built from an already
+--   strict-past measurable current query and the revealed sample coordinate.
+-- counterargument checked: not paper-local traceability because it packages the
+--   reusable residual-driver composition with recursive strict-past
+--   measurability; not a duplicate of `recursiveProcess_measurable_wrt_strictPast`
+--   because that base lemma requires the driver measurability as a hypothesis,
+--   while this theorem derives it from the current/sample residual contract.
+-- coverage search: searched `recursive process measurable strict past adapted
+--   residual update`, `measurable composition filtration monotone generated
+--   process update`, and `residual process measurable adapted query sample
+--   target update strict past`; top hits were SOptLib
+--   `recursiveProcess_measurable_wrt_strictPast`,
+--   `recursive_process_measurable_wrt_sample_prefix`, and Layer0
+--   `oracleResidual_aestronglyMeasurable_of_query_sample_measurable`, all partial
+--   rather than this strict-past recursive residual-process wrapper.
+-- minimal hypotheses: the global saddle setup is replaced by pointwise
+--   measurability of current queries, samples, residual kernel, target map,
+--   update kernel, output projection, and only the monotonicity needed to lift
+--   `past j` to the target strict-past sigma-algebra `past N`.
+
+/-- An auxiliary residual-driven recursion is measurable with respect to a strict-past prefix.
+
+If the current query at step `j` is measurable in `past j`, the sample coordinate
+and auxiliary state live in a common target prefix `past N`, the residual kernel
+`G x s - target x` is jointly measurable through its components, and the
+auxiliary recursion updates by a measurable state-residual kernel, then the
+projected auxiliary state at time `N` is measurable for `past N`.
+
+Layer: Layer1 | Gap: Level 1 (strict-past residual-process adaptedness)
+Proof: derive measurability of each residual driver by lifting the current query
+  along strict-past monotonicity and composing the measurable kernel and target;
+  then invoke `SOptLib.recursiveProcess_measurable_wrt_strictPast`.
+Source: Mathlib measure-theory product, subtraction, and composition APIs
+  together with SOptLib recursive-process strict-past measurability
+Used in: stochastic saddle-point mirror descent adaptedness of the auxiliary
+  mirror sequence driven by the current oracle residual
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/algorithm_spec
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, stochastic convex-concave saddle point -/
+theorem auxiliaryResidualProcess_measurable_wrt_strictPast
+    {Ω S X E V Y : Type*} [MeasurableSpace S] [MeasurableSpace X]
+    [MeasurableSpace E] [Sub E] [MeasurableSub₂ E] [MeasurableSpace V]
+    [MeasurableSpace Y]
+    (past : ℕ → MeasurableSpace Ω)
+    (sample : ℕ → Ω → S)
+    (current : ℕ → Ω → X)
+    (aux : ℕ → Ω → V)
+    (project : V → Y)
+    (G : X → S → E)
+    (target : X → E)
+    (step : ℕ → V → E → V)
+    (N : ℕ)
+    (h_past_mono : ∀ {a b : ℕ}, a ≤ b → past a ≤ past b)
+    (h_init : Measurable[past N] (aux 0))
+    (h_sample : ∀ j, j + 1 ≤ N → Measurable[past N] (sample j))
+    (h_current : ∀ j, j + 1 ≤ N → Measurable[past j] (current j))
+    (h_G : Measurable (fun p : X × S => G p.1 p.2))
+    (h_target : Measurable target)
+    (h_step : ∀ j, j + 1 ≤ N →
+      Measurable (fun p : V × E => step j p.1 p.2))
+    (h_update : ∀ j, j + 1 ≤ N →
+      aux (j + 1) =
+        fun ω => step j (aux j ω) (G (current j ω) (sample j ω) - target (current j ω)))
+    (h_project : Measurable project) :
+    Measurable[past N] (fun ω => project (aux N ω)) := by
+  let driver : ℕ → Ω → E :=
+    fun j ω => G (current j ω) (sample j ω) - target (current j ω)
+  have hdriver :
+      ∀ j, j + 1 ≤ N →
+        Measurable[past N] (driver j) := by
+    intro j hj
+    have hjN : j ≤ N := Nat.le_of_succ_le hj
+    have hcurrent_N : Measurable[past N] (current j) :=
+      (h_current j hj).mono (h_past_mono hjN) le_rfl
+    have hG_slice : Measurable[past N] (fun ω => G (current j ω) (sample j ω)) :=
+      h_G.comp (hcurrent_N.prodMk (h_sample j hj))
+    have htarget_slice : Measurable[past N] (fun ω => target (current j ω)) :=
+      h_target.comp hcurrent_N
+    simpa [driver] using hG_slice.sub htarget_slice
+  have hcore : Measurable[past N] (aux N) :=
+    SOptLib.recursiveProcess_measurable_wrt_strictPast
+      (past := past)
+      (process := aux)
+      (driver := driver)
+      (step := step)
+      (k := N)
+      (N := N)
+      h_init (fun j hj _hprocess => hdriver j hj) h_step
+      (by
+        intro j hj
+        simpa [driver] using h_update j hj)
+      N le_rfl
+  exact h_project.comp hcore
+
+/-- Combine sampled-oracle and auxiliary-residual one-step bounds into a mean-oracle budget.
+
+If `mean = gt - dt`, a sampled-oracle step controls the pairing with `zt - u`,
+and an auxiliary residual step controls the pairing with `u - vt`, then their
+sum controls the mean-oracle pairing with the retained cross correction
+`γ * ⟪zt - vt, dt⟫_ℝ`.
+
+Layer: Layer1 | Gap: Level 1 (mean-oracle one-step budget assembly with residual cross correction)
+Proof: expand `mean = gt - dt`, split the residual pairing through `zt - vt` and `vt - u`, then compose the two supplied one-step inequalities by ordered-ring arithmetic.
+Source: Mathlib real Hilbert-space inner-product algebra and ordered-ring inequality arithmetic
+Used in: stochastic convex-concave saddle-point mirror descent when the sampled mirror step and auxiliary residual mirror step are combined before finite-window telescoping
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/algorithm_spec
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic mirror descent for stochastic convex-concave saddle point problems -/
+theorem combined_mean_oracle_one_step_budget_of_residual_auxiliary_bound
+    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+    (dualNorm : E → ℝ) (γ : ℝ)
+    (zt vt u gt dt mean : E) (zDrop vDrop : ℝ)
+    (hmean : mean = gt - dt)
+    (hStochastic :
+      γ * ⟪gt, zt - u⟫_ℝ ≤
+        zDrop + (1 / 2 : ℝ) * γ ^ 2 * dualNorm gt ^ 2)
+    (hAuxiliary :
+      γ * ⟪dt, u - vt⟫_ℝ ≤
+        vDrop + (1 / 2 : ℝ) * γ ^ 2 * dualNorm dt ^ 2) :
+    γ * ⟪mean, zt - u⟫_ℝ ≤
+      zDrop + vDrop +
+        (1 / 2 : ℝ) * γ ^ 2 * dualNorm gt ^ 2 +
+        (1 / 2 : ℝ) * γ ^ 2 * dualNorm dt ^ 2 -
+        γ * ⟪zt - vt, dt⟫_ℝ := by
+  have hsplit :
+      γ * ⟪mean, zt - u⟫_ℝ =
+        γ * ⟪gt, zt - u⟫_ℝ +
+          γ * ⟪dt, u - vt⟫_ℝ -
+          γ * ⟪zt - vt, dt⟫_ℝ := by
+    rw [hmean]
+    simp only [inner_sub_left, mul_sub]
+    rw [real_inner_comm dt zt, real_inner_comm dt vt]
+    have hvec : zt - u = (zt - vt) + (vt - u) := by
+      abel
+    rw [hvec]
+    simp_rw [inner_add_right]
+    have huv : vt - u = -(u - vt) := by
+      abel
+    rw [huv]
+    simp_rw [inner_neg_right]
+    simp_rw [inner_sub_right]
+    ring
+  nlinarith [hStochastic, hAuxiliary, hsplit]
+
+
+-- Phase 4 batch 3 merge from Staging/recursive_prefix_iterate_and_sampled_direction_aestronglyMeasurable.lean
+
+open MeasureTheory
+
+noncomputable section
+
+-- Generalization plan (G0):
+-- concept/name: finite-prefix a.e.-strong measurability induction for a
+--   recursive iterate and its sampled direction; orig was
+--   `rsgfPrefixIterate_and_oracle_aestronglyMeasurable`
+-- generality used: arbitrary sample type, arbitrary topological state/direction
+--   type, arbitrary base measurable space and measure, an abstract sampled
+--   kernel, and an abstract time-indexed update; no probability, independence,
+--   integrability, algebraic, convexity, smoothness, or finite-dimensional
+--   assumptions are used
+-- portable call pattern: finite-horizon stochastic-gradient, zeroth-order, and
+--   randomized-coordinate recursions repeatedly prove the current iterate and
+--   its fresh sampled direction a.e.-strongly measurable; the prefix law,
+--   sample coordinates, kernel, update, and horizon vary while the induction
+--   conclusion stays the same
+-- counterargument checked: not paper-local traceability and not a one-line
+--   wrapper, because it packages the complete finite-horizon law-scoped
+--   induction; existing recursive-process lemmas require exact measurability,
+--   while the sampled-coordinate staging lemma supplies only the kernel step
+--   for one already-measurable query
+-- coverage search: queried `recursive iterate and sampled oracle a.e. strongly
+--   measurable from measurable update kernel and prefix product measure` and
+--   `finite product prefix recursive iterate sampled coordinate kernel both
+--   aestrongly measurable induction`; closest hits were
+--   `SOptLib.recursive_process_measurable_of_measurable_update`,
+--   `recursive_process_measurable_of_measurable_update_oracle`,
+--   `SOptLib.recursive_momentum_process_prefix_aestronglyMeasurable`, and
+--   `aestronglyMeasurable_sampled_coordinate_kernel_of_adapted_query`, all
+--   partial because they respectively require exact measurability, specialize
+--   the state recursion, or establish only one sampled-kernel step
+-- minimal hypotheses: all are pointwise in time and law-scoped; bounded
+--   indices expose the finite-horizon domain directly, the update premise asks
+--   only for preservation of a.e.-strong measurability for the actual
+--   state/direction target, and the recursion is assumed only at valid steps
+
+/-- Every pre-update iterate and its sampled direction are a.e.-strongly
+measurable along a finite recursive process.
+
+The sampled-kernel premise is deliberately law-scoped: it can be discharged by
+independence or finite-product coordinate splitting even when the kernel is not
+known to be globally measurable.
+
+Layer: Layer1 | Gap: Level 1 (law-scoped finite-prefix recursion measurability)
+Proof: induct over the pre-update time index; the base process is constant, and each successor first applies the sampled-kernel premise and then the update's a.e.-strong measurability closure.
+Source: Mathlib a.e.-strong measurability closure and bounded-index induction APIs
+Used in: stochastic gradient and zeroth-order finite-prefix arguments that need both the current query and its fresh sampled update direction measurable before taking prefix expectations
+Book citation: book/FOML/StochasticZerothOrder.json#/algorithm_spec/steps
+Origin algorithm: Lan, First-Order and Stochastic Optimization Methods for Machine Learning, randomized stochastic gradient-free method -/
+theorem recursive_prefix_iterate_and_sampled_direction_aestronglyMeasurable
+    {Ω Z E : Type*} [MeasurableSpace Ω] [TopologicalSpace E]
+    (μ : Measure Ω) (N : ℕ) (x0 : E)
+    (sample : Fin N → Ω → Z)
+    (kernel : E → Z → E) (step : Fin N → E → E → E)
+    (process : Fin (N + 1) → Ω → E)
+    (h_zero : process 0 = fun _ => x0)
+    (h_kernel :
+      ∀ n : Fin N,
+        AEStronglyMeasurable (process n.castSucc) μ →
+          AEStronglyMeasurable
+            (fun ω => kernel (process n.castSucc ω) (sample n ω)) μ)
+    (h_step :
+      ∀ n : Fin N, ∀ X D : Ω → E,
+        AEStronglyMeasurable X μ → AEStronglyMeasurable D μ →
+          AEStronglyMeasurable (fun ω => step n (X ω) (D ω)) μ)
+    (h_succ :
+      ∀ n : Fin N,
+        process n.succ = fun ω =>
+          step n (process n.castSucc ω)
+            (kernel (process n.castSucc ω) (sample n ω))) :
+    ∀ n : Fin N,
+      AEStronglyMeasurable (process n.castSucc) μ ∧
+        AEStronglyMeasurable
+          (fun ω => kernel (process n.castSucc ω) (sample n ω)) μ := by
+  have hprocess :
+      ∀ n : Fin (N + 1), AEStronglyMeasurable (process n) μ := by
+    intro n
+    refine Fin.induction ?_ ?_ n
+    · have hconst : AEStronglyMeasurable (fun _ : Ω => x0) μ :=
+        aestronglyMeasurable_const
+      simpa only [h_zero] using hconst
+    · intro n hprev
+      have hdirection := h_kernel n hprev
+      have hupdated := h_step n (process n.castSucc)
+        (fun ω => kernel (process n.castSucc ω) (sample n ω))
+        hprev hdirection
+      simpa only [h_succ n] using hupdated
+  intro n
+  have hcurrent := hprocess n.castSucc
+  exact ⟨hcurrent, h_kernel n hcurrent⟩
+
+/-- The expected squared distance after an affine oracle update splits into
+target, residual, and oracle second-moment terms.
+
+If `xNext = x - eta • oracle` and `oracle = target + residual`, current
+distance and oracle second moments together with residual cross-term
+integrability suffice for the exact integrated Hilbert-space identity.
+
+Layer: Layer1 | Gap: Level 1 (integrated affine-update distance identity with oracle residual split)
+Proof: expand the update pointwise by real Hilbert polarization, split the oracle inner product, derive target-inner integrability from the oracle and residual terms, and apply Bochner integral linearity.
+Source: Mathlib real inner-product norm-square polarization and Bochner integral linearity, with SOptLib L2 inner-product integrability
+Used in: stochastic gradient, zeroth-order, and variance-reduced one-step analyses before residual cancellation and distance telescoping
+Book citation: book/FOML/StochasticZerothOrder.json#/main_theorem/proof/13
+Origin algorithm: G. Lan, First-Order and Stochastic Optimization Methods for Machine Learning, randomized stochastic gradient-free method -/
+theorem integral_sq_dist_update_eq_sq_dist_sub_inner_add_norm_sq_of_oracle_eq_target_add_residual
+    {Omega E : Type*} [MeasurableSpace Omega]
+    [NormedAddCommGroup E] [InnerProductSpace Real E]
+    (P : Measure Omega)
+    (x xNext target residual oracle : Omega -> E)
+    (xStar : E) (eta : Real)
+    (h_update : forall omega, xNext omega = x omega - eta • oracle omega)
+    (h_split : forall omega, oracle omega = target omega + residual omega)
+    (hx_meas : AEStronglyMeasurable x P)
+    (horacle_meas : AEStronglyMeasurable oracle P)
+    (hx_sq : Integrable (fun omega => ‖x omega - xStar‖ ^ (2 : Nat)) P)
+    (horacle_sq : Integrable (fun omega => ‖oracle omega‖ ^ (2 : Nat)) P)
+    (hresidual_inner :
+      Integrable (fun omega => inner Real (residual omega) (x omega - xStar)) P) :
+    (∫ omega, ‖xNext omega - xStar‖ ^ (2 : Nat) ∂P) =
+      (∫ omega, ‖x omega - xStar‖ ^ (2 : Nat) ∂P) -
+        2 * eta * (∫ omega, inner Real (target omega) (x omega - xStar) ∂P) -
+        2 * eta * (∫ omega, inner Real (residual omega) (x omega - xStar) ∂P) +
+        eta ^ (2 : Nat) * (∫ omega, ‖oracle omega‖ ^ (2 : Nat) ∂P) := by
+  have hdisp_meas :
+      AEStronglyMeasurable (fun omega => x omega - xStar) P :=
+    hx_meas.sub aestronglyMeasurable_const
+  have horacle_inner :
+      Integrable (fun omega => inner Real (oracle omega) (x omega - xStar)) P :=
+    integrable_inner_of_integrable_sq_norm
+      horacle_meas hdisp_meas horacle_sq hx_sq
+  have htarget_inner :
+      Integrable (fun omega => inner Real (target omega) (x omega - xStar)) P := by
+    refine (horacle_inner.sub hresidual_inner).congr
+      (Filter.Eventually.of_forall fun omega => ?_)
+    change
+      inner Real (oracle omega) (x omega - xStar) -
+          inner Real (residual omega) (x omega - xStar) =
+        inner Real (target omega) (x omega - xStar)
+    rw [h_split omega, inner_add_left]
+    ring
+  have hpoint :
+      (fun omega => ‖xNext omega - xStar‖ ^ (2 : Nat)) =ᵐ[P]
+        (fun omega =>
+          ‖x omega - xStar‖ ^ (2 : Nat) -
+            2 * eta * inner Real (target omega) (x omega - xStar) -
+            2 * eta * inner Real (residual omega) (x omega - xStar) +
+            eta ^ (2 : Nat) * ‖oracle omega‖ ^ (2 : Nat)) := by
+    filter_upwards with omega
+    rw [h_update omega]
+    have hreassoc :
+        (x omega - eta • oracle omega) - xStar =
+          (x omega - xStar) - eta • oracle omega := by
+      abel
+    rw [hreassoc, norm_sub_sq_real, inner_smul_right, norm_smul, mul_pow,
+      Real.norm_eq_abs, sq_abs, h_split omega, inner_add_right,
+      real_inner_comm (x omega - xStar) (target omega),
+      real_inner_comm (x omega - xStar) (residual omega)]
+    ring
+  have htarget_scaled :
+      Integrable
+        (fun omega => 2 * eta * inner Real (target omega) (x omega - xStar)) P :=
+    htarget_inner.const_mul (2 * eta)
+  have hresidual_scaled :
+      Integrable
+        (fun omega => 2 * eta * inner Real (residual omega) (x omega - xStar)) P :=
+    hresidual_inner.const_mul (2 * eta)
+  have horacle_scaled :
+      Integrable (fun omega => eta ^ (2 : Nat) * ‖oracle omega‖ ^ (2 : Nat)) P :=
+    horacle_sq.const_mul (eta ^ (2 : Nat))
+  have hfirst_sub :
+      Integrable
+        (fun omega =>
+          ‖x omega - xStar‖ ^ (2 : Nat) -
+            2 * eta * inner Real (target omega) (x omega - xStar)) P :=
+    hx_sq.sub htarget_scaled
+  calc
+    (∫ omega, ‖xNext omega - xStar‖ ^ (2 : Nat) ∂P) =
+        ∫ omega,
+          ‖x omega - xStar‖ ^ (2 : Nat) -
+            2 * eta * inner Real (target omega) (x omega - xStar) -
+            2 * eta * inner Real (residual omega) (x omega - xStar) +
+            eta ^ (2 : Nat) * ‖oracle omega‖ ^ (2 : Nat) ∂P :=
+      integral_congr_ae hpoint
+    _ =
+        (∫ omega,
+          (‖x omega - xStar‖ ^ (2 : Nat) -
+              2 * eta * inner Real (target omega) (x omega - xStar)) -
+            2 * eta * inner Real (residual omega) (x omega - xStar) ∂P) +
+          ∫ omega, eta ^ (2 : Nat) * ‖oracle omega‖ ^ (2 : Nat) ∂P := by
+      exact integral_add (hfirst_sub.sub hresidual_scaled) horacle_scaled
+    _ =
+      (∫ omega, ‖x omega - xStar‖ ^ (2 : Nat) ∂P) -
+        2 * eta * (∫ omega, inner Real (target omega) (x omega - xStar) ∂P) -
+        2 * eta * (∫ omega, inner Real (residual omega) (x omega - xStar) ∂P) +
+        eta ^ (2 : Nat) * (∫ omega, ‖oracle omega‖ ^ (2 : Nat) ∂P) := by
+      rw [integral_sub hfirst_sub hresidual_scaled,
+        integral_sub hx_sq htarget_scaled,
+        integral_const_mul, integral_const_mul, integral_const_mul]
+
+
+-- Merged from Staging/preconditionedGradientStep_inner_le_quadratic_drop_add_dual.lean
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: inverse-metric preconditioned-gradient one-step potential bound;
+--   orig was `omd_one_step_regret_bound`
+-- generality used: an arbitrary finite decidable coordinate type, a nonzero real
+--   step size, four real coordinate vectors, and a positive-definite real square
+--   metric; no objective, convexity, measure, filtration, oracle, or stochastic
+--   assumptions are used
+-- portable call pattern: adaptive-gradient, online Newton, and variable-metric
+--   mirror-descent analyses use the same comparator-pairing bound while changing
+--   the iterate, next iterate, direction, comparator, metric, and step size
+-- counterargument checked: the existing inverse-metric quadratic shift expansion
+--   supplies the algebraic identity but does not connect a named preconditioned
+--   update to the comparator pairing and potential-drop inequality; composing
+--   these facts is the reusable Layer1 proof step rather than paper traceability
+-- coverage search: queries "inverse metric gradient update inner product upper
+--   bound quadratic potential drop dual quadratic energy positive definite",
+--   "preconditioned gradient step inner product quadratic form difference inverse
+--   matrix", and "online mirror descent one step regret metric potential dual
+--   norm" found `Matrix.toBilin_inv_mulVec_shift_self` and
+--   `SOptLib.preconditionedGradientStep` as partial matches; Mathlib semantic
+--   search found positive-definite matrix and quadratic-form primitives but no
+--   declaration with this complete one-step conclusion
+-- minimal hypotheses: positive definiteness supplies symmetry and inverse
+--   cancellation, `Fintype` and `DecidableEq` support finite matrix algebra and
+--   inversion, and source positivity of the step size is weakened to nonzeroness
+
+/-- An inverse-metric preconditioned gradient update bounds its comparator
+pairing by the metric quadratic-potential drop plus inverse-metric energy.
+
+In fact the displayed bound is an equality under the update equation; it is
+stated as an inequality in the form used by one-step regret arguments.
+
+Layer: Layer1 | Gap: Level 1 (preconditioned-gradient one-step potential decomposition)
+Proof: substitute the named inverse-metric update into the positive-definite matrix quadratic shift expansion, then solve the resulting scalar identity using the nonzero step size.
+Source: Mathlib finite-matrix bilinear forms and positive-definite inverse cancellation, together with SOptLib's inverse-metric shift expansion and preconditioned-gradient step
+Used in: adaptive-gradient, online Newton, and variable-metric online mirror-descent proofs before summing comparator pairings into a regret bound
+Book citation: book/research/Source.json#/key_lemmas/0/statement_math
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, adaptive online mirror descent -/
+theorem preconditionedGradientStep_inner_le_quadratic_drop_add_dual
+    {ι : Type*} [Fintype ι] [DecidableEq ι]
+    (eta : ℝ) (heta : eta ≠ 0)
+    (wcur wnext g wstar : ι → ℝ) (H : Matrix ι ι ℝ)
+    (hH : H.PosDef)
+    (hstep : wnext = preconditionedGradientStep eta H g wcur) :
+    dotProduct g (wcur - wstar) ≤
+      (1 / (2 * eta)) *
+        (Matrix.toBilin' H (wcur - wstar) (wcur - wstar) -
+          Matrix.toBilin' H (wnext - wstar) (wnext - wstar)) +
+      (eta / 2) * Matrix.toBilin' H⁻¹ g g := by
+  let a : ι → ℝ := wcur - wstar
+  have hnext : wnext - wstar = a - eta • H⁻¹.mulVec g := by
+    rw [hstep, preconditionedGradientStep_def]
+    ext i
+    simp [a, sub_eq_add_neg, add_assoc, add_left_comm, add_comm]
+  have hquad := Matrix.toBilin_inv_mulVec_shift_self eta a g H hH
+  rw [← hnext] at hquad
+  have htarget :
+      dotProduct g a =
+        (1 / (2 * eta)) *
+          (Matrix.toBilin' H a a -
+            Matrix.toBilin' H (wnext - wstar) (wnext - wstar)) +
+        (eta / 2) * Matrix.toBilin' H⁻¹ g g := by
+    rw [hquad]
+    field_simp [heta]
+    ring
+  simpa [a] using le_of_eq htarget
+
+end SOptLib
+
+-- Merged from Staging/sum_inner_le_sum_quadratic_drop_add_dual_of_preconditionedGradientSteps.lean
+
+namespace SOptLib
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: cumulative inverse-metric preconditioned-gradient comparator bound;
+--   orig was `finite_index_adaptive_omd_regret`
+-- generality used: an arbitrary horizon, finite decidable coordinate type, nonzero real
+--   step size, iterate path, direction sequence, comparator, and positive-definite
+--   time-varying real square metrics; no objective, convexity, measure, filtration,
+--   oracle, or stochastic assumptions are used
+-- portable call pattern: adaptive-gradient, online Newton, and variable-metric online
+--   mirror-descent analyses sum the same one-step comparator bound while changing the
+--   path, directions, comparator, coordinate type, and positive-definite metric sequence
+-- counterargument checked: this is not merely the one-step theorem under a new name;
+--   it packages the horizon-wide summation and separates both accumulated potential-drop
+--   and inverse-metric-energy terms, a recurring boundary in regret proofs
+-- coverage search: symbol queries "sum inner product upper bound quadratic potential
+--   drop dual quadratic preconditioned gradient steps" and "finite sum one-step regret
+--   bound positive definite metric update" found
+--   `preconditionedGradientStep_inner_le_quadratic_drop_add_dual` only as a one-step
+--   partial match and generic telescope lemmas with different conclusions; Mathlib
+--   semantic search found finite-sum and inner-product primitives but no complete match
+-- minimal hypotheses: positive definiteness is pointwise in time, `Fintype` and
+--   `DecidableEq` support finite matrix algebra and inversion, and source positivity of
+--   the step size is weakened to the nonzeroness used by the one-step decomposition
+
+/-- Summing inverse-metric preconditioned-gradient steps bounds cumulative comparator
+pairings by accumulated metric quadratic-potential drops and inverse-metric energies.
+
+Each time-local update may use a different positive-definite metric, while the step size
+and comparator remain fixed across the finite horizon.
+
+Layer: Layer1 | Gap: Level 1 (finite-horizon preconditioned-gradient regret aggregation)
+Proof: apply the one-step preconditioned-gradient potential bound at every finite time, sum the inequalities, and distribute the finite sums over the potential-drop and dual-energy terms.
+Source: Mathlib finite big-operator monotonicity and distributivity, together with SOptLib's inverse-metric preconditioned-gradient one-step potential decomposition
+Used in: adaptive-gradient, online Newton, and variable-metric online mirror-descent analyses when local comparator inequalities are accumulated before controlling metric variation and dual energy
+Book citation: book/research/Source.json#/key_lemmas/0/statement_math
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, adaptive online mirror descent -/
+theorem sum_inner_le_sum_quadratic_drop_add_dual_of_preconditionedGradientSteps
+    {T : Nat} {ι : Type*} [Fintype ι] [DecidableEq ι]
+    (eta : ℝ) (heta : eta ≠ 0)
+    (w : Fin (T + 1) → ι → ℝ) (g : Fin T → ι → ℝ)
+    (H : Fin T → Matrix ι ι ℝ) (wstar : ι → ℝ)
+    (hstep : ∀ t : Fin T,
+      w (Fin.succ t) =
+        preconditionedGradientStep eta (H t) (g t) (w (Fin.castSucc t)))
+    (hH : ∀ t : Fin T, (H t).PosDef) :
+    ∑ t : Fin T, dotProduct (g t) (w (Fin.castSucc t) - wstar) ≤
+      (1 / (2 * eta)) *
+        ∑ t : Fin T,
+          (Matrix.toBilin' (H t) (w (Fin.castSucc t) - wstar)
+              (w (Fin.castSucc t) - wstar) -
+            Matrix.toBilin' (H t) (w (Fin.succ t) - wstar)
+              (w (Fin.succ t) - wstar)) +
+      (eta / 2) * ∑ t : Fin T, Matrix.toBilin' (H t)⁻¹ (g t) (g t) := by
+  let rhsStep : Fin T → ℝ := fun t =>
+    (1 / (2 * eta)) *
+      (Matrix.toBilin' (H t) (w (Fin.castSucc t) - wstar)
+          (w (Fin.castSucc t) - wstar) -
+        Matrix.toBilin' (H t) (w (Fin.succ t) - wstar)
+          (w (Fin.succ t) - wstar)) +
+    (eta / 2) * Matrix.toBilin' (H t)⁻¹ (g t) (g t)
+  have hsum :
+      ∑ t : Fin T, dotProduct (g t) (w (Fin.castSucc t) - wstar) ≤
+        ∑ t : Fin T, rhsStep t := by
+    refine Finset.sum_le_sum ?_
+    intro t _ht
+    exact preconditionedGradientStep_inner_le_quadratic_drop_add_dual
+      eta heta (w (Fin.castSucc t)) (w (Fin.succ t)) (g t) wstar (H t)
+      (hH t) (hstep t)
+  calc
+    ∑ t : Fin T, dotProduct (g t) (w (Fin.castSucc t) - wstar)
+        ≤ ∑ t : Fin T, rhsStep t := hsum
+    _ = (1 / (2 * eta)) *
+          ∑ t : Fin T,
+            (Matrix.toBilin' (H t) (w (Fin.castSucc t) - wstar)
+                (w (Fin.castSucc t) - wstar) -
+              Matrix.toBilin' (H t) (w (Fin.succ t) - wstar)
+                (w (Fin.succ t) - wstar)) +
+        (eta / 2) * ∑ t : Fin T, Matrix.toBilin' (H t)⁻¹ (g t) (g t) := by
+          dsimp [rhsStep]
+          rw [Finset.sum_add_distrib, ← Finset.mul_sum, ← Finset.mul_sum]
+
+end SOptLib
+
+/-! Phase 4 batch 18: finite-network affine-response and displacement bounds. -/
+
+/-! Promoted from Staging/FiniteNetwork_consensusError_affine_matrix_recurrence_norm_le_geometric_convolution.lean. -/
+
+noncomputable section
+
+open scoped BigOperators
+
+namespace FiniteNetwork
+
+-- Generalization plan (G0):
+-- concept/name: geometric-convolution norm bound for the forced response of a
+--   time-varying affine consensus-error recurrence; orig was
+--   `consensusState_norm_convolution_source`
+-- generality used: an arbitrary finite node carrier, real seminormed additive
+--   module, propagated-matrix family, state and forcing sequences, nonnegative scalar
+--   step, and a pointwise geometric contraction certificate; no inner product,
+--   completeness, finite-dimensionality, measure, probability, convexity,
+--   smoothness, independence, integrability, or oracle assumptions are used
+-- portable call pattern: time-varying consensus, gossip, push-sum, and
+--   gradient-tracking proofs change the mixing schedule, disagreement and
+--   forcing processes, stepsize, contraction prefactor, and rate while reusing
+--   the same passage from an exact forced response to a geometric convolution
+-- counterargument checked: this is not paper-local traceability or a pure
+--   caller-side rename because it composes a vector-valued nonautonomous
+--   response identity with product contraction, the finite-sum triangle
+--   inequality, and scalar rearrangement; existing declarations provide the
+--   unrolling and product-contraction inputs separately but not this boundary
+-- coverage search: symbol queries "forced affine matrix recurrence norm bounded
+--   by finite geometric convolution under product contraction" and "affine
+--   recurrence unroll consecutive matrix product forced response" found
+--   `linearRecurrence_eq_consecutiveProduct_response`,
+--   `affineRecurrence_window_unroll`, and
+--   `consensusError_piLpNorm_consecutiveMatrixProduct_le_geometric_of_blockMinorization`;
+--   LeanSearch found `norm_sum_le`, so coverage is partial rather than full
+-- minimal hypotheses: the exact response is required only at the requested
+--   horizon, contraction is assumed only as the reusable product estimate, and
+--   nonnegativity of `alpha` is precisely what permits scaling inequalities
+
+/-- The norm of an exact forced consensus-error response is bounded by a finite
+geometric convolution whenever every propagated forcing term satisfies the
+corresponding geometric product-contraction estimate.
+
+Layer: Layer1 | Gap: Level 1 (forced time-varying consensus response convolution bound)
+Proof: rewrite by the exact finite response, pull out the nonnegative scalar, apply the finite-sum norm bound termwise, insert the geometric product contraction, and distribute the stepsize into the convolution.
+Source: discrete variation-of-constants for nonautonomous linear systems, Mathlib `norm_sum_le`, finite `PiLp 2` norms, and SOptLib consecutive matrix products and finite-network consensus error
+Used in: pathwise row-mixing estimates for time-varying consensus and gradient tracking, immediately after unrolling the zero-initial disagreement recursion and before applying a scalar convolution-energy bound
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/5/proof/0
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem consensusError_affine_matrix_recurrence_norm_le_geometric_convolution
+    {Node E : Type*} [Fintype Node]
+    [SeminormedAddCommGroup E] [NormedSpace Real E]
+    (P : Nat -> Nat -> Matrix Node Node Real) (X Y : Nat -> Node -> E)
+    (alpha M r : Real) (t : Nat)
+    (halpha : 0 <= alpha)
+    (hresponse :
+      X t = (-alpha) •
+        ∑ j ∈ Finset.range t,
+          consensusError
+            (Matrix.smulVec
+              (P (j + 1) (t - 1 - j)) (Y j)))
+    (hcontract : forall (s k : Nat) (Z : Node -> E),
+      ‖(WithLp.toLp 2
+          (consensusError
+            (Matrix.smulVec (P s k) Z)) :
+          PiLp 2 (fun _ : Node => E))‖ <=
+        M * r ^ k *
+          ‖(WithLp.toLp 2 (consensusError Z) :
+            PiLp 2 (fun _ : Node => E))‖) :
+    ‖(WithLp.toLp 2 (X t) : PiLp 2 (fun _ : Node => E))‖ <=
+      ∑ j ∈ Finset.range t,
+        M * r ^ (t - 1 - j) *
+          (alpha *
+            ‖(WithLp.toLp 2 (consensusError (Y j)) :
+              PiLp 2 (fun _ : Node => E))‖) := by
+  let response : Nat -> PiLp 2 (fun _ : Node => E) := fun j =>
+    WithLp.toLp 2
+      (consensusError
+        (Matrix.smulVec
+          (P (j + 1) (t - 1 - j)) (Y j)))
+  let forcingNorm : Nat -> Real := fun j =>
+    ‖(WithLp.toLp 2 (consensusError (Y j)) :
+      PiLp 2 (fun _ : Node => E))‖
+  have hresponseLp :
+      (WithLp.toLp 2 (X t) : PiLp 2 (fun _ : Node => E)) =
+        (-alpha) • ∑ j ∈ Finset.range t, response j := by
+    rw [hresponse]
+    rw [WithLp.toLp_smul, WithLp.toLp_sum]
+  have hresponse_bound (j : Nat) :
+      ‖response j‖ <= M * r ^ (t - 1 - j) * forcingNorm j := by
+    exact hcontract (j + 1) (t - 1 - j) (Y j)
+  rw [hresponseLp, norm_smul, Real.norm_eq_abs, abs_neg,
+    abs_of_nonneg halpha]
+  change
+    alpha * ‖∑ j ∈ Finset.range t, response j‖ <=
+      ∑ j ∈ Finset.range t,
+        M * r ^ (t - 1 - j) * (alpha * forcingNorm j)
+  calc
+    alpha * ‖∑ j ∈ Finset.range t, response j‖ <=
+        alpha * ∑ j ∈ Finset.range t, ‖response j‖ := by
+      apply mul_le_mul_of_nonneg_left _ halpha
+      exact norm_sum_le (Finset.range t) response
+    _ <= alpha *
+        ∑ j ∈ Finset.range t,
+          M * r ^ (t - 1 - j) * forcingNorm j := by
+      apply mul_le_mul_of_nonneg_left _ halpha
+      apply Finset.sum_le_sum
+      intro j _hj
+      exact hresponse_bound j
+    _ = ∑ j ∈ Finset.range t,
+        M * r ^ (t - 1 - j) *
+          (alpha * forcingNorm j) := by
+      rw [Finset.mul_sum]
+      apply Finset.sum_congr rfl
+      intro j _hj
+      ring
+
+end FiniteNetwork
+
+/-! Promoted from Staging/FiniteNetwork_consensusError_affine_matrix_recurrence_unroll.lean. -/
+
+noncomputable section
+
+open scoped BigOperators Matrix.Module
+
+namespace FiniteNetwork
+
+-- Generalization plan (G0):
+-- concept/name: finite-horizon variation-of-constants formula for a zero-initial
+--   affine consensus-error matrix recurrence; orig was `consensusState_unroll_source`
+-- generality used: an arbitrary finite nonempty node carrier with decidable equality,
+--   an additive commutative real module, a time-varying square-matrix schedule whose
+--   rows sum to one, state and forcing sequences, and a constant real stepsize; no
+--   norm, topology, completeness, inner product, finite-dimensionality, measure,
+--   probability, convexity, smoothness, independence, integrability, or oracle
+--   assumptions are used
+-- portable call pattern: distributed gradient, push-sum, gossip, and tracking proofs
+--   change the row-normalized mixing schedule, disagreement process, forcing process,
+--   and stepsize while reusing the same exact propagated finite-response identity
+-- counterargument checked: this is not paper-local traceability or a pure wrapper;
+--   the generic continuous-linear recurrence theorem does not identify its operator
+--   product with a concrete row-stochastic matrix product, while the existing
+--   geometric-convolution theorem assumes this exact response instead of deriving it
+-- coverage search: symbol queries for "zero initialized affine matrix recurrence
+--   consensus error equality finite sum consecutive product forcing row stochastic"
+--   and "consensus error recurrence unroll consecutive matrix product finite response"
+--   found `linearRecurrence_eq_consecutiveProduct_response`,
+--   `affineRecurrence_window_unroll`, and
+--   `consensusError_affine_matrix_recurrence_norm_le_geometric_convolution`; Mathlib
+--   LeanSearch found only homogeneous scalar `LinearRecurrence` APIs, so all coverage
+--   is partial rather than alpha-equivalent or sufficient for this matrix-projector bridge
+-- minimal hypotheses: row nonnegativity is dropped because only preservation of
+--   constant states is used; zero initialization and the successor recurrence are
+--   pointwise hypotheses, and all analytic assumptions from the source are removed
+
+/-- A zero-initial affine consensus-error recurrence driven by row-sum-one
+time-varying matrices equals the finite sum of projected forcing terms propagated
+by the corresponding consecutive matrix products.
+
+Layer: Layer1 | Gap: Level 1 (row-sum-one affine consensus-response unrolling)
+Proof: induct on the horizon, distribute the newest matrix action and consensus projector over the finite response, remove the redundant inner projector using the row-sum-one hypothesis, and extend each consecutive product by the newest matrix.
+Source: discrete variation-of-constants for nonautonomous linear systems, Mathlib matrix-module actions and finite sums, and SOptLib finite-network consensus-error and consecutive-product APIs
+Used in: exact pathwise unrolling of row-mixed consensus disagreement before a product-contraction estimate in distributed gradient, push-sum, and gradient-tracking analyses
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/6/proof/19
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem consensusError_affine_matrix_recurrence_unroll
+    {Node E : Type*} [Fintype Node] [DecidableEq Node] [Nonempty Node]
+    [AddCommGroup E] [Module Real E]
+    (A : Nat -> Matrix Node Node Real) (X Y : Nat -> Node -> E)
+    (alpha : Real)
+    (hrow : forall k i, ∑ j, A k i j = 1)
+    (hzero : X 0 = 0)
+    (hsucc : forall k,
+      X (k + 1) =
+        consensusError (A k • X k) - alpha • consensusError (Y k))
+    (t : Nat) :
+    X t =
+      (-alpha) •
+        ∑ j ∈ Finset.range t,
+          consensusError
+            ((consecutiveProduct A (j + 1) (t - 1 - j)) • Y j) := by
+  classical
+  have hconsensus_zero : consensusError (0 : Node -> E) = 0 := by
+    funext i
+    simp [consensusError_apply, meanState, SOptLib.finiteUniformAverage_def]
+  have hconsensus_add (U V : Node -> E) :
+      consensusError (U + V) = consensusError U + consensusError V := by
+    funext i
+    simp only [consensusError_apply, Pi.add_apply, meanState,
+      SOptLib.finiteUniformAverage_def, Finset.sum_add_distrib, smul_add]
+    abel
+  have hconsensus_smul (a : Real) (U : Node -> E) :
+      consensusError (a • U) = a • consensusError U := by
+    funext i
+    simp only [consensusError_apply, Pi.smul_apply, meanState,
+      SOptLib.finiteUniformAverage_def, Finset.smul_sum, smul_sub]
+    apply congrArg (fun z => a • U i - z)
+    apply Finset.sum_congr rfl
+    intro j _
+    rw [smul_smul, smul_smul, mul_comm]
+  have hconsensus_sum (s : Finset Nat) (U : Nat -> Node -> E) :
+      consensusError (∑ i ∈ s, U i) = ∑ i ∈ s, consensusError (U i) := by
+    induction s using Finset.induction_on with
+    | empty => simpa only [Finset.sum_empty] using hconsensus_zero
+    | @insert i s hi ih =>
+        simp only [Finset.sum_insert hi]
+        rw [hconsensus_add, ih]
+  have hmatrix_smul (B : Matrix Node Node Real) (a : Real) (U : Node -> E) :
+      B • (a • U) = a • (B • U) := by
+    funext i
+    simp only [Matrix.Module.smul_apply, Pi.smul_apply]
+    calc
+      (∑ j, B i j • a • U j) = ∑ j, a • (B i j • U j) := by
+        apply Finset.sum_congr rfl
+        intro j _
+        rw [smul_smul, smul_smul, mul_comm]
+      _ = a • ∑ j, B i j • U j := by rw [Finset.smul_sum]
+  have hmatrix_sum (B : Matrix Node Node Real)
+      (s : Finset Nat) (U : Nat -> Node -> E) :
+      B • (∑ i ∈ s, U i) = ∑ i ∈ s, B • U i := by
+    induction s using Finset.induction_on with
+    | empty => simp
+    | @insert i s hi ih =>
+        simp only [Finset.sum_insert hi, smul_add, ih]
+  induction t with
+  | zero => simpa using hzero
+  | succ t ih =>
+      rw [hsucc t, ih, hmatrix_smul, hconsensus_smul]
+      rw [hmatrix_sum (A t) (Finset.range t)
+        (fun j => consensusError
+          ((consecutiveProduct A (j + 1) (t - 1 - j)) • Y j))]
+      rw [hconsensus_sum]
+      have hterm : ∀ j ∈ Finset.range t,
+          consensusError
+              (A t •
+                consensusError
+                  ((consecutiveProduct A (j + 1) (t - 1 - j)) • Y j)) =
+            consensusError
+              ((consecutiveProduct A (j + 1) (t - j)) • Y j) := by
+        intro j hj
+        have hjt : j < t := Finset.mem_range.mp hj
+        rw [← consensusError_smulVec_consensusError_of_sum_row_eq_one
+          (A t) ((consecutiveProduct A (j + 1) (t - 1 - j)) • Y j)
+          (hrow t)]
+        rw [show t - j = (t - 1 - j) + 1 by omega,
+          consecutiveProduct_succ]
+        rw [show j + 1 + (t - 1 - j) = t by omega]
+        simp only [smul_smul]
+      have hsum :
+          (∑ j ∈ Finset.range t,
+              consensusError
+                (A t •
+                  consensusError
+                    ((consecutiveProduct A (j + 1) (t - 1 - j)) • Y j))) =
+            ∑ j ∈ Finset.range t,
+              consensusError
+                ((consecutiveProduct A (j + 1) (t - j)) • Y j) := by
+        apply Finset.sum_congr rfl
+        intro j hj
+        exact hterm j hj
+      rw [hsum, Finset.sum_range_succ]
+      simp only [show t + 1 - 1 = t by omega, Nat.sub_self,
+        consecutiveProduct_zero, one_smul]
+      module
+
+end FiniteNetwork
+
+/-! Promoted from Staging/finite_horizon_integral_displacement_sq_le_of_affine_update_and_operator_bound.lean. -/
+
+open MeasureTheory
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: finite-horizon integrated displacement energy controlled by an affine update and an operator-action energy bound; orig was `displacement_energy_le_consensus_tracker`
+-- generality used: an arbitrary measure, finite coordinate type, real normed vector-space coordinates, time-varying state/error/direction processes, and a time-varying operator; no probability, inner product, completeness, finite dimension, smoothness, convexity, filtration, or oracle assumptions
+-- portable call pattern: decentralized gradient, gradient-tracking, and consensus proofs change the random state, disagreement process, search direction, communication operator, action bound, stepsize, horizon, and measure while retaining the same finite-horizon displacement-energy conclusion
+-- counterargument checked: this is not paper-local traceability or a caller-side expression because it packages the nontrivial pathwise affine split, operator-energy transport, Bochner integral comparison, finite-horizon aggregation, and terminal error-energy enlargement in one reusable Layer1 contract
+-- coverage search: queried `finite horizon integral squared norm displacement upper bound affine update operator bound`, `sum integral norm squared difference bounded consensus direction affine recurrence`, and Mathlib's semantic equivalent; `SOptLib.norm_add_sq_le_two_mul_norm_sq_add_two_mul_norm_sq`, `SOptLib.dependentProductNormSq`, and integral monotonicity cover constituents only, while no hit covers the complete finite-horizon conclusion
+-- minimal hypotheses: the update and operator estimates are pointwise only on the summed horizon; squared-energy integrability is required only for the three terms integrated at times below the horizon, the operator coefficient is nonnegative so its root-energy estimate can be squared, and the arbitrary measure need not be finite
+
+/-- A finite-horizon affine update has integrated displacement energy at most
+twice the operator-scaled error energy plus twice the scaled direction energy.
+The error energy includes the terminal time, so the estimate applies directly
+to state-energy conventions that sum from time zero through the horizon.
+
+Layer: Layer1 | Gap: Level 1 (finite-horizon affine displacement-energy aggregation)
+Proof: split each affine displacement coordinate with the binary norm-square inequality, apply the supplied operator-action energy bound, integrate using the three integrability hypotheses, sum over the horizon, and enlarge the error sum by its nonnegative terminal integral.
+Source: Mathlib Bochner integral monotonicity and finite-sum algebra together with SOptLib's finite dependent-product squared energy and binary norm-square inequality
+Used in: decentralized gradient tracking and consensus analyses that charge the total primal movement to disagreement energy and stepsize-scaled tracker or search-direction energy
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/6/proof/23
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem finite_horizon_integral_displacement_sq_le_of_affine_update_and_operator_bound
+    {Ω ι E : Type*} [MeasurableSpace Ω] [Fintype ι]
+    [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (μ : Measure Ω)
+    (x err dir : ℕ → Ω → ι → E)
+    (T : ℕ → (ι → E) → (ι → E))
+    (kappa alpha : ℝ) (N : ℕ)
+    (hdisp_int : ∀ t < N, Integrable (fun ω =>
+      dependentProductNormSq (x (t + 1) ω - x t ω)) μ)
+    (herr_int : ∀ t < N, Integrable (fun ω =>
+      dependentProductNormSq (err t ω)) μ)
+    (hdir_int : ∀ t < N, Integrable (fun ω =>
+      dependentProductNormSq (dir t ω)) μ)
+    (h_update : ∀ t < N, ∀ ω,
+      x (t + 1) ω - x t ω = T t (err t ω) - alpha • dir t ω)
+    (hkappa : 0 ≤ kappa)
+    (h_operator : ∀ t < N, ∀ ω,
+      Real.sqrt (dependentProductNormSq (T t (err t ω))) ≤
+        kappa * Real.sqrt (dependentProductNormSq (err t ω))) :
+    (∑ t ∈ Finset.range N,
+        ∫ ω, dependentProductNormSq (x (t + 1) ω - x t ω) ∂μ) ≤
+      2 * kappa ^ 2 *
+          (∑ t ∈ Finset.range (N + 1),
+            ∫ ω, dependentProductNormSq (err t ω) ∂μ) +
+        2 * alpha ^ 2 *
+          (∑ t ∈ Finset.range N,
+            ∫ ω, dependentProductNormSq (dir t ω) ∂μ) := by
+  have hstep : ∀ t ∈ Finset.range N,
+      (∫ ω, dependentProductNormSq (x (t + 1) ω - x t ω) ∂μ) ≤
+        2 * kappa ^ 2 *
+            (∫ ω, dependentProductNormSq (err t ω) ∂μ) +
+          2 * alpha ^ 2 *
+            (∫ ω, dependentProductNormSq (dir t ω) ∂μ) := by
+    intro t ht
+    have htN : t < N := Finset.mem_range.mp ht
+    have hpoint (ω : Ω) :
+        dependentProductNormSq (x (t + 1) ω - x t ω) ≤
+          2 * kappa ^ 2 * dependentProductNormSq (err t ω) +
+            2 * alpha ^ 2 * dependentProductNormSq (dir t ω) := by
+      rw [h_update t htN ω]
+      have hoperator_sq :
+          dependentProductNormSq (T t (err t ω)) ≤
+            kappa ^ 2 * dependentProductNormSq (err t ω) := by
+        have hout : 0 ≤ dependentProductNormSq (T t (err t ω)) :=
+          dependentProductNormSq_nonneg _
+        have hin : 0 ≤ dependentProductNormSq (err t ω) :=
+          dependentProductNormSq_nonneg _
+        have hsq := (sq_le_sq₀ (Real.sqrt_nonneg _)
+          (mul_nonneg hkappa (Real.sqrt_nonneg _))).2
+            (h_operator t htN ω)
+        rw [Real.sq_sqrt hout, mul_pow, Real.sq_sqrt hin] at hsq
+        exact hsq
+      have hsplit :
+          dependentProductNormSq
+              (T t (err t ω) - alpha • dir t ω) ≤
+            2 * dependentProductNormSq (T t (err t ω)) +
+              2 * alpha ^ 2 * dependentProductNormSq (dir t ω) := by
+        simp only [dependentProductNormSq_def]
+        rw [Finset.mul_sum, Finset.mul_sum, ← Finset.sum_add_distrib]
+        apply Finset.sum_le_sum
+        intro i _hi
+        simpa [sub_eq_add_neg, norm_smul, Real.norm_eq_abs, mul_pow, sq_abs,
+          mul_assoc] using
+          (norm_add_sq_le_two_mul_norm_sq_add_two_mul_norm_sq
+            (T t (err t ω) i) (-(alpha • dir t ω i)))
+      calc
+        dependentProductNormSq (T t (err t ω) - alpha • dir t ω) ≤
+            2 * dependentProductNormSq (T t (err t ω)) +
+              2 * alpha ^ 2 * dependentProductNormSq (dir t ω) := hsplit
+        _ ≤ 2 * (kappa ^ 2 * dependentProductNormSq (err t ω)) +
+              2 * alpha ^ 2 * dependentProductNormSq (dir t ω) :=
+          add_le_add
+            (mul_le_mul_of_nonneg_left hoperator_sq (by norm_num)) le_rfl
+        _ = 2 * kappa ^ 2 * dependentProductNormSq (err t ω) +
+              2 * alpha ^ 2 * dependentProductNormSq (dir t ω) := by ring
+    have hrhs_int : Integrable (fun ω =>
+        2 * kappa ^ 2 * dependentProductNormSq (err t ω) +
+          2 * alpha ^ 2 * dependentProductNormSq (dir t ω)) μ :=
+      ((herr_int t htN).const_mul (2 * kappa ^ 2)).add
+        ((hdir_int t htN).const_mul (2 * alpha ^ 2))
+    have hmono := integral_mono_ae (hdisp_int t htN) hrhs_int
+      (Filter.Eventually.of_forall hpoint)
+    calc
+      (∫ ω, dependentProductNormSq (x (t + 1) ω - x t ω) ∂μ) ≤
+          ∫ ω, 2 * kappa ^ 2 * dependentProductNormSq (err t ω) +
+            2 * alpha ^ 2 * dependentProductNormSq (dir t ω) ∂μ := hmono
+      _ = 2 * kappa ^ 2 *
+            (∫ ω, dependentProductNormSq (err t ω) ∂μ) +
+          2 * alpha ^ 2 *
+            (∫ ω, dependentProductNormSq (dir t ω) ∂μ) := by
+        rw [integral_add
+          ((herr_int t htN).const_mul (2 * kappa ^ 2))
+          ((hdir_int t htN).const_mul (2 * alpha ^ 2)),
+          integral_const_mul, integral_const_mul]
+  calc
+    (∑ t ∈ Finset.range N,
+        ∫ ω, dependentProductNormSq (x (t + 1) ω - x t ω) ∂μ) ≤
+        ∑ t ∈ Finset.range N,
+          (2 * kappa ^ 2 *
+              (∫ ω, dependentProductNormSq (err t ω) ∂μ) +
+            2 * alpha ^ 2 *
+              (∫ ω, dependentProductNormSq (dir t ω) ∂μ)) :=
+      Finset.sum_le_sum hstep
+    _ = 2 * kappa ^ 2 *
+          (∑ t ∈ Finset.range N,
+            ∫ ω, dependentProductNormSq (err t ω) ∂μ) +
+        2 * alpha ^ 2 *
+          (∑ t ∈ Finset.range N,
+            ∫ ω, dependentProductNormSq (dir t ω) ∂μ) := by
+      rw [Finset.sum_add_distrib, Finset.mul_sum, Finset.mul_sum]
+    _ ≤ 2 * kappa ^ 2 *
+          (∑ t ∈ Finset.range (N + 1),
+            ∫ ω, dependentProductNormSq (err t ω) ∂μ) +
+        2 * alpha ^ 2 *
+          (∑ t ∈ Finset.range N,
+            ∫ ω, dependentProductNormSq (dir t ω) ∂μ) := by
+      apply add_le_add
+      · apply mul_le_mul_of_nonneg_left _ (by positivity)
+        rw [Finset.sum_range_succ]
+        exact le_add_of_nonneg_right
+          (integral_nonneg fun ω => dependentProductNormSq_nonneg (err N ω))
+      · exact le_rfl
+
+end SOptLib

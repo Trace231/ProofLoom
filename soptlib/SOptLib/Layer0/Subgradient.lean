@@ -10,6 +10,7 @@ import Mathlib.Topology.MetricSpace.ProperSpace
 import Mathlib.Tactic
 import SOptLib.Model.IsSimpleConvexTermOn
 import SOptLib.Model.Carrier
+import SOptLib.Model.Saddle
 
 open scoped BigOperators InnerProductSpace
 
@@ -1109,3 +1110,102 @@ theorem abs_inner_block_sum_le_sum_dual_bound_mul_radius
                 rw [hpair]
               _ ≤ dual i * radius i := hsupport i
               _ ≤ M i * R i := hmajor
+
+
+-- Phase 4 batch 2 merge from Staging/saddleGap_le_inner_signed_subgradient.lean
+open scoped InnerProductSpace
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: pointwise saddle-gap upper bound from signed component subgradients; orig was single_iterate_phi_gap_le_meanOracle_inner, renamed away from iterate, phi, and mean-oracle setup names.
+-- generality used: arbitrary carrier types `X` and `Y`, real Hilbert evaluation spaces `EX` and `EY`, a payoff `L`, evaluation maps, and pointwise support inequalities for `gx` and `-gy`; no measure, filtration, integrability, convexity, smoothness, boundedness, or finite-dimensionality hypotheses are used.
+-- portable call pattern: stochastic mirror descent, mirror-prox, and primal-dual saddle proofs can convert component carrier subgradient certificates at the current saddle point into a product-space signed oracle pairing before summing over time or taking expectations; the payoff, carrier encodings, evaluation maps, and component subgradient sources change while the gap-to-pairing conclusion stays fixed.
+-- counterargument checked: this is not only paper-local traceability because it packages the recurring convex-concave first-order gap split and signed product-inner recombination; it is not a pure rename of `saddleGap` or `mem_carrierSubdifferential_iff` because it composes both component supports and the `WithLp` product-inner sign convention.
+-- coverage search: searched `saddle gap upper bound component subgradient inner product signed`, `gap less inner signed subgradient convex concave saddle`, and `carrier subdifferential inner product support inequality`; hits included `SOptLib.saddleGap`, `SOptLib.saddleGap_weightedProductOutput_le_weighted_sum`, `SOptLib.saddle_gap_le_of_primal_dual_descent_and_mismatch`, and carrier-subdifferential support lemmas, but none covered this pointwise signed two-block subgradient-to-gap inequality.
+-- minimal hypotheses: all already minimal for the proof; carrier-subdifferential membership is exposed as the exact pointwise support inequalities so future callers can instantiate from carrier, ambient, or selected-subgradient APIs.
+
+/-- A pointwise saddle gap is bounded by the signed product subgradient pairing.
+
+If `gx` supports the payoff in the primal coordinate at the current pair and
+`-gy` supports the negated payoff in the dual coordinate, then the cross
+saddle gap from the current pair to a comparison pair is bounded by the
+inner product of the signed two-block subgradient `(gx, -gy)` with the
+evaluated product displacement.
+
+Layer: Layer0 | Gap: Level 1 (signed component subgradient saddle-gap bound)
+Proof: specialize the two component support inequalities at the comparison
+  coordinates, rearrange them into one-sided value-gap bounds, add the bounds,
+  and rewrite the result as a `WithLp` product-space inner product.
+Source: convex-concave first-order support inequalities, SOptLib saddle-gap
+  model, and Mathlib real Hilbert product inner-product algebra
+Used in: stochastic convex-concave saddle-point mirror descent when converting
+  the one-iterate primal-dual value gap into the deterministic signed mean
+  oracle pairing before weighted regret aggregation
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/algorithm_spec/steps/0
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, stochastic mirror descent for stochastic convex-concave
+  saddle point problems -/
+theorem saddleGap_le_inner_signed_subgradient
+    {X Y EX EY : Type*}
+    [NormedAddCommGroup EX] [InnerProductSpace ℝ EX]
+    [NormedAddCommGroup EY] [InnerProductSpace ℝ EY]
+    (L : X → Y → ℝ) (evalX : X → EX) (evalY : Y → EY)
+    (gx : X → Y → EX) (gy : X → Y → EY) (zt u : X × Y)
+    (hx_support :
+      ∀ x : X,
+        L zt.1 zt.2 + ⟪gx zt.1 zt.2, evalX x - evalX zt.1⟫_ℝ ≤ L x zt.2)
+    (hy_support :
+      ∀ y : Y,
+        -L zt.1 zt.2 + ⟪-gy zt.1 zt.2, evalY y - evalY zt.2⟫_ℝ ≤
+          -L zt.1 y) :
+    saddleGap L zt u ≤
+      ⟪WithLp.toLp 2 (gx zt.1 zt.2, -gy zt.1 zt.2),
+        WithLp.toLp 2 (evalX zt.1, evalY zt.2) -
+          WithLp.toLp 2 (evalX u.1, evalY u.2)⟫_ℝ := by
+  have hx := hx_support u.1
+  have hy := hy_support u.2
+  have hx' :
+      L zt.1 zt.2 - L u.1 zt.2 ≤
+        ⟪gx zt.1 zt.2, evalX zt.1 - evalX u.1⟫_ℝ := by
+    have hxinner :
+        ⟪gx zt.1 zt.2, evalX zt.1 - evalX u.1⟫_ℝ =
+          -⟪gx zt.1 zt.2, evalX u.1 - evalX zt.1⟫_ℝ := by
+      have hdisp : evalX zt.1 - evalX u.1 = -(evalX u.1 - evalX zt.1) := by
+        abel
+      rw [hdisp, inner_neg_right]
+    linarith
+  have hy' :
+      L zt.1 u.2 - L zt.1 zt.2 ≤
+        ⟪gy zt.1 zt.2, evalY u.2 - evalY zt.2⟫_ℝ := by
+    have hyinner :
+        ⟪-gy zt.1 zt.2, evalY u.2 - evalY zt.2⟫_ℝ =
+          -⟪gy zt.1 zt.2, evalY u.2 - evalY zt.2⟫_ℝ := by
+      simp
+    linarith
+  have hsum := add_le_add hy' hx'
+  calc
+    saddleGap L zt u =
+        (L zt.1 u.2 - L zt.1 zt.2) +
+          (L zt.1 zt.2 - L u.1 zt.2) := by
+      simp [saddleGap]
+    _ ≤
+        ⟪gy zt.1 zt.2, evalY u.2 - evalY zt.2⟫_ℝ +
+          ⟪gx zt.1 zt.2, evalX zt.1 - evalX u.1⟫_ℝ := hsum
+    _ =
+        ⟪WithLp.toLp 2 (gx zt.1 zt.2, -gy zt.1 zt.2),
+          WithLp.toLp 2 (evalX zt.1, evalY zt.2) -
+            WithLp.toLp 2 (evalX u.1, evalY u.2)⟫_ℝ := by
+      simp only [WithLp.prod_inner_apply, WithLp.ofLp_fst, WithLp.ofLp_snd,
+        WithLp.toLp_fst, WithLp.toLp_snd, WithLp.sub_fst, WithLp.sub_snd]
+      have hyinner :
+          ⟪-gy zt.1 zt.2, evalY zt.2 - evalY u.2⟫_ℝ =
+            ⟪gy zt.1 zt.2, evalY u.2 - evalY zt.2⟫_ℝ := by
+        have hdisp : evalY zt.2 - evalY u.2 = -(evalY u.2 - evalY zt.2) := by
+          abel
+        rw [hdisp, inner_neg_left, inner_neg_right]
+        ring
+      rw [hyinner]
+      ring
+
+end SOptLib

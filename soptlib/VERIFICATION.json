@@ -4,9 +4,9 @@
     {
       "id": "SOptLib",
       "compiled": true,
-      "source_files": 45,
+      "source_files": 110,
       "axiom_inspection_exit_code": 0,
-      "theorems_checked": 2874,
+      "theorems_checked": 5002,
       "algorithm_theorems_checked": 0,
       "nonstandard_dependencies": [
         {
@@ -60,7 +60,7 @@
       "public_algorithm_uses_sorryAx": false,
       "algorithm_native_decide_axioms": [],
       "algorithm_custom_axioms": [],
-      "source_tree_sha256": "fd27a6858cf01d9fdf7f8a874fe01a09ade487b75f0aa129ea08a442f9c5839a",
+      "source_tree_sha256": "54d8196926476e66873e3c9824cc08a4a2048b35f0acd279178eb7f961d0cd46",
       "source_holes": [],
       "source_declarations": [
         {

@@ -6,6 +6,7 @@ import Mathlib.Tactic
 import SOptLib.Glue.Algebra
 import SOptLib.Glue.Analysis
 import SOptLib.Model.Subdifferential
+import SOptLib.Model.Bregman
 
 open Topology
 open scoped InnerProductSpace
@@ -2553,5 +2554,495 @@ theorem carrierBregmanProxSelectedSubgradientCertificate_subtype_iff
       (-(g + mu • grad x + eta • (grad x - grad x0))) ∈
         carrierSubdifferential h x := by
   rfl
+
+end SOptLib
+
+-- Phase 4 batch 1 merge from Staging/exists_compositeProxObjective_isMinOn_of_closed_convex_lsc_dgf.lean
+-- Generalization plan (G0):
+-- concept/name: composite Bregman prox objective minimizer existence; orig was
+--   blockProxPoint_exists_obligation, renamed away from block-algorithm setup
+--   fields while retaining the prox objective contract.
+-- generality used: a finite-dimensional real Hilbert space carrier, a closed
+--   feasible set, a carrier-subtype simple term, an ambient distance-generating
+--   potential with selected gradient, one base point, oracle vector, and
+--   positive stepsize. No measure, filtration, independence, integrability, or
+--   stochastic-oracle hypotheses are used.
+-- portable call pattern: mirror descent, block mirror descent, and composite
+--   proximal algorithms over noncompact closed convex carriers can instantiate
+--   the carrier, simple term, DGF, base point, oracle vector, and stepsize to
+--   obtain a feasible subtype minimizer without adding prox solvability as a
+--   setup assumption.
+-- counterargument checked: the ambient lsc closed-ball minimizer theorem and
+--   the accelerated composite prox closed-tail theorem are related, but neither
+--   derives the prox objective lower semicontinuity and coercive tail from a
+--   closed convex simple term plus a one-strong DGF, nor returns this
+--   single-center carrier-subtype prox minimizer certificate.
+-- coverage search: searched `existence minimizer composite prox objective
+--   closed convex lower semicontinuous coercive tail`,
+--   `composite prox objective IsMinOn closed ball tail subtype minimizer`, and
+--   `DGF lower bound half square Bregman continuous gradient`. Top hits were
+--   `SOptLib.exists_acceleratedCompositeProxObjective_isMinOn_of_closedBall_tail`
+--   with a different accelerated mixed objective and caller-supplied tail,
+--   `SOptLib.proxObjective_exists_isMinOn_compact` for compact zero-simple-term
+--   prox objectives, `exists_isMinOn_of_lsc_closed_coercive_closedBall` for the
+--   ambient minimizer step, and `IsDistanceGeneratingFunctionOn.half_sq_norm_le_bregman`
+--   for the DGF lower bound projection.
+-- minimal hypotheses: convexity is required only as `ConvexOn` for the
+--   totalized simple term to obtain an affine minorant; closed epigraph gives
+--   lower semicontinuity; finite dimensionality is used only through
+--   `ProperSpace` for compact closed balls.
+
+/-- A closed convex simple term and one-strong DGF give a minimizer of the
+composite Bregman prox objective on a noncompact closed carrier.
+
+For a feasible base point `x`, oracle vector `g`, and positive stepsize `γ`, the
+shifted objective
+`u ↦ ⟪g, u - x⟫ + γ⁻¹ D_ν(x,u) + χ(u)` attains its minimum over the feasible
+carrier subtype.
+
+Layer: Model | Gap: Level 1 (noncompact composite Bregman prox minimizer existence)
+Proof: build lower semicontinuity from continuity of the DGF section and the
+  closed epigraph of the totalized simple term; use an affine lower minorant of
+  the closed convex simple term and the DGF half-square lower bound to obtain a
+  closed-ball coercive tail, then apply the lsc closed-tail minimizer theorem.
+Source: Mathlib convex affine-minorant and lower-semicontinuity APIs, SOptLib
+  distance-generating-function Bregman lower bounds, and proper-space compact
+  closed-ball minimization
+Used in: nonconvex stochastic block mirror descent prox-solvability for each
+  block subproblem over a noncompact closed convex feasible block
+Book citation: book/FOML/NonconvexStochasticBlockMirrorDescent.json#/algorithm_spec
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, nonconvex stochastic block mirror descent -/
+theorem exists_compositeProxObjective_isMinOn_of_closed_convex_lsc_dgf
+    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+    [FiniteDimensional ℝ E] [CompleteSpace E]
+    {X : Set E} (chi : {z : E // z ∈ X} → ℝ)
+    (nu : E → ℝ) (grad : E → E)
+    (hX_closed : IsClosed X)
+    (hchi_closed : IsClosed {p : ({z : E // z ∈ X} × ℝ) | chi p.1 ≤ p.2})
+    (hchi_convex : ConvexOn ℝ X (SOptLib.totalizeOn X chi))
+    (hdgf : IsDistanceGeneratingFunctionOn X nu grad)
+    (x : {z : E // z ∈ X}) (g : E) (γ : ℝ) (hγ : 0 < γ) :
+    ∃ xmin : {z : E // z ∈ X},
+      IsMinOn
+        (fun z : {z : E // z ∈ X} =>
+          ⟪g, z.1 - x.1⟫_ℝ +
+            γ⁻¹ * carrierBregmanFormula nu id grad x.1 z.1 + chi z)
+        Set.univ xmin := by
+  classical
+  obtain ⟨ell, c, hchi_minor_total⟩ :=
+    exists_continuousLinearMap_add_const_le_of_closed_convex_lscOn
+      hX_closed hchi_convex
+      (SOptLib.lowerSemicontinuousOn_totalizeOn_of_closed_carrier_epigraph
+        (X := X) (h := chi) hchi_closed)
+      x
+  have hchi_minor :
+      ∀ z : {z : E // z ∈ X}, ell z.1 + c ≤ chi z := by
+    intro z
+    simpa [SOptLib.totalizeOn_of_mem X chi z.2] using hchi_minor_total z
+  have hγinv : 0 < γ⁻¹ := inv_pos.mpr hγ
+  let Fsub : {z : E // z ∈ X} → ℝ := fun z =>
+    ⟪g, z.1 - x.1⟫_ℝ +
+      γ⁻¹ * carrierBregmanFormula nu id grad x.1 z.1 + chi z
+  let Famb : E → ℝ := SOptLib.totalizeOn X Fsub
+  have htail_all :
+      ∀ B : ℝ, ∃ R : ℝ, ‖x.1 - x.1‖ ≤ R ∧
+        ∀ z : E, z ∈ X → R ≤ ‖z - x.1‖ → B ≤ Famb z := by
+    let ellTotal : E →L[ℝ] ℝ :=
+      (InnerProductSpace.toDual ℝ E g) + ell
+    have ha : 0 < γ⁻¹ * (1 / 2 : ℝ) := by
+      nlinarith
+    refine
+      coercive_lower_tail_of_pos_quadratic_add_clm_add_const_add_nonneg_glue
+        (X := X) x.1 x.1 (a := γ⁻¹ * (1 / 2 : ℝ))
+        ellTotal (c - ⟪g, x.1⟫_ℝ) (fun _ => 0) Famb ha ?_ ?_
+    · intro z hz
+      have hVbase :
+          (1 / 2 : ℝ) * ‖z - x.1‖ ^ 2 ≤
+            carrierBregmanFormula nu id grad x.1 z := by
+        simpa [norm_sub_rev] using hdgf.2.2 x.1 x.2 z hz
+      have hVscale :
+          (γ⁻¹ * (1 / 2 : ℝ)) * ‖z - x.1‖ ^ 2 ≤
+            γ⁻¹ * carrierBregmanFormula nu id grad x.1 z := by
+        have hmul := mul_le_mul_of_nonneg_left hVbase hγinv.le
+        nlinarith
+      have hchi : ell z + c ≤ chi ⟨z, hz⟩ :=
+        hchi_minor ⟨z, hz⟩
+      have hellTotal : ellTotal z = ⟪g, z⟫_ℝ + ell z := by
+        simp [ellTotal, InnerProductSpace.toDual_apply_apply]
+      have hinner :
+          ⟪g, z - x.1⟫_ℝ = ⟪g, z⟫_ℝ - ⟪g, x.1⟫_ℝ := by
+        rw [inner_sub_right]
+      have hF :
+          Famb z =
+            ⟪g, z - x.1⟫_ℝ +
+              γ⁻¹ * carrierBregmanFormula nu id grad x.1 z + chi ⟨z, hz⟩ := by
+        simp [Famb, Fsub, SOptLib.totalizeOn_of_mem X Fsub hz]
+      rw [hF, hellTotal, hinner]
+      nlinarith
+    · intro z hz
+      simp
+  have hnu_cont : ContinuousOn nu X := by
+    intro z hz
+    exact (hdgf.2.1 z hz).continuousAt.continuousWithinAt
+  have hV_cont :
+      ContinuousOn
+        (fun z : E => carrierBregmanFormula nu id grad x.1 z)
+        X := by
+    have hdiff : ContinuousOn (fun z : E => z - x.1) X :=
+      continuousOn_id.sub continuousOn_const
+    have hinner :
+        ContinuousOn
+          (fun z : E => ⟪grad x.1, z - x.1⟫_ℝ)
+          X :=
+      continuousOn_const.inner hdiff
+    simpa [carrierBregmanFormula] using
+      (hnu_cont.sub continuousOn_const).sub hinner
+  have hprox_cont :
+      ContinuousOn
+        (fun z : E =>
+          ⟪g, z - x.1⟫_ℝ +
+            γ⁻¹ * carrierBregmanFormula nu id grad x.1 z)
+        X := by
+    have hdiff : ContinuousOn (fun z : E => z - x.1) X :=
+      continuousOn_id.sub continuousOn_const
+    have hlin : ContinuousOn (fun z : E => ⟪g, z - x.1⟫_ℝ) X :=
+      continuousOn_const.inner hdiff
+    exact hlin.add (continuousOn_const.mul hV_cont)
+  have hchi_lsc :
+      LowerSemicontinuousOn (SOptLib.totalizeOn X chi) X :=
+    SOptLib.lowerSemicontinuousOn_totalizeOn_of_closed_carrier_epigraph
+      (X := X) (h := chi) hchi_closed
+  have hmodel_lsc :
+      LowerSemicontinuousOn
+        (fun z : E =>
+          (⟪g, z - x.1⟫_ℝ +
+            γ⁻¹ * carrierBregmanFormula nu id grad x.1 z) +
+            SOptLib.totalizeOn X chi z)
+        X :=
+    hprox_cont.lowerSemicontinuousOn.add hchi_lsc
+  have hlsc : LowerSemicontinuousOn Famb X := by
+    rw [← lowerSemicontinuous_restrict_iff] at hmodel_lsc ⊢
+    have heq :
+        X.restrict Famb =
+          X.restrict
+            (fun z : E =>
+              (⟪g, z - x.1⟫_ℝ +
+                γ⁻¹ * carrierBregmanFormula nu id grad x.1 z) +
+                SOptLib.totalizeOn X chi z) := by
+      ext z
+      simp [Set.restrict, Famb, Fsub]
+    simpa [heq] using hmodel_lsc
+  have htail_base :
+      ∃ R : ℝ, dist x.1 x.1 ≤ R ∧
+        ∀ z : E, z ∈ X → R ≤ dist z x.1 → Famb x.1 ≤ Famb z := by
+    obtain ⟨R, hbaseR, hR⟩ := htail_all (Famb x.1)
+    refine ⟨R, ?_, ?_⟩
+    · simpa [dist_eq_norm] using hbaseR
+    · intro z hz hdist
+      exact hR z hz (by simpa [dist_eq_norm] using hdist)
+  obtain ⟨zmin, hzmin, hzmin_min⟩ :=
+    exists_isMinOn_of_lsc_closed_coercive_closedBall
+      hX_closed x.1 x.1 x.2 Famb hlsc htail_base
+  refine ⟨⟨zmin, hzmin⟩, ?_⟩
+  change IsMinOn Fsub Set.univ ⟨zmin, hzmin⟩
+  rw [isMinOn_iff]
+  intro z _hz
+  have h := (isMinOn_iff.mp hzmin_min) z.1 z.2
+  simpa [Famb, Fsub, SOptLib.totalizeOn_of_mem X Fsub hzmin,
+    SOptLib.totalizeOn_of_mem X Fsub z.2] using h
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: compact literal mirror-step argmin existence; orig was
+--   mirrorStepPoint_exists, renamed away from the saddle-point setup and toward
+--   the named `literalMirrorObjective` model object.
+-- generality used: arbitrary candidate topological space `P`, arbitrary
+--   interior/base type `Xint`, Hilbert evaluation target `E`, compact nonempty
+--   full candidate carrier, continuous evaluation map, and continuity of the
+--   fixed-base literal divergence section; no measure, filtration, convexity,
+--   smoothness, oracle, or finite-dimensional hypothesis is used.
+-- portable call pattern: mirror-descent and mirror-prox compact update
+--   existence proofs where the current interior/base point is not definitionally
+--   the same type as the feasible candidate carrier can vary `Vlit`, `eval`,
+--   `x`, `g`, and `gamma` while keeping the same literal-objective minimizer
+--   conclusion.
+-- counterargument checked: Mathlib has the lower-level
+--   `IsCompact.exists_isMinOn`, and SOptLib has `mirrorStep_exists_compact` for
+--   same-type base/candidate objectives plus `proxObjective_exists_isMinOn_compact`
+--   for inverse-stepsize prox objectives; neither covers `literalMirrorObjective`
+--   with a distinct base type and literal fixed-base divergence section.
+-- coverage search: queried `literal mirror objective compact argmin exists
+--   continuous compact IsMinOn`, `literalMirrorObjective continuous candidate
+--   point compact exists IsMinOn`, and LeanSearch `compact continuous function
+--   attains minimum on univ IsMinOn`; top hits were Mathlib
+--   `IsCompact.exists_isMinOn`, SOptLib `mirrorStep_exists_compact`,
+--   `proxObjective_exists_isMinOn_compact`, and the existing
+--   `literalMirrorObjective` definition, all lower-level, same-type, or
+--   different-objective results.
+-- minimal hypotheses: fixed-base continuity is used instead of joint
+--   continuity on `Xint × P`; explicit nonemptiness is needed because `x :
+--   Xint` does not produce a candidate of type `P`.
+
+/-- A compact continuous literal mirror objective has a minimizer over all candidates.
+
+For a fixed interior/base point, if the literal divergence section and the
+candidate evaluation map are continuous, the objective
+`SOptLib.literalMirrorObjective Vlit eval x g gamma` attains its minimum on the
+full compact candidate space.
+
+Layer: Model | Gap: Level 1 (compact literal mirror-step argmin existence)
+Proof: build continuity of the literal mirror objective from continuity of the
+  linear inner-product term and the fixed-base divergence section, then apply
+  Mathlib's compact extreme-value theorem on `Set.univ`.
+Source: Mathlib compactness, closed-order topology, continuous inner-product
+  APIs, and SOptLib literal mirror-prox objective notation
+Used in: stochastic saddle-point mirror update construction selecting a compact
+  feasible carrier minimizer for a literal prox objective with an interior base
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/algorithm_spec
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, stochastic mirror descent for stochastic convex-concave
+  saddle point problems -/
+theorem literalMirrorStep_exists_compact
+    {E Xint P : Type*} [TopologicalSpace P]
+    [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+    {Vlit : Xint → P → ℝ} {eval : P → E}
+    (hcompact : IsCompact (Set.univ : Set P))
+    (hne : (Set.univ : Set P).Nonempty)
+    (heval : Continuous eval) (x : Xint)
+    (hVx : Continuous (fun u : P => Vlit x u)) (g : E) (gamma : ℝ) :
+    ∃ u : P, IsMinOn (SOptLib.literalMirrorObjective Vlit eval x g gamma) Set.univ u := by
+  have hobjective :
+      Continuous (SOptLib.literalMirrorObjective Vlit eval x g gamma) := by
+    have hinner : Continuous (fun u : P => ⟪g, eval u⟫_ℝ) :=
+      continuous_const.inner heval
+    have hlin : Continuous (fun u : P => gamma * ⟪g, eval u⟫_ℝ) :=
+      continuous_const.mul hinner
+    simpa [SOptLib.literalMirrorObjective] using hlin.add hVx
+  rcases hcompact.exists_isMinOn hne hobjective.continuousOn with
+    ⟨u, _hu, humin⟩
+  exact ⟨u, humin⟩
+
+-- Generalization plan (G0):
+-- concept/name: literalMirrorStep names the canonical selected minimizer of a
+--   literal mirror-prox objective; orig was mirrorStepPoint, renamed away from
+--   the saddle-point setup and toward the existing `literalMirrorObjective`.
+-- generality used: arbitrary interior/base type `Xint`, arbitrary compact
+--   nonempty candidate topological space `P`, Hilbert evaluation target `E`,
+--   continuous candidate evaluation, and fixed-base continuity of the literal
+--   divergence; no measure, filtration, convexity, smoothness, oracle, or
+--   finite-dimensional hypothesis is used.
+-- portable call pattern: mirror descent, mirror prox, and saddle-point mirror
+--   update constructions with a separate interior/base point and feasible
+--   carrier can vary `Vlit`, `eval`, `x`, `g`, and `gamma` while reusing the
+--   same selected compact argmin and its `IsMinOn` certificate.
+-- counterargument checked: this is not just paper traceability because future
+--   algorithms need the same canonical selector, not only existence; Mathlib
+--   supplies `IsCompact.exists_isMinOn`, and SOptLib already supplies
+--   same-type `proxStep` plus the lower-level staged existence theorem, but
+--   neither names the selected literal mirror step for distinct base and
+--   candidate types.
+-- coverage search: queried `literal mirror step compact argmin selector
+--   interior base candidate`, `argmin selector compact continuous objective
+--   choose IsMinOn`, and LeanSearch `canonical selected minimizer compact
+--   continuous function IsMinOn Classical.choose`; top hits were
+--   `SOptLib.literalMirrorStep_exists_compact`, `SOptLib.proxStep`,
+--   `SOptLib.proxStep_isMirrorStep`, and Mathlib `IsCompact.exists_isMinOn`,
+--   which are existence/lower-level or same-base-type APIs rather than this
+--   selected literal-step object.
+-- minimal hypotheses: explicit nonemptiness of `Set.univ : Set P` is retained
+--   because `x : Xint` does not produce a candidate of type `P`; joint
+--   continuity on the interior/base type is not required because the selector
+--   only uses continuity of the fixed-base candidate section.
+
+/-- Canonical selected minimizer of a compact literal mirror-prox objective.
+
+For a fixed interior/base point `x`, oracle vector `g`, and stepsize `gamma`,
+`literalMirrorStep` chooses a candidate minimizing
+`SOptLib.literalMirrorObjective Vlit eval x g gamma` over the full compact
+candidate space.
+
+Layer: Model | Concept: literal mirror-prox compact argmin selector
+Proof: (definitional construction; classical choice from the compact literal
+  mirror-step existence theorem)
+Source: Mathlib compact extreme-value theorem through
+  `SOptLib.literalMirrorStep_exists_compact` and SOptLib literal mirror-prox
+  objective notation
+Used in: stochastic saddle-point mirror update construction selecting the
+  carrier-valued minimizer of a literal prox objective from an interior base
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/algorithm_spec/steps/0
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, stochastic mirror descent for stochastic convex-concave
+  saddle point problems -/
+noncomputable def literalMirrorStep
+    {E Xint P : Type*} [TopologicalSpace P]
+    [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+    {Vlit : Xint → P → ℝ} {eval : P → E}
+    (hcompact : IsCompact (Set.univ : Set P))
+    (hne : (Set.univ : Set P).Nonempty)
+    (heval : Continuous eval) (x : Xint)
+    (hVx : Continuous (fun u : P => Vlit x u)) (g : E) (gamma : ℝ) : P :=
+  Classical.choose
+    (SOptLib.literalMirrorStep_exists_compact
+      (Vlit := Vlit) (eval := eval) hcompact hne heval x hVx g gamma)
+
+@[simp] theorem literalMirrorStep_def
+    {E Xint P : Type*} [TopologicalSpace P]
+    [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+    {Vlit : Xint → P → ℝ} {eval : P → E}
+    (hcompact : IsCompact (Set.univ : Set P))
+    (hne : (Set.univ : Set P).Nonempty)
+    (heval : Continuous eval) (x : Xint)
+    (hVx : Continuous (fun u : P => Vlit x u)) (g : E) (gamma : ℝ) :
+    SOptLib.literalMirrorStep hcompact hne heval x hVx g gamma =
+      Classical.choose
+        (SOptLib.literalMirrorStep_exists_compact
+          (Vlit := Vlit) (eval := eval) hcompact hne heval x hVx g gamma) := rfl
+
+/-- The canonical literal mirror step minimizes its literal mirror-prox objective.
+
+The selected point returned by `literalMirrorStep` is an `IsMinOn` witness for
+`SOptLib.literalMirrorObjective Vlit eval x g gamma` over all candidates.
+
+Layer: Model | Gap: Level 0 (literal mirror-step selector specification)
+Proof: project the `IsMinOn` certificate from the classical choice used in
+  `literalMirrorStep`.
+Source: Mathlib subtype-free classical choice API, compact extreme-value theorem
+  through `SOptLib.literalMirrorStep_exists_compact`, and SOptLib literal
+  mirror-prox objective notation
+Used in: stochastic saddle-point mirror update verification that the selected
+  carrier point satisfies the one-step literal prox argmin predicate
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/algorithm_spec/steps/0
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, stochastic mirror descent for stochastic convex-concave
+  saddle point problems -/
+theorem literalMirrorStep_isMinOn
+    {E Xint P : Type*} [TopologicalSpace P]
+    [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+    {Vlit : Xint → P → ℝ} {eval : P → E}
+    (hcompact : IsCompact (Set.univ : Set P))
+    (hne : (Set.univ : Set P).Nonempty)
+    (heval : Continuous eval) (x : Xint)
+    (hVx : Continuous (fun u : P => Vlit x u)) (g : E) (gamma : ℝ) :
+    IsMinOn (SOptLib.literalMirrorObjective Vlit eval x g gamma) Set.univ
+      (SOptLib.literalMirrorStep hcompact hne heval x hVx g gamma) := by
+  exact Classical.choose_spec
+    (SOptLib.literalMirrorStep_exists_compact
+      (Vlit := Vlit) (eval := eval) hcompact hne heval x hVx g gamma)
+
+/-- The canonical literal mirror step has objective value no larger than any candidate.
+
+This is the pointwise inequality form of `literalMirrorStep_isMinOn`, useful when
+algorithm proofs unfold the mirror objective into its source expression.
+
+Layer: Model | Gap: Level 0 (literal mirror-step objective inequality)
+Proof: expand `IsMinOn` over `Set.univ` and specialize the selector
+  specification to the comparison candidate.
+Source: Mathlib order extrema predicates on the universal set and SOptLib
+  literal mirror-prox objective notation
+Used in: stochastic saddle-point mirror update proofs comparing the selected
+  prox point against an arbitrary feasible carrier candidate
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/algorithm_spec/steps/0
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, stochastic mirror descent for stochastic convex-concave
+  saddle point problems -/
+theorem literalMirrorStep_minimizes
+    {E Xint P : Type*} [TopologicalSpace P]
+    [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+    {Vlit : Xint → P → ℝ} {eval : P → E}
+    (hcompact : IsCompact (Set.univ : Set P))
+    (hne : (Set.univ : Set P).Nonempty)
+    (heval : Continuous eval) (x : Xint)
+    (hVx : Continuous (fun u : P => Vlit x u)) (g : E) (gamma : ℝ) (y : P) :
+    SOptLib.literalMirrorObjective Vlit eval x g gamma
+        (SOptLib.literalMirrorStep hcompact hne heval x hVx g gamma) ≤
+      SOptLib.literalMirrorObjective Vlit eval x g gamma y := by
+  exact (isMinOn_univ_iff.mp
+    (SOptLib.literalMirrorStep_isMinOn hcompact hne heval x hVx g gamma)) y
+
+end SOptLib
+
+
+open scoped InnerProductSpace
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: two-anchor Bregman proximal objective; orig was
+--   `stochasticCSProjectionObjective`
+-- generality used: an arbitrary carrier `P`, real-valued base objective and
+--   two-point kernel, two centers, and two independent real weights; no
+--   topology, vector-space, measure, convexity, smoothness, or oracle assumptions
+-- portable call pattern: mirror-prox, accelerated proximal, conditional-sliding,
+--   and nested projection steps use the same objective while changing the
+--   carrier, base objective, kernel, centers, and coefficients
+-- counterargument checked: this is not only paper traceability or a caller-side
+--   expression because it names the canonical objective expected by reusable
+--   two-anchor Bregman descent APIs while retaining independently weighted terms
+-- coverage search: symbol searches for `two Bregman prox objective affine base
+--   independently weighted centers`, `objective equality base function plus two
+--   weighted Bregman terms`, and `constrained argmin convex function two Bregman
+--   divergences` found `proxObjective`, `acceleratedCompositeProxObjective`, and
+--   `two_bregman_argmin_descent`; the first two impose a one-kernel or coupled-
+--   coefficient shape, while the last consumes but does not name this objective;
+--   Mathlib LeanSearch was unavailable with HTTP 500
+-- minimal hypotheses: all already minimal; the definition needs no geometric,
+--   regularity, sign, feasibility, or finite-dimensional assumptions
+
+/-- The proximal objective obtained by adding two independently weighted
+Bregman-like terms, based at separate centers, to a base objective.
+
+Layer: Model | Concept: two-anchor Bregman proximal objective
+Proof: (definitional construction; sum a base objective with two independently weighted kernel sections)
+Source: Bregman proximal-point and mirror-prox two-anchor subproblem objectives, using Mathlib real scalar algebra
+Used in: stochastic conditional-sliding inner projection and accelerated or nested mirror-prox subproblems before applying a two-anchor descent inequality
+Book citation: book/research/Source.json#/algorithm_spec/steps/6
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic decentralized communication sliding -/
+def twoBregmanProxObjective
+    {P : Type*} (p : P → ℝ) (V : P → P → ℝ)
+    (x₁ x₂ : P) (mu₁ mu₂ : ℝ) (u : P) : ℝ :=
+  p u + mu₁ * V x₁ u + mu₂ * V x₂ u
+
+/-- The two-anchor Bregman proximal objective unfolds to its base term and two
+independently weighted kernel terms.
+
+Layer: Model | Gap: Level 0 (two-anchor Bregman proximal objective unfolding)
+Proof: by rfl after unfolding `twoBregmanProxObjective`.
+Source: Bregman proximal-point objective notation and Mathlib real scalar algebra
+Used in: normalization of stochastic conditional-sliding and accelerated mirror-prox subproblem objectives before invoking generic argmin descent results
+Book citation: book/research/Source.json#/algorithm_spec/steps/6
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic decentralized communication sliding -/
+@[simp]
+theorem twoBregmanProxObjective_def
+    {P : Type*} (p : P → ℝ) (V : P → P → ℝ)
+    (x₁ x₂ : P) (mu₁ mu₂ : ℝ) (u : P) :
+    twoBregmanProxObjective p V x₁ x₂ mu₁ mu₂ u =
+      p u + mu₁ * V x₁ u + mu₂ * V x₂ u := by
+  rfl
+
+/-- The accelerated composite prox objective is a specialization of the
+two-anchor objective: its previous-point regularizer has weight one, while its
+under-point regularizer has weight `gamma t * mu`.
+
+Layer: Model | Gap: Level 1 (accelerated composite prox specialization)
+Proof: unfold both objectives and normalize the real scalar expression.
+Source: accelerated stochastic approximation two-center prox subproblems and
+  Mathlib real scalar algebra
+Used in: transporting generic two-anchor objective results to accelerated
+  composite prox steps
+Book citation: book/FOML/StochasticAcceleratedGradientDescent.json#/algorithm_spec/steps/1/math
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, stochastic accelerated gradient descent -/
+theorem acceleratedCompositeProxObjective_eq_twoBregmanProxObjective
+    {T P E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+    (gamma : T → ℝ) (mu : ℝ) (h : P → ℝ) (V : P → P → ℝ) (eval : P → E)
+    (t : T) (xPrev xUnder : P) (g : E) (x : P) :
+    acceleratedCompositeProxObjective gamma mu h V eval t xPrev xUnder g x =
+      twoBregmanProxObjective
+        (fun u => gamma t * (⟪g, eval u⟫_ℝ + h u)) V
+        xUnder xPrev (gamma t * mu) 1 x := by
+  simp only [acceleratedCompositeProxObjective_def, twoBregmanProxObjective_def]
+  ring
 
 end SOptLib

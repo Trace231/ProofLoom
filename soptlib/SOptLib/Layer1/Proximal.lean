@@ -1453,3 +1453,295 @@ theorem neg_inner_sub_bregman_young_le_scaled_dualNorm_sq
           nlinarith [hinner_scaled, hV_scaled]
     _ ≤ (c ^ 2 / (2 * A)) * dualNorm zeta ^ 2 := hyoung_base
     _ ≤ coeffOut * dualNorm zeta ^ 2 := hcoeff_scaled
+
+namespace SOptLib
+
+/-- A mirror step satisfying a variational inequality obeys the one-step
+descent bound with a squared dual-gauge penalty.
+
+The statement is carrier-level and mixed-domain: `step` is any selected
+mirror/prox update on the base carrier, `V` is any directed Bregman-like
+potential from base points to comparison points, and `primalNorm`/`dualNorm`
+are any gauge pair for which the displayed support and lower-bound hypotheses
+hold.
+
+Layer: Layer1 | Gap: Level 1 (mirror-step one-step descent from variational data)
+Proof: first turn the variational inequality and mixed Bregman three-point
+  identity into the prox three-point inequality, then split the current-to-
+  comparator pairing through the step and absorb the movement term by Young's
+  inequality.
+Source: SOptLib mirror-descent prox algebra and Mathlib real inner-product
+  ordered-field arithmetic
+Used in: stochastic convex-concave saddle-point mirror descent when a
+  source-DGF product prox update is converted into the pathwise stochastic
+  one-step prox inequality with squared dual oracle penalty
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/key_lemmas/1/proof/2
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, stochastic mirror descent for stochastic convex-concave
+  saddle point problems -/
+theorem sourceDGF_mirrorStep_one_step_bound
+    {P Q E : Type*} [SeminormedAddCommGroup E] [InnerProductSpace ℝ E]
+    (V : P → Q → ℝ) (evalBase : P → E) (evalCompare : Q → E)
+    (grad : P → E) (toCompare : P → Q)
+    (primalNorm dualNorm : E → ℝ) (step : P → E → ℝ → P)
+    (z : P) (x : Q) (g : E) (γ : ℝ)
+    (hγ_nonneg : 0 ≤ γ)
+    (hvariational :
+      0 ≤ ⟪γ • g + grad (step z g γ) - grad z,
+        evalCompare x - evalBase (step z g γ)⟫_ℝ)
+    (hthree_point :
+      V z x =
+        V z (toCompare (step z g γ)) +
+          ⟪grad (step z g γ) - grad z,
+            evalCompare x - evalBase (step z g γ)⟫_ℝ +
+          V (step z g γ) x)
+    (hsupport :
+      ⟪g, evalBase z - evalBase (step z g γ)⟫_ℝ ≤
+        dualNorm g * primalNorm (evalBase z - evalBase (step z g γ)))
+    (hlower :
+      (1 / 2 : ℝ) * primalNorm (evalBase z - evalBase (step z g γ)) ^ 2 ≤
+        V z (toCompare (step z g γ))) :
+    γ * ⟪g, evalBase z - evalCompare x⟫_ℝ ≤
+      V z x - V (step z g γ) x + (1 / 2 : ℝ) * γ ^ 2 * dualNorm g ^ 2 := by
+  let y : P := step z g γ
+  have hthree :
+      γ * ⟪g, evalBase y - evalCompare x⟫_ℝ + V z (toCompare y) ≤
+        V z x - V y x := by
+    have hinner :
+        γ * ⟪g, evalBase y - evalCompare x⟫_ℝ ≤
+          ⟪grad y - grad z, evalCompare x - evalBase y⟫_ℝ := by
+      have hvar_expanded :
+          0 ≤ γ * ⟪g, evalCompare x - evalBase y⟫_ℝ +
+            ⟪grad y - grad z, evalCompare x - evalBase y⟫_ℝ := by
+        have hdiff :
+            ⟪grad y - grad z, evalCompare x - evalBase y⟫_ℝ =
+              ⟪grad y, evalCompare x - evalBase y⟫_ℝ -
+                ⟪grad z, evalCompare x - evalBase y⟫_ℝ := by
+          rw [inner_sub_left]
+        calc
+          0 ≤ ⟪γ • g + grad y - grad z, evalCompare x - evalBase y⟫_ℝ := by
+            simpa [y] using hvariational
+          _ = γ * ⟪g, evalCompare x - evalBase y⟫_ℝ +
+                ⟪grad y - grad z, evalCompare x - evalBase y⟫_ℝ := by
+            rw [hdiff, inner_sub_left, inner_add_left, real_inner_smul_left]
+            ring
+      have hneg :
+          ⟪g, evalBase y - evalCompare x⟫_ℝ =
+            -⟪g, evalCompare x - evalBase y⟫_ℝ := by
+        have hsub : evalBase y - evalCompare x = -(evalCompare x - evalBase y) := by
+          abel
+        rw [hsub, inner_neg_right]
+      rw [hneg]
+      nlinarith
+    nlinarith [hinner, hthree_point]
+  have hscaled_support :
+      γ * ⟪g, evalBase z - evalBase y⟫_ℝ ≤
+        γ * (dualNorm g * primalNorm (evalBase z - evalBase y)) := by
+    exact mul_le_mul_of_nonneg_left (by simpa [y] using hsupport) hγ_nonneg
+  have hyoung :
+      γ * (dualNorm g * primalNorm (evalBase z - evalBase y)) -
+          (1 / 2 : ℝ) * primalNorm (evalBase z - evalBase y) ^ 2 ≤
+        (1 / 2 : ℝ) * γ ^ 2 * dualNorm g ^ 2 := by
+    nlinarith [sq_nonneg (γ * dualNorm g - primalNorm (evalBase z - evalBase y))]
+  have hscaled_young :
+      γ * ⟪g, evalBase z - evalBase y⟫_ℝ - V z (toCompare y) ≤
+        (1 / 2 : ℝ) * γ ^ 2 * dualNorm g ^ 2 := by
+    have hlower_y :
+        (1 / 2 : ℝ) * primalNorm (evalBase z - evalBase y) ^ 2 ≤
+          V z (toCompare y) := by
+      simpa [y] using hlower
+    nlinarith
+  have hsplit :
+      γ * ⟪g, evalBase z - evalCompare x⟫_ℝ =
+        γ * ⟪g, evalBase z - evalBase y⟫_ℝ +
+          γ * ⟪g, evalBase y - evalCompare x⟫_ℝ := by
+    have hvec :
+        evalBase z - evalCompare x =
+          (evalBase z - evalBase y) + (evalBase y - evalCompare x) := by
+      abel
+    rw [hvec, inner_add_right]
+    ring
+  rw [hsplit]
+  nlinarith
+
+end SOptLib
+
+
+open scoped InnerProductSpace
+
+-- Generalization plan (G0):
+-- concept/name: inner-step squared-increment energy from a two-Bregman descent
+--   inequality; orig was `generated_sdcs_inner_increment_energy_inequality`,
+--   renamed away from generated-trace and algorithm-acronym vocabulary
+-- generality used: an arbitrary real inner-product space, objective and directed
+--   potential functions, two consecutive points, a fixed center, drift and error
+--   vectors, and real coefficients; no measure, filtration, convexity,
+--   smoothness, oracle, completeness, or finite-dimensional hypotheses are used
+-- portable call pattern: nested stochastic prox, mirror-sliding, and inexact
+--   Bregman inner loops call this after specializing a raw two-anchor descent
+--   inequality at the previous iterate; the objective, kernel, center, error,
+--   coefficients, and consecutive iterates vary while the energy conclusion
+--   keeps the same shape
+-- counterargument checked: this is not paper-local traceability or a pure
+--   caller-side expression because it packages the reusable absorption of two
+--   directed Bregman penalties into a squared-increment energy term; existing
+--   argmin descent lemmas produce the raw premise, while weighted-center
+--   absorption lemmas have a different geometric conclusion
+-- coverage search: searched SOptLib/project symbols for `squared increment
+--   energy upper bound of two Bregman descent nonnegative stepsize coefficients`,
+--   `two Bregman penalty squared increment coercive`, and `one step energy
+--   inequality backward forward Bregman nonnegative weights`; the closest hits
+--   were `two_bregman_argmin_descent`,
+--   `two_center_bregman_absorbs_weighted_center_sq`, and
+--   `state_sq_step_of_bregman_recurrence`, which cover adjacent premise-producing
+--   or endpoint-control contracts but not this conclusion; Mathlib LeanSearch
+--   for the precise coercive two-Bregman energy shape returned HTTP 500
+-- minimal hypotheses: the source setup, feasibility, stochastic, and global
+--   strong-convexity assumptions are reduced to one pointwise Bregman lower
+--   bound, pointwise nonnegativity of the opposite directed potential, the
+--   diagonal-zero identity at the previous iterate, nonnegativity of the two
+--   weights, and the raw descent inequality; no sign condition on the
+--   linear-growth coefficient is needed
+
+/-- A two-Bregman one-step descent inequality controls squared increment energy.
+
+When the backward directed potential dominates half the squared distance and
+the forward directed potential is nonnegative, the nonnegative two-anchor
+penalties in a raw prox descent bound absorb `eta / 2` times the squared
+consecutive-iterate increment.
+
+Layer: Layer1 | Gap: Level 1 (two-Bregman descent to inner-step increment energy)
+Proof: scale backward coercivity by the nonnegative primary weight, use both pointwise coercivity bounds to make the extra directed penalties nonnegative, and combine the resulting penalty bound with the raw descent inequality by ordered-ring arithmetic.
+Source: Bregman proximal-descent coercivity and Mathlib real ordered-field square arithmetic
+Used in: nested stochastic prox, mirror-sliding, and inexact Bregman inner-loop moment bounds before finite-window telescoping
+Book citation: book/research/Source.json#/algorithm_spec/steps/6
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic decentralized communication sliding -/
+theorem inner_step_increment_energy_of_two_bregman_descent
+    {E : Type*} [SeminormedAddCommGroup E] [InnerProductSpace ℝ E]
+    (f : E → ℝ) (V : E → E → ℝ)
+    (w center uPrev uNext delta : E) (eta beta M : ℝ)
+    (heta_nonneg : 0 ≤ eta) (hbeta_nonneg : 0 ≤ beta)
+    (hself : V uPrev uPrev = 0)
+    (hbackward :
+      (1 / 2 : ℝ) * ‖uNext - uPrev‖ ^ 2 ≤ V uNext uPrev)
+    (hforward_nonneg : 0 ≤ V uPrev uNext)
+    (hdescent :
+      inner ℝ w (uNext - uPrev) + f uNext - f uPrev +
+          eta * V center uNext - eta * V center uPrev ≤
+        beta * V uPrev uPrev - (eta + beta) * V uNext uPrev +
+          inner ℝ delta (uNext - uPrev) + M * ‖uNext - uPrev‖ -
+          beta * V uPrev uNext) :
+    (eta / 2) * ‖uNext - uPrev‖ ^ 2 +
+        inner ℝ w (uNext - uPrev) + f uNext - f uPrev +
+        eta * V center uNext - eta * V center uPrev ≤
+      inner ℝ delta (uNext - uPrev) + M * ‖uNext - uPrev‖ := by
+  rw [hself] at hdescent
+  norm_num at hdescent
+  have hbackward_nonneg : 0 ≤ V uNext uPrev :=
+    le_trans (mul_nonneg (by norm_num) (sq_nonneg _)) hbackward
+  have heta_backward :
+      (eta / 2) * ‖uNext - uPrev‖ ^ 2 ≤ eta * V uNext uPrev := by
+    have hscaled := mul_le_mul_of_nonneg_left hbackward heta_nonneg
+    nlinarith
+  have hpenalty :
+      (eta / 2) * ‖uNext - uPrev‖ ^ 2 ≤
+        (eta + beta) * V uNext uPrev + beta * V uPrev uNext := by
+    have hextra_backward : 0 ≤ beta * V uNext uPrev :=
+      mul_nonneg hbeta_nonneg hbackward_nonneg
+    have hextra_forward : 0 ≤ beta * V uPrev uNext :=
+      mul_nonneg hbeta_nonneg hforward_nonneg
+    nlinarith
+  nlinarith
+
+
+open scoped InnerProductSpace
+
+-- Generalization plan (G0):
+-- concept/name: two-anchor Bregman descent with linear-error absorption; orig
+--   was `generated_sdcs_inner_phi_young_inequality`, renamed away from generated
+--   traces, the SDCS acronym, and the paper-local inner potential
+-- generality used: an arbitrary real normed inner-product space, objective and
+--   directed-potential functions, two anchors, consecutive iterates, a
+--   comparator, drift and error vectors, and real coefficients; no measure,
+--   filtration, convexity, oracle, completeness, or finite-dimensional
+--   hypotheses are used
+-- portable call pattern: stochastic mirror-prox, conditional-sliding, and
+--   nested inexact-prox analyses call this after obtaining a raw two-anchor
+--   descent inequality; their feasible carrier, objective, divergence, centers,
+--   comparator, error, and coefficients vary while the absorbed conclusion
+--   retains the same square-over-positive-denominator budget
+-- counterargument checked: this is not paper-local traceability or a pure
+--   wrapper because it composes a full raw prox-descent relation with pointwise
+--   directed-potential coercivity; the existing completion-square lemma proves
+--   only the internal Hilbert-space error estimate
+-- coverage search: searches for `two Bregman descent upper bound linear
+--   objective error coercivity square positive denominator` and `descent
+--   inequality coercivity linear error square denominator` found the partial
+--   `scaled_linear_inner_quadratic_le_square_over_denominator`, nearby
+--   `two_bregman_argmin_descent`, and staged
+--   `inner_step_increment_energy_of_two_bregman_descent`; none accepts this raw
+--   comparator descent premise and returns its noise-budget replacement, while
+--   Mathlib LeanSearch for the precise shape returned HTTP 500
+-- minimal hypotheses: the source setup and global strong-convexity assumptions
+--   are reduced to one pointwise coercivity bound and positivity of the active
+--   denominator; all other mathematical information is carried by the raw
+--   descent premise, and no sign hypothesis on the linear-growth coefficient
+--   or primary anchor weight is needed
+
+/-- A raw two-anchor Bregman descent bound absorbs its linear error and coercive
+forward-potential terms into a square-over-denominator budget.
+
+The pointwise lower bound on `V uPrev uNext` supplies the quadratic needed to
+absorb both the error pairing and the linear norm term.  The remaining anchor
+and comparator terms are preserved verbatim.
+
+Layer: Layer1 | Gap: Level 1 (two-anchor descent linear-error absorption)
+Proof: scale the pointwise coercivity bound by the positive denominator, then apply the Hilbert-space completion-square estimate to the error pairing and combine it with the supplied raw descent inequality.
+Source: Bregman proximal-descent coercivity, Hilbert-space Cauchy--Schwarz, and Mathlib ordered-field square completion
+Used in: stochastic mirror-prox, conditional-sliding, and nested inexact-prox one-step descent bounds before inner-window telescoping
+Book citation: book/research/Source.json#/algorithm_spec/steps/6
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic decentralized communication sliding -/
+theorem two_bregman_descent_le_of_linear_error_and_coercivity
+    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+    (f : E → ℝ) (V : E → E → ℝ)
+    (w center uPrev uNext u delta : E) (eta D M : ℝ)
+    (hD : 0 < D)
+    (hcoercive :
+      (1 / 2 : ℝ) * ‖uNext - uPrev‖ ^ 2 ≤ V uPrev uNext)
+    (hdescent :
+      inner ℝ w (uNext - u) + f uNext - f u +
+          inner ℝ delta (u - uPrev) +
+          eta * V center uNext - eta * V center u ≤
+        D * V uPrev u - (eta + D) * V uNext u +
+          inner ℝ delta (uNext - uPrev) + M * ‖uNext - uPrev‖ -
+          D * V uPrev uNext) :
+    inner ℝ w (uNext - u) + f uNext - f u +
+        inner ℝ delta (u - uPrev) +
+        eta * V center uNext - eta * V center u ≤
+      D * V uPrev u - (eta + D) * V uNext u +
+        (M + ‖delta‖) ^ 2 / (2 * D) := by
+  have hcoercive_scaled :
+      D * ((1 / 2 : ℝ) * ‖uNext - uPrev‖ ^ 2) ≤
+        D * V uPrev uNext :=
+    mul_le_mul_of_nonneg_left hcoercive hD.le
+  have hyoung_base :=
+    scaled_linear_inner_quadratic_le_square_over_denominator
+      (E := E) (M := M) (gamma := (1 : ℝ)) (D := D)
+      (a := (1 : ℝ)) (δ := -delta) (d := uNext - uPrev)
+      (by norm_num) (by norm_num) hD
+  have hyoung :
+      inner ℝ delta (uNext - uPrev) + M * ‖uNext - uPrev‖ -
+          D * ((1 / 2 : ℝ) * ‖uNext - uPrev‖ ^ 2) ≤
+        (M + ‖delta‖) ^ 2 / (2 * D) := by
+    have hyoung' :
+        M * ‖uNext - uPrev‖ + inner ℝ delta (uNext - uPrev) ≤
+          (M + ‖delta‖) ^ 2 / (2 * D) +
+            D / 2 * ‖uNext - uPrev‖ ^ 2 := by
+      simpa [inner_neg_left, norm_neg] using hyoung_base
+    nlinarith
+  have hnoise :
+      inner ℝ delta (uNext - uPrev) + M * ‖uNext - uPrev‖ -
+          D * V uPrev uNext ≤
+        (M + ‖delta‖) ^ 2 / (2 * D) := by
+    nlinarith
+  nlinarith

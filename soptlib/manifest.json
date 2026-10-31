@@ -6,17 +6,17 @@
       "directory": ".",
       "entry": "All.lean",
       "source_inputs": [],
-      "selection": "Latest coherent canonical library snapshot, including all Analysis modules; no merge with differing per-project Model/Glue versions.",
+      "selection": "SOptLib source snapshot.",
       "files": {
         "All.lean": {
-          "sha256": "0e1e986a54832bcde197df3362e73a5fad06b57da95f5bf5b6040c34463de4f5",
-          "bytes": 1538,
-          "lines": 45
+          "sha256": "32e88b5a9ec30265ec5dd5a73fbe4f69b96b30397ffa9533cf9c15c5980cd327",
+          "bytes": 6215,
+          "lines": 109
         },
         "SOptLib.lean": {
-          "sha256": "645534012006060ba41a1882276550d0731ec71481117e62b654d02a6fef8c38",
-          "bytes": 1375,
-          "lines": 43
+          "sha256": "8c39ce691c0165553f093344ec03321dc6d13b9148d6449cb854306e41716e32",
+          "bytes": 6126,
+          "lines": 108
         },
         "SOptLib/Analysis/BregmanFromCocoercivity.lean": {
           "sha256": "e2a9528199d1242ffa67bbe536474e4ca9800a05c399f2dca9779441eaf3ba80",
@@ -39,29 +39,179 @@
           "lines": 183
         },
         "SOptLib/Glue/Algebra.lean": {
-          "sha256": "2e34bfcdc5f78d83a5a18a8ec22801c83f75ef1677e9943b8518acc5137aedf5",
-          "bytes": 517674,
-          "lines": 10373
+          "sha256": "bc99ade084c7309476b6f8da0adda6c298ef832f63aa21d4f0dd77d9dc25a1bf",
+          "bytes": 1277511,
+          "lines": 23616
+        },
+        "SOptLib/Glue/Algebra/abs_recurrence_le_geometric_history_of_coeff_le.lean": {
+          "sha256": "153bf6d20e710adcf3d5f0d4ffd0cc6baa33fe820d5b7a5197ca2ae975f97c97",
+          "bytes": 8674,
+          "lines": 158
+        },
+        "SOptLib/Glue/Algebra/beta_lt_one_and_pointwise_den_pos_of_gamma_lt_one.lean": {
+          "sha256": "2fca7123aa9b4f4460d7399eedf9daf6deeca6227d17fc63998039fc946e189b",
+          "bytes": 4729,
+          "lines": 70
+        },
+        "SOptLib/Glue/Algebra/displacement_coefficient_nonneg_of_maximal_stepsize.lean": {
+          "sha256": "68827174ec9540978ad2f5e4b8efe864ad49a086a22d705e08aa1ef2deec9939",
+          "bytes": 3664,
+          "lines": 57
+        },
+        "SOptLib/Glue/Algebra/finite_average_norm_sq_add_le_of_cross_zero.lean": {
+          "sha256": "e2b3ffacfaf1c5bb517859fbf4e4eff620d17556b1d78b735bbea3b4d45d2584",
+          "bytes": 4418,
+          "lines": 71
+        },
+        "SOptLib/Glue/Algebra/finite_function_row_centered_average_secondMoment_le.lean": {
+          "sha256": "48b4dc8962cef0ef194bb3f46d547dd135f9875d79019b60f1ab4c2a1754dc32",
+          "bytes": 7688,
+          "lines": 151
+        },
+        "SOptLib/Glue/Algebra/geometric_second_moment_history_term_le_of_recurrence.lean": {
+          "sha256": "fec802288b6a575efa7dcc5a5248cc32a4dc54f4161dcc3f73b54637a4afea55",
+          "bytes": 7170,
+          "lines": 125
+        },
+        "SOptLib/Glue/Algebra/geometric_sq_div_le_gamma_abs_div_sqrt_one_sub_of_sqrt_quotient.lean": {
+          "sha256": "52fa93471de5d4dc22aa7aa2a538fbab33464557b45b6ba0c33d5ad89a6d55b5",
+          "bytes": 4669,
+          "lines": 88
+        },
+        "SOptLib/Glue/Algebra/inner_neg_smul_eq_neg_half_eta_norm_sq_sub_step_sq_add_error_sq.lean": {
+          "sha256": "d5a7d4980391a467949932c4b6d23b7109fdbc61593798934a9bfc9301fad9d4",
+          "bytes": 3250,
+          "lines": 58
+        },
+        "SOptLib/Glue/Algebra/nonneg_of_geometric_square_recurrence.lean": {
+          "sha256": "ff70ae1126c84fe80b084839f1512b4e88c7b1620f92775a851ea7dbb09c00c1",
+          "bytes": 3735,
+          "lines": 54
+        },
+        "SOptLib/Glue/Algebra/one_sub_div_div_mul_eq_div_sq_of_pos.lean": {
+          "sha256": "cde55e53c3326b2d771d56db8ecb9245529706ffadc90d5704177cf241a745e1",
+          "bytes": 2321,
+          "lines": 27
+        },
+        "SOptLib/Glue/Algebra/real_sqrt_natCast_le_natCast_of_pos.lean": {
+          "sha256": "f007701b7320219792f2edf96c214a0edd45c39ad7e4749622a787b59031ea43",
+          "bytes": 2283,
+          "lines": 27
+        },
+        "SOptLib/Glue/Algebra/sq_sum_Icc_geometric_abs_le_inv_one_sub_mul_sum_geometric_sq.lean": {
+          "sha256": "9aa6957c476365b51af4486be7ddf89711243c424ed2fa9f15ed9af60ba1fb65",
+          "bytes": 7441,
+          "lines": 151
+        },
+        "SOptLib/Glue/Algebra/sqrt_inverse_probability_ratio_eq_sqrt_batch_div.lean": {
+          "sha256": "5bdaaa8029d6152683f484884f13fd7dddefb1797bcab9d1f7030da5defd2bcb",
+          "bytes": 2549,
+          "lines": 30
+        },
+        "SOptLib/Glue/Algebra/sum_current_add_previous_shift_le_two_mul_core_of_nonneg.lean": {
+          "sha256": "c21ee37d08241480fb6085793322e6d982066faed16683279f2f35332cdf0f54",
+          "bytes": 5142,
+          "lines": 87
+        },
+        "SOptLib/Glue/Algebra/sum_metric_drop_add_beta_correction_le_of_mono.lean": {
+          "sha256": "1722f0bc78252324f3bccfd5653788fbb848509041d749e5d1d0702cadb716fb",
+          "bytes": 15486,
+          "lines": 293
+        },
+        "SOptLib/Glue/Algebra/two_branch_complexity_factor_le_of_batch_range.lean": {
+          "sha256": "b5d6e733f695ce0187c5fd3a04f1d709923bf6f786f94c763ff03cd0a867b369",
+          "bytes": 3326,
+          "lines": 55
+        },
+        "SOptLib/Glue/Algebra/unit_batch_of_sqrt_bound_of_not_lt.lean": {
+          "sha256": "e25a2aef7fd1d83b0e368ad112eadce20a3ea1bc6629d179daca99c51c5837c9",
+          "bytes": 3415,
+          "lines": 46
         },
         "SOptLib/Glue/Analysis.lean": {
-          "sha256": "e5d765b172a9aa0da5a816bc048f3735e66866b236379a26c69c5ce14ecef322",
-          "bytes": 141194,
-          "lines": 2796
+          "sha256": "24a311db4b79b5f403a43ca37e47c048bdd0b8810e73d7460bfbc1ee98d7bb28",
+          "bytes": 716817,
+          "lines": 13205
+        },
+        "SOptLib/Glue/Analysis/sqrt_accumulator_div_sqrt_step_mono_of_mono.lean": {
+          "sha256": "680132c8992118b3622ae7e3af495e8646e9713bfad16612fdc1812338c4d918",
+          "bytes": 6627,
+          "lines": 116
+        },
+        "SOptLib/Glue/Analysis/sum_Icc_abs_div_sqrt_natCast_le_sqrt_one_add_log_mul_sqrt_sum_sq.lean": {
+          "sha256": "ffa841870548995911f40b20e0ffd3d793288939d69a97fdc18b4018cd1945ed",
+          "bytes": 6330,
+          "lines": 115
+        },
+        "SOptLib/Glue/Analysis/sum_Icc_one_div_natCast_le_one_add_log.lean": {
+          "sha256": "89c3ad0e7e73db82adff6a9f53115c4ff15fea73212a96c8cd09939d55c45cb6",
+          "bytes": 2656,
+          "lines": 32
         },
         "SOptLib/Glue/Calculus.lean": {
-          "sha256": "c6174fb3245c5cbd83157ebaafc282f918eaf537bbdfe317052134583bb789ce",
-          "bytes": 45611,
-          "lines": 931
+          "sha256": "17de3c33ef1ecf49132a5d27e115dd0cfdd48edc97c577771c2b80ec6ca34633",
+          "bytes": 79489,
+          "lines": 1425
         },
         "SOptLib/Glue/Martingale.lean": {
-          "sha256": "7917fb963b80cc9e2eab5f481d9f895345f73dacd278d8d8d03fa35c5d57f4a1",
-          "bytes": 26992,
-          "lines": 557
+          "sha256": "5121bf34f409091dc8cbe29b0cf01adec3ea28849313f607d5552c2652405865",
+          "bytes": 105841,
+          "lines": 1942
         },
         "SOptLib/Glue/Probability.lean": {
-          "sha256": "e777e0dfe3a44b79cb96bc0c716959fcd68d332ab7cd8f0ca666eea5e0756f2c",
-          "bytes": 379335,
-          "lines": 7321
+          "sha256": "e82164777e8644d91f3a81b5cc896dfc1d77ab036348b151369e410b5fcdb229",
+          "bytes": 950458,
+          "lines": 17365
+        },
+        "SOptLib/Glue/Probability/aemeasurable_of_map_eq_probability_measure.lean": {
+          "sha256": "07679d4feb09d055333cc01a2ee381b61fbe8e6e0ac6903967bc47d38f849dd5",
+          "bytes": 3102,
+          "lines": 35
+        },
+        "SOptLib/Glue/Probability/finiteUniformAverage_function_eval_eq.lean": {
+          "sha256": "09710c0528ef9ec036112fe353874521757a54e7b73d7a14d2fc231c573839c8",
+          "bytes": 4470,
+          "lines": 85
+        },
+        "SOptLib/Glue/Probability/finiteUniformAverage_function_eval_eq_zero_of_average_zero.lean": {
+          "sha256": "49d9532e9e880fdadd8987df4bc007f5d1ec6814eb46f4dcf66de4688990b191",
+          "bytes": 2737,
+          "lines": 34
+        },
+        "SOptLib/Glue/Probability/finiteUniformAverage_function_eval_inner_eval_eq_zero_of_average_zero.lean": {
+          "sha256": "fc3b3889633e80bfb65c1c0e87df7022d57353ccf91af8c3813b8cd5f50a8a49",
+          "bytes": 6040,
+          "lines": 117
+        },
+        "SOptLib/Glue/Probability/integral_false_branch_uniform_row_le_of_key_bound.lean": {
+          "sha256": "237d4da18440261a37b7eb90708860147be7f6856527c3e2deefa597845ac0ce",
+          "bytes": 6123,
+          "lines": 120
+        },
+        "SOptLib/Glue/Probability/integral_false_branch_uniform_row_transport.lean": {
+          "sha256": "caeda88852f6445e0815dbfb57686e17052567ed2d10175d2170875f8f1a6db5",
+          "bytes": 5801,
+          "lines": 94
+        },
+        "SOptLib/Glue/Probability/map_prod_assoc_reverse_eq_prod.lean": {
+          "sha256": "c5eb270c42d8c45db09d94a87e996fd66c2b4587f818aaa5779c3d99820ec06c",
+          "bytes": 3725,
+          "lines": 64
+        },
+        "SOptLib/Glue/Probability/map_prod_prod_prod_shuffle_eq_prod.lean": {
+          "sha256": "651cb5407d57ae1db17562d230534e1bffed6e90232f3ef2c61b6997af5ee1fb",
+          "bytes": 6161,
+          "lines": 118
+        },
+        "SOptLib/Glue/Probability/map_prod_prod_shuffle_eq_prod.lean": {
+          "sha256": "50e2021ccc9f83d471ee53ebb25e46657520670e4924951d3a52fe416ef6c3d1",
+          "bytes": 6269,
+          "lines": 129
+        },
+        "SOptLib/Glue/Probability/uniform_pi_singleton_mass.lean": {
+          "sha256": "6ff3ad98942fe524f130acd9fec3a910226bf4af8f9d73bb247efe6d5bb05d92",
+          "bytes": 3095,
+          "lines": 36
         },
         "SOptLib/Layer0/ConditionalGradient.lean": {
           "sha256": "0dc4686508a31894de4226c0816d08fc849e666df882b4c5e2b227a4a1bca249",
@@ -69,24 +219,54 @@
           "lines": 758
         },
         "SOptLib/Layer0/ConvexFOC.lean": {
-          "sha256": "243250d09e44ce2d4fbf247eedddaae1240c903c29960bb5dda88b506b72cafb",
-          "bytes": 138249,
-          "lines": 2765
+          "sha256": "51cd569b1f4d2d3e566b986afe0404baa692ec1b05a3b5d727167156e45a0701",
+          "bytes": 163506,
+          "lines": 3246
+        },
+        "SOptLib/Layer0/ConvexFOC/finiteMatrix_quadratic_contraction_of_projection_variational.lean": {
+          "sha256": "dcb85d6343f9ae3ab92930367d4915418e1713e4bb16b9859c3ab92222bac96c",
+          "bytes": 2079,
+          "lines": 57
         },
         "SOptLib/Layer0/Objective.lean": {
-          "sha256": "f87f9c4a7987a0068488bc918d1e3be0b98311e44f705d2b56581ce7b0e4407e",
-          "bytes": 123286,
-          "lines": 2317
+          "sha256": "c22726ea5b222b1f42128086e5e340dd3a694e5c8c9aafcb66acbb50744cee63",
+          "bytes": 249298,
+          "lines": 4584
+        },
+        "SOptLib/Layer0/Objective/finiteAverageGradient_lipschitz_of_average_sq_smoothness.lean": {
+          "sha256": "608b7dbf471937d180502b6118bb4c31fe6e797fce417e1ccb56b2f7369a7b85",
+          "bytes": 5458,
+          "lines": 89
+        },
+        "SOptLib/Layer0/Objective/finiteAverage_smooth_quadratic_upper_bound_of_average_sq_smoothness.lean": {
+          "sha256": "75460959f8b35fd5be687897325666c4860e26d3a13372f810aeeff4af621f76",
+          "bytes": 5374,
+          "lines": 74
+        },
+        "SOptLib/Layer0/Objective/finiteHorizon_convex_regret_le_gradient_inner_sum.lean": {
+          "sha256": "5106bc569debc8a4768f2fa4646c1a64375858691594432f5ed5117da0acd974",
+          "bytes": 3789,
+          "lines": 56
         },
         "SOptLib/Layer0/Oracle.lean": {
-          "sha256": "ae53933ea78241088dab06abb465fbaeeda9ebc581080a4228257e41801a9ec3",
-          "bytes": 349688,
-          "lines": 6465
+          "sha256": "965e7ae8f7ef9d80d7b3e3504e5d08fdd7cd3b0493d2ddc8bc80d866c7023ddb",
+          "bytes": 472899,
+          "lines": 8422
+        },
+        "SOptLib/Layer0/Oracle/finiteMiniBatch_centered_secondMoment_le_of_average_squared_smoothness.lean": {
+          "sha256": "b57eca7257080613403e78723c4b760293115dff46a765d667c524eafdb8936a",
+          "bytes": 6583,
+          "lines": 104
         },
         "SOptLib/Layer0/Subgradient.lean": {
-          "sha256": "4a9afec1710280c7ab1e20eadd80981fad41c77dcfd4b0755bd8cd7ef3f7010e",
-          "bytes": 62412,
-          "lines": 1111
+          "sha256": "1eac10b643732d92248c20e038b2e9e67f59c317ce334f32439bb624765055ad",
+          "bytes": 68356,
+          "lines": 1211
+        },
+        "SOptLib/Layer0/Subgradient/BoundedGradientsOnFiniteHorizon.lean": {
+          "sha256": "b1c447c38d222de7c1b160e61ccf0330cd55af0eab062ce7f4e9412745cf0d78",
+          "bytes": 4972,
+          "lines": 72
         },
         "SOptLib/Layer1/Complexity.lean": {
           "sha256": "a2c7506c3bafc13b088dfd419b125c15aea87c2e5cba14be1c9b73cf5ff6315d",
@@ -94,34 +274,84 @@
           "lines": 985
         },
         "SOptLib/Layer1/Descent.lean": {
-          "sha256": "5970c7be331fe5f7ed084edae0ec83eb6d905057c03e6d7deb25f61e366b19c5",
-          "bytes": 401607,
-          "lines": 7883
+          "sha256": "80730c1fb22650a20bc5138cebea6f0666aa178401e37a4695cae733209b8876",
+          "bytes": 589323,
+          "lines": 11186
+        },
+        "SOptLib/Layer1/Descent/adaptive_momentum_sq_div_sqrt_accumulator_le_geometric_history_tail.lean": {
+          "sha256": "380550941dfc5a8b02033ec26f7b0f8f61703386b1c3220f7729152d3831bbb3",
+          "bytes": 9086,
+          "lines": 189
+        },
+        "SOptLib/Layer1/Descent/adaptive_projected_momentum_inner_le_metric_drop_young.lean": {
+          "sha256": "e20c6184d27bcd68fb1e4294fa9595916d444960c8898f0fe19a35c46779e710",
+          "bytes": 9274,
+          "lines": 182
+        },
+        "SOptLib/Layer1/Descent/estimator_residual_second_moment_step_of_refresh_or_centered_recursive_branch.lean": {
+          "sha256": "22f836def80388aae2aa7ab395f9fc8bc39ea4358749acaccf2acb87825d9642",
+          "bytes": 5059,
+          "lines": 78
+        },
+        "SOptLib/Layer1/Descent/integrated_objective_error_lyapunov_step.lean": {
+          "sha256": "aebd19268676f2198c4478a45eefd786db345c9c5fdd37e04293487d75f21be8",
+          "bytes": 11966,
+          "lines": 235
+        },
+        "SOptLib/Layer1/Descent/residual_eq_if_refresh_zero_else_prev_add_increment.lean": {
+          "sha256": "a43e9e5ca10b54182f7a96154d70e7fc3a7d8622d8308b2546b0409610f43311",
+          "bytes": 3066,
+          "lines": 40
+        },
+        "SOptLib/Layer1/Descent/smooth_descent_of_inexact_gradient_step.lean": {
+          "sha256": "0ecf17459508ff4a2c18a66353ff242894b2847337683a934a6e86e587bb3ece",
+          "bytes": 4155,
+          "lines": 61
         },
         "SOptLib/Layer1/Proximal.lean": {
-          "sha256": "04a535298068cd11b59d453dfe20b0b11c09e8e10f9c5bea2297c79171385471",
-          "bytes": 69151,
-          "lines": 1455
+          "sha256": "06efcd0db1e71e725de34fc0cfca905bd69220a12942e831e54ba0c7312c2a1b",
+          "bytes": 84560,
+          "lines": 1747
         },
         "SOptLib/Layer1/Telescope.lean": {
-          "sha256": "6b8926a144fef3a80d820354d5da21861c7fc6b24e2836a6e4485c844e633913",
-          "bytes": 277973,
-          "lines": 5546
+          "sha256": "db87a747e9f5e7a68ea1c479df4efdfb5dba635aff4ffcef32d94b5522ef73aa",
+          "bytes": 405345,
+          "lines": 7946
         },
         "SOptLib/Model/BlockSampling.lean": {
-          "sha256": "d83f93fe633e188f16f494e18ff5e18c2f1e55185bc093dc8266ee757f3d4740",
-          "bytes": 47238,
-          "lines": 892
+          "sha256": "508d43fc73903024376bb8ad113f7dad4edcd763981713a3c7a4205e5f86f287",
+          "bytes": 61725,
+          "lines": 1182
+        },
+        "SOptLib/Model/BlockSampling/iidMiniBatchSampleLaw_prefix_row_map_eq_prod.lean": {
+          "sha256": "47b78264eae7c843abd7a2cc5c3c29af72f469a13e4d3291a672d24455158b5c",
+          "bytes": 6779,
+          "lines": 128
+        },
+        "SOptLib/Model/BlockSampling/iidMiniBatchSampleLaw_row_reindex_map_eq_pi.lean": {
+          "sha256": "34f49f93aa521f3f83f07f20c56c32ad0ce3316c26895ed9d0280a58ec25736f",
+          "bytes": 4742,
+          "lines": 92
+        },
+        "SOptLib/Model/BlockSampling/infinitePi_prefix_current_map_eq_prod.lean": {
+          "sha256": "ea63cf6eb31abb674f17150bf1c369ad1a3dbddec7fc4525530614806eacbb10",
+          "bytes": 6034,
+          "lines": 123
+        },
+        "SOptLib/Model/BlockSampling/paired_iidMiniBatch_prefix_current_row_map_eq_prod.lean": {
+          "sha256": "d70743fd8bfd0c2d7c30d654d14ff26b1b792fe2af7b82a4828ef5473d4bc25f",
+          "bytes": 10385,
+          "lines": 201
         },
         "SOptLib/Model/Bregman.lean": {
-          "sha256": "05849d0044deabf4c49c92c5e649da750a857874599748b81905f8023306d400",
-          "bytes": 134383,
-          "lines": 2660
+          "sha256": "3484694ba952997922ac232fb26f583bc72f37d441a7e1e9900acc1cb93dbacf",
+          "bytes": 159002,
+          "lines": 3051
         },
         "SOptLib/Model/Budget.lean": {
-          "sha256": "dbad00be9f25f091636e8e5c97a2ae6d01e557d267f93dd6ff6c58d25454effd",
-          "bytes": 23924,
-          "lines": 449
+          "sha256": "43642f243b5c68d1a3c3329e374e1894b5f497bfacf1404e7775310ff94cec9f",
+          "bytes": 29814,
+          "lines": 546
         },
         "SOptLib/Model/Carrier.lean": {
           "sha256": "745abcc369dd8534fa55cd8e133d41658772cc4bc57504b7cc8978d454f4b706",
@@ -154,9 +384,9 @@
           "lines": 652
         },
         "SOptLib/Model/Filtration.lean": {
-          "sha256": "957e4f353e9bd9bada76bb254bb9e982ed0b39736e5d0bece0426d796770c46a",
-          "bytes": 26648,
-          "lines": 525
+          "sha256": "0530cd619579350ad6a924a34b34b5e10a3744a93a3f3a6c919f26a47710fd06",
+          "bytes": 27721,
+          "lines": 539
         },
         "SOptLib/Model/IsSimpleConvexTermOn.lean": {
           "sha256": "d71a220f16f544dac3daac0a62589eedcfbdaf6bb2542f4f8205d6d0a374e3e0",
@@ -164,39 +394,129 @@
           "lines": 168
         },
         "SOptLib/Model/Iterates.lean": {
-          "sha256": "0c3dcd5cdc2e457461555af8495307edfa72b0e6b9288fc280cd88907c8565ce",
-          "bytes": 378182,
-          "lines": 7637
+          "sha256": "ddcfa06a75e548bd5539ef6708253a97bfefa70990f3c5287a94ba3b1db25b3c",
+          "bytes": 530967,
+          "lines": 10327
+        },
+        "SOptLib/Model/Iterates/AdaptiveMomentState.lean": {
+          "sha256": "3153b03d95329548c30d259106198ba110948b3075575e71ef5c89d9309ea999",
+          "bytes": 13544,
+          "lines": 269
+        },
+        "SOptLib/Model/Iterates/choiceOrDefault_mem_of_nonempty.lean": {
+          "sha256": "4f90ed629443b8cfbaf2e0915118695fac595dce78c66393e84817065aec7974",
+          "bytes": 2359,
+          "lines": 41
+        },
+        "SOptLib/Model/Iterates/gradientStep.lean": {
+          "sha256": "329f47bc6a0917b5be8185939b8f51841848f64abf276a0d3d95fcab454245e1",
+          "bytes": 8245,
+          "lines": 139
+        },
+        "SOptLib/Model/NetworkMatrix.lean": {
+          "sha256": "d74af55e87605cacf355fa45b54483169f2390dbee4bf8f12aa92fe423c9ebcf",
+          "bytes": 859075,
+          "lines": 13726
         },
         "SOptLib/Model/Norms.lean": {
-          "sha256": "79c3ec7133d73dddb0daa1f5c61207ed02c2403c8f266c22246700398adcdc96",
-          "bytes": 51051,
-          "lines": 958
+          "sha256": "9a0443bdb80e3f8860bace98921d3e7f8f4881d7acd1741396dce9b1826f2fbb",
+          "bytes": 158339,
+          "lines": 2558
+        },
+        "SOptLib/Model/Norms/FiniteMatrixQuadraticForm.lean": {
+          "sha256": "7e26d7bcd00ef703b303ab80fe7ef6ba257da2bbe7af5578dbee860e92c167ff",
+          "bytes": 23014,
+          "lines": 380
+        },
+        "SOptLib/Model/Norms/finiteMatrixQuadraticForm_segment_expansion.lean": {
+          "sha256": "c6fa2dfe8ec1047fb9b7c44fdac36554c033fe1774f4c3d55c305d62f1b7bcf8",
+          "bytes": 2604,
+          "lines": 63
+        },
+        "SOptLib/Model/Norms/finiteMatrixQuadraticForm_sub_expansion.lean": {
+          "sha256": "1fd9ea6b521163ab06f0b04454ad183c28d5bc6049bfd2b59000501d58c83ffc",
+          "bytes": 3372,
+          "lines": 58
         },
         "SOptLib/Model/Objective.lean": {
-          "sha256": "83d033e710cb6900e958f636357b075863d860ff13655d5e21672b0eee7c9e2d",
-          "bytes": 112969,
-          "lines": 2221
+          "sha256": "730fe93fc3f9da7004aa69372cabd1c5759d4e00ed16923e76033e026e9f11b9",
+          "bytes": 165575,
+          "lines": 3113
+        },
+        "SOptLib/Model/Objective/FiniteAverageSquaredGradientSmoothness.lean": {
+          "sha256": "3ae93a3a258f968905cdf5d25887fb293646aa7cdd65c43a06b9bc3a76298bac",
+          "bytes": 5602,
+          "lines": 94
+        },
+        "SOptLib/Model/Objective/finiteHorizonRegretAgainstInfimum.lean": {
+          "sha256": "e6576e6271885c07689516786720d99d19720e7ba2171b908dba1df3fc744ddb",
+          "bytes": 6088,
+          "lines": 117
+        },
+        "SOptLib/Model/OperatorMeans.lean": {
+          "sha256": "d5a7e60c0455247054a297b1d63e455e72fb11b3b2ef757cba5d04c1cc74269a",
+          "bytes": 69108,
+          "lines": 1343
         },
         "SOptLib/Model/ParameterChoices.lean": {
-          "sha256": "1ba53940ec480d4ee025ead304f621b99c99cc81b562798d6c827ee16f806811",
-          "bytes": 168108,
-          "lines": 3250
+          "sha256": "e0c329ed3415714c0d8c3960ca7ba0b667a421a56ba434efa690a800ee8c09c7",
+          "bytes": 311911,
+          "lines": 5553
+        },
+        "SOptLib/Model/ParameterChoices/PositiveRealParameter.lean": {
+          "sha256": "a57faa1f700ac35a5e2d723eaee0d1ec0a8c78fc8df0414680b128291d6e631f",
+          "bytes": 2143,
+          "lines": 35
+        },
+        "SOptLib/Model/ParameterChoices/ProbabilityScheduleDomain.lean": {
+          "sha256": "2e48afbb3756a3d47f3dcb3bf13d8b4989fffd504c4012e13d71ca6f07b2b0e7",
+          "bytes": 3265,
+          "lines": 47
+        },
+        "SOptLib/Model/ParameterChoices/coordinateRealSqrtSpec_unique.lean": {
+          "sha256": "97527c77455bda275efd31b42d19a9d71ec9473299bee34b3f5afc2249f6f0f9",
+          "bytes": 2464,
+          "lines": 47
+        },
+        "SOptLib/Model/ParameterChoices/finiteHorizonStepMomentumDomain.lean": {
+          "sha256": "156240b1a625a2edc2b2c83769683f511a981664fadbcb987c5f8259eea48c6d",
+          "bytes": 3793,
+          "lines": 66
+        },
+        "SOptLib/Model/ParameterChoices/realSqrtSpec.lean": {
+          "sha256": "e3715936041e25fda97976767016fd38d45c2115909da6d73538a034c39637f2",
+          "bytes": 4905,
+          "lines": 82
         },
         "SOptLib/Model/Prox.lean": {
-          "sha256": "15c0bc27ede4c7289590736112f258dd3ba91038f4ade80ce488916f6745ad28",
-          "bytes": 140824,
-          "lines": 2557
+          "sha256": "f0482fbd57d44e2ff0356e3a0778badadc7af57f49f4ffef7dc9572c7497d3e9",
+          "bytes": 167034,
+          "lines": 3048
+        },
+        "SOptLib/Model/Prox/IsCheckedAdaptiveProjectedUpdate.lean": {
+          "sha256": "852db67aff5296b7d304d3283552af79cb2a531fbfe9f7595578951ccc68822d",
+          "bytes": 5684,
+          "lines": 87
+        },
+        "SOptLib/Model/Prox/finiteMatrixWeightedProjectionArgmin.lean": {
+          "sha256": "f98bd7d258ae9dcd4c036fd06551519ac86d21b1df5592e1b94057ebf4c5ec3d",
+          "bytes": 2645,
+          "lines": 63
+        },
+        "SOptLib/Model/Prox/finiteMatrixWeightedProjection_minimizes_quadraticForm.lean": {
+          "sha256": "9a6318aa6bc06098a0c9114267c4b477980fb58d29cd7daf2882fb7190db746f",
+          "bytes": 5400,
+          "lines": 84
         },
         "SOptLib/Model/Saddle.lean": {
-          "sha256": "940dc8107d0e529183bb62c607fa3946367919127746e63a034f888bfe2c116c",
-          "bytes": 20676,
-          "lines": 416
+          "sha256": "be8dc4ec79ad5936b4932286227b9b44dd516cb6871b8a2b819ac5982fca7bc9",
+          "bytes": 23577,
+          "lines": 469
         },
         "SOptLib/Model/Selection.lean": {
-          "sha256": "2eead06fd3add3f57d3661195e83da09b80f426a4618190694a3121d7b908372",
-          "bytes": 44337,
-          "lines": 902
+          "sha256": "aecdfb67a6823fa4192ea36f7e08b21cd6570b1b66d7583f8ae941b29a0715ea",
+          "bytes": 70735,
+          "lines": 1361
         },
         "SOptLib/Model/SimpleConvexTermExpr.lean": {
           "sha256": "131ddaaafda22fe02953c0a08db9c3fe44d56eac46df9bf13ef148a7b7ff76f0",
@@ -204,14 +524,14 @@
           "lines": 220
         },
         "SOptLib/Model/Stationarity.lean": {
-          "sha256": "adf72ca556f67a912290a708f897e0a4caf29a694c2e9528e0220cd7c8c0984d",
-          "bytes": 68758,
-          "lines": 1359
+          "sha256": "8f91e7aaf6a73ae159a11ebeb490318f29b15669df5eae888c8637a40880a6ea",
+          "bytes": 79985,
+          "lines": 1543
         },
         "SOptLib/Model/StochasticOracle.lean": {
-          "sha256": "1dae496da74b290cbb16b691ce4aa6567621eca395804fdaf7cfd474ddbbed3a",
-          "bytes": 205268,
-          "lines": 3827
+          "sha256": "ded9e0fe7d567ccd23fa82e63fee5483c0a0d18e35390c89437b3b68b00bdc83",
+          "bytes": 240504,
+          "lines": 4461
         },
         "SOptLib/Model/Subdifferential.lean": {
           "sha256": "0f94dbf980c2f8bd8c65959223399e6e2776e8f553ccdac4f72712368894fd40",
@@ -228,6 +548,11 @@
           "bytes": 12415,
           "lines": 229
         },
+        "SOptLib/Model/Tensors.lean": {
+          "sha256": "fefe1f489c1333f1ab3a37c731bad54cbe57b12ef2177a76e41d8240521e0973",
+          "bytes": 506900,
+          "lines": 9462
+        },
         "SOptLib/Model/Validation.lean": {
           "sha256": "6c2e4e6fd5d86c4394ad1bd1977f4c112b6f76cb0ca29c7309920a3bb895d497",
           "bytes": 5899,
@@ -235,36 +560,80 @@
         }
       },
       "external_imports": [
+        "Mathlib",
+        "Mathlib.Algebra.Algebra.Spectrum.Basic",
         "Mathlib.Algebra.BigOperators.Field",
+        "Mathlib.Algebra.BigOperators.Fin",
         "Mathlib.Algebra.BigOperators.Group.Finset.Basic",
+        "Mathlib.Algebra.BigOperators.Group.Finset.Piecewise",
+        "Mathlib.Algebra.BigOperators.Group.List.Basic",
+        "Mathlib.Algebra.BigOperators.GroupWithZero.Action",
         "Mathlib.Algebra.BigOperators.Intervals",
+        "Mathlib.Algebra.BigOperators.Module",
         "Mathlib.Algebra.BigOperators.Ring.Finset",
+        "Mathlib.Algebra.Group.Basic",
+        "Mathlib.Algebra.Group.Pi.Basic",
+        "Mathlib.Algebra.GroupWithZero.Units.Basic",
+        "Mathlib.Algebra.Module.Basic",
+        "Mathlib.Algebra.Module.BigOperators",
+        "Mathlib.Algebra.Module.LinearMap.End",
         "Mathlib.Algebra.Order.BigOperators.Group.Finset",
         "Mathlib.Algebra.Order.BigOperators.Ring.Finset",
         "Mathlib.Algebra.Order.Chebyshev",
         "Mathlib.Algebra.Order.Field.GeomSum",
+        "Mathlib.Algebra.Order.Field.Power",
         "Mathlib.Algebra.Order.Floor.Div",
         "Mathlib.Algebra.Order.Interval.Finset.SuccPred",
+        "Mathlib.Algebra.Order.Monoid.Unbundled.Basic",
+        "Mathlib.Algebra.Order.Ring.Abs",
         "Mathlib.Algebra.Order.Ring.Basic",
+        "Mathlib.Algebra.Polynomial.AlgebraMap",
+        "Mathlib.Algebra.Ring.Equiv",
         "Mathlib.Algebra.Ring.GeomSum",
+        "Mathlib.Algebra.Ring.Periodic",
+        "Mathlib.Analysis.Analytic.Basic",
+        "Mathlib.Analysis.Analytic.Constructions",
+        "Mathlib.Analysis.Asymptotics.Defs",
         "Mathlib.Analysis.Asymptotics.Lemmas",
+        "Mathlib.Analysis.CStarAlgebra.CStarMatrix",
+        "Mathlib.Analysis.CStarAlgebra.ContinuousFunctionalCalculus.Commute",
+        "Mathlib.Analysis.CStarAlgebra.ContinuousFunctionalCalculus.Instances",
+        "Mathlib.Analysis.CStarAlgebra.ContinuousFunctionalCalculus.Order",
+        "Mathlib.Analysis.CStarAlgebra.ContinuousFunctionalCalculus.Pi",
+        "Mathlib.Analysis.CStarAlgebra.ContinuousFunctionalCalculus.Unique",
         "Mathlib.Analysis.Calculus.AddTorsor.AffineMap",
         "Mathlib.Analysis.Calculus.ContDiff.Basic",
+        "Mathlib.Analysis.Calculus.Deriv.Add",
         "Mathlib.Analysis.Calculus.Deriv.Basic",
+        "Mathlib.Analysis.Calculus.Deriv.Comp",
         "Mathlib.Analysis.Calculus.Deriv.Mul",
+        "Mathlib.Analysis.Calculus.Deriv.Pow",
+        "Mathlib.Analysis.Calculus.Deriv.Prod",
+        "Mathlib.Analysis.Calculus.Deriv.Slope",
         "Mathlib.Analysis.Calculus.FDeriv.Add",
+        "Mathlib.Analysis.Calculus.FDeriv.Analytic",
         "Mathlib.Analysis.Calculus.FDeriv.Basic",
+        "Mathlib.Analysis.Calculus.FDeriv.Bilinear",
+        "Mathlib.Analysis.Calculus.FDeriv.Comp",
+        "Mathlib.Analysis.Calculus.FDeriv.Linear",
         "Mathlib.Analysis.Calculus.FDeriv.Norm",
+        "Mathlib.Analysis.Calculus.FDeriv.Pi",
         "Mathlib.Analysis.Calculus.Gradient.Basic",
+        "Mathlib.Analysis.Calculus.InverseFunctionTheorem.FDeriv",
+        "Mathlib.Analysis.Calculus.ParametricIntegral",
+        "Mathlib.Analysis.Complex.Basic",
+        "Mathlib.Analysis.Complex.CauchyIntegral",
         "Mathlib.Analysis.Complex.Exponential",
         "Mathlib.Analysis.Convex.Approximation",
         "Mathlib.Analysis.Convex.Basic",
         "Mathlib.Analysis.Convex.Combination",
         "Mathlib.Analysis.Convex.Deriv",
         "Mathlib.Analysis.Convex.Function",
+        "Mathlib.Analysis.Convex.Integral",
         "Mathlib.Analysis.Convex.Intrinsic",
         "Mathlib.Analysis.Convex.Jensen",
         "Mathlib.Analysis.Convex.Measure",
+        "Mathlib.Analysis.Convex.SpecificFunctions.Pow",
         "Mathlib.Analysis.Convex.StdSimplex",
         "Mathlib.Analysis.Convex.Strong",
         "Mathlib.Analysis.Convex.Topology",
@@ -273,80 +642,160 @@
         "Mathlib.Analysis.InnerProductSpace.Continuous",
         "Mathlib.Analysis.InnerProductSpace.LinearMap",
         "Mathlib.Analysis.InnerProductSpace.PiL2",
+        "Mathlib.Analysis.InnerProductSpace.ProdL2",
         "Mathlib.Analysis.InnerProductSpace.Projection.Basic",
         "Mathlib.Analysis.LocallyConvex.Separation",
+        "Mathlib.Analysis.Matrix.HermitianFunctionalCalculus",
+        "Mathlib.Analysis.Matrix.Normed",
+        "Mathlib.Analysis.Matrix.Order",
+        "Mathlib.Analysis.Matrix.PosDef",
+        "Mathlib.Analysis.Matrix.Spectrum",
         "Mathlib.Analysis.MeanInequalitiesPow",
         "Mathlib.Analysis.Normed.Affine.Isometry",
+        "Mathlib.Analysis.Normed.Algebra.GelfandFormula",
+        "Mathlib.Analysis.Normed.Algebra.Spectrum",
+        "Mathlib.Analysis.Normed.Field.Basic",
         "Mathlib.Analysis.Normed.Group.Basic",
+        "Mathlib.Analysis.Normed.Group.Continuity",
+        "Mathlib.Analysis.Normed.Group.InfiniteSum",
         "Mathlib.Analysis.Normed.Lp.PiLp",
         "Mathlib.Analysis.Normed.Module.Basic",
         "Mathlib.Analysis.Normed.Module.FiniteDimension",
+        "Mathlib.Analysis.Normed.Operator.Banach",
         "Mathlib.Analysis.Normed.Operator.Basic",
+        "Mathlib.Analysis.Normed.Operator.Mul",
+        "Mathlib.Analysis.Normed.Order.Lattice",
         "Mathlib.Analysis.Seminorm",
+        "Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.ExpLog.Basic",
+        "Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Rpow.Basic",
+        "Mathlib.Analysis.SpecialFunctions.ContinuousFunctionalCalculus.Rpow.Order",
         "Mathlib.Analysis.SpecialFunctions.Log.Base",
         "Mathlib.Analysis.SpecialFunctions.Log.Basic",
+        "Mathlib.Analysis.SpecialFunctions.Pow.Continuity",
         "Mathlib.Analysis.SpecialFunctions.Pow.Real",
         "Mathlib.Analysis.SpecialFunctions.Sqrt",
+        "Mathlib.Analysis.SpecificLimits.ArithmeticGeometric",
         "Mathlib.Analysis.SpecificLimits.Basic",
+        "Mathlib.Combinatorics.Digraph.Basic",
         "Mathlib.Data.Fin.Basic",
         "Mathlib.Data.Finset.Image",
         "Mathlib.Data.Finset.Max",
         "Mathlib.Data.Fintype.Basic",
+        "Mathlib.Data.Fintype.BigOperators",
         "Mathlib.Data.Fintype.Lattice",
         "Mathlib.Data.Fintype.Pi",
+        "Mathlib.Data.Matrix.Action",
+        "Mathlib.Data.Matrix.Basic",
+        "Mathlib.Data.Matrix.Block",
+        "Mathlib.Data.Matrix.Diagonal",
+        "Mathlib.Data.Matrix.Mul",
         "Mathlib.Data.Nat.Basic",
         "Mathlib.Data.Nat.Pairing",
+        "Mathlib.Data.Nat.Periodic",
         "Mathlib.Data.Real.Archimedean",
         "Mathlib.Data.Real.Basic",
         "Mathlib.Data.Real.Sqrt",
+        "Mathlib.Data.Set.Basic",
         "Mathlib.Data.Set.Finite.Basic",
         "Mathlib.Data.Set.Finite.Range",
+        "Mathlib.Dynamics.BirkhoffSum.NormedSpace",
+        "Mathlib.FieldTheory.IsAlgClosed.Spectrum",
+        "Mathlib.LinearAlgebra.Basis.VectorSpace",
+        "Mathlib.LinearAlgebra.Dimension.Free",
+        "Mathlib.LinearAlgebra.Eigenspace.Basic",
+        "Mathlib.LinearAlgebra.Eigenspace.Minpoly",
         "Mathlib.LinearAlgebra.FiniteDimensional.Basic",
+        "Mathlib.LinearAlgebra.Lagrange",
+        "Mathlib.LinearAlgebra.Matrix.Adjugate",
+        "Mathlib.LinearAlgebra.Matrix.BilinearForm",
+        "Mathlib.LinearAlgebra.Matrix.Determinant.Basic",
+        "Mathlib.LinearAlgebra.Matrix.Kronecker",
+        "Mathlib.LinearAlgebra.Matrix.Module",
+        "Mathlib.LinearAlgebra.Matrix.NonsingularInverse",
+        "Mathlib.LinearAlgebra.Matrix.PosDef",
+        "Mathlib.LinearAlgebra.Matrix.Rank",
+        "Mathlib.LinearAlgebra.Matrix.Reindex",
+        "Mathlib.LinearAlgebra.Matrix.Stochastic",
+        "Mathlib.LinearAlgebra.Matrix.ToLin",
+        "Mathlib.LinearAlgebra.Matrix.ToLinearEquiv",
+        "Mathlib.LinearAlgebra.Matrix.Trace",
+        "Mathlib.LinearAlgebra.Projection",
+        "Mathlib.Logic.Equiv.Prod",
+        "Mathlib.Logic.Relation",
         "Mathlib.MeasureTheory.Constructions.BorelSpace.Basic",
         "Mathlib.MeasureTheory.Constructions.BorelSpace.Real",
         "Mathlib.MeasureTheory.Function.ConditionalExpectation.PullOut",
         "Mathlib.MeasureTheory.Function.L2Space",
+        "Mathlib.MeasureTheory.Function.LocallyIntegrable",
+        "Mathlib.MeasureTheory.Function.LpSpace.Basic",
+        "Mathlib.MeasureTheory.Function.LpSpace.ContinuousFunctions",
+        "Mathlib.MeasureTheory.Function.SpecialFunctions.Basic",
         "Mathlib.MeasureTheory.Function.StronglyMeasurable.Inner",
         "Mathlib.MeasureTheory.Group.Arithmetic",
         "Mathlib.MeasureTheory.Integral.Bochner.Basic",
         "Mathlib.MeasureTheory.Integral.Bochner.ContinuousLinearMap",
+        "Mathlib.MeasureTheory.Integral.Bochner.L1",
         "Mathlib.MeasureTheory.Integral.Bochner.SumMeasure",
+        "Mathlib.MeasureTheory.Integral.CircleIntegral",
+        "Mathlib.MeasureTheory.Integral.IntegralEqImproper",
+        "Mathlib.MeasureTheory.Integral.IntervalIntegral.Periodic",
         "Mathlib.MeasureTheory.Integral.Lebesgue.Markov",
         "Mathlib.MeasureTheory.Integral.Prod",
         "Mathlib.MeasureTheory.MeasurableSpace.Basic",
         "Mathlib.MeasureTheory.MeasurableSpace.Constructions",
         "Mathlib.MeasureTheory.MeasurableSpace.MeasurablyGenerated",
         "Mathlib.MeasureTheory.MeasurableSpace.Prod",
+        "Mathlib.MeasureTheory.Measure.Map",
         "Mathlib.MeasureTheory.Measure.MeasureSpace",
+        "Mathlib.NumberTheory.Harmonic.Bounds",
+        "Mathlib.Order.ConditionallyCompleteLattice.Basic",
         "Mathlib.Order.Filter.Extr",
         "Mathlib.Order.SaddlePoint",
         "Mathlib.Probability.ConditionalExpectation",
+        "Mathlib.Probability.Distributions.Gaussian.Multivariate",
         "Mathlib.Probability.Distributions.Uniform",
         "Mathlib.Probability.IdentDistrib",
         "Mathlib.Probability.IdentDistribIndep",
         "Mathlib.Probability.Independence.Basic",
         "Mathlib.Probability.Independence.InfinitePi",
+        "Mathlib.Probability.Independence.Integration",
+        "Mathlib.Probability.Moments.CovarianceBilin",
         "Mathlib.Probability.Moments.Variance",
         "Mathlib.Probability.ProbabilityMassFunction.Basic",
         "Mathlib.Probability.ProbabilityMassFunction.Constructions",
         "Mathlib.Probability.Process.Adapted",
+        "Mathlib.Probability.Process.Filtration",
         "Mathlib.Tactic",
+        "Mathlib.Tactic.FieldSimp",
         "Mathlib.Tactic.Linarith",
         "Mathlib.Tactic.Module",
         "Mathlib.Tactic.NormNum",
         "Mathlib.Tactic.Ring",
         "Mathlib.Topology.Algebra.AffineSubspace",
         "Mathlib.Topology.Algebra.Group.Basic",
+        "Mathlib.Topology.Algebra.GroupWithZero",
+        "Mathlib.Topology.Algebra.InfiniteSum.Module",
+        "Mathlib.Topology.Algebra.InfiniteSum.NatInt",
+        "Mathlib.Topology.Algebra.Module.Equiv",
+        "Mathlib.Topology.Algebra.Module.FiniteDimension",
         "Mathlib.Topology.Algebra.Ring.Real",
         "Mathlib.Topology.Basic",
+        "Mathlib.Topology.ContinuousMap.Units",
+        "Mathlib.Topology.Instances.Matrix",
+        "Mathlib.Topology.LocallyConstant.Basic",
         "Mathlib.Topology.Maps.Basic",
         "Mathlib.Topology.MetricSpace.Basic",
         "Mathlib.Topology.MetricSpace.Bounded",
         "Mathlib.Topology.MetricSpace.HausdorffDistance",
         "Mathlib.Topology.MetricSpace.Lipschitz",
         "Mathlib.Topology.MetricSpace.ProperSpace",
+        "Mathlib.Topology.MetricSpace.Pseudo.Constructions",
+        "Mathlib.Topology.MetricSpace.Pseudo.Defs",
+        "Mathlib.Topology.MetricSpace.Pseudo.Lemmas",
+        "Mathlib.Topology.MetricSpace.Thickening",
         "Mathlib.Topology.Order.Basic",
-        "Mathlib.Topology.Order.Compact"
+        "Mathlib.Topology.Order.Compact",
+        "Mathlib.Topology.Order.IntermediateValue"
       ],
       "local_holes": [],
       "local_axiom_and_opaque_declarations": [

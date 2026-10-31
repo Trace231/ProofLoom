@@ -2,12 +2,16 @@ import Mathlib.Analysis.Calculus.FDeriv.Add
 import Mathlib.Analysis.Calculus.Gradient.Basic
 import Mathlib.MeasureTheory.Integral.Bochner.Basic
 import Mathlib.Order.Filter.Extr
+import Mathlib.Probability.Distributions.Gaussian.Multivariate
 import Mathlib.Topology.Order.Compact
 import Mathlib.Tactic
 import SOptLib.Model.Carrier
 import SOptLib.Model.Selection
+import Mathlib.Analysis.Calculus.FDeriv.Pi
+import SOptLib.Model.Norms
 
 open MeasureTheory
+open ProbabilityTheory
 open scoped InnerProductSpace
 open scoped Gradient
 
@@ -407,6 +411,8 @@ theorem objectiveAmbient_of_mem
   simp [objectiveAmbient, carrierTotalizeOn, hx]
 
 end SOptLib
+
+
 
 namespace SOptLib
 
@@ -2217,5 +2223,891 @@ theorem expectationLe_of_ae_le_add
     (∫ ω, F ω ∂μ) ≤ ∫ ω, G ω + H ω ∂μ := hmono
     _ = (∫ ω, G ω ∂μ) + ∫ ω, H ω ∂μ := hsum_eq
     _ ≤ bG + bH := add_le_add hG_le hH_le
+
+end SOptLib
+
+-- Phase 4 batch 1 merge from Staging/hasGradientAt_coordinateSlice_exactBlockGradient.lean
+namespace SOptLib
+
+-- Generalization plan (G1):
+-- concept/name: coordinate-slice gradient from ambient PiLp gradient; orig was block_coordinate_hasGradientAt
+-- generality used: finite dependent product of real Hilbert blocks with complete block spaces; no measure, convexity, oracle, or algorithm setup assumptions
+-- portable call pattern: stochastic block-coordinate and block mirror/prox proofs that restrict an ambient smooth objective to one updated coordinate and need the selected block of the product gradient as the slice gradient
+-- counterargument checked: not paper-local because it packages a reusable PiLp chain-rule bridge; not a pure wrapper because callers avoid reproving the derivative of coordinate update plus PiLp inner-coordinate identification; no existing public SOptLib/Mathlib lemma had this exact coordinate-slice HasGradientAt conclusion
+-- coverage search: queried "HasGradientAt coordinate slice product gradient PiLp replaceBlock", "gradient coordinate slice ambient finite product chain rule", and "coordinate slice HasGradientAt Function.update PiLp gradient"; hits covered local private proof, Mathlib hasFDerivAt_update, and SOptLib piLp_inner_coord_single but no full packaged theorem
+-- minimal hypotheses: pointwise HasGradientAt of the transported PiLp objective at an arbitrary supplied ambient gradient is enough; global ContDiff smoothness and algorithm setup fields are intentionally left to callers
+
+/-- The selected block of an ambient finite-product gradient is the gradient of
+the corresponding one-coordinate slice.
+
+For a real objective on raw dependent block coordinates, transport it to
+`PiLp 2`, assume an ambient `HasGradientAt` certificate at the point where the
+selected coordinate has value `u`, and project that gradient back to raw
+coordinates.  The selected coordinate is the `HasGradientAt` gradient of
+`z ↦ f (Function.update x i z)`.
+
+Layer: Model | Gap: Level 1 (coordinate-slice product gradient chain rule)
+Proof: compose the supplied ambient `HasGradientAt` certificate with the
+  Fréchet derivative of `Function.update`, then identify the resulting dual
+  functional using the finite `PiLp` single-coordinate inner-product lemma.
+Source: Mathlib `HasGradientAt`/Fréchet chain rule, `Function.update`
+  derivative, finite `PiLp` coordinate insertion, and Hilbert-space Riesz APIs
+Used in: stochastic block mirror descent smooth upper-model proofs where a
+  one-block objective slice must use the selected coordinate of the ambient
+  product-space gradient
+Book citation: book/FOML/NonconvexStochasticBlockMirrorDescent.json#/algorithm_spec
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, nonconvex stochastic block mirror descent -/
+theorem hasGradientAt_coordinate_slice_of_piLp_hasGradientAt
+    {ι : Type*} [Fintype ι] [DecidableEq ι]
+    {Block : ι → Type*}
+    [∀ i, NormedAddCommGroup (Block i)] [∀ i, InnerProductSpace ℝ (Block i)]
+    [∀ i, CompleteSpace (Block i)]
+    (f : (∀ i, Block i) → ℝ) (x : ∀ i, Block i) (i : ι) (u : Block i)
+    (g : PiLp 2 Block)
+    (hgrad :
+      HasGradientAt (fun y : PiLp 2 Block => f (WithLp.ofLp y))
+        g
+        (WithLp.toLp 2 (Function.update x i u))) :
+    HasGradientAt (fun z : Block i => f (Function.update x i z))
+      (WithLp.ofLp g i) u := by
+  let F : PiLp 2 Block → ℝ := fun y => f (WithLp.ofLp y)
+  let xu : ∀ j, Block j := Function.update x i u
+  have hraw :
+      HasFDerivAt (fun z : Block i => Function.update x i z)
+        (ContinuousLinearMap.pi (Pi.single i (.id ℝ (Block i)))) u := by
+    simpa using
+      (hasFDerivAt_update (𝕜 := ℝ) x (i := i) (y := u))
+  have hmap :
+      HasFDerivAt
+        (fun z : Block i => WithLp.toLp 2 (Function.update x i z))
+        (((PiLp.continuousLinearEquiv 2 ℝ Block).symm :
+            (∀ j, Block j) →L[ℝ] PiLp 2 Block).comp
+          (ContinuousLinearMap.pi (Pi.single i (.id ℝ (Block i))))) u := by
+    simpa [PiLp.coe_symm_continuousLinearEquiv] using
+      (((PiLp.continuousLinearEquiv 2 ℝ Block).symm :
+          (∀ j, Block j) →L[ℝ] PiLp 2 Block).hasFDerivAt.comp u hraw)
+  have hcomp := hgrad.hasFDerivAt.comp u hmap
+  rw [hasGradientAt_iff_hasFDerivAt]
+  convert hcomp using 1
+  · ext z
+    simp [PiLp.coe_symm_continuousLinearEquiv,
+      InnerProductSpace.toDual_apply_apply, SOptLib.piLp_inner_coord_single,
+      Pi.single]
+    congr 1
+    ext j
+    by_cases hji : j = i
+    · subst j
+      simp
+    · simp [Function.update_of_ne hji, Pi.single_eq_of_ne hji]
+
+end SOptLib
+
+-- Phase 4 batch 1 merge from Staging/piLpBlockGradient.lean
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: finite dependent PiLp block gradient; orig was exactBlockGradient
+-- generality used: finite dependent product of real Hilbert blocks with complete block spaces; no measure, convexity, smoothness, oracle, or algorithm setup assumptions
+-- portable call pattern: finite block-gradient and block-coordinate methods that represent an objective on raw dependent coordinates but use Mathlib's gradient on the associated PiLp Hilbert product
+-- counterargument checked: not paper-local because the object is the canonical PiLp-gradient-to-coordinate bridge for any finite block objective; not a pure wrapper because downstream proofs can name the exact gradient in block coordinates and share its coordinate formula; not covered by existing SOptLib/Mathlib entries, which provide PiLp projections, inner-coordinate pairing, and coordinate-slice derivative facts but not this block-gradient definition
+-- coverage search: queried "finite product PiLp gradient block coordinates", "gradient PiLp ofLp toLp coordinate finite product", and Mathlib semantic search "gradient on finite PiLp product returned as dependent function coordinates"; hits were Mathlib gradient, PiLp differentiability/projection APIs, SOptLib piLp_inner_coord_single, PiLp.proj_toLp, and the existing coordinate-slice HasGradientAt theorem, with no full duplicate definition
+-- minimal hypotheses: all already minimal for Mathlib's Hilbert-space gradient on PiLp 2: Fintype index, real inner-product block spaces, and completeness of each block
+
+/-- The finite dependent-product gradient transported through `PiLp 2` and
+returned in raw block coordinates.
+
+For an objective written on dependent block coordinates, `piLpBlockGradient`
+assembles the point as a `PiLp 2` Hilbert product, applies Mathlib's `gradient`,
+and projects the resulting ambient gradient back to the raw coordinate family.
+
+Layer: Model | Concept: finite PiLp block gradient
+Proof: (definitional construction; transported Mathlib gradient on a finite dependent `PiLp 2` Hilbert product followed by `WithLp.ofLp`)
+Source: Mathlib inner-product-space gradient and finite dependent `PiLp` Hilbert product APIs
+Used in: stochastic block mirror descent exact-gradient modeling where the paper's block gradient `g(x)` is represented by raw block coordinates while calculus is performed on the product Hilbert space
+Book citation: book/FOML/NonconvexStochasticBlockMirrorDescent.json#/setup/variable_space
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, nonconvex stochastic block mirror descent -/
+noncomputable def piLpBlockGradient
+    {ι : Type*} [Fintype ι]
+    {Block : ι → Type*}
+    [∀ i, NormedAddCommGroup (Block i)] [∀ i, InnerProductSpace ℝ (Block i)]
+    [∀ i, CompleteSpace (Block i)]
+    (f : (∀ i, Block i) → ℝ) (x : ∀ i, Block i) : ∀ i, Block i :=
+  WithLp.ofLp
+    (gradient (fun y : PiLp 2 Block => f (WithLp.ofLp y)) (WithLp.toLp 2 x))
+
+/-- The finite dependent-product block gradient unfolds to the transported
+Mathlib gradient on `PiLp 2`.
+
+Layer: Model | Gap: Level 0 (finite PiLp block-gradient definition)
+Proof: by rfl after unfolding `piLpBlockGradient`.
+Source: Mathlib inner-product-space gradient and finite dependent `PiLp` APIs
+Used in: stochastic block mirror descent proofs that move between the named
+block-gradient object and the ambient product-space gradient -/
+@[simp]
+theorem piLpBlockGradient_def
+    {ι : Type*} [Fintype ι]
+    {Block : ι → Type*}
+    [∀ i, NormedAddCommGroup (Block i)] [∀ i, InnerProductSpace ℝ (Block i)]
+    [∀ i, CompleteSpace (Block i)]
+    (f : (∀ i, Block i) → ℝ) (x : ∀ i, Block i) :
+    piLpBlockGradient f x =
+      WithLp.ofLp
+        (gradient (fun y : PiLp 2 Block => f (WithLp.ofLp y)) (WithLp.toLp 2 x)) := by
+  rfl
+
+/-- The transported finite-product block gradient is the coordinate projection
+of the Mathlib gradient on `PiLp 2`.
+
+Layer: Model | Gap: Level 0 (finite PiLp block-gradient coordinate formula)
+Proof: by rfl after unfolding `piLpBlockGradient`.
+Source: Mathlib inner-product-space gradient and finite dependent `PiLp` coordinate APIs
+Used in: stochastic block mirror descent proofs that select the sampled block of the exact product gradient before comparing it with a stochastic block oracle
+Book citation: book/FOML/NonconvexStochasticBlockMirrorDescent.json#/algorithm_spec/steps/1
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, nonconvex stochastic block mirror descent -/
+@[simp]
+theorem piLpBlockGradient_apply
+    {ι : Type*} [Fintype ι]
+    {Block : ι → Type*}
+    [∀ i, NormedAddCommGroup (Block i)] [∀ i, InnerProductSpace ℝ (Block i)]
+    [∀ i, CompleteSpace (Block i)]
+    (f : (∀ i, Block i) → ℝ) (x : ∀ i, Block i) (i : ι) :
+    piLpBlockGradient f x i =
+      WithLp.ofLp
+        (gradient (fun y : PiLp 2 Block => f (WithLp.ofLp y)) (WithLp.toLp 2 x)) i := by
+  rfl
+
+/-- The transported finite-product block gradient gives the gradient of a
+one-coordinate slice when the ambient transported objective has its Mathlib
+gradient at the corresponding `PiLp 2` point.
+
+Layer: Model | Gap: Level 1 (PiLp block-gradient coordinate-slice API)
+Proof: specialize the ambient coordinate-slice `HasGradientAt` bridge to the
+Mathlib gradient used by `piLpBlockGradient`, then fold the named block-gradient
+definition.
+Source: Mathlib `HasGradientAt`/gradient APIs and SOptLib coordinate-slice
+PiLp gradient bridge
+Used in: stochastic block mirror descent proofs that replace the selected block
+of the exact product gradient with the gradient of the one-block objective
+slice -/
+theorem hasGradientAt_coordinate_slice_piLpBlockGradient_of_piLp_hasGradientAt
+    {ι : Type*} [Fintype ι] [DecidableEq ι]
+    {Block : ι → Type*}
+    [∀ i, NormedAddCommGroup (Block i)] [∀ i, InnerProductSpace ℝ (Block i)]
+    [∀ i, CompleteSpace (Block i)]
+    (f : (∀ i, Block i) → ℝ) (x : ∀ i, Block i) (i : ι) (u : Block i)
+    (hgrad :
+      HasGradientAt (fun y : PiLp 2 Block => f (WithLp.ofLp y))
+        (gradient (fun y : PiLp 2 Block => f (WithLp.ofLp y))
+          (WithLp.toLp 2 (Function.update x i u)))
+        (WithLp.toLp 2 (Function.update x i u))) :
+    HasGradientAt (fun z : Block i => f (Function.update x i z))
+      (piLpBlockGradient f (Function.update x i u) i) u := by
+  simpa [piLpBlockGradient] using
+    hasGradientAt_coordinate_slice_of_piLp_hasGradientAt
+      (f := f) (x := x) (i := i) (u := u)
+      (g := gradient (fun y : PiLp 2 Block => f (WithLp.ofLp y))
+        (WithLp.toLp 2 (Function.update x i u)))
+      hgrad
+
+-- Generalization plan (G0):
+-- concept/name: finite-component smoothness and initial objective-gap assumption; orig was SmoothnessAssumption.
+-- generality used: arbitrary component index type and real Hilbert carrier with complete-space gradient calculus; no measure, independence, integrability, convexity, oracle, filtration, or finite-dimensional hypotheses are used.
+-- portable call pattern: finite-sum smooth distributed and variance-reduced algorithms call the same component-gradient Lipschitz and initial component-gap projections while changing the component family, selected gradients, initial point, smoothness scale, and gap scale.
+-- counterargument checked: not paper-local because finite-component smoothness together with bounded initial gaps is a standard finite-sum optimization assumption; not a pure duplicate because SOptLib.FiniteFamilyGradientSmoothness covers only gradient realization and Lipschitzness, while this predicate adds the objective-infimum lower-boundedness and initial-gap clauses.
+-- coverage search: lean_search_symbols "finite component smoothness assumption HasGradientAt Lipschitz initial gap bounded below" found SOptLib.FiniteFamilyGradientSmoothness as a partial smoothness bundle and finite-average smooth-descent theorems, but no assumption carrying the objective-infimum gap; lean_search_symbols "objective infimum initial gap finite component lower bounded smoothness assumption" found only the local SmoothnessAssumption plus objectiveInfimumValue APIs; lean_leansearch "finite family component smoothness assumption gradients Lipschitz initial objective gap bounded below" found Mathlib Lipschitz/mean-value lemmas but no finite-sum optimization assumption bundle.
+-- minimal hypotheses: the algorithm setup object, node finiteness, decidable equality, nonempty node assumption, and finite-dimensionality were removed; the complete-space assumption is retained because the bundled gradient predicate is Mathlib/SOptLib's Hilbert gradient API.
+
+/-- Finite-family gradient smoothness with bounded component initial gaps.
+
+The predicate extends `FiniteFamilyGradientSmoothness` by recording that each
+component objective is bounded below on a carrier `X`, and that a common budget
+`Delta` bounds every component's initial gap to the corresponding carrier
+infimum value.
+
+Layer: Model | Concept: finite-component smoothness and initial objective-gap assumption
+Proof: (definitional construction; conjunction of selected-gradient smoothness, objective lower-boundedness, and initial component-gap bounds)
+Source: finite-sum smooth optimization assumptions, Mathlib Hilbert-space gradient predicates, and SOptLib objective-infimum values
+Used in: pull-with-memory decentralized gradient descent extraction of component smoothness, finite-average gradient identification, and initial objective-gap bounds
+Book citation: book/LiangSongYuan2025/PullWithMemoryDGD.json#/assumptions/4
+Origin algorithm: Liang, Song, and Yuan, Decentralized Optimization over Time-Varying Row-Stochastic Digraphs, PULM-based Decentralized Gradient Descent -/
+noncomputable def FiniteComponentSmoothnessAssumption
+    {ι E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
+    (X : Set E) (F : ι → E → ℝ) (gradF : ι → E → E) (x0 : E)
+    (Lcomp : ι → ℝ) (Delta : ℝ) : Prop :=
+  FiniteFamilyGradientSmoothness F gradF Lcomp ∧
+    0 ≤ Delta ∧
+      (∀ i, BddBelow ((F i) '' X)) ∧
+        ∀ i, F i x0 - objectiveInfimumValue X (F i) ≤ Delta
+
+/-- The finite-component smoothness and initial-gap assumption unfolds to
+finite-family gradient smoothness, nonnegativity of the initial-gap budget,
+component lower-boundedness on the carrier, and component initial-gap bounds.
+
+Layer: Model | Gap: Level 0 (finite-component smoothness assumption unfolding)
+Proof: by rfl after unfolding `FiniteComponentSmoothnessAssumption`.
+Source: finite-sum smooth optimization assumptions, Mathlib conjunction APIs, and SOptLib objective-infimum values
+Used in: rewriting a finite-component smoothness assumption into smoothness, lower-bound, and initial-gap clauses for finite-average descent proofs
+Book citation: book/LiangSongYuan2025/PullWithMemoryDGD.json#/assumptions/4
+Origin algorithm: Liang, Song, and Yuan, Decentralized Optimization over Time-Varying Row-Stochastic Digraphs, PULM-based Decentralized Gradient Descent -/
+@[simp] theorem FiniteComponentSmoothnessAssumption_def
+    {ι E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
+    (X : Set E) (F : ι → E → ℝ) (gradF : ι → E → E) (x0 : E)
+    (Lcomp : ι → ℝ) (Delta : ℝ) :
+    FiniteComponentSmoothnessAssumption X F gradF x0 Lcomp Delta ↔
+      FiniteFamilyGradientSmoothness F gradF Lcomp ∧
+        0 ≤ Delta ∧
+          (∀ i, BddBelow ((F i) '' X)) ∧
+            ∀ i, F i x0 - objectiveInfimumValue X (F i) ≤ Delta := by
+  rfl
+
+namespace FiniteComponentSmoothnessAssumption
+
+/-- A finite-component smoothness and initial-gap assumption exposes the
+underlying finite-family gradient smoothness bundle.
+
+Layer: Model | Gap: Level 0 (finite-component smoothness bridge to selected-gradient smoothness)
+Proof: project the finite-family smoothness conjunct from the assumption.
+Source: SOptLib finite-family gradient smoothness API and Mathlib conjunction projections
+Used in: finite-sum proofs that first consume the broader initial-gap assumption and then call SOptLib finite-family gradient-smoothness lemmas
+Book citation: book/LiangSongYuan2025/PullWithMemoryDGD.json#/assumptions/4
+Origin algorithm: Liang, Song, and Yuan, Decentralized Optimization over Time-Varying Row-Stochastic Digraphs, PULM-based Decentralized Gradient Descent -/
+theorem finiteFamilyGradientSmoothness
+    {ι E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
+    {X : Set E} {F : ι → E → ℝ} {gradF : ι → E → E} {x0 : E}
+    {Lcomp : ι → ℝ} {Delta : ℝ}
+    (h : FiniteComponentSmoothnessAssumption X F gradF x0 Lcomp Delta) :
+    FiniteFamilyGradientSmoothness F gradF Lcomp :=
+  h.1
+
+/-- Component smoothness constants are nonnegative.
+
+Layer: Model | Gap: Level 0 (finite-component smoothness nonnegative scale projection)
+Proof: project nonnegativity from the underlying finite-family smoothness bundle.
+Source: ordered real smoothness constants and Mathlib conjunction projections
+Used in: finite-sum stepsize and smooth descent side-condition extraction from component smoothness assumptions
+Book citation: book/LiangSongYuan2025/PullWithMemoryDGD.json#/assumptions/4
+Origin algorithm: Liang, Song, and Yuan, Decentralized Optimization over Time-Varying Row-Stochastic Digraphs, PULM-based Decentralized Gradient Descent -/
+theorem smoothness_nonneg
+    {ι E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
+    {X : Set E} {F : ι → E → ℝ} {gradF : ι → E → E} {x0 : E}
+    {Lcomp : ι → ℝ} {Delta : ℝ}
+    (h : FiniteComponentSmoothnessAssumption X F gradF x0 Lcomp Delta) (i : ι) :
+    0 ≤ Lcomp i :=
+  h.1.2.1 i
+
+/-- The common initial component-gap scale is nonnegative.
+
+Layer: Model | Gap: Level 0 (finite-component initial-gap nonnegative scale projection)
+Proof: project the initial-gap budget conjunct of `FiniteComponentSmoothnessAssumption`.
+Source: ordered real objective-gap scales and Mathlib conjunction projections
+Used in: finite-sum descent proofs that extract nonnegativity of the initial objective-gap budget
+Book citation: book/LiangSongYuan2025/PullWithMemoryDGD.json#/assumptions/4
+Origin algorithm: Liang, Song, and Yuan, Decentralized Optimization over Time-Varying Row-Stochastic Digraphs, PULM-based Decentralized Gradient Descent -/
+theorem initial_gap_nonneg
+    {ι E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
+    {X : Set E} {F : ι → E → ℝ} {gradF : ι → E → E} {x0 : E}
+    {Lcomp : ι → ℝ} {Delta : ℝ}
+    (h : FiniteComponentSmoothnessAssumption X F gradF x0 Lcomp Delta) :
+    0 ≤ Delta :=
+  h.2.1
+
+/-- The selected component gradient realizes the derivative of each component.
+
+Layer: Model | Gap: Level 0 (finite-component gradient realization projection)
+Proof: project gradient realization from the underlying finite-family smoothness bundle.
+Source: Mathlib Hilbert-space gradient predicates and conjunction projections
+Used in: finite-average gradient identification from component differentiability in finite-sum smooth algorithms
+Book citation: book/LiangSongYuan2025/PullWithMemoryDGD.json#/assumptions/4
+Origin algorithm: Liang, Song, and Yuan, Decentralized Optimization over Time-Varying Row-Stochastic Digraphs, PULM-based Decentralized Gradient Descent -/
+theorem hasGradientAt
+    {ι E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
+    {X : Set E} {F : ι → E → ℝ} {gradF : ι → E → E} {x0 : E}
+    {Lcomp : ι → ℝ} {Delta : ℝ}
+    (h : FiniteComponentSmoothnessAssumption X F gradF x0 Lcomp Delta)
+    (i : ι) (x : E) :
+    HasGradientAt (F i) (gradF i x) x :=
+  h.1.1 i x
+
+/-- Selected component gradients satisfy their componentwise Lipschitz bounds.
+
+Layer: Model | Gap: Level 0 (finite-component gradient Lipschitz projection)
+Proof: project the component Lipschitz conjunct from the underlying finite-family smoothness bundle.
+Source: normed-space Lipschitz-gradient assumptions and Mathlib conjunction projections
+Used in: finite-average smooth quadratic upper bounds and disagreement-gradient estimates in finite-sum algorithms
+Book citation: book/LiangSongYuan2025/PullWithMemoryDGD.json#/assumptions/4
+Origin algorithm: Liang, Song, and Yuan, Decentralized Optimization over Time-Varying Row-Stochastic Digraphs, PULM-based Decentralized Gradient Descent -/
+theorem lipschitz
+    {ι E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
+    {X : Set E} {F : ι → E → ℝ} {gradF : ι → E → E} {x0 : E}
+    {Lcomp : ι → ℝ} {Delta : ℝ}
+    (h : FiniteComponentSmoothnessAssumption X F gradF x0 Lcomp Delta)
+    (i : ι) (x y : E) :
+    ‖gradF i x - gradF i y‖ ≤ Lcomp i * ‖x - y‖ :=
+  h.1.2.2 i x y
+
+/-- Each component objective image over the carrier is bounded below.
+
+Layer: Model | Gap: Level 0 (finite-component objective lower-boundedness projection)
+Proof: project the bounded-below objective-image conjunct of `FiniteComponentSmoothnessAssumption`.
+Source: Mathlib order-theoretic boundedness and SOptLib objective-infimum values
+Used in: justifying component infimum values before converting initial component gaps into finite-average objective gaps
+Book citation: book/LiangSongYuan2025/PullWithMemoryDGD.json#/assumptions/4
+Origin algorithm: Liang, Song, and Yuan, Decentralized Optimization over Time-Varying Row-Stochastic Digraphs, PULM-based Decentralized Gradient Descent -/
+theorem bddBelow
+    {ι E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
+    {X : Set E} {F : ι → E → ℝ} {gradF : ι → E → E} {x0 : E}
+    {Lcomp : ι → ℝ} {Delta : ℝ}
+    (h : FiniteComponentSmoothnessAssumption X F gradF x0 Lcomp Delta) (i : ι) :
+    BddBelow ((F i) '' X) :=
+  h.2.2.1 i
+
+/-- Each component's initial objective gap to its carrier infimum value is
+bounded by the common gap scale.
+
+Layer: Model | Gap: Level 0 (finite-component initial objective-gap projection)
+Proof: project the initial objective-gap conjunct of `FiniteComponentSmoothnessAssumption`.
+Source: SOptLib objective-infimum values, ordered real objective gaps, and Mathlib conjunction projections
+Used in: bounding the initial finite-average objective gap in distributed finite-sum smooth descent arguments
+Book citation: book/LiangSongYuan2025/PullWithMemoryDGD.json#/assumptions/4
+Origin algorithm: Liang, Song, and Yuan, Decentralized Optimization over Time-Varying Row-Stochastic Digraphs, PULM-based Decentralized Gradient Descent -/
+theorem initial_gap_le
+    {ι E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
+    {X : Set E} {F : ι → E → ℝ} {gradF : ι → E → E} {x0 : E}
+    {Lcomp : ι → ℝ} {Delta : ℝ}
+    (h : FiniteComponentSmoothnessAssumption X F gradF x0 Lcomp Delta) (i : ι) :
+    F i x0 - objectiveInfimumValue X (F i) ≤ Delta :=
+  h.2.2.2 i
+
+/-- Specialization of the carrier/componentwise predicate to a common
+component smoothness constant on the full ambient space.
+
+Layer: Model | Gap: Level 0 (finite-component smoothness full-space constant specialization)
+Proof: by rfl after unfolding `FiniteComponentSmoothnessAssumption`.
+Source: finite-sum smooth optimization assumptions and SOptLib objective-infimum values
+Used in: source-facing smooth finite-sum algorithms whose component assumptions are stated on the full ambient carrier with one common smoothness scale
+Book citation: book/LiangSongYuan2025/PullWithMemoryDGD.json#/assumptions/4
+Origin algorithm: Liang, Song, and Yuan, Decentralized Optimization over Time-Varying Row-Stochastic Digraphs, PULM-based Decentralized Gradient Descent -/
+theorem univ_const_iff
+    {ι E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
+    (F : ι → E → ℝ) (gradF : ι → E → E) (x0 : E) (L Delta : ℝ) :
+    FiniteComponentSmoothnessAssumption (Set.univ : Set E) F gradF x0
+        (fun _ : ι => L) Delta ↔
+      FiniteFamilyGradientSmoothness F gradF (fun _ : ι => L) ∧
+        0 ≤ Delta ∧
+          (∀ i, BddBelow ((F i) '' (Set.univ : Set E))) ∧
+            ∀ i, F i x0 - objectiveInfimumValue (Set.univ : Set E) (F i) ≤ Delta := by
+  rfl
+
+end FiniteComponentSmoothnessAssumption
+
+end SOptLib
+
+namespace SOptLib
+
+
+-- Generalization plan (G0):
+-- concept/name: Lipschitz-gradient objective regularity; orig was CL11.
+-- generality used: arbitrary complete real inner-product normed additive group
+--   E and objective f : E -> Real with a real smoothness constant L; no measure,
+--   convexity, oracle, or finite-dimensional assumptions are needed to state
+--   the predicate.
+-- portable call pattern: smooth first-order, finite-sum, stochastic-gradient,
+--   and zeroth-order proofs can instantiate E, f, and L when they need the
+--   reusable assumption that f is differentiable and its Mathlib gradient has a
+--   global L-Lipschitz bound.
+-- counterargument checked: not just paper-local traceability because the same
+--   regularity class is the entry assumption for smooth descent, Gaussian
+--   smoothing, and gradient-gap steps; it is not a pure duplicate of the
+--   existing finite-family or carrier-gradient predicates, which require
+--   selected gradients, carriers, or component families.
+-- coverage search: searched "differentiable Lipschitz gradient predicate",
+--   "Lipschitz gradient objective differentiable", and "Smooth objective
+--   differentiable gradient Lipschitz definition"; top hits were
+--   FiniteFamilyGradientSmoothness, carrierGradient_lipschitz_of_assumption,
+--   and smooth-descent consequence theorems, all partial rather than this
+--   global Mathlib-gradient objective predicate.
+-- minimal hypotheses: all already minimal for the proposition; positivity of L
+--   and finite-dimensional Euclidean structure are caller-side assumptions, not
+--   needed by the definition.
+
+/-- A real objective is differentiable and has a globally Lipschitz Mathlib gradient.
+
+Layer: Model | Concept: Lipschitz-gradient objective regularity
+Proof: (definitional construction; conjunction of differentiability and a
+  global norm bound for gradient differences)
+Source: Mathlib Hilbert-space gradient and differentiability predicates
+Used in: randomized stochastic gradient-free smoothness assumptions before
+  smooth descent, Gaussian smoothing, finite-difference moment, and gradient-gap
+  estimates
+Book citation: book/FOML/StochasticZerothOrder.json#/assumptions/3/math
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic gradient-free method -/
+def LipschitzGradientObjective
+    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
+    (f : E → ℝ) (L : ℝ) : Prop :=
+  Differentiable ℝ f ∧
+    ∀ x y : E, ‖∇ f y - ∇ f x‖ ≤ L * ‖y - x‖
+
+/-- The Lipschitz-gradient objective predicate unfolds to differentiability and
+the global gradient-difference bound.
+
+Layer: Model | Gap: Level 0 (Lipschitz-gradient objective unfolding)
+Proof: by rfl after unfolding `LipschitzGradientObjective`.
+Source: Mathlib Hilbert-space gradient and differentiability predicates
+Used in: randomized stochastic gradient-free smoothness assumptions when
+  replacing the source `C_L^{1,1}` notation by its Lean proposition
+Book citation: book/FOML/StochasticZerothOrder.json#/assumptions/3/math
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic gradient-free method -/
+@[simp] theorem LipschitzGradientObjective_def
+    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
+    (f : E → ℝ) (L : ℝ) :
+    LipschitzGradientObjective f L ↔
+      Differentiable ℝ f ∧
+        ∀ x y : E, ‖∇ f y - ∇ f x‖ ≤ L * ‖y - x‖ :=
+  Iff.rfl
+
+namespace LipschitzGradientObjective
+
+/-- A Lipschitz-gradient objective is differentiable.
+
+Layer: Model | Gap: Level 0 (Lipschitz-gradient objective differentiability projection)
+Proof: unfold the Lipschitz-gradient objective predicate and take the first
+  conjunct.
+Source: Mathlib Hilbert-space differentiability predicates and propositional
+  conjunction APIs
+Used in: smooth first-order and zeroth-order objective proofs before converting
+  differentiability into pointwise gradient certificates
+Book citation: book/FOML/StochasticZerothOrder.json#/assumptions/3/math
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic gradient-free method -/
+theorem differentiable
+    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
+    {f : E → ℝ} {L : ℝ} (h : LipschitzGradientObjective f L) :
+    Differentiable ℝ f :=
+  h.1
+
+/-- A Lipschitz-gradient objective satisfies its global gradient-difference bound.
+
+Layer: Model | Gap: Level 0 (Lipschitz-gradient objective bound projection)
+Proof: unfold the Lipschitz-gradient objective predicate and specialize the
+  second conjunct at the two points.
+Source: Mathlib Hilbert-space gradient and norm APIs
+Used in: smooth descent, Gaussian smoothing, and stochastic finite-difference
+  estimates that consume the Lipschitz gradient inequality pointwise
+Book citation: book/FOML/StochasticZerothOrder.json#/assumptions/3/math
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic gradient-free method -/
+theorem gradient_lipschitz
+    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
+    {f : E → ℝ} {L : ℝ} (h : LipschitzGradientObjective f L)
+    (x y : E) :
+    ‖∇ f y - ∇ f x‖ ≤ L * ‖y - x‖ :=
+  h.2 x y
+
+end LipschitzGradientObjective
+
+
+
+
+-- Generalization plan (G0):
+-- concept/name: stochastic objective realization by sample losses; orig was
+--   SZOAssumption15.
+-- generality used: arbitrary decision type X, sample type S with a measurable
+--   space, sample law P, real-valued sample loss F, and deterministic objective
+--   f; no Euclidean, smoothness, convexity, probability, oracle, or
+--   finite-dimensional assumptions are needed.
+-- portable call pattern: zeroth-order, stochastic-objective, and sampled-loss
+--   proofs can instantiate the decision type, sample law, loss kernel, and
+--   objective while keeping the conclusion that every fixed query has a
+--   measurable integrable function-value realization whose expectation is the
+--   objective value.
+-- counterargument checked: not paper-local traceability because the same
+--   all-query function-value realization contract is used before converting
+--   finite differences or sampled objectives into deterministic objectives;
+--   not a duplicate of objectiveExpectation or expectationEq, which name a
+--   single expectation expression/equality but do not bundle all fixed
+--   decisions with measurability.
+-- coverage search: searched "sample function values measurable integrable
+--   expectation equals objective" and "stochastic objective realization
+--   integrable measurable integral equals objective"; top hits were
+--   SOptLib.objectiveExpectation_eq_integral_kernel,
+--   SOptLib.objectiveExpectation_eq_integral_of_map_eq, and
+--   SOptLib.expectationEq, all partial rather than this all-query sampled-loss
+--   realization predicate.
+-- minimal hypotheses: all already minimal; measurability of S is required for
+--   measurable fibers, and real-valued Bochner integrability/equality supplies
+--   the expectation contract without further typeclasses.
+
+/-- Sample losses realize a deterministic stochastic objective at every query.
+
+For each decision `x`, the sample function `s ↦ F x s` is measurable and
+integrable under `P`, and its Bochner integral is the deterministic objective
+value `f x`.
+
+Layer: Model | Concept: Stochastic objective realization
+Proof: (definitional construction; all-query conjunction of measurable
+  fibers, Bochner integrability, and objective expectation equality)
+Source: Mathlib measure theory Bochner integral notation and stochastic
+  objective expectation predicates
+Used in: randomized stochastic gradient-free proofs when Assumption 15 turns
+  sampled zeroth-order function values at fixed queries into deterministic
+  objective values before finite-difference and smoothing estimates
+Book citation: book/FOML/StochasticZerothOrder.json#/assumptions/4
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic gradient-free method -/
+def StochasticObjectiveRealization
+    {X S : Type*} [MeasurableSpace S]
+    (P : Measure S) (F : X → S → ℝ) (f : X → ℝ) : Prop :=
+  (∀ x : X, Measurable (fun s => F x s)) ∧
+    (∀ x : X, Integrable (fun s => F x s) P) ∧
+    (∀ x : X, (∫ s, F x s ∂P) = f x)
+
+/-- The stochastic objective realization predicate unfolds to fixed-query
+measurability, integrability, and expectation equality.
+
+Layer: Model | Gap: Level 0 (stochastic objective realization formula)
+Proof: by rfl after unfolding `StochasticObjectiveRealization`.
+Source: Mathlib measure theory Bochner integral notation and measurability APIs
+Used in: randomized stochastic gradient-free proofs when extracting the three
+  fixed-query obligations supplied by the function-value realization assumption
+Book citation: book/FOML/StochasticZerothOrder.json#/assumptions/4
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic gradient-free method -/
+@[simp]
+theorem StochasticObjectiveRealization_def
+    {X S : Type*} [MeasurableSpace S]
+    (P : Measure S) (F : X → S → ℝ) (f : X → ℝ) :
+    StochasticObjectiveRealization P F f ↔
+      (∀ x : X, Measurable (fun s => F x s)) ∧
+        (∀ x : X, Integrable (fun s => F x s) P) ∧
+        (∀ x : X, (∫ s, F x s ∂P) = f x) := by
+  rfl
+
+/-- A stochastic objective realization gives measurability of each sample-loss
+fiber.
+
+Layer: Model | Gap: Level 0 (sample-loss fiber measurability projection)
+Proof: project the first conjunct of `StochasticObjectiveRealization`.
+Source: Mathlib measure theory measurable function predicates
+Used in: randomized stochastic gradient-free proofs when fixed-query
+  zeroth-order function values must be measurable before integration
+Book citation: book/FOML/StochasticZerothOrder.json#/assumptions/4
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic gradient-free method -/
+theorem StochasticObjectiveRealization.measurable
+    {X S : Type*} [MeasurableSpace S]
+    {P : Measure S} {F : X → S → ℝ} {f : X → ℝ}
+    (h : StochasticObjectiveRealization P F f) (x : X) :
+    Measurable (fun s => F x s) :=
+  h.1 x
+
+/-- A stochastic objective realization gives integrability of each sample-loss
+fiber.
+
+Layer: Model | Gap: Level 0 (sample-loss fiber integrability projection)
+Proof: project the second conjunct of `StochasticObjectiveRealization`.
+Source: Mathlib measure theory Bochner integrability predicates
+Used in: randomized stochastic gradient-free proofs when fixed-query
+  zeroth-order function values must be integrable before expectation rewrites
+Book citation: book/FOML/StochasticZerothOrder.json#/assumptions/4
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic gradient-free method -/
+theorem StochasticObjectiveRealization.integrable
+    {X S : Type*} [MeasurableSpace S]
+    {P : Measure S} {F : X → S → ℝ} {f : X → ℝ}
+    (h : StochasticObjectiveRealization P F f) (x : X) :
+    Integrable (fun s => F x s) P :=
+  h.2.1 x
+
+/-- A stochastic objective realization identifies each sample-loss expectation
+with the deterministic objective value.
+
+Layer: Model | Gap: Level 0 (sample-loss expectation equality projection)
+Proof: project the final conjunct of `StochasticObjectiveRealization`.
+Source: Mathlib measure theory Bochner integral notation and equality APIs
+Used in: randomized stochastic gradient-free proofs when integrating the
+  two function values in a zeroth-order finite difference and rewriting them
+  as deterministic objective values
+Book citation: book/FOML/StochasticZerothOrder.json#/assumptions/4
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic gradient-free method -/
+theorem StochasticObjectiveRealization.integral_eq
+    {X S : Type*} [MeasurableSpace S]
+    {P : Measure S} {F : X → S → ℝ} {f : X → ℝ}
+    (h : StochasticObjectiveRealization P F f) (x : X) :
+    (∫ s, F x s ∂P) = f x :=
+  h.2.2 x
+
+
+
+
+-- Generalization plan (G0):
+-- concept/name: attained feasible objective infimum; orig was
+--   `fStar_eq_objective_of_global_optimal`, renamed away from paper-local
+--   optimum notation and algorithm-specific global-optimal wording.
+-- generality used: arbitrary carrier type, feasible set, real-valued objective,
+--   and feasible optimizer; no measure, convexity, smoothness, oracle, topology,
+--   Hilbert, or finite-dimensional assumptions are used.
+-- portable call pattern: convex or nonconvex stochastic-optimization proofs
+--   that replace a named infimum value by the objective value at an attained
+--   globally optimal feasible comparison point; the feasible set, objective,
+--   and optimizer witness vary while the equality statement stays fixed.
+-- counterargument checked: this is not only paper traceability because it closes
+--   a recurring attained-optimum-to-infimum bridge for the named SOptLib
+--   `objectiveInfimumValue`; it is not a pure wrapper around Mathlib because
+--   the statement preserves the SOptLib objective model and discharges the
+--   bounded-below side condition from pointwise optimality.
+-- coverage search: lean_search_symbols "objective infimum value equals attained
+--   minimum forall lower bound feasible set" found `objectiveInfimumValue`,
+--   `objectiveInfimumValue_le`, and bundled `objectiveMinimum...` projections
+--   as partial hits but no equality for `objectiveInfimumValue`; lean_search_symbols
+--   "sInf image equals value minimizer lower bound member" and LeanSearch
+--   "infimum of a set equals an attained lower bound" found Mathlib `csInf` and
+--   `IsGLB` facts as proof ingredients, not the SOptLib objective bridge.
+-- minimal hypotheses: explicit bounded-below hypothesis removed; it follows
+--   from feasibility of `xStar` and the pointwise feasible-set lower bound.
+
+/-- The feasible objective infimum equals the objective value at any feasible
+point whose value lower-bounds all feasible objective values.
+
+Layer: Model | Gap: Level 0 (attained feasible objective infimum equality)
+Proof: unfold `objectiveInfimumValue`, use pointwise optimality to build the
+  lower-bound certificate for the feasible objective image, and combine
+  `csInf_le` with `le_csInf` by antisymmetry.
+Source: Mathlib conditionally complete linear order API for real `sInf` over
+  set images
+Used in: randomized stochastic gradient-free convex branch where the paper
+  optimum value `f*` is replaced by the objective value at an attained global
+  optimizer
+Book citation: book/FOML/StochasticZerothOrder.json#/assumptions/11
+Origin algorithm: G. Lan, First-Order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic gradient free method -/
+theorem objectiveInfimumValue_eq_of_forall_le {E : Type*} {X : Set E}
+    {f : E → ℝ} {xStar : E}
+    (hxStar : xStar ∈ X) (h_le : ∀ x, x ∈ X → f xStar ≤ f x) :
+    objectiveInfimumValue X f = f xStar := by
+  have h_bddBelow : BddBelow (f '' X) := by
+    exact ⟨f xStar, by
+      rintro y ⟨x, hx, rfl⟩
+      exact h_le x hx⟩
+  refine le_antisymm ?_ ?_
+  · exact objectiveInfimumValue_le h_bddBelow hxStar
+  · rw [objectiveInfimumValue_def]
+    refine le_csInf ?_ ?_
+    · exact ⟨f xStar, ⟨xStar, hxStar, rfl⟩⟩
+    · rintro y ⟨x, hx, rfl⟩
+      exact h_le x hx
+
+
+
+
+-- Generalization plan (G0):
+-- concept/name: Gaussian smoothing of a real objective by standard-Gaussian
+--   additive perturbations; orig was gaussianSmoothing.
+-- generality used: arbitrary finite-dimensional real inner-product normed
+--   additive group E with a measurable space; no smoothness, convexity, oracle,
+--   integrability, or positivity hypotheses are needed to name the total
+--   Bochner integral expression.
+-- portable call pattern: randomized zeroth-order and Gaussian random-search
+--   algorithms can instantiate E, f, and mu when replacing a raw expectation
+--   expression by the named smoothed objective f_mu.
+-- counterargument checked: not paper-local traceability because the same
+--   standard-Gaussian smoothing object appears in RSGF, random gradient-free,
+--   accelerated random-search, and nonconvex random-search proofs; not covered
+--   by Mathlib, whose Gaussian API provides stdGaussian and moments but no
+--   smoothing objective definition.
+-- coverage search: searched "Gaussian smoothing maps function integral shifted
+--   gaussian measure", "gaussianSmoothing standard Gaussian integral shift",
+--   "stdGaussianSmoothing", and "standard Gaussian smoothing definition
+--   integral shifted function"; top hits were only this algorithm declaration,
+--   reference-example wrappers around a missing stdGaussianSmoothing name, and
+--   Mathlib/SOptLib Gaussian moment facts, all partial rather than this
+--   Model-level definition with an apply theorem.
+-- minimal hypotheses: finite-dimensional inner-product structure is required
+--   by Mathlib's stdGaussian; Borel, second-countability, positivity of mu, and
+--   regularity assumptions are caller-side facts not needed by the definition.
+
+/-- Gaussian smoothing sends `f` to `x ↦ ∫ u, f (x + mu • u) d(stdGaussian E)`.
+
+Layer: Model | Concept: Gaussian smoothing
+Proof: (definitional construction; Bochner integral of a shifted objective
+  along the finite-dimensional standard Gaussian law)
+Source: Mathlib multivariate standard Gaussian measure and Bochner integral
+  notation
+Used in: randomized stochastic gradient-free smoothing when the raw Gaussian
+  expectation defining the smoothed objective is replaced by a named model
+  object before differentiating, comparing gradients, and applying descent
+Book citation: book/FOML/StochasticZerothOrder.json#/algorithm_spec/parameters/2
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic gradient-free method -/
+noncomputable def gaussianSmoothing
+    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+    [FiniteDimensional ℝ E] [MeasurableSpace E]
+    (f : E → ℝ) (mu : ℝ) (x : E) : ℝ :=
+  ∫ u, f (x + mu • u) ∂(stdGaussian E)
+
+/-- The value of Gaussian smoothing is the standard-Gaussian integral of the
+shifted objective.
+
+Layer: Model | Gap: Level 0 (Gaussian smoothing definitional formula)
+Proof: by rfl after unfolding `gaussianSmoothing`.
+Source: Mathlib multivariate standard Gaussian measure and Bochner integral
+  notation
+Used in: randomized stochastic gradient-free proofs when rewriting the named
+  smoothed objective back to its Gaussian expectation for integrability,
+  differentiation, and finite-difference estimates
+Book citation: book/FOML/StochasticZerothOrder.json#/algorithm_spec/parameters/2
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic gradient-free method -/
+@[simp]
+theorem gaussianSmoothing_def
+    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+    [FiniteDimensional ℝ E] [MeasurableSpace E]
+    (f : E → ℝ) (mu : ℝ) (x : E) :
+    gaussianSmoothing f mu x = ∫ u, f (x + mu • u) ∂(stdGaussian E) := by
+  rfl
+
+/-- Compatibility name for rewriting a Gaussian smoothing value to its
+standard-Gaussian integral formula. -/
+theorem gaussianSmoothing_apply
+    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+    [FiniteDimensional ℝ E] [MeasurableSpace E]
+    (f : E → ℝ) (mu : ℝ) (x : E) :
+    gaussianSmoothing f mu x = ∫ u, f (x + mu • u) ∂(stdGaussian E) := by
+  rfl
+
+/-- Gaussian smoothing preserves constant objectives. -/
+@[simp]
+theorem gaussianSmoothing_const
+    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+    [FiniteDimensional ℝ E] [MeasurableSpace E] [BorelSpace E]
+    (c mu : ℝ) (x : E) :
+    gaussianSmoothing (fun _ : E => c) mu x = c := by
+  simp [gaussianSmoothing, integral_const, probReal_univ]
+
+/-- Gaussian smoothing with zero radius returns the original objective value. -/
+@[simp]
+theorem gaussianSmoothing_zero_mu
+    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+    [FiniteDimensional ℝ E] [MeasurableSpace E] [BorelSpace E]
+    (f : E → ℝ) (x : E) :
+    gaussianSmoothing f 0 x = f x := by
+  simp [gaussianSmoothing, integral_const, probReal_univ]
+
+
+
+
+-- Generalization plan (G0):
+-- concept/name: nonnegative objective gap to an attained feasible infimum; orig was
+--   `objective_gap_nonneg_of_global_optimal`, renamed away from paper-local `fStar`.
+-- generality used: arbitrary carrier type, feasible set, real-valued objective,
+--   feasible optimizer and comparison point; no measure, topology, convexity,
+--   smoothness, oracle, Hilbert, or finite-dimensional assumptions are needed.
+-- portable call pattern: stochastic optimization convergence proofs establish a
+--   global lower-bound witness and use this theorem to discard a feasible
+--   objective gap; the objective, feasible set, optimizer, and iterate vary.
+-- counterargument checked: this is not paper-only traceability or a caller-side
+--   expression because it packages the attained-infimum bridge with the final
+--   ordered subtraction step; it is not duplicated by `objectiveGapIntegrand_nonneg`,
+--   whose conclusion is an indexed integrand and whose lower-bound hypothesis is
+--   already stated directly against a reference value.
+-- coverage search: searched `objective infimum gap nonnegative lower bound` and
+--   `sub objectiveInfimumValue nonnegative forall lower bound`; hits were the
+--   partial `objectiveInfimumValue_le`, `objectiveInfimumValue_eq_of_forall_le`,
+--   and `objectiveGapIntegrand_nonneg`, with no theorem for this feasible scalar gap.
+-- minimal hypotheses: explicit bounded-below assumptions are avoided because the
+--   optimizer lower-bound certificate supplies them through the equality bridge.
+
+/-- Every feasible objective value lies above an attained feasible infimum.
+
+Layer: Model | Gap: Level 0 (nonnegative objective gap to an attained infimum)
+Proof: rewrite the feasible infimum using the attained-optimizer equality bridge,
+then apply `sub_nonneg` to the pointwise optimality inequality.
+Source: Mathlib conditionally complete linear-order `sInf` API and ordered real subtraction
+Used in: convergence bounds that replace a feasible objective gap by a nonnegative
+remainder after selecting a globally optimal comparison point
+Book citation: book/FOML/StochasticZerothOrder.json#/assumptions/11
+Origin algorithm: G. Lan, First-Order and Stochastic Optimization Methods for Machine Learning, randomized stochastic gradient-free method -/
+theorem sub_objectiveInfimumValue_nonneg_of_forall_le
+    {E : Type*} {X : Set E} {f : E → ℝ} {xStar x : E}
+    (hxStar : xStar ∈ X) (hx : x ∈ X)
+    (h_le : ∀ y : E, y ∈ X → f xStar ≤ f y) :
+    0 ≤ f x - objectiveInfimumValue X f := by
+  rw [objectiveInfimumValue_eq_of_forall_le hxStar h_le]
+  exact sub_nonneg.mpr (h_le x hx)
+
+
+
+
+-- Generalization plan (G0):
+-- concept/name: AbsTaylorRemainderBound exposes the global absolute first-order
+--   Taylor remainder bound for a smooth real objective; orig was
+--   SmoothDescentBound.
+-- generality used: arbitrary complete real inner-product normed additive group
+--   E, objective f : E -> Real, and real smoothness scale L; no measure,
+--   convexity, oracle, filtration, probability, bounded-below, or
+--   finite-dimensional assumptions are needed to state the predicate.
+-- portable call pattern: zeroth-order, stochastic-gradient, variance-reduced,
+--   and proximal-descent proofs can instantiate E, f, and L when they need the
+--   same two-sided Taylor-remainder estimate before pathwise descent or
+--   finite-difference error algebra.
+-- counterargument checked: existing SOptLib has
+--   abs_taylor_remainder_le_of_hasGradientAt_lipschitzOn_convex, which derives
+--   the pointwise inequality from selected-gradient hypotheses on a convex set;
+--   this staging entry differs by naming the global property used as an
+--   objective assumption and supplies the LipschitzGradientObjective bridge.
+-- coverage search: searched "absolute Taylor remainder bound Lipschitz
+--   gradient squared displacement", "taylor remainder le HasGradientAt
+--   lipschitzOn convex", and Mathlib semantic search for an absolute
+--   first-order Taylor remainder from Lipschitz derivative. Top hits were
+--   SOptLib.abs_taylor_remainder_le_of_hasGradientAt_lipschitzOn_convex,
+--   SOptLib.smooth_quadratic_upper_bound_of_hasGradientAt_lipschitzOn_convex,
+--   and Mathlib one-dimensional Taylor remainder bounds; these are constructor
+--   or proof components, not the named global predicate.
+-- minimal hypotheses: all already minimal for the predicate; CompleteSpace is
+--   retained because Mathlib's Hilbert-space gradient API and the staged
+--   LipschitzGradientObjective API use it, while positivity of L is caller-side.
+
+/-- A real objective satisfies the global absolute first-order Taylor remainder bound.
+
+For every pair of points, the error between `f y` and the affine Taylor model
+of `f` at `x` is bounded by `L / 2` times the squared displacement norm.
+
+Layer: Model | Concept: absolute Taylor-remainder objective regularity
+Proof: (definitional construction; universal absolute first-order Taylor
+  remainder inequality using the Mathlib gradient)
+Source: Mathlib Hilbert-space gradient notation and smooth first-order Taylor
+  remainder calculus
+Used in: randomized stochastic gradient-free smoothness assumptions before
+  pathwise descent and finite-difference Taylor-remainder estimates
+Book citation: book/FOML/StochasticZerothOrder.json#/assumptions/0/math
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic gradient-free method -/
+def AbsTaylorRemainderBound
+    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
+    (f : E → ℝ) (L : ℝ) : Prop :=
+  ∀ x y : E,
+    |f y - f x - ⟪∇ f x, y - x⟫_ℝ| ≤ (L / 2) * ‖y - x‖ ^ (2 : ℕ)
+
+/-- The absolute Taylor-remainder predicate unfolds to its pointwise inequality.
+
+Layer: Model | Gap: Level 0 (absolute Taylor-remainder predicate unfolding)
+Proof: by rfl after unfolding `AbsTaylorRemainderBound`.
+Source: Mathlib Hilbert-space gradient notation and ordered real inequalities
+Used in: randomized stochastic gradient-free proofs when replacing the source
+  smooth-descent display by the Lean objective-regularity predicate
+Book citation: book/FOML/StochasticZerothOrder.json#/assumptions/0/math
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic gradient-free method -/
+@[simp] theorem AbsTaylorRemainderBound_def
+    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
+    (f : E → ℝ) (L : ℝ) :
+    AbsTaylorRemainderBound f L ↔
+      ∀ x y : E,
+        |f y - f x - ⟪∇ f x, y - x⟫_ℝ| ≤ (L / 2) * ‖y - x‖ ^ (2 : ℕ) :=
+  Iff.rfl
+
 
 end SOptLib

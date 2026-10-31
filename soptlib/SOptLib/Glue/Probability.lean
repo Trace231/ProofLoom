@@ -1,18 +1,25 @@
 -- SOptLib/Glue/Probability.lean
 import Mathlib.Analysis.InnerProductSpace.Basic
+import Mathlib.Analysis.InnerProductSpace.PiL2
 import Mathlib.Algebra.BigOperators.Group.Finset.Basic
+import Mathlib.Analysis.Convex.Integral
+import Mathlib.Analysis.Convex.SpecificFunctions.Pow
 import Mathlib.Data.Fintype.Pi
 import Mathlib.Data.Real.Sqrt
 import Mathlib.MeasureTheory.Constructions.BorelSpace.Basic
 import Mathlib.MeasureTheory.Function.L2Space
 import Mathlib.MeasureTheory.Integral.Prod
+import Mathlib.MeasureTheory.Integral.IntegralEqImproper
 import Mathlib.MeasureTheory.Integral.Lebesgue.Markov
 import Mathlib.MeasureTheory.Function.StronglyMeasurable.Inner
 import Mathlib.MeasureTheory.MeasurableSpace.MeasurablyGenerated
+import Mathlib.Probability.Distributions.Gaussian.Multivariate
 import Mathlib.Probability.Moments.Variance
+import Mathlib.Probability.Moments.CovarianceBilin
 import Mathlib.Probability.IdentDistrib
 import Mathlib.Probability.IdentDistribIndep
 import Mathlib.Probability.Independence.Basic
+import Mathlib.Probability.Independence.Integration
 import Mathlib.Probability.ConditionalExpectation
 import Mathlib.Probability.ProbabilityMassFunction.Constructions
 import SOptLib.Glue.Algebra
@@ -21,6 +28,297 @@ import SOptLib.Glue.Analysis
 
 open MeasureTheory ProbabilityTheory
 open scoped InnerProductSpace
+
+noncomputable section GaussianMoments
+
+variable {E : Type*}
+  [NormedAddCommGroup E] [InnerProductSpace ℝ E] [FiniteDimensional ℝ E]
+  [MeasurableSpace E] [BorelSpace E] [SecondCountableTopology E]
+
+/-- The standard Gaussian `p`-th norm moment. -/
+def stdGaussianMoment (p : ℝ) : ℝ :=
+  ∫ u, ‖u‖ ^ p ∂(stdGaussian E)
+
+/-- The mixed second moment of a standard Gaussian vector is the ambient inner
+product. -/
+theorem integral_inner_mul_inner_stdGaussian (v w : E) :
+    ∫ u, ⟪v, u⟫_ℝ * ⟪w, u⟫_ℝ ∂(stdGaussian E) = ⟪v, w⟫_ℝ := by
+  have h1 := covarianceBilin_apply (μ := stdGaussian E) IsGaussian.memLp_two_id v w
+  simp only [id, integral_id_stdGaussian, sub_zero] at h1
+  rw [← h1, covarianceBilin_stdGaussian (E := E)]
+  rfl
+
+/-- The squared norm of a standard Gaussian vector has expectation equal to the
+ambient dimension. -/
+theorem stdGaussianMoment_two :
+    ∫ u, ‖u‖ ^ (2 : ℝ) ∂(stdGaussian E) = (Module.finrank ℝ E : ℝ) := by
+  classical
+  let b : OrthonormalBasis (Fin (Module.finrank ℝ E)) ℝ E := stdOrthonormalBasis ℝ E
+  have hnorm : ∀ u : E, ‖u‖ ^ (2 : ℝ) = ∑ i, ⟪b i, u⟫_ℝ * ⟪b i, u⟫_ℝ := by
+    intro u
+    rw [Real.rpow_two, ← real_inner_self_eq_norm_sq]
+    simpa [real_inner_comm u] using (b.sum_inner_mul_inner u u).symm
+  calc
+    ∫ u, ‖u‖ ^ (2 : ℝ) ∂(stdGaussian E)
+        = ∫ u, ∑ i, ⟪b i, u⟫_ℝ * ⟪b i, u⟫_ℝ ∂(stdGaussian E) := by
+            simp [hnorm]
+    _ = ∑ i, ∫ u, ⟪b i, u⟫_ℝ * ⟪b i, u⟫_ℝ ∂(stdGaussian E) := by
+          rw [integral_finset_sum]
+          intro i _
+          have hL2 : MemLp id 2 (stdGaussian E) := IsGaussian.memLp_two_id
+          exact (hL2.continuousLinearMap_comp (innerSL ℝ (b i))).integrable_mul
+            (hL2.continuousLinearMap_comp (innerSL ℝ (b i)))
+    _ = ∑ i, ⟪b i, b i⟫_ℝ := by
+          simp [integral_inner_mul_inner_stdGaussian]
+    _ = ∑ i : Fin (Module.finrank ℝ E), (1 : ℝ) := by
+          congr with i
+          simp
+    _ = (Module.finrank ℝ E : ℝ) := by
+          simp [Finset.sum_const, nsmul_eq_mul]
+
+/-- The quadratic exponential moment of the standard Gaussian. -/
+theorem integral_exp_mul_norm_sq_stdGaussian (a : ℝ) (ha : a < (1 / 2 : ℝ)) :
+    ∫ u : E, Real.exp (a * ‖u‖ ^ 2) ∂(stdGaussian E) =
+      (1 - 2 * a) ^ (-((Module.finrank ℝ E : ℝ) / 2)) := by
+  classical
+  let n_nat := Module.finrank ℝ E
+  let b : OrthonormalBasis (Fin n_nat) ℝ E := stdOrthonormalBasis ℝ E
+  have hnorm : ∀ x : Fin n_nat → ℝ,
+      ‖(∑ i, x i • (b i : E))‖ ^ 2 = ∑ i, (x i) ^ 2 := by
+    intro x
+    simpa using Finset.norm_sq_sum_smul_orthonormalBasis b x
+  have h1D : ∫ x : ℝ, Real.exp (a * x ^ 2) ∂(gaussianReal 0 1) =
+      (1 - 2 * a) ^ (-(1 / 2 : ℝ)) := by
+    rw [integral_gaussianReal_eq_integral_smul (one_ne_zero : (1 : NNReal) ≠ 0)]
+    have heq : ∀ x : ℝ, gaussianPDFReal 0 1 x • Real.exp (a * x ^ 2) =
+        (Real.sqrt (2 * Real.pi))⁻¹ * Real.exp (-((1 - 2 * a) / 2) * x ^ 2) := by
+      intro x
+      simp only [gaussianPDFReal, sub_zero, NNReal.coe_one, mul_one, smul_eq_mul]
+      rw [inv_eq_one_div, mul_assoc, ← Real.exp_add]
+      congr 1
+      ring_nf
+    simp_rw [heq, MeasureTheory.integral_const_mul]
+    rw [integral_gaussian ((1 - 2 * a) / 2)]
+    have h1ma_pos : (0 : ℝ) < 1 - 2 * a := by
+      linarith
+    rw [show Real.pi / ((1 - 2 * a) / 2) = 2 * Real.pi / (1 - 2 * a) from by
+      field_simp]
+    rw [Real.sqrt_div (by positivity : (0 : ℝ) ≤ 2 * Real.pi)]
+    rw [← mul_div_assoc]
+    rw [inv_mul_cancel₀ (Real.sqrt_ne_zero'.mpr (by positivity : (0 : ℝ) < 2 * Real.pi))]
+    rw [one_div, Real.sqrt_eq_rpow]
+    rw [← Real.rpow_neg h1ma_pos.le]
+  rw [stdGaussian_eq_map_pi_orthonormalBasis b]
+  rw [MeasureTheory.integral_map
+    (Continuous.aemeasurable (by continuity :
+      Continuous (fun x : Fin n_nat → ℝ => (∑ i, x i • (b i : E) : E))))
+    (Continuous.aestronglyMeasurable (by fun_prop :
+      Continuous (fun u : E => Real.exp (a * ‖u‖ ^ 2))))]
+  simp_rw [hnorm]
+  have hprod : ∀ x : Fin n_nat → ℝ,
+      Real.exp (a * ∑ i, (x i) ^ 2) = ∏ i, Real.exp (a * (x i) ^ 2) := by
+    intro x
+    rw [Finset.mul_sum, ← Real.exp_sum]
+  simp_rw [hprod]
+  change (∫ x : Fin n_nat → ℝ,
+      ∏ i, (fun y => Real.exp (a * y ^ 2)) (x i)
+      ∂Measure.pi fun _ => gaussianReal 0 1) = _
+  rw [MeasureTheory.integral_fintype_prod_eq_pow (fun x => Real.exp (a * x ^ 2))]
+  rw [h1D, Fintype.card_fin]
+  rw [← Real.rpow_natCast ((1 - 2 * a) ^ (-(1 / 2 : ℝ))) n_nat]
+  rw [← Real.rpow_mul (by linarith : (0 : ℝ) ≤ 1 - 2 * a)]
+  congr 1
+  ring
+
+/-- A `tau`-parameterized upper bound for standard Gaussian norm moments. -/
+theorem stdGaussianMoment_le_of_tau (p τ : ℝ) (hp : 0 < p) (hτ0 : 0 < τ)
+    (hτ1 : τ < 1) :
+    ∫ u : E, ‖u‖ ^ p ∂(stdGaussian E) ≤
+      (p / (τ * Real.exp 1)) ^ (p / 2) *
+        (1 - τ) ^ (-((Module.finrank ℝ E : ℝ) / 2)) := by
+  set C := (p / (τ * Real.exp 1)) ^ (p / 2) with hC_def
+  have hpoint : ∀ u : E, ‖u‖ ^ p ≤ C * Real.exp ((τ / 2) * ‖u‖ ^ 2) := by
+    intro u
+    have h :=
+      rpow_mul_exp_neg_mul_sq_le ‖u‖ p τ (norm_nonneg u) hp hτ0
+    have hcancel :
+        Real.exp (-(τ / 2) * ‖u‖ ^ 2) * Real.exp ((τ / 2) * ‖u‖ ^ 2) = 1 := by
+      rw [← Real.exp_add]
+      simp [neg_mul]
+    calc
+      ‖u‖ ^ p = ‖u‖ ^ p * 1 := (mul_one _).symm
+      _ =
+          ‖u‖ ^ p *
+            (Real.exp (-(τ / 2) * ‖u‖ ^ 2) * Real.exp ((τ / 2) * ‖u‖ ^ 2)) := by
+            rw [hcancel]
+      _ = (‖u‖ ^ p * Real.exp (-(τ / 2) * ‖u‖ ^ 2)) *
+            Real.exp ((τ / 2) * ‖u‖ ^ 2) := by
+            ring
+      _ ≤ C * Real.exp ((τ / 2) * ‖u‖ ^ 2) := by
+            exact mul_le_mul_of_nonneg_right h (Real.exp_pos _).le
+  have hpint : Integrable (fun u : E => ‖u‖ ^ p) (stdGaussian E) := by
+    have :=
+      (IsGaussian.memLp_id (stdGaussian E) (ENNReal.ofReal p)
+        ENNReal.ofReal_ne_top).integrable_norm_rpow'
+    simpa [ENNReal.toReal_ofReal hp.le] using this
+  have hCint : Integrable (fun u : E => C * Real.exp ((τ / 2) * ‖u‖ ^ 2))
+      (stdGaussian E) := by
+    apply Integrable.const_mul
+    classical
+    let n_nat := Module.finrank ℝ E
+    let b : OrthonormalBasis (Fin n_nat) ℝ E := stdOrthonormalBasis ℝ E
+    have h1m : (0 : ℝ) < (1 - τ) / 2 := by
+      linarith
+    have hnorm : ∀ x : Fin n_nat → ℝ,
+        ‖(∑ i, x i • (b i : E))‖ ^ 2 = ∑ i, (x i) ^ 2 := by
+      intro x
+      set f : EuclideanSpace ℝ (Fin n_nat) := (EuclideanSpace.equiv _ ℝ).symm x with hf_def
+      have hiso : ‖∑ i, x i • (b i : E)‖ = ‖f‖ := by
+        conv_lhs =>
+          rw [show ∑ i, x i • (b i : E) = b.repr.symm f from by
+            rw [b.sum_repr_symm]
+            rfl]
+        rw [b.repr.symm.norm_map]
+      rw [hiso, EuclideanSpace.norm_eq]
+      rw [sq, Real.mul_self_sqrt (Finset.sum_nonneg fun i _ => sq_nonneg _)]
+      congr 1
+      ext j
+      simp [hf_def, EuclideanSpace.equiv, sq]
+    have hint1D : Integrable (fun xi : ℝ => Real.exp (τ / 2 * xi ^ 2))
+        (gaussianReal 0 1) := by
+      rw [gaussianReal_of_var_ne_zero 0 (one_ne_zero : (1 : NNReal) ≠ 0)]
+      rw [integrable_withDensity_iff_integrable_smul' (measurable_gaussianPDF 0 1)
+        (ae_of_all _ fun _ => gaussianPDF_lt_top)]
+      have heq : ∀ xi : ℝ, (gaussianPDF 0 1 xi).toReal •
+          Real.exp (τ / 2 * xi ^ 2) =
+          (1 / Real.sqrt (2 * Real.pi)) * Real.exp (-((1 - τ) / 2) * xi ^ 2) := by
+        intro xi
+        simp only [smul_eq_mul]
+        rw [show (gaussianPDF 0 1 xi).toReal = gaussianPDFReal 0 1 xi from by
+          simp [gaussianPDF, ENNReal.toReal_ofReal (gaussianPDFReal_nonneg 0 1 xi)]]
+        simp only [gaussianPDFReal, sub_zero, NNReal.coe_one, mul_one]
+        rw [inv_eq_one_div, mul_assoc, ← Real.exp_add]
+        congr 1
+        ring_nf
+      simp_rw [heq]
+      exact (integrable_exp_neg_mul_sq h1m).const_mul _
+    have hprod :
+        Integrable (fun x : Fin n_nat → ℝ =>
+          Real.exp (τ / 2 * ∑ i, (x i) ^ 2))
+          (Measure.pi fun _ => gaussianReal 0 1) := by
+      have hfact : ∀ x : Fin n_nat → ℝ,
+          Real.exp (τ / 2 * ∑ i, (x i) ^ 2) =
+            ∏ i, Real.exp (τ / 2 * (x i) ^ 2) := by
+        intro x
+        rw [← Real.exp_sum]
+        congr 1
+        rw [← Finset.mul_sum]
+      simp_rw [hfact]
+      exact Integrable.fintype_prod (fun _ => hint1D)
+    rw [stdGaussian_eq_map_pi_orthonormalBasis b]
+    have hg_cont : Continuous
+        (fun x : Fin n_nat → ℝ => (∑ i, x i • (b i : E) : E)) := by
+      continuity
+    rw [integrable_map_measure (Continuous.aestronglyMeasurable (by fun_prop))
+      hg_cont.aemeasurable]
+    exact hprod.congr (ae_of_all _ fun x => by
+      simp only [Function.comp_apply]
+      congr 1
+      rw [hnorm x])
+  have hmono :
+      ∫ u : E, ‖u‖ ^ p ∂(stdGaussian E) ≤
+        C * ∫ u : E, Real.exp ((τ / 2) * ‖u‖ ^ 2) ∂(stdGaussian E) := by
+    have h1 := MeasureTheory.integral_mono hpint hCint hpoint
+    rwa [MeasureTheory.integral_const_mul] at h1
+  have hMGF :
+      ∫ u : E, Real.exp ((τ / 2) * ‖u‖ ^ 2) ∂(stdGaussian E) =
+        (1 - τ) ^ (-((Module.finrank ℝ E : ℝ) / 2)) := by
+    have hτ_half : τ / 2 < (1 / 2 : ℝ) := by
+      linarith
+    have htwo : 2 * (τ / 2) = τ := by
+      ring
+    simpa [htwo] using
+      (integral_exp_mul_norm_sq_stdGaussian (E := E) (a := τ / 2) hτ_half)
+  rw [hMGF] at hmono
+  exact hmono
+
+/-- The `p`-th norm moment of a standard Gaussian vector is bounded above by
+`(p + dim E)^(p/2)` for `2 <= p`. -/
+theorem stdGaussianMoment_le_add_finrank_rpow_of_two_le
+    (p : ℝ) (hp : 2 ≤ p) :
+    ∫ u : E, ‖u‖ ^ p ∂(stdGaussian E) ≤
+      (p + (Module.finrank ℝ E : ℝ)) ^ (p / 2) := by
+  by_cases hn : Module.finrank ℝ E = 0
+  · have hSub : Subsingleton E := Module.finrank_zero_iff.mp hn
+    have hE0 : ∀ v : E, v = 0 := fun v => Subsingleton.elim v 0
+    have hM0 : ∫ u : E, ‖u‖ ^ p ∂(stdGaussian E) = 0 := by
+      have hzero : ∀ u : E, ‖u‖ ^ p = 0 := fun u => by
+        rw [hE0 u, norm_zero, Real.zero_rpow (by linarith : p ≠ 0)]
+      simp_rw [hzero]
+      simp
+    rw [hM0, hn, Nat.cast_zero, add_zero]
+    exact Real.rpow_nonneg (by linarith) _
+  · have hn_nat : 0 < Module.finrank ℝ E := Nat.pos_of_ne_zero hn
+    have hn_pos : (0 : ℝ) < (Module.finrank ℝ E : ℝ) := by
+      exact_mod_cast hn_nat
+    have hp_pos : (0 : ℝ) < p := by
+      linarith
+    set nn := (Module.finrank ℝ E : ℝ) with hnn_def
+    have hpn_pos : (0 : ℝ) < p + nn := by
+      linarith
+    set τ := p / (p + nn) with hτ_def
+    have hτ0 : 0 < τ := div_pos hp_pos hpn_pos
+    have hτ1 : τ < 1 := by
+      rw [hτ_def]
+      exact (div_lt_one hpn_pos).mpr (by linarith)
+    have hbound := stdGaussianMoment_le_of_tau (E := E) p τ hp_pos hτ0 hτ1
+    have hpte : p / (τ * Real.exp 1) = (p + nn) / Real.exp 1 := by
+      rw [hτ_def]
+      field_simp
+    have h1mt : 1 - τ = nn / (p + nn) := by
+      rw [hτ_def]
+      field_simp
+      ring
+    rw [hpte, h1mt] at hbound
+    have key_ineq : ((p + nn) / nn) ^ (nn / 2) ≤ Real.exp (p / 2) := by
+      rw [show (p + nn) / nn = 1 + p / nn by
+        field_simp
+        ring]
+      have hmul : (nn / 2) * (p / nn) = p / 2 := by
+        field_simp [hn_pos.ne']
+      simpa [hmul, mul_comm, mul_left_comm, mul_assoc] using
+        one_add_rpow_le_exp_mul (p / nn) (nn / 2) (by positivity) (by positivity)
+    have h_neg_rpow :
+        (nn / (p + nn)) ^ (-(nn / 2)) = ((p + nn) / nn) ^ (nn / 2) := by
+      rw [Real.rpow_neg (div_nonneg hn_pos.le hpn_pos.le)]
+      rw [← Real.inv_rpow (div_nonneg hn_pos.le hpn_pos.le)]
+      congr 1
+      rw [inv_div]
+    have h_div_rpow :
+        ((p + nn) / Real.exp 1) ^ (p / 2) =
+          (p + nn) ^ (p / 2) * (Real.exp 1) ^ (-(p / 2)) := by
+      rw [Real.div_rpow hpn_pos.le (Real.exp_pos 1).le]
+      rw [Real.rpow_neg (Real.exp_pos 1).le]
+      rw [div_eq_mul_inv]
+    have h_exp_rpow : (Real.exp 1) ^ (-(p / 2)) = Real.exp (-(p / 2)) := by
+      rw [Real.rpow_def_of_pos (Real.exp_pos 1)]
+      rw [Real.log_exp]
+      ring_nf
+    rw [h_neg_rpow, h_div_rpow, h_exp_rpow] at hbound
+    calc
+      ∫ u : E, ‖u‖ ^ p ∂(stdGaussian E)
+          ≤ (p + nn) ^ (p / 2) * Real.exp (-(p / 2)) *
+              ((p + nn) / nn) ^ (nn / 2) := hbound
+      _ ≤ (p + nn) ^ (p / 2) * Real.exp (-(p / 2)) * Real.exp (p / 2) := by
+        apply mul_le_mul_of_nonneg_left key_ineq
+        apply mul_nonneg (Real.rpow_nonneg hpn_pos.le _) (Real.exp_pos _).le
+      _ = (p + nn) ^ (p / 2) := by
+        rw [mul_assoc, ← Real.exp_add]
+        simp
+      _ = (p + (Module.finrank ℝ E : ℝ)) ^ (p / 2) := by
+        rw [hnn_def]
+
+end GaussianMoments
 
 /-- Transfer fixed-fiber integrability through an independent random parameter.
 
@@ -7319,3 +7617,9749 @@ theorem integral_finset_affine_regroup_of_integral_eq
         intro i _hi
         rw [hC_linear i _hi]
         module
+
+-- Promoted from Staging/integral_rpow_le_rpow_of_integrable_nonneg_of_integral_le.lean
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: fractional-moment Jensen bound from a first-moment bound; orig was
+--   _voucher_step_theorem1_noise_rpow_jensen_bound_48
+-- generality used: an arbitrary measurable space, probability measure, integrable real-valued
+--   random variable, a.e. nonnegativity, and a real exponent in the unit interval
+-- portable call pattern: stochastic algorithms bound the expectation of a nonnegative accumulated
+--   noise or gradient statistic and then need the corresponding fractional-moment bound; the
+--   statistic, exponent, and deterministic bound may all change while the conclusion shape stays fixed
+-- counterargument checked: this is not paper traceability or a pure wrapper because it composes
+--   fractional-power integrability, Jensen's inequality, and monotonicity through a supplied bound
+-- coverage search: searched “integral real rpow upper bound Jensen nonnegative integrable exponent
+--   between zero one”; Mathlib ConcaveOn.le_map_integral and Real.concaveOn_rpow are partial hits,
+--   while SOptLib has no declaration covering the combined contract
+-- minimal hypotheses: a.e. nonnegativity replaces pointwise nonnegativity; no separate nonnegativity
+--   assumption on the upper bound is needed because it follows from the integral bound
+
+/-- A first-moment bound for a nonnegative random variable controls every fractional moment.
+
+For an integrable `Z ≥ 0` and `p ∈ [0, 1]` on a probability space, the function
+`Z ^ p` is automatically integrable, Jensen gives its integral at most
+`(∫ Z) ^ p`, and monotonicity transfers an upper bound on `∫ Z` to the result.
+
+Layer: Glue | Gap: Level 1 (fractional-moment Jensen bound with derived integrability)
+Proof: dominate `Z ^ p` by the integrable function `Z + 1`, apply `Real.concaveOn_rpow` through `ConcaveOn.le_map_integral`, and use monotonicity of `Real.rpow` on nonnegative bases.
+Source: Mathlib convex integral Jensen API and real-power concavity, continuity, and order lemmas
+Used in: stochastic recursive-momentum analysis after bounding the expected accumulated squared oracle noise, and in analogous fractional-moment conversions for nonnegative stochastic error budgets
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/main_theorem/proof
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem integral_rpow_le_rpow_of_integrable_nonneg_of_integral_le
+    {Ω : Type*} [MeasurableSpace Ω] (P : Measure Ω) [IsProbabilityMeasure P]
+    {Z : Ω → ℝ} {p B : ℝ}
+    (hZ_int : Integrable Z P)
+    (hZ_nonneg : ∀ᵐ ω ∂P, 0 ≤ Z ω)
+    (hp : p ∈ Set.Icc (0 : ℝ) 1)
+    (hZ_integral_le : ∫ ω, Z ω ∂P ≤ B) :
+    ∫ ω, Real.rpow (Z ω) p ∂P ≤ Real.rpow B p := by
+  have hZ_rpow_aesm :
+      AEStronglyMeasurable (fun ω => Real.rpow (Z ω) p) P :=
+    (Real.continuous_rpow_const hp.1).comp_aestronglyMeasurable
+      hZ_int.aestronglyMeasurable
+  have hZ_rpow_int : Integrable (fun ω => Real.rpow (Z ω) p) P := by
+    have hmajorant_int : Integrable (fun ω => Z ω + 1) P :=
+      hZ_int.add (integrable_const (c := (1 : ℝ)))
+    refine hmajorant_int.mono' hZ_rpow_aesm ?_
+    filter_upwards [hZ_nonneg] with ω hZω
+    have hpow_nonneg : 0 ≤ Real.rpow (Z ω) p := Real.rpow_nonneg hZω p
+    rw [Real.norm_of_nonneg hpow_nonneg]
+    by_cases hZ_le_one : Z ω ≤ 1
+    · exact le_trans (Real.rpow_le_one hZω hZ_le_one hp.1) (by linarith)
+    · exact le_trans (Real.rpow_le_self_of_one_le (le_of_lt (lt_of_not_ge hZ_le_one)) hp.2)
+        (by linarith)
+  have hJensen :
+      ∫ ω, Real.rpow (Z ω) p ∂P ≤ Real.rpow (∫ ω, Z ω ∂P) p := by
+    simpa [Function.comp_def] using
+      (Real.concaveOn_rpow hp.1 hp.2).le_map_integral
+        (Real.continuous_rpow_const hp.1).continuousOn isClosed_Ici hZ_nonneg
+        hZ_int hZ_rpow_int
+  have hZ_integral_nonneg : 0 ≤ ∫ ω, Z ω ∂P :=
+    integral_nonneg_of_ae hZ_nonneg
+  exact hJensen.trans
+    (Real.rpow_le_rpow hZ_integral_nonneg hZ_integral_le hp.1)
+
+
+-- Promoted from Staging/aestronglyMeasurable_comp_of_indep_product_law.lean
+open MeasureTheory ProbabilityTheory
+
+-- Generalization plan (G0):
+-- concept/name: pullback of product-law a.e.-strong measurability along independent
+--   random variables; orig was aestronglyMeasurable_comp_of_indep_product_law
+-- generality used: arbitrary measurable source and marginal spaces, arbitrary topological
+--   codomain, and arbitrary source measures whose two marginal
+--   pushforward laws are sigma-finite
+-- portable call pattern: a stochastic algorithm composes a law-measurable scalar or vector
+--   kernel with an adapted state and an independent fresh sample; all spaces, laws, and the
+--   kernel may change while the composed-kernel measurability conclusion is unchanged
+-- counterargument checked: not paper-local and not a pure wrapper; it combines independence's
+--   joint product-law identity with a.e.-strong measurability transport through a mapped law
+-- coverage search: symbol and semantic searches found Mathlib's
+--   indepFun_iff_map_prod_eq_prod_map_map and AEStronglyMeasurable.comp_aemeasurable as separate
+--   ingredients, but no Mathlib or SOptLib declaration with this complete contract
+-- minimal hypotheses: sigma-finiteness of the two pushforward laws is used by the product-law
+--   characterization; all other hypotheses are exactly those required for the pair map and
+--   a.e.-strong composition
+
+/-- A kernel that is a.e. strongly measurable under the product of two marginal laws
+remains a.e. strongly measurable after composition with the corresponding independent
+random variables.
+
+Layer: Glue | Gap: Level 1 (independent product-law a.e.-strong measurability pullback)
+Proof: identify the pushforward law of the random pair with the product of its marginal laws using independence, then compose the kernel's a.e.-strong measurability with the a.e.-measurable pair map.
+Source: Mathlib probability independence product-law characterization and measure-theoretic a.e.-strong measurability composition APIs
+Used in: recursive stochastic momentum proofs pulling scalar and vector residual kernels from the adapted-state/fresh-sample product law back to the algorithm probability space
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/key_lemmas/1
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem aestronglyMeasurable_comp_of_indep_product_law
+    {A B R Ω : Type*} [MeasurableSpace Ω] [MeasurableSpace A] [MeasurableSpace B]
+    [TopologicalSpace R]
+    {P : Measure Ω}
+    {X : Ω → A} {Y : Ω → B} {φ : A × B → R}
+    (hX : AEMeasurable X P) (hY : AEMeasurable Y P)
+    (σX : SigmaFinite (Measure.map X P)) (σY : SigmaFinite (Measure.map Y P))
+    (hindep : IndepFun X Y P)
+    (hφ : AEStronglyMeasurable φ ((Measure.map X P).prod (Measure.map Y P))) :
+    AEStronglyMeasurable (fun ω => φ (X ω, Y ω)) P := by
+  have hpair : AEMeasurable (fun ω => (X ω, Y ω)) P := hX.prodMk hY
+  have hmap_pair :
+      Measure.map (fun ω => (X ω, Y ω)) P =
+        (Measure.map X P).prod (Measure.map Y P) :=
+    (indepFun_iff_map_prod_eq_prod_map_map' hX hY σX σY).mp hindep
+  have hφ_pair :
+      AEStronglyMeasurable φ (Measure.map (fun ω => (X ω, Y ω)) P) := by
+    rw [hmap_pair]
+    exact hφ
+  simpa [Function.comp_def] using hφ_pair.comp_aemeasurable hpair
+
+
+-- Promoted from Staging/integrable_comp_of_indep_fixed_integral_bound_aestronglyMeasurable.lean
+open MeasureTheory ProbabilityTheory
+
+-- Generalization plan (G0):
+-- concept/name: independent-composition integrability from nonnegative uniformly bounded
+--   fixed fibers under product-law a.e. strong measurability; the original name already
+--   exposes this mathematical contract
+-- generality used: arbitrary measurable source, parameter, and sample spaces; an arbitrary
+--   finite source measure; real-valued kernels and a.e. measurable random inputs; no
+--   probability, optimization, normed-vector-space, or finite-dimensional assumptions
+-- portable call pattern: random-query moment proofs in recursive momentum, stochastic
+--   gradient, and variance-reduction algorithms vary the query X, fresh sample Y, kernel φ,
+--   sample law ν, and uniform bound C while retaining the same composed-integrability goal
+-- counterargument checked: not paper-local and not a pure wrapper; the closest SOptLib
+--   theorem requires global measurability of the uncurried kernel, while this result uses
+--   only a.e. strong measurability under the generated product law
+-- coverage search: symbol searches for “nonnegative independent composition integrable from
+--   uniformly bounded fixed-fiber integrals under product-law a.e. strong measurability” found
+--   SOptLib's stricter `integrable_comp_of_indep_fixed_integral_bound`; semantic Mathlib search
+--   found `integrable_prod_iff` and the independence joint-law characterization but no theorem
+--   with the complete transfer contract
+-- minimal hypotheses: finiteness of ν and of the X-law is derived from the law identity and
+--   finiteness of P; all stated regularity, nonnegativity, fiber-integrability, and bound
+--   hypotheses are used directly
+
+/-- A nonnegative kernel evaluated at independent random parameters is integrable when its
+fixed fibers are integrable and have a uniform integral bound, assuming only a.e. strong
+measurability under the generated product law.
+
+Layer: Glue | Gap: Level 1 (product-law a.e.-measurable fixed-fiber integrability transfer)
+Proof: identify the joint pushforward law using independence, apply the product-measure integrability criterion, dominate the fiber norm integrals by the uniform bound, and transport integrability back through the joint map.
+Source: Mathlib probability independence joint-law characterization and product-measure Bochner integration APIs
+Used in: recursive-momentum random-query residual moment proofs with an adapted query and a fresh independent sample
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/key_lemmas/1
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem integrable_comp_of_indep_fixed_integral_bound_aestronglyMeasurable
+    {Ω W S : Type*} [MeasurableSpace Ω] [MeasurableSpace W] [MeasurableSpace S]
+    {P : Measure Ω} {ν : Measure S} [IsFiniteMeasure P]
+    {φ : W → S → ℝ} {X : Ω → W} {Y : Ω → S} {C : ℝ}
+    (hφ_prod :
+      AEStronglyMeasurable
+        (fun p : W × S => φ p.1 p.2) ((Measure.map X P).prod ν))
+    (hX : AEMeasurable X P) (hY : AEMeasurable Y P)
+    (h_indep : IndepFun X Y P)
+    (h_dist : Measure.map Y P = ν)
+    (hφ_nonneg : ∀ w s, 0 ≤ φ w s)
+    (hfixed_int : ∀ w, Integrable (fun s => φ w s) ν)
+    (hfixed_bound : ∀ w, ∫ s, φ w s ∂ν ≤ C) :
+    Integrable (fun ω => φ (X ω) (Y ω)) P := by
+  have h_joint_aemeas : AEMeasurable (fun ω => (X ω, Y ω)) P :=
+    hX.prodMk hY
+  have h_prod_eq :
+      Measure.map (fun ω => (X ω, Y ω)) P = (Measure.map X P).prod ν := by
+    rw [(indepFun_iff_map_prod_eq_prod_map_map hX hY).mp h_indep, h_dist]
+  have hφ_joint :
+      AEStronglyMeasurable
+        (fun p : W × S => φ p.1 p.2)
+        (Measure.map (fun ω => (X ω, Y ω)) P) := by
+    rw [h_prod_eq]
+    exact hφ_prod
+  letI : IsFiniteMeasure ν := by
+    rw [← h_dist]
+    exact Measure.isFiniteMeasure_map P Y
+  letI : IsFiniteMeasure (Measure.map X P) :=
+    Measure.isFiniteMeasure_map P X
+  suffices h_prod :
+      Integrable (fun p : W × S => φ p.1 p.2) ((Measure.map X P).prod ν) by
+    have h_on_map :
+        Integrable (fun p : W × S => φ p.1 p.2)
+          (Measure.map (fun ω => (X ω, Y ω)) P) := by
+      rwa [h_prod_eq]
+    exact (integrable_map_measure hφ_joint h_joint_aemeas).mp h_on_map
+  rw [integrable_prod_iff hφ_prod]
+  refine ⟨Filter.Eventually.of_forall hfixed_int, ?_⟩
+  refine Integrable.mono (integrable_const C)
+    (hφ_prod.norm.integral_prod_right') (Filter.Eventually.of_forall ?_)
+  intro w
+  have h_abs_eq :
+      (∫ y, ‖φ (w, y).1 (w, y).2‖ ∂ν) = ∫ s, φ w s ∂ν := by
+    refine integral_congr_ae (Filter.Eventually.of_forall ?_)
+    intro s
+    exact Real.norm_of_nonneg (hφ_nonneg w s)
+  have h_int_nonneg : 0 ≤ ∫ s, φ w s ∂ν :=
+    integral_nonneg fun s => hφ_nonneg w s
+  have hC_nonneg : 0 ≤ C :=
+    le_trans h_int_nonneg (hfixed_bound w)
+  rw [h_abs_eq, Real.norm_eq_abs, abs_of_nonneg h_int_nonneg,
+    Real.norm_eq_abs, abs_of_nonneg hC_nonneg]
+  exact hfixed_bound w
+
+
+-- Promoted from Staging/integrable_finite_index_first_prod_of_fiber_integrable.lean
+-- Generalization plan (G0):
+-- concept/name: finite-index first-coordinate product integrability from integrable fibers;
+--   the original name already exposes this paper-free mathematical contract
+-- generality used: a finite measurable index type with measurable singletons, an arbitrary
+--   measurable sample space, a normed additive commutative codomain, a finite index measure,
+--   and an s-finite sample measure
+-- portable call pattern: randomized finite-selector algorithms prove integrability of a
+--   selector/sample observable after establishing integrability separately for every selected
+--   fiber; the index type, selector law, sample law, codomain, and fiber family may all change
+-- counterargument checked: this is not merely a paper wrapper; unlike the closest PMF theorem,
+--   it permits every finite index measure and derives joint a.e.-strong measurability from the
+--   fiber hypotheses instead of requiring it from the caller
+-- coverage search: `finite index product function integrable of every fiber integrable` and
+--   `integrable product measure iff fiber integrable finite first measure`; Mathlib
+--   `MeasureTheory.integrable_prod_iff` requires joint a.e.-strong measurability, while
+--   `PMF.integrable_prod_of_fiber_integrable` is restricted to `PMF.toMeasure` and retains that
+--   extra premise, so coverage is partial
+-- minimal hypotheses: `[Finite ι]` replaces computational `[Fintype ι]`; finite `ν` is needed
+--   to lift each fiber to the product, and s-finiteness of `μ` is needed for product-measure APIs
+
+open MeasureTheory
+
+/-- A selector-first product observable over a finite measurable index is integrable when every
+sample fiber is integrable.
+
+Layer: Glue | Gap: Level 1 (finite-index product integrability derived solely from fiber integrability)
+Proof: decompose the uncurried observable into a finite sum of measurable first-coordinate singleton indicators; each summand is integrable by lifting its fiber to the product measure.
+Source: Mathlib Bochner integrability for product measures, measurable indicators, and finite sums
+Used in: finite-selector stochastic algorithms establishing integrability of a randomized output jointly with the sample before taking its expectation
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/proof_obligations
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem integrable_finite_index_first_prod_of_fiber_integrable
+    {ι Ω E : Type*} [MeasurableSpace ι] [Finite ι] [MeasurableSingletonClass ι]
+    [MeasurableSpace Ω] [NormedAddCommGroup E]
+    (ν : Measure ι) [IsFiniteMeasure ν] (μ : Measure Ω) [SFinite μ]
+    (F : ι → Ω → E) (hF_int : ∀ i, Integrable (F i) μ) :
+    Integrable (fun q : ι × Ω => F q.1 q.2) (ν.prod μ) := by
+  classical
+  letI : Fintype ι := Fintype.ofFinite ι
+  let G : ι → ι × Ω → E := fun i q =>
+    ({r : ι × Ω | r.1 = i}.indicator (fun q => F i q.2) q)
+  have hG_int : ∀ i ∈ Finset.univ, Integrable (G i) (ν.prod μ) := by
+    intro i _hi
+    have hbaseProd : Integrable (fun q : ι × Ω => F i q.2) (ν.prod μ) :=
+      (hF_int i).comp_snd ν
+    have hset : MeasurableSet ({r : ι × Ω | r.1 = i} : Set (ι × Ω)) :=
+      measurable_fst (measurableSet_singleton i)
+    exact hbaseProd.indicator hset
+  have hsum : Integrable (fun q => Finset.sum Finset.univ (fun i => G i q))
+      (ν.prod μ) :=
+    MeasureTheory.integrable_finset_sum (s := Finset.univ) (μ := ν.prod μ) hG_int
+  refine hsum.congr ?_
+  filter_upwards with q
+  dsimp [G]
+  symm
+  rw [Finset.sum_eq_single q.1]
+  · simp
+  · intro j _hj hqj
+    have hne : q.1 ≠ j := fun h => hqj h.symm
+    simp [hne]
+  · intro hnot
+    exact False.elim (hnot (Finset.mem_univ q.1))
+
+
+-- Promoted from Staging/integrable_sq_norm_sub.lean
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: L2 closure of pointwise subtraction; orig was integrable_sq_norm_sub_block
+-- generality used: arbitrary measurable domain and measure, with only a normed additive commutative group as codomain
+-- portable call pattern: variance-reduced and recursive-momentum proofs subtract two L2 residual processes; the processes and their endpoint L2 proofs change while squared-norm integrability of their difference remains the conclusion
+-- counterargument checked: not paper-local and not a pure wrapper; Mathlib exposes the MemLp conversion and subtraction edges separately, while this packages the recurring squared-norm integrability contract
+-- coverage search: queried `integrable squared norm difference from integrable squared norms a.e. strongly measurable` and `MemLp subtraction squared norm integrable`; Mathlib hits were `memLp_two_iff_integrable_sq_norm` and `MemLp.sub`, while SOptLib's `integrable_sq_norm_sub_of_measurable_mem_diameter_bound` has stronger finite-measure, carrier-membership, and diameter hypotheses
+-- minimal hypotheses: both measurability hypotheses are required by the L2 characterizations; no finite-measure, probability, scalar-action, or finite-dimensional assumption is used
+
+/-- The squared norm of the difference of two L2 vector processes is integrable.
+
+Layer: Glue | Gap: Level 1 (squared-norm integrability closure under subtraction)
+Proof: convert both squared-norm integrability hypotheses to `MemLp` at exponent two, apply `MemLp.sub`, and convert the resulting L2 membership back to squared-norm integrability.
+Source: Mathlib measure-theoretic L2 characterization `memLp_two_iff_integrable_sq_norm` and `MemLp.sub`
+Used in: recursive-momentum variance reduction when the difference of two sampled centered residuals must be square-integrable before pairing it with the previous error
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/steps/5
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem integrable_sq_norm_sub
+    {Ω E : Type*} [MeasurableSpace Ω] [NormedAddCommGroup E]
+    {P : Measure Ω} {u v : Ω → E}
+    (hu_meas : AEStronglyMeasurable u P)
+    (hv_meas : AEStronglyMeasurable v P)
+    (hu_sq : Integrable (fun ω => ‖u ω‖ ^ 2) P)
+    (hv_sq : Integrable (fun ω => ‖v ω‖ ^ 2) P) :
+    Integrable (fun ω => ‖u ω - v ω‖ ^ 2) P := by
+  have hu_l2 : MemLp u 2 P :=
+    (memLp_two_iff_integrable_sq_norm hu_meas).2 hu_sq
+  have hv_l2 : MemLp v 2 P :=
+    (memLp_two_iff_integrable_sq_norm hv_meas).2 hv_sq
+  exact
+    (memLp_two_iff_integrable_sq_norm (hu_meas.sub hv_meas)).1
+      (hu_l2.sub hv_l2)
+
+
+-- Promoted from Staging/integral_comp_eq_zero_of_indep_fixed_integral_zero_aestronglyMeasurable.lean
+open MeasureTheory ProbabilityTheory
+
+-- Generalization plan (G0):
+-- concept/name: product-law a.e.-strongly-measurable independent fixed-fiber
+--   cancellation; the original name already exposes the mathematical contract
+-- generality used: arbitrary measurable source, parameter, and sample spaces;
+--   a finite source measure; an arbitrary real Banach target; a.e. measurable
+--   random variables; no probability, optimization, finite-dimensional, Borel,
+--   or second-countability assumptions
+-- portable call pattern: recursive-momentum, stochastic-gradient, and
+--   variance-reduction proofs vary the adapted random query, fresh sample law,
+--   and vector kernel while retaining product-law regularity and fixed-fiber
+--   zero Bochner integrals
+-- counterargument checked: this is not a paper-local wrapper; the closest
+--   SOptLib theorem requires global measurability of the uncurried kernel,
+--   whereas this theorem works with only law-scoped a.e. strong measurability
+-- coverage search: symbol and semantic searches for “composed integral equals
+--   zero under independence, fixed-fiber zero, and product-law a.e. strong
+--   measurability” found Mathlib's joint-law characterization, `integral_map`,
+--   and `integral_prod`, and SOptLib's strictly stronger-measurability
+--   `integral_comp_eq_zero_of_indep_fixed_integral_zero`; no full match
+-- minimal hypotheses: target measurable-space, Borel, and second-countability
+--   assumptions were unused and removed; `SFinite ν` follows from the stated
+--   law equality and finiteness of the source measure
+
+/-- Fixed-fiber zero Bochner integrals remain zero after evaluating the kernel
+at independent random parameters when the kernel is a.e. strongly measurable
+under their product law.
+
+Layer: Glue | Gap: Level 1 (product-law a.e.-measurable Fubini cancellation)
+Proof: identify the joint pushforward law using independence, transport integrability through the joint map, and apply Bochner Fubini to the product law before simplifying the zero fibers.
+Source: Mathlib probability independence joint-law characterization and product-measure Bochner integration APIs
+Used in: recursive-momentum and variance-reduction cross-term cancellation at an adapted random query with a fresh independent sample
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/key_lemmas/1
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem integral_comp_eq_zero_of_indep_fixed_integral_zero_aestronglyMeasurable
+    {Ω W S V : Type*} [MeasurableSpace Ω] [MeasurableSpace W] [MeasurableSpace S]
+    [NormedAddCommGroup V] [NormedSpace ℝ V]
+    {P : Measure Ω} {ν : Measure S} [IsFiniteMeasure P]
+    {φ : W → S → V} {X : Ω → W} {Y : Ω → S}
+    (hφ_prod :
+      AEStronglyMeasurable
+        (fun p : W × S => φ p.1 p.2) ((Measure.map X P).prod ν))
+    (hX : AEMeasurable X P) (hY : AEMeasurable Y P)
+    (h_indep : IndepFun X Y P)
+    (h_dist : Measure.map Y P = ν)
+    (h_int : Integrable (fun ω => φ (X ω) (Y ω)) P)
+    (hfixed_zero : ∀ w, ∫ s, φ w s ∂ν = 0) :
+    ∫ ω, φ (X ω) (Y ω) ∂P = 0 := by
+  have h_joint_aemeas : AEMeasurable (fun ω => (X ω, Y ω)) P :=
+    hX.prodMk hY
+  have h_prod_eq :
+      Measure.map (fun ω => (X ω, Y ω)) P = (Measure.map X P).prod ν := by
+    rw [(indepFun_iff_map_prod_eq_prod_map_map hX hY).mp h_indep, h_dist]
+  have hφ_joint :
+      AEStronglyMeasurable
+        (fun p : W × S => φ p.1 p.2)
+        (Measure.map (fun ω => (X ω, Y ω)) P) := by
+    rw [h_prod_eq]
+    exact hφ_prod
+  letI : IsFiniteMeasure ν := by
+    rw [← h_dist]
+    exact Measure.isFiniteMeasure_map P Y
+  have h_int_prod :
+      Integrable (fun p : W × S => φ p.1 p.2) ((Measure.map X P).prod ν) := by
+    have h_on_joint :
+        Integrable (fun p : W × S => φ p.1 p.2)
+          (Measure.map (fun ω => (X ω, Y ω)) P) :=
+      (integrable_map_measure hφ_joint h_joint_aemeas).mpr h_int
+    rwa [h_prod_eq] at h_on_joint
+  calc
+    ∫ ω, φ (X ω) (Y ω) ∂P
+        = ∫ p : W × S, φ p.1 p.2
+            ∂Measure.map (fun ω => (X ω, Y ω)) P := by
+          exact (integral_map h_joint_aemeas hφ_joint).symm
+    _ = ∫ p : W × S, φ p.1 p.2 ∂(Measure.map X P).prod ν := by
+          rw [h_prod_eq]
+    _ = ∫ w : W, ∫ s : S, φ w s ∂ν ∂Measure.map X P :=
+          integral_prod _ h_int_prod
+    _ = 0 := by
+          simp [hfixed_zero]
+
+
+-- Promoted from Staging/integral_comp_le_of_indep_fixed_integral_bound_aestronglyMeasurable.lean
+open MeasureTheory ProbabilityTheory
+
+-- Generalization plan (G0):
+-- concept/name: independent-composition integral upper-bound transfer under
+--   product-law a.e. strong measurability; the original name already exposes
+--   the complete mathematical contract
+-- generality used: arbitrary measurable source, parameter, and sample spaces;
+--   an abstract probability measure on the source; a real-valued kernel and
+--   a.e. measurable random inputs; no probability assumption on the named
+--   sample law, optimization vocabulary, or finite-dimensional structure
+-- portable call pattern: recursive-momentum, stochastic-gradient, and
+--   variance-reduction moment proofs vary the random query, fresh sample,
+--   scalar kernel, sample law, and bound while retaining the same composed
+--   integral upper bound
+-- counterargument checked: this is not paper-local or a pure wrapper; the
+--   closest SOptLib bounds require global measurability of the uncurried
+--   kernel, whereas this theorem uses only law-scoped a.e. strong measurability
+-- coverage search: symbol and semantic searches for “composed integral upper
+--   bound under independence, fixed-fiber bound, and product-law a.e. strong
+--   measurability” found SOptLib's
+--   `integral_comp_le_of_indep_fixed_integral_bound` and variable-bound
+--   companion, both with strictly stronger global measurability, plus
+--   Mathlib's joint-law characterization, `integral_map`, and `integral_prod`;
+--   no declaration has the complete weakened-regularity contract
+-- minimal hypotheses: probability of the sample law was removed because its
+--   finiteness follows from the law equality and probability of the source;
+--   all remaining hypotheses are used directly
+
+/-- A uniform upper bound on fixed-fiber integrals remains an upper bound after
+evaluating the kernel at independent random parameters when the kernel is a.e.
+strongly measurable under their product law.
+
+Layer: Glue | Gap: Level 1 (product-law a.e.-measurable Fubini bound transfer)
+Proof: identify the joint pushforward law using independence, transport integrability through the joint map, apply Fubini under the product law, and integrate the uniform fiber bound.
+Source: Mathlib probability independence joint-law characterization and product-measure Bochner integration APIs
+Used in: recursive-momentum and variance-reduction random-query moment bounds at an adapted iterate with a fresh independent sample
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/key_lemmas/1
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem integral_comp_le_of_indep_fixed_integral_bound_aestronglyMeasurable
+    {Ω W S : Type*} [MeasurableSpace Ω] [MeasurableSpace W] [MeasurableSpace S]
+    {P : Measure Ω} {ν : Measure S} [IsProbabilityMeasure P]
+    {φ : W → S → ℝ} {X : Ω → W} {Y : Ω → S} {C : ℝ}
+    (hφ_prod :
+      AEStronglyMeasurable
+        (fun p : W × S => φ p.1 p.2) ((Measure.map X P).prod ν))
+    (hX : AEMeasurable X P) (hY : AEMeasurable Y P)
+    (h_indep : IndepFun X Y P)
+    (h_dist : Measure.map Y P = ν)
+    (h_int : Integrable (fun ω => φ (X ω) (Y ω)) P)
+    (hfixed_bound : ∀ w, ∫ s, φ w s ∂ν ≤ C) :
+    ∫ ω, φ (X ω) (Y ω) ∂P ≤ C := by
+  have h_joint_aemeas : AEMeasurable (fun ω => (X ω, Y ω)) P :=
+    hX.prodMk hY
+  have h_prod_eq :
+      Measure.map (fun ω => (X ω, Y ω)) P = (Measure.map X P).prod ν := by
+    rw [(indepFun_iff_map_prod_eq_prod_map_map hX hY).mp h_indep, h_dist]
+  have hφ_joint :
+      AEStronglyMeasurable
+        (fun p : W × S => φ p.1 p.2)
+        (Measure.map (fun ω => (X ω, Y ω)) P) := by
+    rw [h_prod_eq]
+    exact hφ_prod
+  letI : IsFiniteMeasure ν := by
+    rw [← h_dist]
+    exact Measure.isFiniteMeasure_map P Y
+  have h_int_prod :
+      Integrable (fun p : W × S => φ p.1 p.2) ((Measure.map X P).prod ν) := by
+    have h_on_joint :
+        Integrable (fun p : W × S => φ p.1 p.2)
+          (Measure.map (fun ω => (X ω, Y ω)) P) :=
+      (integrable_map_measure hφ_joint h_joint_aemeas).mpr h_int
+    rwa [h_prod_eq] at h_on_joint
+  haveI : IsProbabilityMeasure (Measure.map X P) :=
+    Measure.isProbabilityMeasure_map hX
+  calc
+    ∫ ω, φ (X ω) (Y ω) ∂P
+        = ∫ p : W × S, φ p.1 p.2
+            ∂Measure.map (fun ω => (X ω, Y ω)) P := by
+          exact (integral_map h_joint_aemeas hφ_joint).symm
+    _ = ∫ p : W × S, φ p.1 p.2 ∂(Measure.map X P).prod ν := by
+          rw [h_prod_eq]
+    _ = ∫ w : W, ∫ s : S, φ w s ∂ν ∂Measure.map X P :=
+          integral_prod _ h_int_prod
+    _ ≤ ∫ _ : W, C ∂Measure.map X P := by
+          exact integral_mono h_int_prod.integral_prod_left (integrable_const C)
+            (fun w => hfixed_bound w)
+    _ = C := by
+          simp [integral_const]
+
+
+-- Promoted from Staging/integral_le_integral_three_terms_of_ae_le_add_zero_integrals.lean
+open MeasureTheory
+
+/-- An a.e. upper bound by an integrable retained term and an integrable
+zero-integral correction gives the integral upper bound by the retained term.
+
+Layer: Glue | Gap: Level 1 (integral monotonicity with zero-correction cancellation)
+Proof: apply `integral_mono_ae` to the sum, split its integral, and cancel the
+  correction.
+Source: Mathlib Bochner integral monotonicity and additivity APIs
+Used in: stochastic-optimization expectation bounds after grouping centered
+  error terms into a zero-integral correction -/
+theorem integral_le_integral_of_ae_le_add_of_integral_eq_zero
+    {Ω E : Type*} [MeasurableSpace Ω] {μ : Measure Ω}
+    [NormedAddCommGroup E] [NormedSpace ℝ E] [PartialOrder E]
+    [IsOrderedAddMonoid E] [IsOrderedModule ℝ E] [ClosedIciTopology E]
+    {lhs retained correction : Ω → E}
+    (hlhs_int : Integrable lhs μ)
+    (hretained_int : Integrable retained μ)
+    (hcorrection_int : Integrable correction μ)
+    (hpoint : lhs ≤ᵐ[μ] retained + correction)
+    (hcorrection_zero : ∫ ω, correction ω ∂μ = 0) :
+    ∫ ω, lhs ω ∂μ ≤ ∫ ω, retained ω ∂μ := by
+  calc
+    (∫ ω, lhs ω ∂μ) ≤ ∫ ω, retained ω + correction ω ∂μ :=
+      integral_mono_ae hlhs_int (hretained_int.add hcorrection_int) hpoint
+    _ = (∫ ω, retained ω ∂μ) + ∫ ω, correction ω ∂μ :=
+      integral_add hretained_int hcorrection_int
+    _ = ∫ ω, retained ω ∂μ := by rw [hcorrection_zero, add_zero]
+
+
+-- Promoted from Staging/integral_sqrt_sq_le_integral_inv_mul_weighted_bound.lean
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: weighted integral Cauchy--Schwarz bound for square-root energy;
+--   orig was integral_sqrt_sum_sq_weighted_cauchy_bound
+-- generality used: an arbitrary measurable space and arbitrary measure; real-valued
+--   positive weight and nonnegative energy; no probability or finiteness class
+-- portable call pattern: self-normalized stochastic-gradient and adaptive-method
+--   analyses bounding expected root energy from reciprocal-weight and weighted-energy
+--   budgets while the measure, random weight, energy process, and budget vary
+-- counterargument checked: not paper-local traceability or a one-line wrapper because
+--   it derives a squared integral estimate by constructing two L2 square-root factors,
+--   applying Holder, identifying their product, and absorbing an external budget
+-- coverage search: symbol searches for weighted square-root integral Cauchy--Schwarz
+--   found Mathlib integral_mul_le_Lp_mul_Lq_of_nonneg as a proof component and
+--   SOptLib integral_nonneg_le_of_integral_sq_le_sq as an unweighted probability-space
+--   L2-to-L1 result; neither has the inverse-weight/weighted-energy contract
+-- minimal hypotheses: dropped IsProbabilityMeasure and the source's separate
+--   Integrable (sqrt energy) hypothesis; all remaining hypotheses are used
+
+/-- The square of the integral of a square-root energy is bounded by a reciprocal-weight
+integral times any upper budget for the corresponding weighted energy.
+
+Layer: Glue | Gap: Level 1 (weighted integral Cauchy--Schwarz energy bound)
+Proof: form the L2 factors `sqrt (1 / eta)` and `sqrt (eta * energy)`, apply
+  Mathlib's nonnegative Holder inequality at exponents two, square the result, and
+  use the supplied weighted-energy budget.
+Source: Mathlib `MeasureTheory.integral_mul_le_Lp_mul_Lq_of_nonneg`, L2 membership,
+  Bochner integrability, and real square-root APIs
+Used in: self-normalized stochastic-gradient convergence bounds that convert an
+  adaptive weighted squared-gradient budget into an expected root-energy estimate
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/cited_theorems/1
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in
+  Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem sq_integral_sqrt_le_integral_inv_mul_weighted_bound
+    {Ω : Type*} [MeasurableSpace Ω]
+    (P : Measure Ω) (eta energy : Ω → ℝ) (B : ℝ)
+    (heta_pos : ∀ᵐ ω ∂P, 0 < eta ω)
+    (hinv_int : Integrable (fun ω => 1 / eta ω) P)
+    (hweighted_int : Integrable (fun ω => eta ω * energy ω) P)
+    (henergy_nonneg : ∀ᵐ ω ∂P, 0 ≤ energy ω)
+    (hweighted_le : ∫ ω, eta ω * energy ω ∂P ≤ B) :
+    (∫ ω, Real.sqrt (energy ω) ∂P) ^ 2 ≤
+      (∫ ω, 1 / eta ω ∂P) * B := by
+  let f : Ω → ℝ := fun ω => Real.sqrt (1 / eta ω)
+  let g : Ω → ℝ := fun ω => Real.sqrt (eta ω * energy ω)
+  have heta_nonneg : ∀ᵐ ω ∂P, 0 ≤ eta ω :=
+    heta_pos.mono fun _ hω => le_of_lt hω
+  have hinv_nonneg : ∀ᵐ ω ∂P, 0 ≤ 1 / eta ω := by
+    filter_upwards [heta_pos] with ω hetaω
+    exact div_nonneg zero_le_one (le_of_lt hetaω)
+  have hweighted_nonneg : ∀ᵐ ω ∂P, 0 ≤ eta ω * energy ω := by
+    filter_upwards [heta_nonneg, henergy_nonneg] with ω hetaω henergyω
+    exact mul_nonneg hetaω henergyω
+  have hroot_nonneg : ∀ᵐ ω ∂P, 0 ≤ Real.sqrt (energy ω) := by
+    filter_upwards with ω
+    exact Real.sqrt_nonneg _
+  have hf_nonneg : ∀ᵐ ω ∂P, 0 ≤ f ω := by
+    filter_upwards with ω
+    exact Real.sqrt_nonneg _
+  have hg_nonneg : ∀ᵐ ω ∂P, 0 ≤ g ω := by
+    filter_upwards with ω
+    exact Real.sqrt_nonneg _
+  have hf_aesm : AEStronglyMeasurable f P :=
+    Real.continuous_sqrt.comp_aestronglyMeasurable hinv_int.aestronglyMeasurable
+  have hg_aesm : AEStronglyMeasurable g P :=
+    Real.continuous_sqrt.comp_aestronglyMeasurable hweighted_int.aestronglyMeasurable
+  have hf_sq_int : Integrable (fun ω => ‖f ω‖ ^ 2) P := by
+    refine hinv_int.congr ?_
+    filter_upwards [hinv_nonneg] with ω hinvω
+    show 1 / eta ω = ‖Real.sqrt (1 / eta ω)‖ ^ 2
+    rw [Real.norm_of_nonneg (Real.sqrt_nonneg _), Real.sq_sqrt hinvω]
+  have hg_sq_int : Integrable (fun ω => ‖g ω‖ ^ 2) P := by
+    refine hweighted_int.congr ?_
+    filter_upwards [hweighted_nonneg] with ω hweightedω
+    show eta ω * energy ω = ‖Real.sqrt (eta ω * energy ω)‖ ^ 2
+    rw [Real.norm_of_nonneg (Real.sqrt_nonneg _), Real.sq_sqrt hweightedω]
+  have hf_l2 : MemLp f (ENNReal.ofReal (2 : ℝ)) P := by
+    simpa using (memLp_two_iff_integrable_sq_norm hf_aesm).2 hf_sq_int
+  have hg_l2 : MemLp g (ENNReal.ofReal (2 : ℝ)) P := by
+    simpa using (memLp_two_iff_integrable_sq_norm hg_aesm).2 hg_sq_int
+  have hfg_eq : ∀ᵐ ω ∂P, f ω * g ω = Real.sqrt (energy ω) := by
+    filter_upwards [heta_pos, henergy_nonneg] with ω hetaω henergyω
+    have hetaω_nonneg : 0 ≤ eta ω := le_of_lt hetaω
+    have hinvω_nonneg : 0 ≤ 1 / eta ω :=
+      div_nonneg zero_le_one hetaω_nonneg
+    have hweightedω_nonneg : 0 ≤ eta ω * energy ω :=
+      mul_nonneg hetaω_nonneg henergyω
+    have hmul : (1 / eta ω) * (eta ω * energy ω) = energy ω := by
+      field_simp [ne_of_gt hetaω]
+    show Real.sqrt (1 / eta ω) * Real.sqrt (eta ω * energy ω) =
+      Real.sqrt (energy ω)
+    rw [← Real.sqrt_mul hinvω_nonneg, hmul]
+  have hpq : (2 : ℝ).HolderConjugate (2 : ℝ) := by
+    rw [Real.holderConjugate_iff_eq_conjExponent (by norm_num : (1 : ℝ) < 2)]
+    norm_num
+  have hholder :
+      ∫ ω, f ω * g ω ∂P ≤
+        (∫ ω, f ω ^ (2 : ℝ) ∂P) ^ ((1 : ℝ) / 2) *
+          (∫ ω, g ω ^ (2 : ℝ) ∂P) ^ ((1 : ℝ) / 2) :=
+    MeasureTheory.integral_mul_le_Lp_mul_Lq_of_nonneg
+      (μ := P) hpq hf_nonneg hg_nonneg hf_l2 hg_l2
+  have hf_pow_int_eq :
+      (∫ ω, f ω ^ (2 : ℝ) ∂P) = ∫ ω, 1 / eta ω ∂P := by
+    refine integral_congr_ae ?_
+    filter_upwards [hinv_nonneg] with ω hinvω
+    show (Real.sqrt (1 / eta ω)) ^ (2 : ℝ) = 1 / eta ω
+    rw [Real.rpow_two, Real.sq_sqrt hinvω]
+  have hg_pow_int_eq :
+      (∫ ω, g ω ^ (2 : ℝ) ∂P) = ∫ ω, eta ω * energy ω ∂P := by
+    refine integral_congr_ae ?_
+    filter_upwards [hweighted_nonneg] with ω hweightedω
+    show (Real.sqrt (eta ω * energy ω)) ^ (2 : ℝ) = eta ω * energy ω
+    rw [Real.rpow_two, Real.sq_sqrt hweightedω]
+  let A : ℝ := ∫ ω, 1 / eta ω ∂P
+  let C : ℝ := ∫ ω, eta ω * energy ω ∂P
+  have hA_nonneg : 0 ≤ A := by
+    simpa [A] using integral_nonneg_of_ae hinv_nonneg
+  have hC_nonneg : 0 ≤ C := by
+    simpa [C] using integral_nonneg_of_ae hweighted_nonneg
+  have hI_eq : (∫ ω, f ω * g ω ∂P) = ∫ ω, Real.sqrt (energy ω) ∂P :=
+    integral_congr_ae hfg_eq
+  have hroot_le :
+      ∫ ω, Real.sqrt (energy ω) ∂P ≤
+        A ^ ((1 : ℝ) / 2) * C ^ ((1 : ℝ) / 2) := by
+    rw [← hI_eq]
+    rw [hf_pow_int_eq, hg_pow_int_eq] at hholder
+    simpa [A, C] using hholder
+  have hroot_int_nonneg : 0 ≤ ∫ ω, Real.sqrt (energy ω) ∂P :=
+    integral_nonneg_of_ae hroot_nonneg
+  have hsquare :
+      (A ^ ((1 : ℝ) / 2) * C ^ ((1 : ℝ) / 2)) ^ 2 = A * C := by
+    have hA_sqrt : A ^ ((1 : ℝ) / 2) = Real.sqrt A := by
+      rw [Real.sqrt_eq_rpow]
+    have hC_sqrt : C ^ ((1 : ℝ) / 2) = Real.sqrt C := by
+      rw [Real.sqrt_eq_rpow]
+    rw [hA_sqrt, hC_sqrt, mul_pow, Real.sq_sqrt hA_nonneg,
+      Real.sq_sqrt hC_nonneg]
+  have hroot_sq_le : (∫ ω, Real.sqrt (energy ω) ∂P) ^ 2 ≤ A * C := by
+    calc
+      (∫ ω, Real.sqrt (energy ω) ∂P) ^ 2 ≤
+          (A ^ ((1 : ℝ) / 2) * C ^ ((1 : ℝ) / 2)) ^ 2 :=
+        pow_le_pow_left₀ hroot_int_nonneg hroot_le 2
+      _ = A * C := hsquare
+  have hC_le_B : C ≤ B := by
+    simpa [C] using hweighted_le
+  calc
+    (∫ ω, Real.sqrt (energy ω) ∂P) ^ 2 ≤ A * C := hroot_sq_le
+    _ ≤ A * B := mul_le_mul_of_nonneg_left hC_le_B hA_nonneg
+    _ = (∫ ω, 1 / eta ω ∂P) * B := by rfl
+
+
+-- Promoted from Staging/integral_sum_telescope_eq_of_random_endpoints.lean
+-- Generalization plan (G0):
+-- concept/name: expectation of a finite pointwise telescope with random endpoints;
+--   orig was integral_sum_telescope_eq_of_random_endpoints and already names the concept
+-- generality used: arbitrary measurable domain and measure, finite index set, and real normed
+--   additive target; no probability, finite-measure, independence, or optimization assumptions
+-- portable call pattern: finite-potential telescopes in stochastic gradient, momentum, and
+--   variance-reduction analyses; the window, drops, endpoint processes, and measure may change
+-- counterargument checked: not paper-local bookkeeping or a pure wrapper, because it derives
+--   terminal integrability and the endpoint-integral identity from an a.e. telescope
+-- coverage search: Mathlib MeasureTheory.integral_finset_sum and integral_sub are partial
+--   ingredients; SOptLib integral_finset_sum_le_of_pointwise_finset_sum_le is an ordered
+--   probability-measure inequality and does not provide this equality or inferred endpoint
+--   integrability
+-- minimal hypotheses: the source's pointwise telescope was weakened to an a.e. equality; all
+--   measure finiteness and probability assumptions were removed
+
+open MeasureTheory
+open scoped BigOperators
+
+/-- A finite sum of integrals of random drops equals the difference of the
+integrals of its random endpoints when the drops telescope almost everywhere.
+
+Layer: Glue | Gap: Level 1 (finite Bochner-integral telescope with random endpoints)
+Proof: integrate the finite sum termwise, use the a.e. telescope, and apply
+  integral subtraction; terminal integrability is derived from the same telescope.
+Source: Mathlib Bochner `integral_finset_sum`, `Integrable.congr`, and `integral_sub` APIs
+Used in: stochastic recursive-momentum and variance-reduction analyses when a finite
+  Lyapunov-drop window telescopes between random initial and terminal potentials
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD,
+  STOchastic Recursive Momentum -/
+theorem integral_sum_telescope_eq_of_random_endpoints
+    {Ω ι E : Type*} [MeasurableSpace Ω]
+    [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (μ : Measure Ω) (times : Finset ι) (drop : ι → Ω → E)
+    (initial terminal : Ω → E)
+    (hdrop_int : ∀ i ∈ times, Integrable (drop i) μ)
+    (hinitial_int : Integrable initial μ)
+    (hpoint : ∀ᵐ ω ∂μ,
+      Finset.sum times (fun i => drop i ω) = initial ω - terminal ω) :
+    Finset.sum times (fun i => ∫ ω, drop i ω ∂μ) =
+      (∫ ω, initial ω ∂μ) - (∫ ω, terminal ω ∂μ) := by
+  classical
+  have hsum_int :
+      Integrable (fun ω => Finset.sum times (fun i => drop i ω)) μ :=
+    MeasureTheory.integrable_finset_sum times hdrop_int
+  have hterminal_int : Integrable terminal μ := by
+    apply (hinitial_int.sub hsum_int).congr
+    filter_upwards [hpoint] with ω hω
+    change initial ω - Finset.sum times (fun i => drop i ω) = terminal ω
+    rw [hω]
+    abel
+  calc
+    Finset.sum times (fun i => ∫ ω, drop i ω ∂μ) =
+        ∫ ω, Finset.sum times (fun i => drop i ω) ∂μ :=
+      (MeasureTheory.integral_finset_sum times hdrop_int).symm
+    _ = ∫ ω, initial ω - terminal ω ∂μ := integral_congr_ae hpoint
+    _ = (∫ ω, initial ω ∂μ) - (∫ ω, terminal ω ∂μ) :=
+      MeasureTheory.integral_sub hinitial_int hterminal_int
+
+
+-- Promoted from Staging/exists_nonneg_ae_bound_accumulator_of_ae_bounded_increments.lean
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: finite-time a.e. boundedness of an additive accumulator with uniformly
+--   bounded increments; orig was lemma3_cumulativeGradientNormSq_eventually_le
+-- generality used: ordered additive-commutative-monoid-valued processes over an arbitrary
+--   measure; no probability, measurability, integrability, topology, or scalar structure is used
+-- portable call pattern: adaptive stochastic-gradient, AdaGrad, and recursive-momentum
+--   analyses bound a scalar history accumulator from its initial value, recurrence, and
+--   uniform a.e. increment bound; the process, increment, measure, and time may all change
+-- counterargument checked: although the proof is an induction, it is not paper traceability
+--   or a pure wrapper: it packages finite intersections of time-dependent a.e. bounds with
+--   an additive recurrence, a reusable bridge before compact-range or integrability arguments
+-- coverage search: queries "almost everywhere bounded finite additive accumulator bounded
+--   initial increments", "exists nonnegative almost everywhere upper bound recurrence
+--   increments", and "accumulator successor equals previous plus increment uniform bound"
+--   found only Mathlib martingale convergence results with stronger filtration hypotheses and
+--   SOptLib lemmas consuming an existing a.e. bound for integrability; no result covers this
+--   finite-time recurrence contract
+-- minimal hypotheses: weakened the probability measure to an arbitrary measure, the exact
+--   pointwise recurrence to an a.e. upper recurrence, and retained only one nonnegative bound
+--   for the initial value and increments
+
+/-- An additive accumulator has a nonnegative almost-everywhere upper bound at every
+finite time when its initial value and the increments through that time share such a bound.
+
+Layer: Glue | Gap: Level 1 (finite-time a.e. bound propagation through an additive recurrence)
+Proof: induct on time, intersect the a.e. recurrence, preceding bound, and next-increment bound,
+  then add their nonnegative scalar bounds.
+Source: Mathlib almost-everywhere filter intersections and ordered additive-monoid inequalities
+Used in: adaptive stochastic-gradient and recursive-momentum proofs bounding finite cumulative
+  gradient or error histories before applying compact-range and integrability arguments
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/assumptions/6
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD,
+  STOchastic Recursive Momentum -/
+theorem exists_nonneg_ae_bound_accumulator_of_ae_bounded_increments
+    {M Ω : Type*} [AddZeroClass M] [Preorder M] [AddLeftMono M] [AddRightMono M]
+    [MeasurableSpace Ω]
+    (P : Measure Ω) (acc inc : ℕ → Ω → M) (C : M) (t : ℕ)
+    (hC_nonneg : 0 ≤ C)
+    (hzero : ∀ᵐ ω ∂P, acc 0 ω ≤ C)
+    (hstep : ∀ n < t, ∀ᵐ ω ∂P, acc (n + 1) ω ≤ acc n ω + inc (n + 1) ω)
+    (hinc : ∀ n < t, ∀ᵐ ω ∂P, inc (n + 1) ω ≤ C) :
+    ∃ R : M, 0 ≤ R ∧ ∀ᵐ ω ∂P, acc t ω ≤ R := by
+  revert hstep hinc
+  induction t with
+  | zero =>
+      intro _hstep _hinc
+      exact ⟨C, hC_nonneg, hzero⟩
+  | succ t ih =>
+      intro hstep hinc
+      rcases ih
+          (fun n hn => hstep n (Nat.lt_trans hn (Nat.lt_succ_self t)))
+          (fun n hn => hinc n (Nat.lt_trans hn (Nat.lt_succ_self t))) with
+        ⟨R, hR_nonneg, hR⟩
+      refine ⟨R + C, add_nonneg hR_nonneg hC_nonneg, ?_⟩
+      filter_upwards [hstep t (Nat.lt_succ_self t), hR,
+        hinc t (Nat.lt_succ_self t)] with ω hacc hprev hnext
+      exact hacc.trans (add_le_add hprev hnext)
+
+
+-- Promoted from Staging/aestronglyMeasurable_prod_of_continuous_ae_of_fiber.lean
+open MeasureTheory
+open scoped Topology
+
+-- Generalization plan (G0):
+-- concept/name: product-law a.e. strong measurability for a Carathéodory
+--   kernel; orig was
+--   `sampled_product_aestronglyMeasurable_of_continuous_ae_of_fiber`, renamed
+--   to `aestronglyMeasurable_prod_of_continuous_ae_of_fiber`
+-- generality used: arbitrary topological parameter carrier, measurable query
+--   and sample spaces, an s-finite sample measure, an arbitrary first-coordinate
+--   measure, a normed additive target, and a strongly measurable query map; no
+--   probability, independence, convexity, smoothness, oracle, completeness, or
+--   finite-dimensional assumptions
+-- portable call pattern: recursive-momentum, stochastic-gradient, and
+--   sample-average proofs vary the parameter space, sample law, kernel, and
+--   query projection while retaining product-law regularity from sample-a.e.
+--   continuous parameter sections and fixed-parameter measurable fibers
+-- counterargument checked: this is not a paper-local wrapper; Mathlib's global
+--   Carathéodory theorem requires continuity and strong measurability for every
+--   section, whereas this theorem performs the nontrivial law-scoped upgrade
+--   from a.e. continuity and a.e. strongly measurable fibers
+-- coverage search: `lean_search_symbols` queries for “a.e. strongly measurable
+--   product function from continuous sections and measurable fibers” and
+--   “Carathéodory measurable continuous sections measurable fibers”, plus
+--   Mathlib LeanSearch for the same contract, found
+--   `stronglyMeasurable_uncurry_of_continuous_of_stronglyMeasurable` as a
+--   strictly global partial match and `AEStronglyMeasurable.prodMk_left/right`
+--   only in the reverse direction; no SOptLib theorem covers the a.e. product
+--   construction
+-- minimal hypotheses: the proof uses only strong measurability of the query
+--   map, so the source's Borel and second-countability assumptions on its
+--   parameter carrier are dropped; `SFinite νSample` is required by the
+--   product-measure projection formula
+
+/-- A kernel pulled back by a strongly measurable parameter map is a.e.
+strongly measurable under a product law when its parameter sections are
+continuous sample-almost everywhere and every sample fiber is a.e. strongly
+measurable.
+
+Layer: Glue | Gap: Level 1 (law-scoped Carathéodory product measurability)
+Proof: approximate the parameter map by simple functions, assemble each finite-range pullback from its measurable sample fibers, and pass to the pointwise limit on the full-measure set of continuous parameter sections.
+Source: Mathlib strongly measurable simple-function approximation, product-measure projection, and a.e. sequential-limit APIs
+Used in: recursive-momentum and stochastic-gradient conditioning arguments that evaluate a sample kernel at a measurable random query under a query-law/sample-law product measure
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem aestronglyMeasurable_prod_of_continuous_ae_of_fiber
+    {ι Sample Q V : Type*}
+    [TopologicalSpace ι]
+    [MeasurableSpace Sample] [MeasurableSpace Q]
+    [NormedAddCommGroup V]
+    (νQ : Measure Q) (νSample : Measure Sample) [SFinite νSample]
+    (kernel : ι → Sample → V) (queryPoint : Q → ι)
+    (hqueryPoint : StronglyMeasurable queryPoint)
+    (hcontinuous_ae : ∀ᵐ ξ ∂νSample, Continuous fun x : ι => kernel x ξ)
+    (hfiber_aesm : ∀ x : ι, AEStronglyMeasurable (kernel x) νSample) :
+    AEStronglyMeasurable
+      (fun p : Q × Sample => kernel (queryPoint p.1) p.2)
+      (νQ.prod νSample) := by
+  classical
+  let sf : ℕ → SimpleFunc Q ι := hqueryPoint.approx
+  have happrox_aesm :
+      ∀ n : ℕ,
+        AEStronglyMeasurable
+          (fun p : Q × Sample => kernel (sf n p.1) p.2)
+          (νQ.prod νSample) := by
+    intro n
+    let T : Finset ι := (sf n).range
+    have hsum_aesm :
+        AEStronglyMeasurable
+          (fun p : Q × Sample =>
+            T.sum fun y =>
+              (({q : Q | sf n q = y} ×ˢ (Set.univ : Set Sample)).indicator
+                (fun p : Q × Sample => kernel y p.2) p))
+          (νQ.prod νSample) := by
+      refine Finset.aestronglyMeasurable_fun_sum T ?_
+      intro y hy
+      have hbase :
+          AEStronglyMeasurable
+            (fun p : Q × Sample => kernel y p.2)
+            (νQ.prod νSample) := by
+        have hsnd_ac :
+            Measure.map Prod.snd (νQ.prod νSample) ≪ νSample := by
+          rw [Measure.map_snd_prod]
+          exact Measure.AbsolutelyContinuous.rfl.smul_left (νQ Set.univ)
+        exact (hfiber_aesm y).mono_ac hsnd_ac |>.comp_aemeasurable
+          measurable_snd.aemeasurable
+      exact hbase.indicator
+        (((sf n).measurableSet_fiber y).prod MeasurableSet.univ)
+    refine hsum_aesm.congr ?_
+    filter_upwards with p
+    have hmem : sf n p.1 ∈ T := SimpleFunc.mem_range_self (sf n) p.1
+    have hsum :
+        (T.sum fun y =>
+              (({q : Q | sf n q = y} ×ˢ (Set.univ : Set Sample)).indicator
+                (fun p : Q × Sample => kernel y p.2) p)) =
+          kernel (sf n p.1) p.2 := by
+      rw [Finset.sum_eq_single (sf n p.1)]
+      · simp
+      · intro y hy hyne
+        have hpnot :
+            p ∉ ({q : Q | sf n q = y} ×ˢ (Set.univ : Set Sample)) := by
+          intro hp
+          exact hyne.symm (by simpa using hp.1)
+        simp [Set.indicator_of_notMem hpnot]
+      · intro hnot
+        exact (hnot hmem).elim
+    simpa [T] using hsum
+  have hcontinuous_prod :
+      ∀ᵐ p ∂νQ.prod νSample,
+        Continuous fun x : ι => kernel x p.2 := by
+    have hsnd_ac :
+        Measure.map Prod.snd (νQ.prod νSample) ≪ νSample := by
+      rw [Measure.map_snd_prod]
+      exact Measure.AbsolutelyContinuous.rfl.smul_left (νQ Set.univ)
+    exact ae_of_ae_map measurable_snd.aemeasurable (hsnd_ac.ae_le hcontinuous_ae)
+  have htendsto :
+      ∀ᵐ p ∂νQ.prod νSample,
+        Filter.Tendsto (fun n : ℕ => kernel (sf n p.1) p.2) Filter.atTop
+          (𝓝 (kernel (queryPoint p.1) p.2)) := by
+    filter_upwards [hcontinuous_prod] with p hcont
+    exact (hcont.tendsto (queryPoint p.1)).comp (hqueryPoint.tendsto_approx p.1)
+  exact aestronglyMeasurable_of_tendsto_ae Filter.atTop happrox_aesm htendsto
+
+
+-- Promoted from Staging/nonneg_of_ae_norm_le.lean
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: nonnegativity of an almost-everywhere uniform norm bound; orig was
+--   section3_lipschitz_constant_nonneg_obligation
+-- generality used: a seminormed additive commutative group and a nonzero measure;
+--   no measurability, probability normalization, integrability, or completeness is used
+-- portable call pattern: stochastic-gradient and oracle analyses recover the sign of a
+--   declared uniform norm bound; the process, law, and bound vary while the conclusion stays fixed
+-- counterargument checked: the proof is short, but it packages the recurring bridge from an
+--   a.e. norm bound to the scalar side condition needed by powers and monotonicity lemmas
+-- coverage search: queries "a.e. norm upper bound implies nonnegative constant" and
+--   "nonzero measure eventually norm bound" found Mathlib Lp-bound lemmas and SOptLib's
+--   integrable_sq_norm_of_ae_bound, but none has this conclusion without assuming it
+-- minimal hypotheses: weakened probability measure to NeZero measure and normed group to
+--   SeminormedAddCommGroup; removed all measurability and algorithm-specific assumptions
+
+/-- An almost-everywhere upper bound on norms under a nonzero measure is nonnegative.
+
+Layer: Glue | Gap: Level 0 (sign of an almost-everywhere uniform norm bound)
+Proof: obtain one point satisfying the bound from the nontrivial almost-everywhere filter,
+  then compare the bound with the nonnegative norm at that point.
+Source: Mathlib almost-everywhere filters for nonzero measures and seminorm nonnegativity
+Used in: stochastic-gradient and oracle analyses that derive scalar bound side conditions
+  from almost-sure uniform gradient or residual bounds
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/assumptions/6
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD,
+  STOchastic Recursive Momentum -/
+theorem nonneg_of_ae_norm_le
+    {Ω E : Type*} [MeasurableSpace Ω] [SeminormedAddCommGroup E]
+    (μ : Measure Ω) [NeZero μ] (f : Ω → E) (C : ℝ)
+    (hbound : ∀ᵐ ω ∂μ, ‖f ω‖ ≤ C) :
+    0 ≤ C := by
+  rcases hbound.exists with ⟨ω, hω⟩
+  exact (norm_nonneg (f ω)).trans hω
+
+
+-- Promoted from Staging/ae_eq_measurable_comp_of_indep_product_aestronglyMeasurable.lean
+open MeasureTheory ProbabilityTheory
+
+-- Generalization plan (G0):
+-- concept/name: measurable representative for a product-law a.e.-strongly measurable
+--   kernel composed with an adapted query and an independent sample; orig was
+--   section3_random_query_residual_prefixAEMeasurable
+-- generality used: arbitrary measurable query and sample spaces, an arbitrary topological
+--   codomain, an arbitrary measure with sigma-finite query and sample marginal laws,
+--   and an arbitrary target sigma-algebra
+-- portable call pattern: a stochastic method evaluates a law-regular kernel at an adapted
+--   random query and an independent fresh sample; the query, sample coordinate, target
+--   sigma-algebra, and kernel may all change while the representative construction is fixed
+-- counterargument checked: the existing product-law pullback theorem gives only ambient
+--   a.e.-strong measurability, whereas this result retains measurability in a specified target
+--   sigma-algebra, so it is neither paper-local nor a pure wrapper
+-- coverage search: searches for "measurable representative composition independent random
+--   variables product law" found Mathlib's indepFun_iff_map_prod_eq_prod_map_map and
+--   AEStronglyMeasurable.ae_eq_mk, plus the partial staged theorem
+--   aestronglyMeasurable_comp_of_indep_product_law; none has the target-sigma-algebra conclusion
+-- minimal hypotheses: sigma-finiteness is required only of the two marginal laws;
+--   target-to-ambient inclusion, target-measurable query and sample representatives,
+--   independence, and product-law a.e.-strong measurability are all used directly
+
+/-- A product-law a.e.-strongly measurable kernel evaluated at an adapted query and an
+independent sample is a.e. equal to a strongly measurable function in any target sigma-algebra
+that contains measurable representatives of both inputs.
+
+Layer: Glue | Gap: Level 1 (target-sigma-algebra representative under independent product law)
+Proof: choose the query's source-measurable representative and the kernel's strongly measurable product-law representative. Independence identifies the representative pair's law with the product of its marginals, allowing the kernel equality to be pulled back and combined with the query equality.
+Source: Mathlib probability independence product-law characterization and a.e.-strong measurability representative APIs
+Used in: stochastic recursive-momentum history induction when a fresh sampled-gradient residual must be represented in the enlarged sample prefix
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/steps
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem ae_eq_measurable_comp_of_indep_product_aestronglyMeasurable
+    {Ω Q S V : Type*} [mΩ : MeasurableSpace Ω]
+    [MeasurableSpace Q] [MeasurableSpace S]
+    [TopologicalSpace V]
+    (mTarget : MeasurableSpace Ω)
+    (query queryRep : Ω → Q) (sample : Ω → S) (kernel : Q → S → V)
+    (μ : @Measure Ω mΩ)
+    (hqueryRep_sigmaFinite : SigmaFinite (@Measure.map Ω Q mΩ _ queryRep μ))
+    (hsample_sigmaFinite : SigmaFinite (@Measure.map Ω S mΩ _ sample μ))
+    (htarget_ambient : mTarget ≤ mΩ)
+    (hqueryRep : Measurable[mTarget] queryRep)
+    (hsample : Measurable[mTarget] sample)
+    (hquery : query =ᵐ[μ] queryRep)
+    (hindep : IndepFun queryRep sample μ)
+    (hkernel : AEStronglyMeasurable (Function.uncurry kernel)
+      ((@Measure.map Ω Q mΩ _ queryRep μ).prod
+        (@Measure.map Ω S mΩ _ sample μ))) :
+    ∃ resultRep : Ω → V,
+      StronglyMeasurable[mTarget] resultRep ∧
+        (fun ω => kernel (query ω) (sample ω)) =ᵐ[μ] resultRep := by
+  have hqueryRep_ambient : AEMeasurable queryRep μ :=
+    (hqueryRep.mono htarget_ambient le_rfl).aemeasurable
+  have hsample_ambient : AEMeasurable sample μ :=
+    (hsample.mono htarget_ambient le_rfl).aemeasurable
+  let kernelRep : Q × S → V := hkernel.mk (Function.uncurry kernel)
+  refine ⟨fun ω => kernelRep (queryRep ω, sample ω), ?_, ?_⟩
+  · exact hkernel.stronglyMeasurable_mk.comp_measurable
+      (hqueryRep.prod hsample)
+  · have hpair_map :
+        @Measure.map Ω (Q × S) mΩ _ (fun ω => (queryRep ω, sample ω)) μ =
+          (@Measure.map Ω Q mΩ _ queryRep μ).prod
+            (@Measure.map Ω S mΩ _ sample μ) :=
+      (indepFun_iff_map_prod_eq_prod_map_map'
+        hqueryRep_ambient hsample_ambient
+        hqueryRep_sigmaFinite hsample_sigmaFinite).mp hindep
+    have hkernel_ae :
+        Function.uncurry kernel =ᵐ[
+          @Measure.map Ω (Q × S) mΩ _ (fun ω => (queryRep ω, sample ω)) μ]
+          kernelRep := by
+      rw [hpair_map]
+      exact hkernel.ae_eq_mk
+    have hpair_aem : AEMeasurable (fun ω => (queryRep ω, sample ω)) μ :=
+      hqueryRep_ambient.prodMk hsample_ambient
+    have hpull :
+        (fun ω => kernel (queryRep ω) (sample ω)) =ᵐ[μ]
+          fun ω => kernelRep (queryRep ω, sample ω) := by
+      simpa [Function.comp_def] using ae_eq_comp hpair_aem hkernel_ae
+    have hquery_pull :
+        (fun ω => kernel (query ω) (sample ω)) =ᵐ[μ]
+          fun ω => kernel (queryRep ω) (sample ω) := by
+      filter_upwards [hquery] with ω hω
+      simp [hω]
+    exact hquery_pull.trans hpull
+
+
+-- Promoted from Staging/integrable_map_measure_and_integral_le_of_comp.lean
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: paired integrability and integral-bound transport to a pushforward law;
+--   orig was section3_sample_law_gradient_residual_sq_integrable_and_le
+-- generality used: arbitrary measurable spaces and measure; real-valued observable;
+--   no probability, finiteness, convexity, smoothness, or oracle assumptions
+-- portable call pattern: fixed-query moment proofs transport an integrable bounded
+--   observable from a sampled composition to the corresponding sample-coordinate law;
+--   the measure, sample map, observable, and bound may all change
+-- counterargument checked: this is not paper-local residual notation; although its proof
+--   composes two short map-measure facts, it packages the recurring paired contract needed
+--   by downstream conditional/product-law arguments
+-- coverage search: “integrable pushed forward map measure and integral upper bound of
+--   composition” and “pushforward law integrability transport integral upper bound paired”;
+--   Mathlib integrable_map_measure and integral_map and SOptLib's
+--   integrable_map_measure_of_integrable_comp and integral_comp_eq_integral_of_map_eq are
+--   partial hits, but none returns both transported facts
+-- minimal hypotheses: a.e. strong measurability of the observable under the mapped measure,
+--   a.e. measurability of the map, composition integrability, and the base integral bound
+
+/-- Integrability and an integral upper bound descend together to a pushforward measure.
+
+For a real observable `φ`, integrability of `φ ∘ Y` and an upper bound on its
+base-space integral give the corresponding paired facts under `Measure.map Y P`.
+
+Layer: Glue | Gap: Level 0 (paired pushforward-law integrability and integral-bound transport)
+Proof: use the map-measure integrability equivalence, then rewrite the mapped integral with Mathlib's Bochner `integral_map` formula.
+Source: Mathlib measure theory Bochner integrability and map-measure integration APIs
+Used in: fixed-query stochastic-gradient second-moment bounds transported from a sampled stream coordinate to its sample law before product-law conditioning
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/assumptions/2
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem integrable_map_measure_and_integral_le_of_comp
+    {Ω S : Type*} [MeasurableSpace Ω] [MeasurableSpace S]
+    (P : Measure Ω) (Y : Ω → S) (φ : S → ℝ) (bound : ℝ)
+    (hφ : AEStronglyMeasurable φ (Measure.map Y P))
+    (hY : AEMeasurable Y P)
+    (hcomp_int : Integrable (fun ω => φ (Y ω)) P)
+    (hcomp_le : ∫ ω, φ (Y ω) ∂P ≤ bound) :
+    Integrable φ (Measure.map Y P) ∧
+      ∫ s, φ s ∂Measure.map Y P ≤ bound := by
+  refine ⟨integrable_map_measure_of_integrable_comp hφ hY ?_, ?_⟩
+  · simpa [Function.comp_def] using hcomp_int
+  · rw [integral_map hY hφ]
+    exact hcomp_le
+
+
+-- Promoted from Staging/integrable_sqrt_sum_sq_norm_of_ae_bound.lean
+open MeasureTheory
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: integrability of the square root of finite squared-norm energy under an
+--   almost-everywhere uniform norm bound; orig was
+--   theorem1_expected_root_gradient_norm_sq_sum_integrable
+-- generality used: an arbitrary finite index type, a seminormed additive commutative group,
+--   and an arbitrary finite measure; no probability normalization, inner product, completeness,
+--   finite-dimensionality, smoothness, convexity, or oracle assumptions are used
+-- portable call pattern: finite-horizon stochastic-gradient, variance-reduced, and distributed
+--   algorithms establish integrability of a root-energy observable after proving component norm
+--   measurability and a uniform a.e. bound; the horizon, process, law, space, and bound may change
+-- counterargument checked: this is not paper-local traceability or a pure wrapper; it composes
+--   finite-sum strong measurability, square-root continuity, squared norm domination, and bounded
+--   integrability into the recurring root-energy contract needed by later expectation inequalities
+-- coverage search: queries `integrable square root finite sum squared norms uniform almost
+--   everywhere bound`, `integrable sqrt sum norm squared of ae norm le constant`, and `nonnegative
+--   integrable function square root`; Mathlib supplies `Integrable.of_bound` and finite-sum
+--   measurability, while SOptLib `integrable_sq_norm_of_ae_bound` covers one squared norm and a
+--   second-moment bound, not the square root of a finite sum, so coverage is partial
+-- minimal hypotheses: weakened probability measure to finite measure and Euclidean space to a
+--   seminormed additive commutative group; component norm a.e.-strong measurability is exactly the
+--   regularity used, and the norm bound is required only almost everywhere
+
+/-- The square root of a finite sum of squared norms is integrable when the component norms are
+a.e.-strongly measurable and uniformly bounded almost everywhere.
+
+Layer: Glue | Gap: Level 1 (bounded finite root-energy integrability)
+Proof: form the a.e.-strongly measurable finite sum of squared norms, compose it with continuous
+  square root, and dominate the result by the square root of the cardinality times the squared bound.
+Source: Mathlib finite-sum a.e.-strong measurability, real square-root continuity and monotonicity,
+  and finite-measure integrability by uniform domination
+Used in: finite-horizon stochastic-gradient root-energy expectations before weighted
+  Cauchy--Schwarz and average-stationarity comparisons
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/main_theorem/proof/19
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD,
+  STOchastic Recursive Momentum -/
+theorem integrable_sqrt_sum_sq_norm_of_ae_bound
+    {ι Ω E : Type*} [Fintype ι] [MeasurableSpace Ω] [SeminormedAddCommGroup E]
+    (P : Measure Ω) [IsFiniteMeasure P] (f : ι → Ω → E) (G : ℝ)
+    (hf_meas : ∀ i, AEStronglyMeasurable (fun ω => ‖f i ω‖) P)
+    (hf_bound : ∀ᵐ ω ∂P, ∀ i, ‖f i ω‖ ≤ G) :
+    Integrable
+      (fun ω => Real.sqrt (Finset.sum Finset.univ (fun i => ‖f i ω‖ ^ 2))) P := by
+  classical
+  have hsumsq_aesm :
+      AEStronglyMeasurable
+        (fun ω => Finset.sum Finset.univ (fun i => ‖f i ω‖ ^ 2)) P := by
+    refine Finset.aestronglyMeasurable_fun_sum Finset.univ ?_
+    intro i _hi
+    exact (hf_meas i).pow 2
+  have hroot_aesm :
+      AEStronglyMeasurable
+        (fun ω => Real.sqrt (Finset.sum Finset.univ (fun i => ‖f i ω‖ ^ 2))) P :=
+    Real.continuous_sqrt.comp_aestronglyMeasurable hsumsq_aesm
+  refine Integrable.of_bound hroot_aesm
+    (C := Real.sqrt ((Fintype.card ι : ℝ) * G ^ 2)) ?_
+  filter_upwards [hf_bound] with ω hω
+  have hsum_bound :
+      Finset.sum Finset.univ (fun i => ‖f i ω‖ ^ 2) ≤
+        (Fintype.card ι : ℝ) * G ^ 2 := by
+    calc
+      Finset.sum Finset.univ (fun i => ‖f i ω‖ ^ 2) ≤
+          Finset.sum Finset.univ (fun _i : ι => G ^ 2) := by
+            refine Finset.sum_le_sum ?_
+            intro i _hi
+            exact pow_le_pow_left₀ (norm_nonneg _) (hω i) 2
+      _ = (Fintype.card ι : ℝ) * G ^ 2 := by simp
+  simpa [Real.norm_of_nonneg (Real.sqrt_nonneg _)] using
+    Real.sqrt_le_sqrt hsum_bound
+
+
+-- Promoted from Staging/integral_sqrt_sum_sq_norm_le_sqrt_card_mul_sq_of_ae_bound.lean
+open MeasureTheory
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: expected finite root-energy bound under a uniform component norm bound;
+--   orig was theorem1_expected_root_gradient_norm_sq_sum_le_sqrt_T_mul_G_sq
+-- generality used: an arbitrary finite index type, a seminormed additive commutative group,
+--   and an arbitrary probability measure; no inner product, completeness, finite-dimensionality,
+--   smoothness, convexity, or oracle assumptions are used
+-- portable call pattern: finite-horizon stochastic-gradient, variance-reduced, and distributed
+--   algorithms bound the expectation of a root-sum-of-squares certificate after establishing
+--   component measurability and a uniform a.e. norm bound; the index type, process, law, carrier,
+--   and bound may all change while the conclusion retains the same cardinality scaling
+-- counterargument checked: this is not paper-local traceability or a one-line rename; it combines
+--   bounded root-energy integrability, a finite squared-norm aggregation estimate, integral
+--   monotonicity, and probability normalization into a reusable expectation bound
+-- coverage search: queries `integral square root finite sum squared norms upper bound cardinality
+--   uniform almost everywhere bound` and `sqrt sum sq norm le sqrt card mul square of norm bound`;
+--   Mathlib hits such as `Real.sqrt_le_sqrt` and `integral_mono_ae` cover individual transitions,
+--   while `integrable_sqrt_sum_sq_norm_of_ae_bound` proves only the companion integrability
+--   contract, so existing coverage is partial rather than alpha-equivalent
+-- minimal hypotheses: weakened Euclidean space to a seminormed additive commutative group;
+--   component norm measurability and the norm bound are required only almost everywhere, while
+--   probability normalization is exactly what removes the measure-mass factor from the conclusion
+
+/-- The expected square root of a finite sum of squared norms is at most the square root of the
+cardinality times the squared uniform component bound.
+
+Layer: Glue | Gap: Level 1 (expected finite root-energy bound from uniform component bounds)
+Proof: obtain integrability from the bounded root-energy companion, bound every squared norm and
+  its finite sum almost everywhere, then use integral monotonicity and probability normalization.
+Source: Mathlib finite-sum order, real square-root monotonicity, and Bochner integral monotonicity;
+  companion integrability from `integrable_sqrt_sum_sq_norm_of_ae_bound`
+Used in: finite-horizon stochastic-gradient analyses that cap the expected aggregate gradient
+  energy before a scalar case split or an average-stationarity normalization
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/main_theorem/proof/19
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD,
+  STOchastic Recursive Momentum -/
+theorem integral_sqrt_sum_sq_norm_le_sqrt_card_mul_sq_of_ae_bound
+    {ι Ω E : Type*} [Fintype ι] [MeasurableSpace Ω] [SeminormedAddCommGroup E]
+    (P : Measure Ω) [IsProbabilityMeasure P] (f : ι → Ω → E) (G : ℝ)
+    (hf_meas : ∀ i, AEStronglyMeasurable (fun ω => ‖f i ω‖) P)
+    (hf_bound : ∀ᵐ ω ∂P, ∀ i, ‖f i ω‖ ≤ G) :
+    (∫ ω, Real.sqrt (Finset.sum Finset.univ (fun i => ‖f i ω‖ ^ 2)) ∂P) ≤
+      Real.sqrt ((Fintype.card ι : ℝ) * G ^ 2) := by
+  classical
+  have hroot_int := integrable_sqrt_sum_sq_norm_of_ae_bound P f G hf_meas hf_bound
+  have hconst_int :
+      Integrable (fun _ω : Ω => Real.sqrt ((Fintype.card ι : ℝ) * G ^ 2)) P :=
+    integrable_const (c := Real.sqrt ((Fintype.card ι : ℝ) * G ^ 2))
+  have hpoint :
+      ∀ᵐ ω ∂P,
+        Real.sqrt (Finset.sum Finset.univ (fun i => ‖f i ω‖ ^ 2)) ≤
+          Real.sqrt ((Fintype.card ι : ℝ) * G ^ 2) := by
+    filter_upwards [hf_bound] with ω hω
+    apply Real.sqrt_le_sqrt
+    calc
+      Finset.sum Finset.univ (fun i => ‖f i ω‖ ^ 2) ≤
+          Finset.sum Finset.univ (fun _i : ι => G ^ 2) := by
+        refine Finset.sum_le_sum ?_
+        intro i _hi
+        exact pow_le_pow_left₀ (norm_nonneg _) (hω i) 2
+      _ = (Fintype.card ι : ℝ) * G ^ 2 := by simp
+  have hmono := integral_mono_ae hroot_int hconst_int hpoint
+  simpa [integral_const, probReal_univ] using hmono
+
+
+-- Promoted from Staging/integral_inv_card_sum_le_integral_sqrt_sum_sq_div_sqrt_card.lean
+open MeasureTheory
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: integral comparison from a finite uniform sum to root-sum-square;
+--   orig was theorem1_generated_average_le_expected_root_sum_div_sqrt
+-- generality used: arbitrary measurable space, measure, finite index type, and
+--   real scalar fibers; no probability, oracle, smoothness, or sign assumptions
+-- portable call pattern: finite-window stochastic convergence proofs integrate a
+--   uniform scalar average and compare it with expected pathwise l2 energy; the
+--   certificate fibers, time index, and measure may all change
+-- counterargument checked: this is not paper-local or a pure wrapper because it
+--   packages pointwise finite Cauchy--Schwarz with both integrability obligations,
+--   integral monotonicity, and extraction of the deterministic cardinality factor
+-- coverage search: queries "integral finite uniform average upper bound integral
+--   square root sum squares divided square root cardinality" and "integral inv
+--   card sum le integral sqrt sum sq div sqrt card integrable" found Mathlib's
+--   sum_div_card_sq_le_sum_sq_div_card and the staged pointwise
+--   inv_card_mul_sum_le_sqrt_sum_sq_div_sqrt_card only; both are partial
+-- minimal hypotheses: arbitrary measure; fiber integrability constructs the left
+--   integrand, root-sum integrability supplies the right; Nonempty is unnecessary
+
+/-- The integral of an inverse-cardinality-scaled finite sum is at most the
+integral of its root-sum-of-squares divided by the square root of the cardinality.
+
+Layer: Glue | Gap: Level 1 (integrated finite-average root-mean-square comparison)
+Proof: apply the pointwise finite Cauchy--Schwarz bound under integral monotonicity,
+  using the supplied fiber and root-sum integrability, then pull out the constant divisor.
+Source: Mathlib Bochner integral monotonicity and constant-factor rules, together with the finite Chebyshev root-sum bound
+Used in: finite-window stochastic stationarity proofs comparing an expected uniform average of certificate magnitudes with expected pathwise l2 energy
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/main_theorem/proof/19
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem integral_inv_card_sum_le_integral_sqrt_sum_sq_div_sqrt_card
+    {Ω ι : Type*} [MeasurableSpace Ω] [Fintype ι]
+    (μ : Measure Ω) (a : ι → Ω → ℝ)
+    (ha : ∀ i, Integrable (a i) μ)
+    (hroot : Integrable
+      (fun ω => Real.sqrt (Finset.sum Finset.univ (fun i => a i ω ^ 2))) μ) :
+    (∫ ω, (Fintype.card ι : ℝ)⁻¹ * Finset.sum Finset.univ (fun i => a i ω) ∂μ) ≤
+      (∫ ω, Real.sqrt (Finset.sum Finset.univ (fun i => a i ω ^ 2)) ∂μ) /
+        Real.sqrt (Fintype.card ι : ℝ) := by
+  classical
+  have hsum : Integrable (fun ω => Finset.sum Finset.univ (fun i => a i ω)) μ :=
+    integrable_finset_sum Finset.univ (fun i _hi => ha i)
+  have hleft :
+      Integrable
+        (fun ω => (Fintype.card ι : ℝ)⁻¹ * Finset.sum Finset.univ (fun i => a i ω)) μ :=
+    hsum.const_mul (Fintype.card ι : ℝ)⁻¹
+  have hright :
+      Integrable
+        (fun ω =>
+          Real.sqrt (Finset.sum Finset.univ (fun i => a i ω ^ 2)) /
+            Real.sqrt (Fintype.card ι : ℝ)) μ := by
+    simpa [div_eq_mul_inv, mul_comm] using
+      hroot.const_mul (Real.sqrt (Fintype.card ι : ℝ))⁻¹
+  calc
+    (∫ ω, (Fintype.card ι : ℝ)⁻¹ * Finset.sum Finset.univ (fun i => a i ω) ∂μ) ≤
+        ∫ ω, Real.sqrt (Finset.sum Finset.univ (fun i => a i ω ^ 2)) /
+          Real.sqrt (Fintype.card ι : ℝ) ∂μ := by
+      exact integral_mono hleft hright
+        (fun ω => inv_card_mul_sum_le_sqrt_sum_sq_div_sqrt_card (fun i => a i ω))
+    _ = (∫ ω, Real.sqrt (Finset.sum Finset.univ (fun i => a i ω ^ 2)) ∂μ) /
+        Real.sqrt (Fintype.card ι : ℝ) := by
+      rw [integral_div]
+
+
+-- Promoted from Staging/le_integral_mul_rpow_of_le_reciprocal_inverse_rpow_stepsize.lean
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: integral cancellation for a reciprocal inverse-real-power step
+--   size; orig was `theorem1_root_sum_bound_with_sampled_gradients`
+-- generality used: an arbitrary measurable space and measure, two arbitrary
+--   real-valued functions, and real numerator, multiplier, exponent, and bound;
+--   no probability, integrability, smoothness, oracle, or convexity assumptions
+-- portable call pattern: AdaGrad-style and recursive-momentum analyses replace a
+--   reciprocal adaptive-step-size factor by the power of its positive random base
+--   while the measure, local step-size wrapper, numerator, exponent, and scalar
+--   multiplier vary
+-- counterargument checked: this is not paper-local traceability or a pure wrapper;
+--   it bridges a caller's step-size representation to the named inverse-power
+--   schedule, pulls a scalar into an integral, and performs a.e. field cancellation
+-- coverage search: symbol queries for "integral reciprocal inverse real power step
+--   size times numerator" found only the schedule definition and its positivity and
+--   continuity API; Mathlib semantic search found `integral_mul_const` as a proof
+--   component but no theorem with the complete a.e. schedule-cancellation contract
+-- minimal hypotheses: arbitrary measure replaces the source probability measure;
+--   integrability is unnecessary because Mathlib's Bochner integral commutes with
+--   constant multiplication without it, and positivity is localized to an a.e. base
+
+/-- An upper bound containing the integral of a reciprocal inverse-real-power step
+size can be rewritten as the integral of the corresponding base power.
+
+The a.e. schedule hypothesis permits algorithm-local step-size wrappers while the
+conclusion exposes only the positive random base and its real power.
+
+Layer: Glue | Gap: Level 1 (reciprocal adaptive-step-size integral cancellation)
+Proof: pull the constant numerator-multiplier product into the integral, use the
+  a.e. schedule identity, and cancel the nonzero numerator and positive real-power
+  denominator pointwise.
+Source: Mathlib `MeasureTheory.integral_mul_const`, `integral_congr_ae`,
+  `Real.rpow_pos_of_pos`, and ordered-field simplification
+Used in: adaptive stochastic-gradient and recursive-momentum root-sum estimates
+  replacing a Cauchy--Schwarz reciprocal-step-size factor by a powered cumulative
+  gradient statistic
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/main_theorem/proof/21
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in
+  Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem le_integral_mul_rpow_of_le_reciprocal_inverse_rpow_stepsize
+    {Ω : Type*} [MeasurableSpace Ω]
+    (P : Measure Ω) (eta base : Ω → ℝ) (k M p X : ℝ)
+    (heta : ∀ᵐ ω ∂P, eta ω = k / Real.rpow (base ω) p)
+    (hbase_pos : ∀ᵐ ω ∂P, 0 < base ω)
+    (hk_ne : k ≠ 0)
+    (hbound : X ≤ (∫ ω, 1 / eta ω ∂P) * (k * M)) :
+    X ≤ ∫ ω, M * Real.rpow (base ω) p ∂P := by
+  refine hbound.trans_eq ?_
+  rw [← integral_mul_const]
+  refine integral_congr_ae ?_
+  filter_upwards [heta, hbase_pos] with ω hetaω hbaseω
+  rw [hetaω]
+  have hrpow_ne : Real.rpow (base ω) p ≠ 0 :=
+    ne_of_gt (Real.rpow_pos_of_pos hbaseω p)
+  field_simp [hk_ne, hrpow_ne]
+
+
+-- Promoted from Staging/integrable_mul_sq_norm_of_ae_bounds.lean
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: integrability of a bounded scalar weight times a bounded squared norm;
+--   orig was weighted_sq_norm_integrable_of_ae_bounds_pattern
+-- generality used: an arbitrary measurable space, finite measure, normed additive
+--   commutative group, two a.e.-strongly measurable processes, and a.e. norm bounds
+-- portable call pattern: stochastic algorithms proving expectation well-posedness for
+--   an adapted scalar coefficient times a squared gradient, residual, or update norm;
+--   the coefficient, vector process, finite measure, and essential bounds may all vary
+-- counterargument checked: this is not paper traceability or a pure wrapper because it
+--   packages measurability closure for a product with the joint bound calculation;
+--   neither the Mathlib nor SOptLib hits states this weighted squared-norm contract
+-- coverage search: searched `integrable scalar weight times squared norm of vector
+--   process a.e. bounded finite measure` and `bounded weight squared norm integrable`;
+--   partial hits were `Integrable.of_bound`, `Integrable.smul_bdd`,
+--   `memLp_two_iff_integrable_sq_norm`, and `SOptLib.integrable_sq_norm_of_ae_bound`
+-- minimal hypotheses: `IsFiniteMeasure` replaces probability, `NormedAddCommGroup` is
+--   sufficient, and nonnegativity of each bound is derived on the a.e. bound event
+
+/-- A bounded scalar weight times the squared norm of a bounded vector process is integrable.
+
+Layer: Glue | Gap: Level 1 (weighted squared-norm integrability from essential bounds)
+Proof: close a.e.-strong measurability under norm, powers, and multiplication, then apply
+  `Integrable.of_bound` using the product of the two essential bounds.
+Source: Mathlib Bochner measurability closure and finite-measure bounded integrability APIs
+Used in: recursive-momentum expectation proofs for adapted weights multiplying squared
+  stochastic-gradient, objective-gradient, residual, and gradient-difference norms
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex
+  SGD, STOchastic Recursive Momentum -/
+theorem integrable_mul_sq_norm_of_ae_bounds
+    {Ω E : Type*} [MeasurableSpace Ω] [NormedAddCommGroup E]
+    {μ : Measure Ω} [IsFiniteMeasure μ]
+    {w : Ω → ℝ} {v : Ω → E} {A B : ℝ}
+    (hw_meas : AEStronglyMeasurable w μ)
+    (hv_meas : AEStronglyMeasurable v μ)
+    (hw_bound : ∀ᵐ ω ∂μ, ‖w ω‖ ≤ A)
+    (hv_bound : ∀ᵐ ω ∂μ, ‖v ω‖ ≤ B) :
+    Integrable (fun ω => w ω * ‖v ω‖ ^ 2) μ := by
+  have hmul_meas :
+      AEStronglyMeasurable (fun ω => w ω * ‖v ω‖ ^ 2) μ :=
+    hw_meas.mul (hv_meas.norm.pow 2)
+  refine Integrable.of_bound hmul_meas (A * B ^ 2) ?_
+  filter_upwards [hw_bound, hv_bound] with ω hwω hvω
+  have hA_nonneg : 0 ≤ A := (norm_nonneg (w ω)).trans hwω
+  have hv_sq : ‖v ω‖ ^ 2 ≤ B ^ 2 :=
+    pow_le_pow_left₀ (norm_nonneg (v ω)) hvω 2
+  calc
+    ‖w ω * ‖v ω‖ ^ 2‖ = ‖w ω‖ * ‖v ω‖ ^ 2 := by
+      rw [norm_mul, Real.norm_of_nonneg (sq_nonneg _)]
+    _ ≤ A * B ^ 2 := mul_le_mul hwω hv_sq (sq_nonneg _) hA_nonneg
+
+-- Phase 4 merged from focused staging declarations.
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: integral upper bound from a constant budget, a noise budget,
+--   and a zero-integral residual; orig was
+--   `partB_stream_weighted_gradient_integral_le_of_residual`, renamed away
+--   from the part-B stream-gradient proof boundary.
+-- generality used: arbitrary measurable space, arbitrary probability measure,
+--   and functions into a complete ordered real normed vector space; no convexity,
+--   smoothness, oracle, filtration, Hilbert, or finite-dimensional assumptions
+--   are used.
+-- portable call pattern: stochastic convergence proofs turn a pathwise upper
+--   bound by a deterministic initial-distance budget plus stochastic noise and
+--   centered residual into an expectation bound; the measure, functions,
+--   constant budget, and noise bound vary while the conclusion shape is fixed.
+-- counterargument checked: not paper-local traceability because it packages a
+--   common expectation-assembly step after martingale residual cancellation;
+--   not fully covered by SOptLib because
+--   `integral_le_integral_of_ae_le_add_of_integral_eq_zero` only removes the
+--   zero correction and does not absorb the retained constant-plus-noise term
+--   using a separate noise integral bound.
+-- coverage search: searched `integral f less equal constant plus bound ae
+--   less equal constant plus noise residual residual integral zero`, `integral
+--   mono ae integral add integrable const zero residual bound`, and LeanSearch
+--   for the same a.e. constant-plus-noise-plus-residual contract; relevant hits
+--   were SOptLib `integral_le_integral_of_ae_le_add_of_integral_eq_zero` and
+--   Mathlib `MeasureTheory.integral_mono_ae`, both proof components but not
+--   the full constant/noise/residual assembly.
+-- minimal hypotheses: `[IsProbabilityMeasure μ]` is required so the integral
+--   of the deterministic constant is the same constant; all integrability and
+--   bound hypotheses are used directly.
+
+/-- An a.e. bound by a deterministic constant, a noise term, and a zero-integral
+residual gives an integral bound by the constant plus any integral noise bound.
+
+Layer: Glue | Gap: Level 1 (constant-plus-noise integral assembly with zero residual)
+Proof: discard the zero-integral residual using
+  `integral_le_integral_of_ae_le_add_of_integral_eq_zero`, split the integral
+  of `c + noise`, and apply the noise integral bound.
+Source: Mathlib Bochner integral monotonicity and additivity APIs, together
+  with the SOptLib zero-correction integral lemma
+Used in: randomized stochastic accelerated-gradient convex-case weighted stream
+  gradient bound after the martingale residual budget has zero expectation and
+  the oracle-noise budget is bounded by the variance assumption
+Book citation: book/FOML/NonconvexStochasticAcceleratedGD.json#/main_theorem/proof/22
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic accelerated gradient descent
+  (Algorithm 6.4 and Theorem 6.12) -/
+theorem integral_le_const_add_of_ae_le_const_add_add_and_integral_le_and_zero
+    {Ω E : Type*} [MeasurableSpace Ω] {μ : Measure Ω} [IsProbabilityMeasure μ]
+    [NormedAddCommGroup E] [NormedSpace ℝ E] [PartialOrder E]
+    [IsOrderedAddMonoid E] [IsOrderedModule ℝ E] [ClosedIciTopology E] [CompleteSpace E]
+    {f noise residual : Ω → E} {c B : E}
+    (hf_int : Integrable f μ)
+    (hnoise_int : Integrable noise μ)
+    (hresidual_int : Integrable residual μ)
+    (hpoint : ∀ᵐ ω ∂μ, f ω ≤ c + noise ω + residual ω)
+    (hnoise_le : (∫ ω, noise ω ∂μ) ≤ B)
+    (hresidual_zero : (∫ ω, residual ω ∂μ) = 0) :
+    (∫ ω, f ω ∂μ) ≤ c + B := by
+  have hretained_int : Integrable (fun ω : Ω => c + noise ω) μ :=
+    (integrable_const c).add hnoise_int
+  have hpoint' :
+      f ≤ᵐ[μ] (fun ω : Ω => c + noise ω) + residual := by
+    filter_upwards [hpoint] with ω hω
+    simpa [Pi.add_apply, add_assoc] using hω
+  have hle_retained :
+      (∫ ω, f ω ∂μ) ≤ ∫ ω, c + noise ω ∂μ :=
+    integral_le_integral_of_ae_le_add_of_integral_eq_zero
+      hf_int hretained_int hresidual_int hpoint' hresidual_zero
+  calc
+    (∫ ω, f ω ∂μ) ≤ ∫ ω, c + noise ω ∂μ := hle_retained
+    _ = c + ∫ ω, noise ω ∂μ := by
+      rw [integral_add (integrable_const c) hnoise_int]
+      simp [integral_const, probReal_univ]
+    _ ≤ c + B := add_le_add (le_refl c) hnoise_le
+
+end SOptLib
+
+-- Phase 4 batch 1 merge from Staging/integral_finite_selector_first_prod_eq_sum_of_integrable.lean
+noncomputable section
+
+open MeasureTheory
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: selector-first finite product integral expansion from product
+--   integrability; orig was
+--   `finite_selector_first_product_integral_eq_weighted_sum_of_integrable`,
+--   renamed away from local selector/output wording while retaining the
+--   finite-selector product-law contract.
+-- generality used: arbitrary sample measurable space, finite selector
+--   measurable space with measurable singletons, sigma-finite sample measure,
+--   finite selector measure, and Bochner-valued observable; no probability
+--   normalization, independence, filtration, convexity, smoothness, oracle,
+--   objective, inner-product, or finite-dimensional assumptions are used.
+-- portable call pattern: randomized-output and selected-index stochastic
+--   proofs call this after proving the joint selector/sample integrand is
+--   integrable and before rewriting the selected expectation as singleton
+--   selector masses times sample-fiber expectations; the selector type, sample
+--   law, selector law, and observable change while the expansion shape stays
+--   fixed.
+-- counterargument checked: this is not only paper traceability because it
+--   isolates a reusable zero-atom-safe Fubini/finite-law expansion. It is not a
+--   duplicate of `SOptLib.integral_finite_index_first_prod_eq_sum_weights`,
+--   which requires all fibers integrable, nor of
+--   `integral_prod_finite_law_eq_integral_weighted_fiber_sum`, which keeps the
+--   weighted selector sum inside the base integral rather than producing the
+--   sum of fiber integrals.
+-- coverage search: searched CATALOG/SOptLib and `lean_search_symbols` for
+--   "selector first finite product integral weighted sum product integrable
+--   fiber integrals"; top partial hits were
+--   `SOptLib.integral_finite_index_first_prod_eq_sum_weights`,
+--   `integral_selected_finite_index_prod_eq_sum_weights`, and
+--   `integral_prod_finite_law_eq_integral_weighted_fiber_sum`.
+--   LeanSearch found Mathlib Fubini and finite integral primitives such as
+--   `MeasureTheory.integral_prod` and `MeasureTheory.integral_fintype`, but no
+--   full zero-atom-safe product-integrability expansion.
+-- minimal hypotheses: `SFinite μ` supports product Fubini, `IsFiniteMeasure ν`
+--   supports finite-selector integration, and product integrability of the
+--   uncurried observable is the only integrability assumption; per-fiber
+--   integrability, positivity, and total mass one are unnecessary.
+
+/-- A selector-first finite product integral expands as singleton masses times
+fiber integrals, assuming only product integrability.
+
+For a finite selector measure `ν` on the first coordinate and a sample measure
+`μ` on the second coordinate, product integrability of the uncurried observable
+is enough to rewrite the product integral as the finite weighted sum of its
+sample-fiber integrals.
+
+Layer: Glue | Gap: Level 1 (zero-atom-safe finite selector product integral expansion)
+Proof: apply product-measure Fubini to the integrable uncurried observable, then
+  evaluate the finite selector integral by `integral_fintype`.
+Source: Mathlib product-measure Bochner integration and finite-type integral APIs
+Used in: nonconvex stochastic block mirror descent randomized output expectation
+  realization from an explicit finite selector law
+Book citation: book/FOML/NonconvexStochasticBlockMirrorDescent.json#/main_theorem/proof/23
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, nonconvex stochastic block mirror descent -/
+theorem integral_finite_selector_first_prod_eq_sum_of_integrable
+    {Ω α E : Type*} [MeasurableSpace Ω] [MeasurableSpace α]
+    [NormedAddCommGroup E] [NormedSpace ℝ E] [CompleteSpace E]
+    [Fintype α] [MeasurableSingletonClass α]
+    (ν : Measure α) (μ : Measure Ω) [SFinite μ] [IsFiniteMeasure ν]
+    (F : α → Ω → E)
+    (hF : Integrable (fun q : α × Ω => F q.1 q.2) (ν.prod μ)) :
+    ∫ q : α × Ω, F q.1 q.2 ∂(ν.prod μ) =
+      ∑ a : α, ν.real ({a} : Set α) • ∫ ω, F a ω ∂μ := by
+  classical
+  rw [MeasureTheory.integral_prod (fun q : α × Ω => F q.1 q.2) hF]
+  rw [MeasureTheory.integral_fintype]
+  exact Integrable.of_finite
+
+end
+
+-- Generalization plan (G0):
+-- concept/name: product-law integrability transfer with a composed state-dependent bound;
+--   orig was integrable_comp_of_indep_fixed_integral_comp_bound.
+-- generality used: arbitrary measurable spaces Ω, W, and S; finite source measure P and
+--   sample law ν; a.e.-strongly measurable scalar kernel under the generated product law;
+--   a.e.-strongly measurable bound B under the X-law; a.e.-measurable random inputs X and Y;
+--   independence, law identity, nonnegative fibers, fixed-fiber integrability, integrable
+--   composed bound, and pointwise fixed-fiber domination.
+-- portable call pattern: martingale MGF, validation, and random-query moment proofs vary
+--   Ω, W, S, φ, B, X, Y, P, and ν while retaining independent X/Y, law of Y,
+--   nonnegative fixed fibers, integrable B(X), and integrability of φ(X,Y).
+-- counterargument checked: not paper-local traceability and not a caller-side expression;
+--   the theorem packages the product-law/Fubini domination step needed whenever fixed
+--   sample-fiber L¹ norms are controlled by an integrable random-query bound.
+-- coverage search: symbol searches for "integrable composition independent fixed fiber
+--   integral bound random bound aemeasurable" and "IndepFun Measure.map product integrable
+--   fixed fiber integral bound" found SOptLib uniform-bound transfers
+--   integrable_comp_of_indep_fixed_integral_bound(_aestronglyMeasurable) and the integral
+--   variable-bound companion, but no integrability transfer dominated by B ∘ X.
+-- minimal hypotheses: finiteness of ν and of the X-law are derived from the law identity
+--   and finite P; no convexity, normed-space, finite-dimensional, or optimization-specific
+--   assumptions are used.
+
+/-- A nonnegative kernel evaluated at independent random parameters is integrable when its
+fixed fibers are integrable and their integrals are bounded by an integrable function of the
+fixed parameter, assuming only a.e. strong measurability under the generated product law.
+
+Layer: Glue | Gap: Level 1 (product-law a.e.-measurable fixed-fiber integrability transfer with random bound)
+Proof: identify the joint pushforward law using independence, apply the product-measure integrability criterion, dominate the fiber norm integrals by the integrable bound under the X-law, and transport integrability back through the joint map.
+Source: Mathlib probability independence joint-law characterization and product-measure Bochner integration APIs
+Used in: stochastic saddle-point martingale cross-term concentration where an adapted weighted query is paired with a fresh iid sample and the fixed-fiber MGF is bounded by a prefix weight
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/algorithm_spec
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic convex-concave saddle point -/
+theorem integrable_comp_of_indep_fixed_integral_comp_bound_aestronglyMeasurable
+    {Ω W S : Type*} [MeasurableSpace Ω] [MeasurableSpace W] [MeasurableSpace S]
+    {P : Measure Ω} {ν : Measure S} [IsFiniteMeasure P]
+    {φ : W → S → ℝ} {B : W → ℝ} {X : Ω → W} {Y : Ω → S}
+    (hφ_prod :
+      AEStronglyMeasurable
+        (fun p : W × S => φ p.1 p.2) ((Measure.map X P).prod ν))
+    (hB_aesm : AEStronglyMeasurable B (Measure.map X P))
+    (hX : AEMeasurable X P) (hY : AEMeasurable Y P)
+    (h_indep : IndepFun X Y P)
+    (h_dist : Measure.map Y P = ν)
+    (hφ_nonneg : ∀ w s, 0 ≤ φ w s)
+    (hfixed_int : ∀ w, Integrable (fun s => φ w s) ν)
+    (hB_int : Integrable (fun ω => B (X ω)) P)
+    (hfixed_bound : ∀ w, ∫ s, φ w s ∂ν ≤ B w) :
+    Integrable (fun ω => φ (X ω) (Y ω)) P := by
+  have h_joint_aemeas : AEMeasurable (fun ω => (X ω, Y ω)) P :=
+    hX.prodMk hY
+  have h_prod_eq :
+      Measure.map (fun ω => (X ω, Y ω)) P = (Measure.map X P).prod ν := by
+    rw [(indepFun_iff_map_prod_eq_prod_map_map hX hY).mp h_indep, h_dist]
+  have hφ_joint :
+      AEStronglyMeasurable
+        (fun p : W × S => φ p.1 p.2)
+        (Measure.map (fun ω => (X ω, Y ω)) P) := by
+    rw [h_prod_eq]
+    exact hφ_prod
+  letI : IsFiniteMeasure ν := by
+    rw [← h_dist]
+    exact Measure.isFiniteMeasure_map P Y
+  letI : IsFiniteMeasure (Measure.map X P) :=
+    Measure.isFiniteMeasure_map P X
+  suffices h_prod :
+      Integrable (fun p : W × S => φ p.1 p.2) ((Measure.map X P).prod ν) by
+    have h_on_joint :
+        Integrable (fun p : W × S => φ p.1 p.2)
+          (Measure.map (fun ω => (X ω, Y ω)) P) := by
+      rw [h_prod_eq]
+      exact h_prod
+    exact (integrable_map_measure hφ_joint h_joint_aemeas).mp h_on_joint
+  have hB_map_int : Integrable B (Measure.map X P) := by
+    exact (integrable_map_measure hB_aesm hX).mpr hB_int
+  rw [integrable_prod_iff hφ_prod]
+  refine ⟨Filter.Eventually.of_forall hfixed_int, ?_⟩
+  refine Integrable.mono hB_map_int
+    (hφ_prod.norm.integral_prod_right') (Filter.Eventually.of_forall ?_)
+  intro w
+  have h_abs_eq :
+      (∫ y, ‖φ (w, y).1 (w, y).2‖ ∂ν) = ∫ s, φ w s ∂ν := by
+    refine integral_congr_ae (Filter.Eventually.of_forall ?_)
+    intro s
+    exact Real.norm_of_nonneg (hφ_nonneg w s)
+  have h_int_nonneg : 0 ≤ ∫ s, φ w s ∂ν :=
+    integral_nonneg fun s => hφ_nonneg w s
+  have hB_nonneg : 0 ≤ B w :=
+    le_trans h_int_nonneg (hfixed_bound w)
+  rw [h_abs_eq]
+  simpa [Real.norm_of_nonneg h_int_nonneg, Real.norm_of_nonneg hB_nonneg] using
+    hfixed_bound w
+
+-- Generalization plan (G0):
+-- concept/name: product-law integral bound transfer with a composed random bound under law-scoped a.e. strong measurability; the original name already exposes the reusable mathematical contract
+-- generality used: arbitrary measurable source, parameter, and sample spaces; an arbitrary finite source measure; real-valued kernel and bound functions; a.e. measurable random inputs; no probability, optimization, normed-space, or finite-dimensional assumptions
+-- portable call pattern: random-query MGF, variance, and stochastic-gradient moment proofs vary the history state X, fresh sample Y, scalar kernel φ, sample law ν, and bound function B while retaining the same conclusion ∫ φ(X,Y) ≤ ∫ B(X)
+-- counterargument checked: not paper-local traceability and not a pure wrapper; the existing SOptLib variable-bound theorem requires global measurability of the kernel and bound, while this statement only assumes a.e. strong measurability under the generated product law and X-law
+-- coverage search: searched "independent random parameter variable bound fixed fiber integral aestrongly measurable" and "integral phi X Y le integral B X independence fixed fiber integral bound"; top hits were SOptLib `integral_comp_le_integral_comp_bound_of_indep_fixed_integral_bound` with stronger global measurability, SOptLib uniform-bound `integral_comp_le_of_indep_fixed_integral_bound_aestronglyMeasurable`, and Mathlib product-law/Fubini primitives, so coverage is partial rather than full
+-- minimal hypotheses: finiteness of ν is derived from the law identity and finiteness of P; all stated a.e. measurability, independence, integrability, and fixed-fiber bound hypotheses are used directly
+
+/-- Transfer fixed-fiber scalar integral bounds through independent random parameters when the
+bound depends on the fixed parameter and only law-scoped a.e. strong measurability is available.
+
+If `Y` has law `ν`, `X` is independent of `Y`, and every fixed-fiber integral
+`∫ s, φ w s ∂ν` is bounded above by `B w`, then the composed random integral is
+bounded above by the integral of the composed bound `B ∘ X`.
+
+Layer: Glue | Gap: Level 1 (product-law a.e.-measurable variable-bound Fubini transfer)
+Proof: identify the joint pushforward law using independence, transport integrability to the product law, apply Fubini under the product law, integrate the pointwise fixed-fiber bound, and map the bound integral back along `X`.
+Source: Mathlib probability independence joint-law characterization and product-measure Bochner integration APIs
+Used in: stochastic saddle-point MGF transfer for adapted prefix weights and a fresh independent oracle sample
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/algorithm_spec
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic convex-concave saddle point -/
+theorem integral_comp_le_integral_comp_bound_of_indep_fixed_integral_bound_aestronglyMeasurable
+    {Ω W S : Type*} [MeasurableSpace Ω] [MeasurableSpace W] [MeasurableSpace S]
+    {P : Measure Ω} {ν : Measure S} [IsFiniteMeasure P]
+    {φ : W → S → ℝ} {B : W → ℝ} {X : Ω → W} {Y : Ω → S}
+    (hφ_prod :
+      AEStronglyMeasurable
+        (fun p : W × S => φ p.1 p.2) ((Measure.map X P).prod ν))
+    (hB_aesm : AEStronglyMeasurable B (Measure.map X P))
+    (hX : AEMeasurable X P) (hY : AEMeasurable Y P)
+    (h_indep : IndepFun X Y P)
+    (h_dist : Measure.map Y P = ν)
+    (h_int : Integrable (fun ω => φ (X ω) (Y ω)) P)
+    (hB_int : Integrable (fun ω => B (X ω)) P)
+    (hfixed_bound : ∀ w, ∫ s, φ w s ∂ν ≤ B w) :
+    ∫ ω, φ (X ω) (Y ω) ∂P ≤ ∫ ω, B (X ω) ∂P := by
+  have h_joint_aemeas : AEMeasurable (fun ω => (X ω, Y ω)) P :=
+    hX.prodMk hY
+  have h_prod_eq :
+      Measure.map (fun ω => (X ω, Y ω)) P = (Measure.map X P).prod ν := by
+    rw [(indepFun_iff_map_prod_eq_prod_map_map hX hY).mp h_indep, h_dist]
+  have hφ_joint :
+      AEStronglyMeasurable
+        (fun p : W × S => φ p.1 p.2)
+        (Measure.map (fun ω => (X ω, Y ω)) P) := by
+    rw [h_prod_eq]
+    exact hφ_prod
+  letI : IsFiniteMeasure ν := by
+    rw [← h_dist]
+    exact Measure.isFiniteMeasure_map P Y
+  have h_int_prod :
+      Integrable (fun p : W × S => φ p.1 p.2) ((Measure.map X P).prod ν) := by
+    have h_on_joint :
+        Integrable (fun p : W × S => φ p.1 p.2)
+          (Measure.map (fun ω => (X ω, Y ω)) P) :=
+      (integrable_map_measure hφ_joint h_joint_aemeas).mpr h_int
+    rwa [h_prod_eq] at h_on_joint
+  have hB_map_int : Integrable B (Measure.map X P) := by
+    exact (integrable_map_measure hB_aesm hX).mpr hB_int
+  calc
+    ∫ ω, φ (X ω) (Y ω) ∂P
+        = ∫ p : W × S, φ p.1 p.2
+            ∂Measure.map (fun ω => (X ω, Y ω)) P := by
+          exact (integral_map h_joint_aemeas hφ_joint).symm
+    _ = ∫ p : W × S, φ p.1 p.2 ∂(Measure.map X P).prod ν := by
+          rw [h_prod_eq]
+    _ = ∫ w : W, ∫ s : S, φ w s ∂ν ∂Measure.map X P :=
+          integral_prod _ h_int_prod
+    _ ≤ ∫ w : W, B w ∂Measure.map X P := by
+          exact integral_mono h_int_prod.integral_prod_left hB_map_int
+            (fun w => hfixed_bound w)
+    _ = ∫ ω, B (X ω) ∂P :=
+          integral_map hX hB_aesm
+
+-- Generalization plan (G0):
+-- concept/name: bounded strict-past weighted exponential MGF transfer from fixed-fiber
+--   bounds; orig was bounded_prefix_weighted_one_step_mgf_transfer
+-- generality used: arbitrary measurable base, sample, and query spaces; abstract
+--   probability measure P and sample law nuS; strict-past sigma-algebra, sample map,
+--   query map, nonnegative integrable weight, real query gauge, scalar exponent kernel,
+--   and composed exponent process. No normed vector space, inner product, oracle,
+--   convexity, or finite-dimensional assumptions are used.
+-- portable call pattern: iid-stream concentration proofs vary the prefix sigma-algebra,
+--   adapted query, fresh sample coordinate, query radius, weight, and fixed-fiber MGF
+--   theorem while retaining the same one-step weighted MGF conclusion.
+-- counterargument checked: not paper-local traceability and not a pure wrapper; existing
+--   SOptLib entries provide strict-past independence and product-law integral transfers
+--   separately, but no declaration packages the bounded-query weighted MGF transfer.
+-- coverage search: queried `independent state fixed fiber mgf weighted exponential
+--   integral bound`, `bounded query strict past weighted exponential fixed fiber bound
+--   independence sample`, and LeanSearch `independent random variables fixed fiber
+--   integral bound weighted exponential moment generating function`; top hits were
+--   `integral_comp_le_integral_comp_bound_of_indep_fixed_integral_bound`,
+--   `integrable_comp_of_indep_fixed_integral_bound_aestronglyMeasurable`,
+--   `indepFun_of_measurable_left_of_indep_comap`, and Mathlib subgaussian MGF lemmas,
+--   all partial rather than this complete bounded weighted-transfer contract.
+-- minimal hypotheses: global measurability of the exponent kernel is used to obtain
+--   product-law a.e. strong measurability; past measurability supplies independence;
+--   separate a.e. measurability of query and sample supplies map-measure transport;
+--   nonnegativity and integrability of the weight are exactly what make the random
+--   bound `exp c * H` integrable.
+
+/-- Transfer bounded fixed-fiber exponential moment bounds to a strict-past weighted
+one-step MGF inequality.
+
+If a nonnegative weight and a bounded query are measurable with respect to a
+past sigma-algebra independent of a fresh sample, and every bounded query fiber
+has exponential integral at most `exp c`, then the composed weighted exponential
+is integrable and its integral is bounded by `exp c` times the weight integral.
+
+Layer: Glue | Gap: Level 1 (bounded strict-past weighted MGF transfer)
+Proof: package the nonnegative weight and bounded query as the independent state,
+  apply product-law/Fubini integrability and integral-bound transfers with the
+  random bound `exp c * H`, then rewrite the composed kernel by the supplied
+  exponent identity.
+Source: Mathlib probability independence, product-measure Bochner integration,
+  measurable subtypes, and real exponential APIs
+Used in: stochastic saddle-point martingale cross-term concentration where an
+  adapted bounded query is paired with a fresh iid sample and a prefix weight
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/algorithm_spec
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, stochastic convex-concave saddle point -/
+theorem bounded_strictPast_weighted_exp_mgf_transfer_of_fixed_fiber_bound
+    {Ω S Q : Type*} [mΩ : MeasurableSpace Ω] [mS : MeasurableSpace S]
+    [mQ : MeasurableSpace Q]
+    {P : Measure Ω} {νS : Measure S} [IsFiniteMeasure P]
+    {past : MeasurableSpace Ω} {sample : Ω → S} {query : Ω → Q}
+    {H : Ω → ℝ} {R ν c : ℝ} {gauge : Q → ℝ}
+    {score : Q → S → ℝ} {Z : Ω → ℝ}
+    (hscore : Measurable (fun p : Q × S => score p.1 p.2))
+    (hH_past : @Measurable Ω ℝ past (by infer_instance) H)
+    (hquery_past : @Measurable Ω Q past mQ query)
+    (hquery_aemeas : @AEMeasurable Ω Q mQ mΩ query P)
+    (hsample_aemeas : @AEMeasurable Ω S mS mΩ sample P)
+    (hpast_indep_sample :
+      Indep past (MeasurableSpace.comap sample mS) P)
+    (hsample_law : @Measure.map Ω S mΩ mS sample P = νS)
+    (hH_nonneg : ∀ ω, 0 ≤ H ω)
+    (hH_int : Integrable H P)
+    (hquery_bound : ∀ ω, gauge (query ω) ≤ R)
+    (hscore_eq : ∀ ω, score (query ω) (sample ω) = Z ω)
+    (hfixed_int :
+      ∀ q : {q : Q // gauge q ≤ R},
+        Integrable (fun ξ => Real.exp (ν * score q ξ)) νS)
+    (hfixed_bound :
+      ∀ q : {q : Q // gauge q ≤ R},
+        ∫ ξ, Real.exp (ν * score q ξ) ∂νS ≤ Real.exp c) :
+    Integrable (fun ω => H ω * Real.exp (ν * Z ω)) P ∧
+      ∫ ω, H ω * Real.exp (ν * Z ω) ∂P ≤
+        Real.exp c * ∫ ω, H ω ∂P := by
+  let Weight := {r : ℝ // 0 ≤ r}
+  let BoundedQuery := {q : Q // gauge q ≤ R}
+  let W := Weight × BoundedQuery
+  let X : Ω → W := fun ω =>
+    ((⟨H ω, hH_nonneg ω⟩ : Weight), (⟨query ω, hquery_bound ω⟩ : BoundedQuery))
+  let Y : Ω → S := sample
+  let φ : W → S → ℝ := fun w ξ =>
+    (w.1 : ℝ) * Real.exp (ν * score (w.2 : Q) ξ)
+  let B : W → ℝ := fun w => Real.exp c * (w.1 : ℝ)
+  have hφ_meas : Measurable (fun p : W × S => φ p.1 p.2) := by
+    have hweight : Measurable (fun p : W × S => ((p.1.1 : Weight) : ℝ)) :=
+      measurable_subtype_coe.comp (measurable_fst.comp measurable_fst)
+    have hq :
+        Measurable (fun p : W × S => ((p.1.2 : BoundedQuery) : Q)) :=
+      measurable_subtype_coe.comp (measurable_snd.comp measurable_fst)
+    have hquery_sample :
+        Measurable (fun p : W × S => (((p.1.2 : BoundedQuery) : Q), p.2)) :=
+      hq.prodMk measurable_snd
+    have hscore_comp :
+        Measurable (fun p : W × S => score ((p.1.2 : BoundedQuery) : Q) p.2) :=
+      hscore.comp hquery_sample
+    have hexp :
+        Measurable (fun p : W × S =>
+          Real.exp (ν * score ((p.1.2 : BoundedQuery) : Q) p.2)) :=
+      (Real.continuous_exp.comp (continuous_const.mul continuous_id)).measurable.comp
+        hscore_comp
+    simpa [φ] using hweight.mul hexp
+  have hφ_prod :
+      AEStronglyMeasurable
+        (fun p : W × S => φ p.1 p.2)
+        ((@Measure.map Ω W mΩ (by infer_instance) X P).prod νS) :=
+    hφ_meas.aestronglyMeasurable
+  have hB_meas : Measurable B := by
+    have hweight : Measurable (fun w : W => (w.1 : ℝ)) :=
+      measurable_subtype_coe.comp measurable_fst
+    simpa [B] using measurable_const.mul hweight
+  have hB_aesm :
+      AEStronglyMeasurable B (@Measure.map Ω W mΩ (by infer_instance) X P) :=
+    hB_meas.aestronglyMeasurable
+  have hX_aemeas : AEMeasurable X P := by
+    have hweight_aemeas :
+        AEMeasurable (fun ω : Ω => (⟨H ω, hH_nonneg ω⟩ : Weight)) P := by
+      simpa [Set.mem_Ici, Set.codRestrict, Weight] using
+        (hH_int.aestronglyMeasurable.aemeasurable).subtype_mk
+          (s := Set.Ici (0 : ℝ)) (hfs := fun ω => hH_nonneg ω)
+    have hquery_bound_aemeas :
+        AEMeasurable (fun ω : Ω => (⟨query ω, hquery_bound ω⟩ : BoundedQuery)) P := by
+      simpa [BoundedQuery, Set.mem_setOf_eq] using
+        hquery_aemeas.subtype_mk
+          (s := {q : Q | gauge q ≤ R}) (hfs := fun ω => hquery_bound ω)
+    exact hweight_aemeas.prodMk hquery_bound_aemeas
+  have hY_aemeas : AEMeasurable Y P := by
+    simpa [Y] using hsample_aemeas
+  have hstate_indep : IndepFun X Y P := by
+    have hweight_past :
+        @Measurable Ω Weight past (by infer_instance)
+          (fun ω : Ω => (⟨H ω, hH_nonneg ω⟩ : Weight)) :=
+      Measurable.subtype_mk hH_past
+    have hquery_bound_past :
+        @Measurable Ω BoundedQuery past (by infer_instance)
+          (fun ω : Ω => (⟨query ω, hquery_bound ω⟩ : BoundedQuery)) :=
+      Measurable.subtype_mk hquery_past
+    have hstate_past : @Measurable Ω W past (by infer_instance) X := by
+      exact hweight_past.prod hquery_bound_past
+    rw [IndepFun_iff_Indep]
+    exact indep_of_indep_of_le_left hpast_indep_sample hstate_past.comap_le
+  have hφ_nonneg : ∀ w ξ, 0 ≤ φ w ξ := by
+    intro w ξ
+    exact mul_nonneg w.1.2 (le_of_lt (Real.exp_pos _))
+  have hfixed_int' : ∀ w : W, Integrable (fun ξ => φ w ξ) νS := by
+    intro w
+    simpa [φ] using (hfixed_int w.2).const_mul (w.1 : ℝ)
+  have hB_int : Integrable (fun ω => B (X ω)) P := by
+    simpa [B, X, Weight] using hH_int.const_mul (Real.exp c)
+  have hfixed_bound' : ∀ w : W, ∫ ξ, φ w ξ ∂νS ≤ B w := by
+    intro w
+    have hw_nonneg : 0 ≤ (w.1 : ℝ) := w.1.2
+    calc
+      ∫ ξ, φ w ξ ∂νS
+          = (w.1 : ℝ) * ∫ ξ, Real.exp (ν * score (w.2 : Q) ξ) ∂νS := by
+            simp [φ, MeasureTheory.integral_const_mul]
+      _ ≤ (w.1 : ℝ) * Real.exp c :=
+            mul_le_mul_of_nonneg_left (hfixed_bound w.2) hw_nonneg
+      _ = B w := by simp [B, mul_comm, mul_left_comm, mul_assoc]
+  have hcomp_int : Integrable (fun ω => φ (X ω) (Y ω)) P := by
+    exact
+      @integrable_comp_of_indep_fixed_integral_comp_bound_aestronglyMeasurable
+        Ω W S mΩ (by infer_instance) mS P νS (by infer_instance)
+        φ B X Y
+        hφ_prod hB_aesm hX_aemeas hY_aemeas hstate_indep hsample_law
+        hφ_nonneg hfixed_int' hB_int hfixed_bound'
+  have hcomp_le :
+      ∫ ω, φ (X ω) (Y ω) ∂P ≤ ∫ ω, B (X ω) ∂P := by
+    exact
+      @integral_comp_le_integral_comp_bound_of_indep_fixed_integral_bound_aestronglyMeasurable
+        Ω W S mΩ (by infer_instance) mS P νS (by infer_instance)
+        φ B X Y
+        hφ_prod hB_aesm hX_aemeas hY_aemeas hstate_indep hsample_law
+        hcomp_int hB_int hfixed_bound'
+  have hφ_comp_eq :
+      (fun ω => φ (X ω) (Y ω)) =
+        (fun ω => H ω * Real.exp (ν * Z ω)) := by
+    funext ω
+    simp [φ, X, Y, hscore_eq ω]
+  have hB_comp_eq :
+      (fun ω => B (X ω)) = fun ω => Real.exp c * H ω := by
+    funext ω
+    simp [B, X, Weight]
+  constructor
+  · simpa [hφ_comp_eq] using hcomp_int
+  · calc
+      ∫ ω, H ω * Real.exp (ν * Z ω) ∂P
+          = ∫ ω, φ (X ω) (Y ω) ∂P := by
+            rw [hφ_comp_eq]
+      _ ≤ ∫ ω, B (X ω) ∂P := hcomp_le
+      _ = Real.exp c * ∫ ω, H ω ∂P := by
+            rw [hB_comp_eq, MeasureTheory.integral_const_mul]
+
+-- Generalization plan (G0):
+-- concept/name: integrable_sq_compact_pair_continuous_gauge_smul_sub exposes square integrability of a nonnegative continuous gauge applied to a scaled difference of two compact-valued points; orig was compact_pair_continuous_gauge_smul_sub_sq_integrable.
+-- generality used: arbitrary finite measure, compact topological state type, real normed vector evaluation space, continuous evaluation, continuous nonnegative gauge, scalar stepsize, and a.e.-strong measurability of the composed gauge process; no convexity, smoothness, filtration, oracle, Hilbert, or probability-only assumptions are used.
+-- portable call pattern: stochastic saddle-point, mirror-descent, and primal-dual cross-term proofs can call this when two feasible random states lie in a compact carrier and a continuous primal gauge is evaluated on their scaled displacement; the measure, state type, evaluation map, gauge, scalar, and random states change while the squared integrability conclusion stays the same.
+-- counterargument checked: not paper-local traceability because compact feasible-pair domination of continuous displacement gauges recurs across stochastic-optimization L2 side conditions; not a pure caller-side expression because the lemma packages compact extreme-value domination and square-integrability-by-bound; existing SOptLib entries provide the compact bound and generic bounded integrability separately but not this compact-pair scaled-gauge square conclusion.
+-- coverage search: searched `integrable square compact continuous image bounded measurable`, `Continuous on compact bounded Integrable square`, and `compact valued continuous gauge squared integrable finite measure`; top hits were `exists_nonneg_norm_bound_of_isCompact_of_continuousOn`, `exists_nonneg_ae_norm_bound_comp_of_eventually_mem_compact_of_continuousOn`, `integrable_sq_norm_of_ae_bound`, and `integrable_sq_norm_sub_of_measurable_mem_diameter_bound`, all partial rather than the nonnegative real gauge of a scaled compact-pair difference.
+-- minimal hypotheses: pointwise nonnegativity of the gauge replaces paper-specific seminorm nonnegativity, finite measure replaces probability measure, and measurability is required only for the composed real process rather than for any algorithm-specific query object.
+
+/-- A nonnegative continuous gauge of a scaled compact-pair displacement has an
+integrable square along any finite-measure process.
+
+If `P × P` is compact, `eval : P → E` and `gauge : E → ℝ` are continuous, and
+the composed gauge process is a.e.-strongly measurable, compactness gives a
+uniform bound on the gauge over all pairs.  Nonnegativity turns the bound on
+the real norm into a bound on the square.
+
+Layer: Glue | Gap: Level 1 (compact-pair continuous gauge square integrability)
+Proof: apply the compact continuous norm-bound theorem to the pair map
+  `(p, q) ↦ gauge (η • (eval p - eval q))`, convert the resulting uniform bound
+  to a square bound using gauge nonnegativity, then dominate by a constant on a
+  finite measure space.
+Source: Mathlib compact extreme-value, real square-order, and Bochner
+  integrability-by-domination APIs via SOptLib compact-bound infrastructure
+Used in: stochastic convex-concave saddle-point martingale cross-term
+  integrability where the adapted direction is a stepsize-scaled difference of
+  two compact feasible product states measured by a continuous primal gauge
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/algorithm_spec
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, stochastic mirror descent for stochastic convex-concave
+  saddle point problems -/
+theorem integrable_sq_compact_pair_continuous_gauge_smul_sub
+    {Ω P E : Type*} [MeasurableSpace Ω] [TopologicalSpace P]
+    [NormedAddCommGroup E] [NormedSpace ℝ E]
+    {μ : Measure Ω} [IsFiniteMeasure μ]
+    (eval : P → E) (gauge : E → ℝ) (η : ℝ) (x y : Ω → P)
+    (hcompact_pair : IsCompact (Set.univ : Set (P × P)))
+    (heval : Continuous eval)
+    (hgauge : Continuous gauge)
+    (hgauge_nonneg : ∀ z : E, 0 ≤ gauge z)
+    (hmeas : AEStronglyMeasurable
+      (fun ω => gauge (η • (eval (x ω) - eval (y ω)))) μ) :
+    Integrable (fun ω => (gauge (η • (eval (x ω) - eval (y ω)))) ^ 2) μ := by
+  have hcont : ContinuousOn
+      (fun p : P × P => gauge (η • (eval p.1 - eval p.2))) Set.univ := by
+    have hdiff : Continuous (fun p : P × P => eval p.1 - eval p.2) :=
+      (heval.comp continuous_fst).sub (heval.comp continuous_snd)
+    exact (hgauge.comp (hdiff.const_smul η)).continuousOn
+  rcases exists_nonneg_norm_bound_of_isCompact_of_continuousOn
+      (fun p : P × P => gauge (η • (eval p.1 - eval p.2)))
+      hcompact_pair hcont with
+    ⟨D, _hD_nonneg, hD_bound⟩
+  have hbounded_sq :
+      ∀ᵐ ω ∂μ, ‖(gauge (η • (eval (x ω) - eval (y ω)))) ^ 2‖ ≤ ‖D ^ 2‖ := by
+    refine Filter.Eventually.of_forall ?_
+    intro ω
+    have hbound := hD_bound (x ω, y ω)
+      (by simp : (x ω, y ω) ∈ (Set.univ : Set (P × P)))
+    have hnonneg : 0 ≤ gauge (η • (eval (x ω) - eval (y ω))) :=
+      hgauge_nonneg _
+    have hle : gauge (η • (eval (x ω) - eval (y ω))) ≤ D := by
+      simpa [Real.norm_of_nonneg hnonneg] using hbound
+    rw [Real.norm_of_nonneg (sq_nonneg _), Real.norm_of_nonneg (sq_nonneg D)]
+    exact pow_le_pow_left₀ hnonneg hle 2
+  exact Integrable.mono (integrable_const (D ^ 2)) (hmeas.pow 2) hbounded_sq
+
+-- Generalization plan (G0):
+-- concept/name: fractional moment bound from a square-exponential moment; orig was exp_square_fractional_moment_bound and the staged name exposes the scalar probability inequality without saddle-point vocabulary.
+-- generality used: arbitrary measurable space, arbitrary probability measure, real-valued a.e. strongly measurable random variable, positive square scale, and fractional exponent in [0,1].
+-- portable call pattern: sub-Gaussian and sub-exponential scalarization proofs derive integrability and expectation bounds for exp(p * X^2 / sigma^2) after a light-tail assumption on exp(X^2 / sigma^2); the sample space, law, scalar random variable, scale, and exponent vary.
+-- counterargument checked: not paper-local traceability because the statement is a paper-free scalar moment conversion; not a pure wrapper because it packages measurability, integrability, exponent rewriting, and the rpow Jensen bound into the exact call-site conclusion.
+-- coverage search: searched "fractional moment exponential square integrable bound probability p between zero one", "integrable power nonnegative random variable integral rpow le exponential moment", and LeanSearch "fractional moment bound from exponential square moment probability real random variable"; SOptLib integral_rpow_le_rpow_of_integrable_nonneg_of_integral_le covers the Jensen bound for an abstract nonnegative Z but not the square-exponential integrability conclusion, and Mathlib integrable exponential-moment hits cover different two-sided linear exponential moments.
+-- minimal hypotheses: weakened source hX_int to AEStronglyMeasurable X because only measurability of X^2/sigma^2 is used; positive sigma2 is retained to make the square-scaled exponent nonnegative.
+
+/-- A square-exponential moment bound controls all fractional square-exponential moments.
+
+If `X` is a real random variable on a probability space and
+`∫ exp (X^2 / σ2) ≤ exp 1`, then for every `p ∈ [0, 1]` the fractional
+square-exponential `exp (p * (X^2 / σ2))` is integrable and has expectation at
+most `exp p`.
+
+Layer: Glue | Gap: Level 1 (fractional square-exponential moment conversion)
+Proof: prove the fractional exponential is dominated by the full square exponential for integrability, then apply the SOptLib Jensen/rpow moment bound to `Z = exp (X^2 / σ2)` and rewrite `exp 1 ^ p` as `exp p`.
+Source: SOptLib Glue probability fractional-power Jensen bound plus Mathlib real exponential and Bochner integrability APIs
+Used in: stochastic convex-concave saddle-point light-tail scalarization before deriving the centered one-dimensional linear MGF estimate
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/key_lemmas/1
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic mirror descent for stochastic convex-concave saddle point problems -/
+theorem exp_square_fractional_moment_bound
+    {Ω : Type*} [MeasurableSpace Ω] {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : Ω → ℝ} {σ2 p : ℝ}
+    (hσ2_pos : 0 < σ2)
+    (hX_aesm : AEStronglyMeasurable X μ)
+    (hexp_sq_int : Integrable (fun ω => Real.exp (X ω ^ 2 / σ2)) μ)
+    (hexp_sq_bound : ∫ ω, Real.exp (X ω ^ 2 / σ2) ∂μ ≤ Real.exp 1)
+    (hp : p ∈ Set.Icc (0 : ℝ) 1) :
+    Integrable (fun ω => Real.exp (p * (X ω ^ 2 / σ2))) μ ∧
+      ∫ ω, Real.exp (p * (X ω ^ 2 / σ2)) ∂μ ≤ Real.exp p := by
+  classical
+  have hp_nonneg : 0 ≤ p := hp.1
+  have hp_le_one : p ≤ 1 := hp.2
+  let A : Ω → ℝ := fun ω => X ω ^ 2 / σ2
+  let Z : Ω → ℝ := fun ω => Real.exp (A ω)
+  have hA_nonneg : ∀ ω, 0 ≤ A ω := by
+    intro ω
+    dsimp [A]
+    exact div_nonneg (sq_nonneg (X ω)) hσ2_pos.le
+  have htarget_aesm :
+      AEStronglyMeasurable (fun ω => Real.exp (p * A ω)) μ := by
+    have hA_aesm : AEStronglyMeasurable A μ := by
+      have hsq_aesm : AEStronglyMeasurable (fun ω => X ω ^ 2) μ := by
+        simpa using (hX_aesm.pow 2)
+      dsimp [A]
+      simpa [div_eq_mul_inv, mul_comm, mul_left_comm, mul_assoc] using
+        hsq_aesm.const_mul σ2⁻¹
+    exact Real.continuous_exp.comp_aestronglyMeasurable (hA_aesm.const_mul p)
+  have htarget_int : Integrable (fun ω => Real.exp (p * A ω)) μ := by
+    refine Integrable.mono' (by simpa [Z, A] using hexp_sq_int) htarget_aesm ?_
+    refine Filter.Eventually.of_forall fun ω => ?_
+    have hnonneg : 0 ≤ Real.exp (p * A ω) := le_of_lt (Real.exp_pos _)
+    rw [Real.norm_of_nonneg hnonneg]
+    exact Real.exp_le_exp.mpr
+      ((mul_le_mul_of_nonneg_right hp_le_one (hA_nonneg ω)).trans_eq (by ring))
+  have hpow_eq :
+      (fun ω => Real.rpow (Z ω) p) = fun ω => Real.exp (p * A ω) := by
+    funext ω
+    dsimp [Z]
+    calc
+      Real.rpow (Real.exp (A ω)) p = Real.exp (A ω * p) := by
+        simpa using (Real.exp_mul (A ω) p).symm
+      _ = Real.exp (p * A ω) := by ring
+  have hZ_int : Integrable Z μ := by
+    simpa [Z, A] using hexp_sq_int
+  have hZ_nonneg : ∀ᵐ ω ∂μ, 0 ≤ Z ω :=
+    Filter.Eventually.of_forall fun ω => le_of_lt (Real.exp_pos _)
+  have hJ :
+      ∫ ω, Real.rpow (Z ω) p ∂μ ≤ Real.rpow (Real.exp 1) p :=
+    integral_rpow_le_rpow_of_integrable_nonneg_of_integral_le
+      (P := μ) hZ_int hZ_nonneg hp hexp_sq_bound
+  constructor
+  · simpa [A] using htarget_int
+  · have hJ' : ∫ ω, Real.exp (p * A ω) ∂μ ≤ Real.rpow (Real.exp 1) p := by
+      rw [← hpow_eq]
+      exact hJ
+    calc
+      ∫ ω, Real.exp (p * (X ω ^ 2 / σ2)) ∂μ =
+          ∫ ω, Real.exp (p * A ω) ∂μ := by rfl
+      _ ≤ Real.rpow (Real.exp 1) p := hJ'
+      _ = Real.exp p := by
+        simp
+
+-- Generalization plan (G0):
+-- concept/name: finite exponential-moment recurrence from one-step weighted MGF bounds; orig was finite_iid_stream_cross_term_mgf_le_of_one_step
+-- generality used: arbitrary measurable sample space, probability measure, finite index set, real summands, scalar weight, and real cost function
+-- portable call pattern: martingale and stochastic-optimization MGF proofs where the index finset, random increments, scalar parameter, measure, and one-step costs vary but the finite exponential budget conclusion is unchanged
+-- counterargument checked: not paper-local because the statement contains no saddle-point or oracle vocabulary; not a pure wrapper because it packages integrability and an integral bound through a finite exponential recurrence
+-- coverage search: searched "integrable exponential finite sum moment generating function one step bound", "integrable exp sum le exp sum one step mgf", and Mathlib semantic subgaussian MGF results; hits cover independent/subgaussian specializations or scalar telescopes, not this weighted-prefix one-step recurrence contract
+-- minimal hypotheses: no nonnegativity of the scalar is used; no topology, finite-dimensional structure, independence, convexity, or measurability of summands is required beyond the supplied one-step integrability hypotheses
+
+/-- A finite weighted one-step MGF recurrence gives an exponential-moment bound for
+the finite sum of real random variables.
+
+If each new summand satisfies the weighted prefix inequality
+`∫ H * exp (ν * ζ i) ≤ exp (c i) * ∫ H` for every nonnegative integrable prefix
+weight `H`, then `exp (ν * sum ζ)` is integrable and its integral is bounded by
+`exp (sum c)`.
+
+Layer: Glue | Gap: Level 1 (finite weighted-prefix exponential-moment recurrence)
+Proof: induct over the finite index set.  The successor step chooses the current
+  prefix exponential as `H`, applies the one-step MGF hypothesis, and multiplies
+  by the induction hypothesis using positivity of `Real.exp`.
+Source: Mathlib finite big-operator induction, real exponential addition, and Bochner integral constants
+Used in: stochastic saddle-point martingale cross-term tail proof after conditional one-step MGF transfer
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/key_lemmas/3
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic convex-concave saddle point -/
+theorem integrable_exp_weighted_sum_le_exp_sum_of_weighted_one_step_mgf
+    {Ω ι : Type*} [MeasurableSpace Ω] [DecidableEq ι]
+    (P : Measure Ω) [IsProbabilityMeasure P]
+    (s : Finset ι) (ζ : ι → Ω → ℝ) (c : ι → ℝ) (ν : ℝ)
+    (hone :
+      ∀ i ∈ s,
+        ∀ H : Ω → ℝ,
+          (∀ ω, 0 ≤ H ω) →
+          Integrable H P →
+          Integrable (fun ω => H ω * Real.exp (ν * ζ i ω)) P ∧
+            ∫ ω, H ω * Real.exp (ν * ζ i ω) ∂P ≤
+              Real.exp (c i) * ∫ ω, H ω ∂P) :
+    Integrable (fun ω => Real.exp (ν * (∑ i ∈ s, ζ i ω))) P ∧
+      ∫ ω, Real.exp (ν * (∑ i ∈ s, ζ i ω)) ∂P ≤
+        Real.exp (∑ i ∈ s, c i) := by
+  classical
+  have hrec :
+      ∀ u : Finset ι, u ⊆ s →
+        Integrable (fun ω => Real.exp (ν * (∑ i ∈ u, ζ i ω))) P ∧
+          ∫ ω, Real.exp (ν * (∑ i ∈ u, ζ i ω)) ∂P ≤
+            Real.exp (∑ i ∈ u, c i) := by
+    intro u
+    refine Finset.induction_on u ?base ?step
+    · intro _hu
+      constructor
+      · simpa only [Finset.sum_empty, mul_zero, Real.exp_zero] using
+          (integrable_const (1 : ℝ) :
+            Integrable (fun _ : Ω => (1 : ℝ)) P)
+      · simp [integral_const, probReal_univ]
+    · intro a u hau ih hu
+      have hu_subset : u ⊆ s := by
+        intro i hi
+        exact hu (Finset.mem_insert_of_mem hi)
+      have ha_mem : a ∈ s :=
+        hu (Finset.mem_insert_self a u)
+      let H : Ω → ℝ := fun ω => Real.exp (ν * (∑ i ∈ u, ζ i ω))
+      have hH_nonneg : ∀ ω, 0 ≤ H ω := fun ω => le_of_lt (Real.exp_pos _)
+      have hH_int : Integrable H P := by
+        simpa [H] using (ih hu_subset).1
+      have hstep := hone a ha_mem H hH_nonneg hH_int
+      have hfun_eq :
+          (fun ω => Real.exp (ν * (∑ i ∈ insert a u, ζ i ω))) =
+            (fun ω => H ω * Real.exp (ν * ζ a ω)) := by
+        funext ω
+        rw [Finset.sum_insert hau]
+        simp [H, mul_add, Real.exp_add, mul_comm]
+      constructor
+      · simpa [hfun_eq] using hstep.1
+      · calc
+          ∫ ω, Real.exp (ν * (∑ i ∈ insert a u, ζ i ω)) ∂P
+              = ∫ ω, H ω * Real.exp (ν * ζ a ω) ∂P := by
+                  rw [hfun_eq]
+          _ ≤ Real.exp (c a) * ∫ ω, H ω ∂P := hstep.2
+          _ ≤ Real.exp (c a) * Real.exp (∑ i ∈ u, c i) := by
+                  exact mul_le_mul_of_nonneg_left
+                    (by simpa [H] using (ih hu_subset).2)
+                    (le_of_lt (Real.exp_pos _))
+          _ = Real.exp (∑ i ∈ insert a u, c i) := by
+                  rw [Finset.sum_insert hau, Real.exp_add]
+  simpa using hrec s (fun _ hi => hi)
+
+-- Generalization plan (G0):
+-- concept/name: strict one-sided Chernoff tail from an MGF budget at a fixed positive parameter; orig was finite_sum_tail_from_mgf_budget_block and the staged name exposes the measure tail bound without finite-sum or saddle-point vocabulary.
+-- generality used: arbitrary measurable space, arbitrary measure, real-valued statistic, positive scalar MGF parameter, real tail level, logarithmic MGF budget, and threshold arithmetic.
+-- portable call pattern: martingale and stochastic-optimization concentration proofs first establish an integral bound for `exp (ν * S)` and then convert it to a one-sided high-probability bound; the random sum, measure, MGF parameter, budget, and threshold vary.
+-- counterargument checked: not paper-local because the statement contains only measure, exponential moment, and real threshold data; not a duplicate of Mathlib's Chernoff lemma because the algorithm needs a strict `ENNReal` measure bound from a caller-supplied integral budget rather than a non-strict `μ.real` bound through `mgf`.
+-- coverage search: searched "measure of greater than bounded by exponential negative from moment generating function bound", "Markov inequality exponential moment tail bound", LeanSearch "If E exp (nu * X) <= exp (nu * a - lambda), prove measure {X > a} <= exp (-lambda)", and `ProbabilityTheory.measure_ge_le_exp_mul_mgf`; hits were Mathlib's real non-strict Chernoff bound and SOptLib's strict Markov tail lemma, giving ingredient coverage but not this strict ENNReal MGF-budget wrapper.
+-- minimal hypotheses: no probability or finite-dimensional structure is needed; integrability of the exponential and a positive MGF parameter are the only analytic hypotheses, while `C + lambda ≤ ν * a` is the exact threshold arithmetic used by the caller.
+
+/-- A fixed-parameter MGF budget gives a strict upper-tail bound.
+
+If `∫ exp (ν * S) ≤ exp C`, `ν > 0`, and the tail level `a` satisfies
+`C + λ ≤ ν * a`, then the strict event `{ω | S ω > a}` has measure at most
+`exp (-λ)`.
+
+Layer: Glue | Gap: Level 1 (strict ENNReal Chernoff tail from an MGF budget)
+Proof: apply the SOptLib strict Markov inequality to `exp (ν * S)` at threshold
+  `exp (C + λ)`, simplify the exponential ratio to `exp (-λ)`, and use
+  monotonicity of `exp` to embed `{S > a}` into the Markov event.
+Source: Mathlib real exponential arithmetic and SOptLib strict Markov tail bound for nonnegative real random variables
+Used in: stochastic saddle-point martingale cross-term concentration after a finite MGF recurrence and fixed-horizon threshold arithmetic
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/key_lemmas/3
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic convex-concave saddle point -/
+theorem measure_gt_le_exp_neg_of_mgf_bound_at
+    {Ω : Type*} [MeasurableSpace Ω] (P : Measure Ω)
+    (S : Ω → ℝ) (ν lambda a C : ℝ)
+    (hν_pos : 0 < ν)
+    (hthreshold : C + lambda ≤ ν * a)
+    (hmgf_int : Integrable (fun ω => Real.exp (ν * S ω)) P)
+    (hmgf_le : ∫ ω, Real.exp (ν * S ω) ∂P ≤ Real.exp C) :
+    P {ω | S ω > a} ≤ ENNReal.ofReal (Real.exp (-lambda)) := by
+  let f : Ω → ℝ := fun ω => Real.exp (ν * S ω)
+  have hf_nonneg : ∀ ω, 0 ≤ f ω := fun ω => le_of_lt (Real.exp_pos _)
+  have hratio :
+      Real.exp C / Real.exp (C + lambda) = Real.exp (-lambda) := by
+    calc
+      Real.exp C / Real.exp (C + lambda)
+          = Real.exp C / (Real.exp C * Real.exp lambda) := by
+              rw [Real.exp_add]
+      _ = (Real.exp lambda)⁻¹ := by
+              field_simp [ne_of_gt (Real.exp_pos C), ne_of_gt (Real.exp_pos lambda)]
+      _ = Real.exp (-lambda) := by
+              rw [Real.exp_neg]
+  have hmarkov :
+      P {ω | f ω > Real.exp (C + lambda)} ≤
+        ENNReal.ofReal (Real.exp (-lambda)) := by
+    refine measure_gt_le_of_integral_le_of_nonneg
+      (μ := P) f (Real.exp (C + lambda)) (Real.exp C) (Real.exp (-lambda))
+      (by simpa [f] using hmgf_int) hf_nonneg
+      (by simpa [f] using hmgf_le)
+      (le_of_lt (Real.exp_pos _)) ?_ ?_
+    · intro _htpos
+      exact le_of_eq hratio
+    · intro hzero
+      have hpos : 0 < Real.exp (C + lambda) := Real.exp_pos _
+      rw [hzero] at hpos
+      linarith
+  have hsubset :
+      {ω | S ω > a} ⊆ {ω | f ω > Real.exp (C + lambda)} := by
+    intro ω hω
+    have hmul : ν * a < ν * S ω :=
+      mul_lt_mul_of_pos_left hω hν_pos
+    have htail_arg : C + lambda < ν * S ω :=
+      lt_of_le_of_lt hthreshold hmul
+    exact Real.exp_lt_exp.mpr htail_arg
+  exact le_trans (measure_mono hsubset) hmarkov
+
+-- Generalization plan (G0):
+-- concept/name: inner-product integrability from scalar L2 gauges and a pointwise support bound; orig was inner_integrable_of_dual_gauge_sq_integrable
+-- generality used: arbitrary measurable domain and measure, Hilbert codomain, abstract vector processes, and abstract nonnegative scalar gauges; no oracle, product norm, or saddle-point structure is assumed
+-- portable call pattern: stochastic mirror-descent martingale cross terms call this after proving a dual-gauge residual second moment, a primal-gauge direction second moment, and the primal-dual support inequality; the oracle residual, direction process, gauges, and support inequality vary while inner-product integrability remains the conclusion
+-- counterargument checked: not paper-local and not a pure wrapper; SOptLib integrable_inner_of_integrable_sq_norm covers vector squared norms, while this lemma covers scalar gauge domination when actual Hilbert norms are not available
+-- coverage search: queried `integrable inner product dominated by product square integrable scalar gauges`, `Integrable inner abs inner le mul MemLp integrable_mul`, and LeanSearch for an inner product bounded by product of two square-integrable real functions; top hits were SOptLib integrable_inner_of_integrable_sq_norm, Mathlib MeasureTheory.MemLp.integrable_mul, and L2.inner lemmas, none combining scalar gauges with an inner-product domination hypothesis
+-- minimal hypotheses: vector a.e. strong measurability is needed for the inner product; gauge square integrability plus a.e. nonnegativity is needed to recover gauge measurability and L2 membership; the support bound is a.e. rather than pointwise
+
+/-- An inner product dominated by the product of two nonnegative square-integrable
+scalar gauges is integrable.
+
+Layer: Glue | Gap: Level 1 (inner-product integrability from scalar L2 gauge domination)
+Proof: recover scalar gauge measurability from square integrability and nonnegativity,
+  use Holder via `MemLp.integrable_mul`, then dominate the real inner product by the
+  integrable gauge product.
+Source: Mathlib Lp-space Holder multiplication, Bochner integrability domination, and real Hilbert inner-product measurability
+Used in: stochastic saddle-point mirror descent when an oracle-noise cross term is controlled by product dual and primal gauges before applying martingale cancellation
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/algorithm_spec/steps/0
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic mirror descent for stochastic convex-concave saddle point problems -/
+theorem integrable_inner_of_abs_inner_le_mul_sq_integrable_gauges
+    {Ω E : Type*} [MeasurableSpace Ω]
+    [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+    {μ : Measure Ω} {zeta d : Ω → E} {A B : Ω → ℝ}
+    (hzeta_meas : AEStronglyMeasurable zeta μ)
+    (hd_meas : AEStronglyMeasurable d μ)
+    (hA_sq : Integrable (fun ω => A ω ^ 2) μ)
+    (hB_sq : Integrable (fun ω => B ω ^ 2) μ)
+    (hA_nonneg : ∀ᵐ ω ∂μ, 0 ≤ A ω)
+    (hB_nonneg : ∀ᵐ ω ∂μ, 0 ≤ B ω)
+    (hbound : ∀ᵐ ω ∂μ, |⟪zeta ω, d ω⟫_ℝ| ≤ A ω * B ω) :
+    Integrable (fun ω => ⟪zeta ω, d ω⟫_ℝ) μ := by
+  have hA_meas : AEStronglyMeasurable A μ :=
+    AEStronglyMeasurable.of_integrable_sq_of_nonneg hA_sq hA_nonneg
+  have hB_meas : AEStronglyMeasurable B μ :=
+    AEStronglyMeasurable.of_integrable_sq_of_nonneg hB_sq hB_nonneg
+  have hA_sq_norm : Integrable (fun ω => ‖A ω‖ ^ 2) μ := by
+    refine hA_sq.congr ?_
+    exact hA_nonneg.mono (fun ω hω => by simp [Real.norm_of_nonneg hω])
+  have hB_sq_norm : Integrable (fun ω => ‖B ω‖ ^ 2) μ := by
+    refine hB_sq.congr ?_
+    exact hB_nonneg.mono (fun ω hω => by simp [Real.norm_of_nonneg hω])
+  have hA_l2 : MemLp A 2 μ :=
+    (memLp_two_iff_integrable_sq_norm hA_meas).2 hA_sq_norm
+  have hB_l2 : MemLp B 2 μ :=
+    (memLp_two_iff_integrable_sq_norm hB_meas).2 hB_sq_norm
+  have hProdInt : Integrable (fun ω => A ω * B ω) μ := by
+    simpa [Pi.mul_apply] using
+      (MemLp.integrable_mul hA_l2 hB_l2 :
+        Integrable ((fun ω => A ω) * (fun ω => B ω)) μ)
+  refine hProdInt.mono' (AEStronglyMeasurable.inner hzeta_meas hd_meas) ?_
+  filter_upwards [hbound, hA_nonneg, hB_nonneg] with ω hω hAω hBω
+  have hprod_nonneg : 0 ≤ A ω * B ω := mul_nonneg hAω hBω
+  simpa [Real.norm_eq_abs, Real.norm_of_nonneg hprod_nonneg] using hω
+
+
+-- Phase 4 batch 2 merge from Staging/integrable_exp_sum_le_exp_sum_of_weighted_one_step_mgf.lean
+open MeasureTheory
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: ordered finite exponential-moment recurrence for prefix-measurable weights; orig was ordered_range_cross_term_mgf_bound
+-- generality used: arbitrary measurable sample space, abstract probability measure, natural-time filtration-like measurable spaces, real summands, scalar exponent, and deterministic one-step costs
+-- portable call pattern: predictable-noise concentration proofs where each prefix exponential is measurable with respect to the past sigma-algebra and a one-step weighted MGF multiplier is available
+-- counterargument checked: not a duplicate of integrable_exp_weighted_sum_le_exp_sum_of_weighted_one_step_mgf, because that theorem requires one-step bounds for all nonnegative integrable weights while this one only requires them for prefix-measurable weights
+-- coverage search: searched "finite prefix exponential weighted sum one step mgf bound", "integrable exponential sum bounded by one step mgf multipliers", and LeanSearch "finite moment generating function bound from one step weighted exponential inequality for predictable prefix weights"; closest hits were Mathlib subgaussian MGF primitives, the prior arbitrary-weight staging theorem, and private source one-step lemmas, none of which covers the prefix-measurable ordered recurrence
+-- minimal hypotheses: no nonnegativity of the scalar, independence, topology, finite-dimensional structure, convexity, or oracle vocabulary is used; measurability is required only for the actual prefix weights used by the induction
+
+/-- An ordered finite prefix MGF recurrence gives an exponential-moment bound for
+the sum of real random variables.
+
+If each prefix exponential is measurable with respect to its past sigma-algebra
+and the one-step weighted MGF inequality holds for every nonnegative integrable
+weight measurable with respect to that past, then the finite-prefix exponential
+is integrable and its integral is bounded by the exponential accumulated cost.
+
+Layer: Glue | Gap: Level 1 (ordered prefix-measurable exponential-moment recurrence)
+Proof: induct over `N`; the successor step uses the current prefix exponential as the weight, applies the prefix-measurable one-step MGF inequality, and combines with the induction hypothesis by positivity of `Real.exp`.
+Source: Mathlib finite range sums, real exponential addition, and Bochner integral constants
+Used in: stochastic saddle-point martingale cross-term concentration after strict-past one-step MGF transfer
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/key_lemmas/3
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic convex-concave saddle point -/
+theorem integrable_exp_sum_le_exp_sum_of_weighted_one_step_mgf
+    {Ω : Type*} [MeasurableSpace Ω]
+    (P : Measure Ω) [IsProbabilityMeasure P]
+    (F : ℕ → MeasurableSpace Ω)
+    (ζ : ℕ → Ω → ℝ) (cost : ℕ → ℝ) (ν : ℝ) (N : ℕ)
+    (hprefix_meas :
+      ∀ k : ℕ,
+        Measurable[F k]
+          (fun ω => Real.exp (ν * (∑ n ∈ Finset.range k, ζ n ω))))
+    (hone :
+      ∀ k : ℕ,
+        ∀ H : Ω → ℝ,
+          Measurable[F k] H →
+          (∀ ω, 0 ≤ H ω) →
+          Integrable H P →
+          Integrable (fun ω => H ω * Real.exp (ν * ζ k ω)) P ∧
+            ∫ ω, H ω * Real.exp (ν * ζ k ω) ∂P ≤
+              Real.exp (cost k) * ∫ ω, H ω ∂P) :
+    Integrable
+        (fun ω => Real.exp (ν * (∑ n ∈ Finset.range N, ζ n ω))) P ∧
+      ∫ ω, Real.exp (ν * (∑ n ∈ Finset.range N, ζ n ω)) ∂P ≤
+        Real.exp (∑ n ∈ Finset.range N, cost n) := by
+  induction N with
+  | zero =>
+      constructor
+      · simpa only [Finset.sum_range_zero, mul_zero, Real.exp_zero] using
+          (integrable_const (1 : ℝ) : Integrable (fun _ : Ω => (1 : ℝ)) P)
+      · simp [integral_const, probReal_univ]
+  | succ k ih =>
+      let H : Ω → ℝ := fun ω => Real.exp (ν * (∑ n ∈ Finset.range k, ζ n ω))
+      have hH_nonneg : ∀ ω, 0 ≤ H ω := fun ω => le_of_lt (Real.exp_pos _)
+      have hH_int : Integrable H P := by
+        simpa [H] using ih.1
+      have hH_meas : Measurable[F k] H := by
+        simpa [H] using hprefix_meas k
+      have hstep := hone k H hH_meas hH_nonneg hH_int
+      have hfun_eq :
+          (fun ω => Real.exp (ν * (∑ n ∈ Finset.range (k + 1), ζ n ω))) =
+            (fun ω => H ω * Real.exp (ν * ζ k ω)) := by
+        funext ω
+        rw [Finset.sum_range_succ]
+        simp [H, mul_add, Real.exp_add, mul_comm]
+      constructor
+      · simpa [hfun_eq] using hstep.1
+      · calc
+          ∫ ω, Real.exp (ν * (∑ n ∈ Finset.range (k + 1), ζ n ω)) ∂P
+              = ∫ ω, H ω * Real.exp (ν * ζ k ω) ∂P := by
+                  rw [hfun_eq]
+          _ ≤ Real.exp (cost k) * ∫ ω, H ω ∂P := hstep.2
+          _ ≤ Real.exp (cost k) * Real.exp (∑ n ∈ Finset.range k, cost n) := by
+                  exact mul_le_mul_of_nonneg_left
+                    (by simpa [H] using ih.2)
+                    (le_of_lt (Real.exp_pos _))
+          _ = Real.exp (∑ n ∈ Finset.range (k + 1), cost n) := by
+                  rw [Finset.sum_range_succ, Real.exp_add, mul_comm]
+
+
+-- Phase 4 batch 2 merge from Staging/prefix_exp_kernel_sum_measurable_of_strictPast.lean
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: finite prefix exponential of strict-past kernel summands; orig was
+--   `prefix_kernel_exp_weight_strictPast_measurable`, renamed to expose the
+--   reusable measurable exponential-kernel sum rather than a saddle-point MGF label.
+-- generality used: arbitrary source type with an explicit target sigma-algebra,
+--   arbitrary query and sample measurable spaces, arbitrary finite index set, and
+--   pointwise jointly measurable real kernels; no measure, independence, Hilbert,
+--   convexity, oracle, or finite-dimensional assumptions are used.
+-- portable call pattern: martingale concentration proofs build a prefix weight
+--   from adapted queries and already-revealed sample coordinates, while the kernel
+--   and index set vary across stochastic mirror-descent and finite-memory proofs.
+-- counterargument checked: not just paper traceability, because the result packages
+--   the common strict-past monotonicity plus kernel composition plus finite
+--   exponential-sum closure; not a pure Mathlib rename because Mathlib supplies only
+--   the lower-level measurable sum and exponential closure lemmas.
+-- coverage search: searched `finite sum exponential measurable product kernel
+--   measurable strict past`, `Measurable exp finset sum measurable`, and
+--   `strictPast kernel finite sum exponential measurable`; top hits were Mathlib
+--   `Measurable.exp`, `Finset.measurable_fun_sum`, SOptLib
+--   `measurable_finset_sum_kernel_comp_of_coordinate_measurable`, and the local
+--   source theorem. Existing SOptLib covers same-kernel coordinate sums but not
+--   per-index strict-past adapted queries with exponential prefix weights.
+-- minimal hypotheses: all global algorithm assumptions were replaced by pointwise
+--   measurability of each selected query, sample, and kernel, plus only the
+--   strict-past inclusion needed to lift query measurability to the target past.
+
+/-- A finite exponential of composed strict-past kernel summands is measurable.
+
+If each selected query is measurable with respect to its own strict-past
+sigma-algebra, those sigma-algebras are below a common target past, each selected
+sample coordinate is measurable for the target past, and each indexed kernel is
+jointly measurable, then the exponential of the finite kernel sum is measurable
+for the target past.
+
+Layer: Glue | Gap: Level 1 (strict-past finite exponential kernel-sum measurability)
+Proof: lift each query to the target past, compose the indexed measurable kernel
+  with the query/sample product map, close under finite sums, then compose with
+  scalar multiplication and the real exponential.
+Source: Mathlib MeasureTheory measurable-space ordering, product measurability,
+  finite sums, and real exponential APIs
+Used in: stochastic saddle-point martingale concentration where the prefix MGF
+  weight is built from adapted queries and already-revealed iid sample coordinates
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/algorithm_spec
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, stochastic convex-concave saddle point -/
+theorem prefix_exp_kernel_sum_measurable_of_strictPast
+    {Ω Ξ Q ι : Type*} [MeasurableSpace Ξ] [MeasurableSpace Q]
+    {m : MeasurableSpace Ω} (strictPast : ι → MeasurableSpace Ω)
+    (sampleAt : ι → Ω → Ξ) (q : ι → Ω → Q)
+    (kernel : ι → Q → Ξ → ℝ) (s : Finset ι) (ν : ℝ)
+    (hstrict_le : ∀ i ∈ s, strictPast i ≤ m)
+    (hq : ∀ i ∈ s, Measurable[strictPast i] (q i))
+    (hsample : ∀ i ∈ s, Measurable[m] (sampleAt i))
+    (hkernel : ∀ i ∈ s, Measurable (fun p : Q × Ξ => kernel i p.1 p.2)) :
+    Measurable[m]
+      (fun ω => Real.exp (ν * (∑ i ∈ s, kernel i (q i ω) (sampleAt i ω)))) := by
+  have hsummand :
+      ∀ i ∈ s, Measurable[m] (fun ω => kernel i (q i ω) (sampleAt i ω)) := by
+    intro i hi
+    have hq_m : Measurable[m] (q i) :=
+      (hq i hi).mono (hstrict_le i hi) le_rfl
+    exact (hkernel i hi).comp (hq_m.prodMk (hsample i hi))
+  have hsum : Measurable[m] (fun ω => ∑ i ∈ s, kernel i (q i ω) (sampleAt i ω)) :=
+    Finset.measurable_sum s hsummand
+  exact Real.measurable_exp.comp (measurable_const.mul hsum)
+
+
+-- Phase 4 batch 2 merge from Staging/centered_exp_square_moment_to_linear_mgf_bound.lean
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: centered square-exponential moment to linear MGF bound; orig was scalar_centered_exp_square_to_linear_mgf and the staged name exposes the probability inequality without saddle-point or algorithm vocabulary.
+-- generality used: arbitrary measurable space, arbitrary probability measure, real-valued integrable random variable, positive square scale, centered integral, and square-exponential integrability plus expectation bound.
+-- portable call pattern: martingale and oracle scalarization proofs convert a centered scalar noise with light-tail square control into a one-step linear MGF bound; the sample space, law, scalar random variable, MGF parameter, and variance scale vary.
+-- counterargument checked: not paper-local traceability because the statement is a paper-free scalar MGF bridge; not a duplicate because Mathlib has sub-Gaussian MGF structures and bounded-variable Hoeffding lemmas but not this square-exponential moment implication, while SOptLib only had the fractional moment and pointwise exponential ingredients.
+-- coverage search: searched "centered random variable exponential square moment linear mgf bound", "integral exp nu X less equal exp quadratic variance centered exp square", LeanSearch "centered real random variable bounded exponential square moment moment generating function"; top hits were the local private theorem, staged exp_square_fractional_moment_bound, Real.exp_le_self_add_exp_nine_mul_sq_div_sixteen, and Mathlib ProbabilityTheory.HasSubgaussianMGF, giving partial ingredient coverage only.
+-- minimal hypotheses: strengthened the source by dropping the unused nonnegativity hypothesis on ν; all remaining assumptions are used for measurability/integrability, centering, or the square-exponential moment bound.
+
+/-- Square completion used to dominate a linear scalar by a quadratic light-tail term.
+
+Layer: Glue | Gap: Level 0 (real square-completion domination)
+Proof: multiply by the positive square scale and complete the square in
+  `4 * x - 3 * ν * σ2`.
+Source: Mathlib ordered real-field arithmetic and square nonnegativity
+Used in: scalar light-tail MGF proofs when the MGF parameter is in the large branch
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/key_lemmas/1
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic mirror descent for stochastic convex-concave saddle point problems -/
+private theorem linear_le_quadratic_scaled
+    {σ2 : ℝ} (hσ2_pos : 0 < σ2) (ν x : ℝ) :
+    ν * x ≤ 3 * ν ^ 2 * σ2 / 8 + 2 * x ^ 2 / (3 * σ2) := by
+  have hnonneg :
+      0 ≤
+        σ2 *
+          (3 * ν ^ 2 * σ2 / 8 + 2 * x ^ 2 / (3 * σ2) - ν * x) := by
+    field_simp [hσ2_pos.ne']
+    nlinarith [sq_nonneg (4 * x - 3 * ν * σ2)]
+  have hdiff :
+      0 ≤ 3 * ν ^ 2 * σ2 / 8 + 2 * x ^ 2 / (3 * σ2) - ν * x :=
+    (mul_nonneg_iff_of_pos_left hσ2_pos).mp hnonneg
+  linarith
+
+/-- A centered square-exponential moment bound gives a quadratic linear-MGF bound.
+
+If a real random variable is centered and `∫ exp (X^2 / σ2) ≤ exp 1`, then
+`∫ exp (ν * X) ≤ exp (3 * ν^2 * σ2 / 4)`.  The result also returns
+integrability of the linear exponential.
+
+Layer: Glue | Gap: Level 1 (centered square-exponential moment to linear MGF)
+Proof: split on `ν^2 * σ2 ≤ 16 / 9`.  The small branch integrates
+`Real.exp_le_self_add_exp_nine_mul_sq_div_sixteen` and cancels the centered
+linear term; the large branch uses square completion and the fractional
+square-exponential moment bound at exponent `2 / 3`.
+Source: Mathlib Bochner integration for real random variables, SOptLib fractional square-exponential moment conversion, and real exponential domination
+Used in: stochastic convex-concave saddle-point mirror descent after fixed-fiber scalar oracle-noise centering and light-tail control
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/key_lemmas/1
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic mirror descent for stochastic convex-concave saddle point problems -/
+theorem centered_exp_square_moment_to_linear_mgf_bound
+    {Ω : Type*} [MeasurableSpace Ω] {μ : Measure Ω} [IsProbabilityMeasure μ]
+    {X : Ω → ℝ} {ν σ2 : ℝ}
+    (hσ2_pos : 0 < σ2)
+    (hX_int : Integrable X μ)
+    (hX_centered : ∫ ω, X ω ∂μ = 0)
+    (hexp_sq_int : Integrable (fun ω => Real.exp (X ω ^ 2 / σ2)) μ)
+    (hexp_sq_bound : ∫ ω, Real.exp (X ω ^ 2 / σ2) ∂μ ≤ Real.exp 1) :
+    Integrable (fun ω => Real.exp (ν * X ω)) μ ∧
+      ∫ ω, Real.exp (ν * X ω) ∂μ ≤ Real.exp (3 * ν ^ 2 * σ2 / 4) := by
+  classical
+  have hfrac :
+      ∀ p : ℝ, p ∈ Set.Icc (0 : ℝ) 1 →
+        Integrable (fun ω => Real.exp (p * (X ω ^ 2 / σ2))) μ ∧
+          ∫ ω, Real.exp (p * (X ω ^ 2 / σ2)) ∂μ ≤ Real.exp p := by
+    intro p hp
+    exact exp_square_fractional_moment_bound
+      (hσ2_pos := hσ2_pos) (hX_aesm := hX_int.aestronglyMeasurable)
+      (hexp_sq_int := hexp_sq_int) (hexp_sq_bound := hexp_sq_bound) hp
+  by_cases hsmall : ν ^ 2 * σ2 ≤ 16 / 9
+  · let p : ℝ := 9 * ν ^ 2 * σ2 / 16
+    have hp_nonneg : 0 ≤ p := by
+      dsimp [p]
+      positivity
+    have hp_le_one : p ≤ 1 := by
+      dsimp [p]
+      nlinarith [hsmall]
+    have hp : p ∈ Set.Icc (0 : ℝ) 1 := ⟨hp_nonneg, hp_le_one⟩
+    have hp_bound_target : p ≤ 3 * ν ^ 2 * σ2 / 4 := by
+      dsimp [p]
+      nlinarith [sq_nonneg ν, hσ2_pos.le]
+    have hfrac_p := hfrac p hp
+    have hνX_int : Integrable (fun ω => ν * X ω) μ := hX_int.const_mul ν
+    have hcombo_int :
+        Integrable (fun ω => ν * X ω + Real.exp (p * (X ω ^ 2 / σ2))) μ :=
+      hνX_int.add hfrac_p.1
+    have hlin_int : Integrable (fun ω => Real.exp (ν * X ω)) μ := by
+      refine Integrable.mono' ((hνX_int.norm).add hfrac_p.1)
+        (Real.continuous_exp.comp_aestronglyMeasurable
+          (hνX_int.aestronglyMeasurable)) ?_
+      refine Filter.Eventually.of_forall fun ω => ?_
+      have hpoint :=
+        Real.exp_le_self_add_exp_nine_mul_sq_div_sixteen (ν * X ω)
+      have hsq_exp :
+          Real.exp (9 * (ν * X ω) ^ 2 / 16) =
+            Real.exp (p * (X ω ^ 2 / σ2)) := by
+        congr 1
+        dsimp [p]
+        field_simp [hσ2_pos.ne']
+      have hpoint' :
+          Real.exp (ν * X ω) ≤
+            ν * X ω + Real.exp (p * (X ω ^ 2 / σ2)) := by
+        simpa [hsq_exp] using hpoint
+      have hnonneg : 0 ≤ Real.exp (ν * X ω) := le_of_lt (Real.exp_pos _)
+      rw [Real.norm_of_nonneg hnonneg]
+      have habs_bound :
+          ν * X ω + Real.exp (p * (X ω ^ 2 / σ2)) ≤
+            ‖ν * X ω‖ + Real.exp (p * (X ω ^ 2 / σ2)) := by
+        rw [Real.norm_eq_abs]
+        nlinarith [le_abs_self (ν * X ω)]
+      exact hpoint'.trans habs_bound
+    constructor
+    · exact hlin_int
+    · have hpoint :
+          ∀ ω,
+            Real.exp (ν * X ω) ≤
+              ν * X ω + Real.exp (p * (X ω ^ 2 / σ2)) := by
+        intro ω
+        have hbase :=
+          Real.exp_le_self_add_exp_nine_mul_sq_div_sixteen (ν * X ω)
+        have hsq_exp :
+            Real.exp (9 * (ν * X ω) ^ 2 / 16) =
+              Real.exp (p * (X ω ^ 2 / σ2)) := by
+          congr 1
+          dsimp [p]
+          field_simp [hσ2_pos.ne']
+        simpa [hsq_exp] using hbase
+      have hmono :
+          ∫ ω, Real.exp (ν * X ω) ∂μ ≤
+            ∫ ω, ν * X ω + Real.exp (p * (X ω ^ 2 / σ2)) ∂μ :=
+        integral_mono hlin_int hcombo_int hpoint
+      have hcombo_eval :
+          ∫ ω, ν * X ω + Real.exp (p * (X ω ^ 2 / σ2)) ∂μ =
+            ∫ ω, Real.exp (p * (X ω ^ 2 / σ2)) ∂μ := by
+        rw [MeasureTheory.integral_add hνX_int hfrac_p.1]
+        rw [MeasureTheory.integral_const_mul]
+        rw [hX_centered, mul_zero, zero_add]
+      calc
+        ∫ ω, Real.exp (ν * X ω) ∂μ
+            ≤ ∫ ω, ν * X ω + Real.exp (p * (X ω ^ 2 / σ2)) ∂μ := hmono
+        _ = ∫ ω, Real.exp (p * (X ω ^ 2 / σ2)) ∂μ := hcombo_eval
+        _ ≤ Real.exp p := hfrac_p.2
+        _ ≤ Real.exp (3 * ν ^ 2 * σ2 / 4) :=
+          Real.exp_le_exp.mpr hp_bound_target
+  · have hlarge : 16 / 9 ≤ ν ^ 2 * σ2 := le_of_not_ge hsmall
+    let θ : ℝ := (2 : ℝ) / 3
+    let C : ℝ := Real.exp (3 * ν ^ 2 * σ2 / 8)
+    have hθ : θ ∈ Set.Icc (0 : ℝ) 1 := by
+      dsimp [θ]
+      norm_num
+    have hfracθ := hfrac θ hθ
+    have htarget_aesm :
+        AEStronglyMeasurable (fun ω => Real.exp (ν * X ω)) μ :=
+      Real.continuous_exp.comp_aestronglyMeasurable
+        ((hX_int.aestronglyMeasurable).const_mul ν)
+    have hdom_int :
+        Integrable (fun ω => C * Real.exp (θ * (X ω ^ 2 / σ2))) μ :=
+      hfracθ.1.const_mul C
+    have hpoint :
+        ∀ ω,
+          Real.exp (ν * X ω) ≤
+            C * Real.exp (θ * (X ω ^ 2 / σ2)) := by
+      intro ω
+      have hyoung :=
+        linear_le_quadratic_scaled (hσ2_pos := hσ2_pos) ν (X ω)
+      have hquad :
+          2 * X ω ^ 2 / (3 * σ2) = θ * (X ω ^ 2 / σ2) := by
+        dsimp [θ]
+        field_simp [hσ2_pos.ne']
+      calc
+        Real.exp (ν * X ω)
+            ≤ Real.exp
+                (3 * ν ^ 2 * σ2 / 8 + θ * (X ω ^ 2 / σ2)) :=
+              Real.exp_le_exp.mpr (by simpa [hquad] using hyoung)
+        _ = C * Real.exp (θ * (X ω ^ 2 / σ2)) := by
+          dsimp [C]
+          rw [Real.exp_add]
+    have hlin_int : Integrable (fun ω => Real.exp (ν * X ω)) μ := by
+      refine Integrable.mono' hdom_int htarget_aesm ?_
+      refine Filter.Eventually.of_forall fun ω => ?_
+      have hnonneg : 0 ≤ Real.exp (ν * X ω) := le_of_lt (Real.exp_pos _)
+      rw [Real.norm_of_nonneg hnonneg]
+      exact hpoint ω
+    constructor
+    · exact hlin_int
+    · have hmono :
+          ∫ ω, Real.exp (ν * X ω) ∂μ ≤
+            ∫ ω, C * Real.exp (θ * (X ω ^ 2 / σ2)) ∂μ :=
+        integral_mono hlin_int hdom_int hpoint
+      have hconst_nonneg : 0 ≤ C := le_of_lt (Real.exp_pos _)
+      have hlarge_compare :
+          3 * ν ^ 2 * σ2 / 8 + θ ≤ 3 * ν ^ 2 * σ2 / 4 := by
+        dsimp [θ]
+        nlinarith [hlarge]
+      calc
+        ∫ ω, Real.exp (ν * X ω) ∂μ
+            ≤ ∫ ω, C * Real.exp (θ * (X ω ^ 2 / σ2)) ∂μ := hmono
+        _ = C * ∫ ω, Real.exp (θ * (X ω ^ 2 / σ2)) ∂μ := by
+          rw [MeasureTheory.integral_const_mul]
+        _ ≤ C * Real.exp θ :=
+          mul_le_mul_of_nonneg_left hfracθ.2 hconst_nonneg
+        _ = Real.exp (3 * ν ^ 2 * σ2 / 8 + θ) := by
+          dsimp [C]
+          rw [Real.exp_add]
+        _ ≤ Real.exp (3 * ν ^ 2 * σ2 / 4) :=
+          Real.exp_le_exp.mpr hlarge_compare
+
+
+-- Phase 4 batch 2 merge from Staging/integrable_exp_weighted_sum_le_of_exp_integral_bounds.lean
+open MeasureTheory
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: finite exponential-moment bound for a convex weighted sum; orig was weighted_square_exp_integral_bound and the staged name exposes integrability plus an integral bound for `exp` of a normalized finite weighted sum.
+-- generality used: arbitrary measurable space, arbitrary measure, finite index set, real weights, real random summands, a.e. strong measurability of the summands, and termwise exponential integrability/integral bounds; no probability, independence, convexity, oracle, normed-space, or finite-dimensional hypotheses are used.
+-- portable call pattern: light-tail and MGF proofs for stochastic algorithms can call this after normalizing nonnegative time or coordinate weights, while changing the finite window, weights, summands, measure, and common exponential budget.
+-- counterargument checked: not paper-local because the statement contains no saddle-point, oracle, iterate, or theorem-number vocabulary; not a pure wrapper because it combines finite exponential Jensen, integrability transfer through an upper envelope, and weighted integral aggregation.
+-- coverage search: searched "integrable exponential weighted finite sum integral bound termwise exp integral bounds", "integral exponential of weighted finite sum bounded by weighted sum of exponential integrals Jensen", and Mathlib semantic "integral exponential weighted sum bounded by weighted sum exponential Jensen finite nonnegative weights sum one"; closest hits were `Real.exp_finset_weighted_sum_le_sum_weighted_exp` and Mathlib `ConvexOn.map_sum_le`, which cover only the pointwise Jensen step, plus MGF recurrence lemmas with different one-step hypotheses.
+-- minimal hypotheses: a.e. strong measurability of the un-exponentiated summands is the measurability needed to form the weighted exponent; the measure is not required to be finite or probabilistic because the common bound follows from deterministic weight normalization.
+
+/-- Termwise exponential-moment bounds control the exponential moment of a normalized
+finite weighted sum.
+
+If nonnegative weights on a finite set sum to one and every `exp (U i)` is
+integrable with integral at most `B`, then `exp (sum theta i * U i)` is
+integrable and has integral at most `B`.
+
+Layer: Glue | Gap: Level 1 (finite weighted exponential-moment Jensen bound)
+Proof: apply finite Jensen for `Real.exp` pointwise, dominate by the weighted
+  sum of termwise exponentials for integrability, then commute the integral
+  through the finite sum and use the common termwise bound.
+Source: Mathlib convex Jensen API for finite sums and Bochner integral finite-sum/scalar-linearity APIs
+Used in: stochastic saddle-point light-tail proof bounding the normalized weighted oracle-square exponential by single-time exponential moment budgets
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/assumptions/14
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic convex-concave saddle point -/
+theorem integrable_exp_weighted_sum_le_of_exp_integral_bounds
+    {Ω ι : Type*} [MeasurableSpace Ω]
+    (μ : Measure Ω) (s : Finset ι) (theta : ι → ℝ) (U : ι → Ω → ℝ) (B : ℝ)
+    (hU_aesm : ∀ i ∈ s, AEStronglyMeasurable (U i) μ)
+    (htheta_nonneg : ∀ i ∈ s, 0 ≤ theta i)
+    (htheta_sum : Finset.sum s theta = 1)
+    (hU_exp_int : ∀ i ∈ s, Integrable (fun ω => Real.exp (U i ω)) μ)
+    (hU_exp_bound : ∀ i ∈ s, ∫ ω, Real.exp (U i ω) ∂μ ≤ B) :
+    Integrable (fun ω => Real.exp (Finset.sum s (fun i => theta i * U i ω))) μ ∧
+      ∫ ω, Real.exp (Finset.sum s (fun i => theta i * U i ω)) ∂μ ≤ B := by
+  classical
+  let F : Ω → ℝ := fun ω => Real.exp (Finset.sum s (fun i => theta i * U i ω))
+  let R : Ω → ℝ := fun ω => Finset.sum s (fun i => theta i * Real.exp (U i ω))
+  have hpoint : ∀ ω, F ω ≤ R ω := by
+    intro ω
+    simpa [F, R] using
+      Real.exp_finset_weighted_sum_le_sum_weighted_exp
+        (s := s) (w := theta) (x := fun i => U i ω)
+        htheta_nonneg htheta_sum
+  have hR_int : Integrable R μ := by
+    dsimp [R]
+    exact MeasureTheory.integrable_finset_sum (μ := μ) (s := s)
+      (f := fun i ω => theta i * Real.exp (U i ω))
+      (fun i hi => (hU_exp_int i hi).const_mul (theta i))
+  have hF_aesm : AEStronglyMeasurable F μ := by
+    have hsum_aesm :
+        AEStronglyMeasurable
+          (fun ω => Finset.sum s (fun i => theta i * U i ω)) μ := by
+      have hsum_fun :
+          AEStronglyMeasurable
+            ((Finset.sum s (fun i => fun ω => theta i * U i ω)) : Ω → ℝ) μ :=
+        Finset.aestronglyMeasurable_sum s
+          (fun i hi => (hU_aesm i hi).const_mul (theta i))
+      refine hsum_fun.congr ?_
+      exact Filter.Eventually.of_forall (fun ω => by simp)
+    exact Real.continuous_exp.comp_aestronglyMeasurable hsum_aesm
+  have hF_int : Integrable F μ := by
+    refine hR_int.mono' hF_aesm ?_
+    refine Filter.Eventually.of_forall ?_
+    intro ω
+    simpa [F, Real.norm_of_nonneg (le_of_lt (Real.exp_pos _))] using hpoint ω
+  constructor
+  · simpa [F] using hF_int
+  · have hmono : ∫ ω, F ω ∂μ ≤ ∫ ω, R ω ∂μ :=
+      integral_mono hF_int hR_int hpoint
+    calc
+      ∫ ω, Real.exp (Finset.sum s (fun i => theta i * U i ω)) ∂μ
+          = ∫ ω, F ω ∂μ := rfl
+      _ ≤ ∫ ω, R ω ∂μ := hmono
+      _ = Finset.sum s (fun i => theta i * ∫ ω, Real.exp (U i ω) ∂μ) := by
+            dsimp [R]
+            rw [MeasureTheory.integral_finset_sum (s := s) (μ := μ)
+              (f := fun i ω => theta i * Real.exp (U i ω))
+              (fun i hi => (hU_exp_int i hi).const_mul (theta i))]
+            refine Finset.sum_congr rfl ?_
+            intro i _hi
+            rw [MeasureTheory.integral_const_mul]
+      _ ≤ Finset.sum s (fun i => theta i * B) := by
+            refine Finset.sum_le_sum ?_
+            intro i hi
+            exact mul_le_mul_of_nonneg_left (hU_exp_bound i hi) (htheta_nonneg i hi)
+      _ = B := by
+            rw [← Finset.sum_mul, htheta_sum, one_mul]
+
+open MeasureTheory ProbabilityTheory
+
+-- Generalization plan (G0):
+-- concept/name: transport of integrability from a nondegenerate real Gaussian
+--   law to Lebesgue measure after multiplication by its density; orig was
+--   `gaussianReal_density_mul_integrable_of_integrable`.
+-- generality used: an arbitrary real mean, arbitrary nonzero nonnegative
+--   variance, and an arbitrary real-valued function; no probability-space,
+--   finite-dimensional, convexity, smoothness, oracle, or filtration
+--   assumptions are used.
+-- portable call pattern: Gaussian smoothing, Stein identities, and
+--   random-direction proofs use this when moving an integrability obligation
+--   from `gaussianReal mu v` to a density-weighted Lebesgue integral; the
+--   function, mean, and variance vary while the conclusion shape is unchanged.
+-- counterargument checked: this is not paper-local traceability or a pure
+--   rename; it is a Gaussian-specific bridge between Mathlib's distribution
+--   representation and its general `withDensity` integrability API. The short
+--   composition packages a recurring measure-representation transition.
+-- coverage search: queried `integrable product density withDensity iff
+--   integrable measure` and `Gaussian law integrable iff Lebesgue density
+--   gaussianPDFReal`, and used semantic LeanSearch for the same contract. Top
+--   hits were Mathlib `integrable_withDensity_iff`,
+--   `gaussianReal_of_var_ne_zero`, and
+--   `integral_gaussianReal_eq_integral_smul`; these are ingredients or an
+--   integral equality, not the Gaussian-specific integrability transport.
+-- minimal hypotheses: the original standard mean and variance are generalized
+--   to `mu` and nonzero `v`; nonzero variance is exactly what identifies the
+--   Gaussian law with its Lebesgue density.
+
+/-- Integrability under a nondegenerate real Gaussian law implies Lebesgue
+integrability after multiplication by the Gaussian density.
+
+Layer: Glue | Gap: Level 0 (real Gaussian density integrability transport)
+Proof: rewrite `gaussianReal mu v` as Lebesgue measure with density
+  `gaussianPDF mu v`, then apply Mathlib `integrable_withDensity_iff` and
+  simplify the density's `toReal` value.
+Source: Mathlib real Gaussian distribution representation and Bochner
+  integrability under `Measure.withDensity`
+Used in: Gaussian smoothing and one-dimensional Stein integration-by-parts
+  proofs when Gaussian-law integrability must discharge density-weighted
+  Lebesgue integrability obligations
+Book citation: book/FOML/StochasticZerothOrder.json#/key_lemmas/0
+Origin algorithm: G. Lan, First-Order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic gradient-free method -/
+theorem integrable_mul_gaussianPDFReal_of_integrable_gaussianReal
+    (mu : ℝ) {v : NNReal} (hv : v ≠ 0) {φ : ℝ → ℝ}
+    (hφ : Integrable φ (gaussianReal mu v)) :
+    Integrable (fun t : ℝ => φ t * gaussianPDFReal mu v t) := by
+  have hwith : Integrable φ (volume.withDensity (gaussianPDF mu v)) := by
+    simpa [gaussianReal_of_var_ne_zero mu hv] using hφ
+  have hweighted :=
+    (MeasureTheory.integrable_withDensity_iff
+      (μ := volume) (f := gaussianPDF mu v) (g := φ)
+      (measurable_gaussianPDF mu v)
+      (Filter.Eventually.of_forall fun _ => gaussianPDF_lt_top)).1 hwith
+  simpa only [toReal_gaussianPDF] using hweighted
+
+
+open MeasureTheory ProbabilityTheory
+
+-- Generalization plan (G0):
+-- concept/name: Gaussian density integrability transport for a negated identity factor; orig was
+--   `gaussianReal_density_neg_mul_integrable_of_integrable_mul`.
+-- generality used: an arbitrary real-valued function `φ` under the standard real Gaussian law;
+--   no probability-space, finite-dimensional, convexity, smoothness, oracle, or filtration assumptions.
+-- portable call pattern: one-dimensional Gaussian Stein and integration-by-parts proofs use this
+--   to discharge a density-weighted left-term from Gaussian-law integrability of `φ t * t`; `φ`
+--   changes with the line or finite-difference integrand while the conclusion shape stays fixed.
+-- counterargument checked: this is not paper-local traceability, a pure rename, or a caller-side
+--   expression; it combines the Gaussian-law/density bridge with the sign and algebra conversion.
+-- coverage search: searched `integrable negative identity gaussian density`, `integrable withDensity
+--   gaussianPDFReal`, and SOptLib probability glue; Mathlib `integrable_withDensity_iff` and the
+--   staged Gaussian representation theorem are ingredients, but no declaration covers this contract.
+-- minimal hypotheses: only the pointwise function and its standard-Gaussian integrability premise
+--   are needed; the centered unit-variance law is retained because the density derivative is `-t`.
+
+/- Integrability of a negated identity factor against the standard Gaussian density
+follows from integrability of the corresponding product under the standard Gaussian law.
+
+Layer: Glue | Gap: Level 0 (Gaussian density integrability transport)
+Proof: Apply the existing Gaussian-law-to-density integrability bridge to `φ t * t`,
+then use negation and pointwise ring normalization.
+Source: Mathlib real Gaussian distribution representation and `Measure.withDensity` integrability API
+Used in: One-dimensional Gaussian Stein integration-by-parts steps, where a Gaussian-law line-integrability
+hypothesis must discharge the left-hand density term containing `-t * gaussianPDFReal 0 1 t`.
+Book citation: book/FOML/StochasticZerothOrder.json#/key_lemmas/0
+Origin algorithm: G. Lan, First-Order and Stochastic Optimization Methods for Machine Learning, randomized stochastic gradient-free method -/
+theorem integrable_mul_neg_id_mul_gaussianPDFReal_of_integrable_mul_id_gaussianReal
+    (φ : ℝ → ℝ)
+    (hφt : Integrable (fun t : ℝ => φ t * t) (gaussianReal 0 1)) :
+    Integrable (fun t : ℝ => φ t * (-t * gaussianPDFReal 0 1 t)) := by
+  have hbase :
+      Integrable (fun t : ℝ => (φ t * t) * gaussianPDFReal 0 1 t) :=
+    integrable_mul_gaussianPDFReal_of_integrable_gaussianReal
+      (mu := 0) (v := 1) (by norm_num) hφt
+  have hneg : Integrable (fun t : ℝ => -((φ t * t) * gaussianPDFReal 0 1 t)) :=
+    hbase.neg
+  refine hneg.congr (Filter.Eventually.of_forall ?_)
+  intro t
+  ring
+
+
+open MeasureTheory ProbabilityTheory
+
+-- Generalization plan (G0):
+-- concept/name: exact low even moments of the one-dimensional standard real
+--   Gaussian law; orig was the local cluster
+--   `gaussianReal_second_moment`/`gaussianReal_fourth_moment`/
+--   `gaussianReal_sixth_moment`, renamed away from the zeroth-order algorithm
+--   section.
+-- generality used: no carrier, filtration, oracle, convexity, smoothness, or
+--   finite-dimensional structure is involved; the proof only uses Mathlib's
+--   real standard Gaussian measure `gaussianReal 0 1`, variance API, and MGF
+--   derivative-to-moment bridge.
+-- portable call pattern: Gaussian smoothing and random-direction proofs call
+--   these scalar moments when coordinate product expansions reduce rank-one,
+--   fourth-moment, or sixth-norm calculations to one-dimensional standard
+--   normal powers; downstream algorithms change only the surrounding product
+--   index and algebraic expansion.
+-- counterargument checked: not paper-local traceability because the statement
+--   is a standard distribution fact reusable outside the RSGF proof; not a
+--   caller-side expression because Mathlib exposes the MGF and variance tools
+--   but not this packed `2,4,6` moment contract.
+-- coverage search: queried `integral x power 2 4 6 standard gaussianReal zero
+--   one equals moments`, `standard normal gaussianReal even moment integral
+--   power equals factorial`, and LeanSearch for standard normal `x^4 = 3` and
+--   `x^6 = 15`; hits were the private source lemmas, SOptLib Gaussian
+--   exponential/norm-moment bounds, Mathlib `variance_fun_id_gaussianReal`,
+--   `mgf_fun_id_gaussianReal`, and `iteratedDeriv_mgf_zero`, all partial rather
+--   than a public exact low-even-moment package.
+-- minimal hypotheses: all algorithm setup fields are eliminated; the remaining
+--   statement has no parameters or hypotheses beyond the concrete standard
+--   real Gaussian law.
+
+/-- The standard real Gaussian has second, fourth, and sixth moments `1`, `3`,
+and `15`.
+
+These are the exact low even moments needed after coordinate product expansions
+reduce Gaussian random-direction calculations to one-dimensional standard
+normal powers.
+
+Layer: Glue | Gap: Level 0 (standard real Gaussian low even moments)
+Proof: use Mathlib's variance formula for the second moment and the MGF
+  moment-derivative identity with the closed-form Gaussian MGF for the fourth
+  and sixth moments.
+Source: Mathlib `Probability.Distributions.Gaussian.Real` variance and
+  moment-generating-function APIs
+Used in: randomized stochastic gradient-free Gaussian direction proofs that
+  evaluate coordinate square, square-square, and square-cube product moments
+Book citation: book/FOML/StochasticZerothOrder.json#/algorithm_spec/parameters/1
+Origin algorithm: Lan, First-Order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic gradient-free method -/
+theorem integral_pow_two_four_six_gaussianReal_zero_one :
+    (∫ x : ℝ, x ^ (2 : ℕ) ∂(gaussianReal 0 1) = 1) ∧
+      (∫ x : ℝ, x ^ (4 : ℕ) ∂(gaussianReal 0 1) = 3) ∧
+        (∫ x : ℝ, x ^ (6 : ℕ) ∂(gaussianReal 0 1) = 15) := by
+  constructor
+  · have hvar : Var[fun x : ℝ => x; gaussianReal 0 1] = 1 := by
+      simpa using (variance_fun_id_gaussianReal (μ := 0) (v := (1 : ℝ≥0)))
+    simpa [variance_eq_integral measurable_id'.aemeasurable, integral_id_gaussianReal] using hvar
+  constructor
+  · calc
+      ∫ x : ℝ, x ^ (4 : ℕ) ∂(gaussianReal 0 1)
+          = iteratedDeriv 4 (mgf (fun x : ℝ => x) (gaussianReal 0 1)) 0 := by
+              rw [iteratedDeriv_mgf_zero] <;> simp
+      _ = 3 := by
+            rw [mgf_fun_id_gaussianReal, iteratedDeriv_succ, iteratedDeriv_succ,
+              iteratedDeriv_succ, iteratedDeriv_one]
+            simp only [zero_mul, zero_add, one_mul, NNReal.coe_one]
+            have h1 :
+                deriv (fun t ↦ Real.exp (t ^ (2 : ℕ) / 2)) =
+                  fun t ↦ t * Real.exp (t ^ (2 : ℕ) / 2) := by
+              ext t
+              rw [_root_.deriv_exp (by fun_prop)]
+              simp only [deriv_div_const, differentiableAt_fun_id, Nat.cast_ofNat,
+                DifferentiableAt.fun_pow, deriv_fun_pow, Nat.add_one_sub_one, pow_one,
+                deriv_id'', one_mul, zero_add]
+              ring
+            have h2 :
+                deriv (fun t ↦ t * Real.exp (t ^ (2 : ℕ) / 2)) =
+                  fun t ↦ (1 + t ^ (2 : ℕ)) * Real.exp (t ^ (2 : ℕ) / 2) := by
+              ext t
+              rw [deriv_fun_mul (by fun_prop) (by fun_prop), h1]
+              simp
+              ring
+            have h3 :
+                deriv (fun t ↦ (1 + t ^ (2 : ℕ)) * Real.exp (t ^ (2 : ℕ) / 2)) =
+                  fun t ↦ (3 * t + t ^ (3 : ℕ)) * Real.exp (t ^ (2 : ℕ) / 2) := by
+              ext t
+              rw [deriv_fun_mul (by fun_prop) (by fun_prop), h1]
+              simp
+              ring
+            have h4 :
+                deriv (fun t ↦ (3 * t + t ^ (3 : ℕ)) * Real.exp (t ^ (2 : ℕ) / 2)) =
+                  fun t ↦ (3 + 6 * t ^ (2 : ℕ) + t ^ (4 : ℕ)) *
+                    Real.exp (t ^ (2 : ℕ) / 2) := by
+              have hpoly :
+                  deriv (fun t : ℝ => 3 * t + t ^ (3 : ℕ)) =
+                    fun t => 3 + 3 * t ^ (2 : ℕ) := by
+                ext t
+                have hpow : deriv (fun s : ℝ => s ^ (3 : ℕ)) t = 3 * t ^ (2 : ℕ) := by
+                  simpa using
+                    (deriv_fun_pow (f := fun s : ℝ => s) (x := t) (by fun_prop) 3)
+                rw [deriv_fun_add (by fun_prop) (by fun_prop),
+                  deriv_fun_mul (by fun_prop) (by fun_prop), hpow]
+                simp
+              ext t
+              rw [deriv_fun_mul (by fun_prop) (by fun_prop), h1, hpoly]
+              ring
+            rw [h1, h2, h3, h4]
+            norm_num
+  · calc
+      ∫ x : ℝ, x ^ (6 : ℕ) ∂(gaussianReal 0 1)
+          = iteratedDeriv 6 (mgf (fun x : ℝ => x) (gaussianReal 0 1)) 0 := by
+              rw [iteratedDeriv_mgf_zero] <;> simp
+      _ = 15 := by
+            rw [mgf_fun_id_gaussianReal, iteratedDeriv_succ, iteratedDeriv_succ,
+              iteratedDeriv_succ, iteratedDeriv_succ, iteratedDeriv_succ,
+              iteratedDeriv_one]
+            simp only [zero_mul, zero_add, one_mul, NNReal.coe_one]
+            have h1 :
+                deriv (fun t ↦ Real.exp (t ^ (2 : ℕ) / 2)) =
+                  fun t ↦ t * Real.exp (t ^ (2 : ℕ) / 2) := by
+              ext t
+              rw [_root_.deriv_exp (by fun_prop)]
+              simp only [deriv_div_const, differentiableAt_fun_id, Nat.cast_ofNat,
+                DifferentiableAt.fun_pow, deriv_fun_pow, Nat.add_one_sub_one, pow_one,
+                deriv_id'', one_mul, zero_add]
+              ring
+            have h2 :
+                deriv (fun t ↦ t * Real.exp (t ^ (2 : ℕ) / 2)) =
+                  fun t ↦ (1 + t ^ (2 : ℕ)) * Real.exp (t ^ (2 : ℕ) / 2) := by
+              ext t
+              rw [deriv_fun_mul (by fun_prop) (by fun_prop), h1]
+              simp
+              ring
+            have h3 :
+                deriv (fun t ↦ (1 + t ^ (2 : ℕ)) * Real.exp (t ^ (2 : ℕ) / 2)) =
+                  fun t ↦ (3 * t + t ^ (3 : ℕ)) * Real.exp (t ^ (2 : ℕ) / 2) := by
+              ext t
+              rw [deriv_fun_mul (by fun_prop) (by fun_prop), h1]
+              simp
+              ring
+            have h4 :
+                deriv (fun t ↦ (3 * t + t ^ (3 : ℕ)) * Real.exp (t ^ (2 : ℕ) / 2)) =
+                  fun t ↦ (3 + 6 * t ^ (2 : ℕ) + t ^ (4 : ℕ)) *
+                    Real.exp (t ^ (2 : ℕ) / 2) := by
+              have hpoly :
+                  deriv (fun t : ℝ => 3 * t + t ^ (3 : ℕ)) =
+                    fun t => 3 + 3 * t ^ (2 : ℕ) := by
+                ext t
+                have hpow : deriv (fun s : ℝ => s ^ (3 : ℕ)) t = 3 * t ^ (2 : ℕ) := by
+                  simpa using
+                    (deriv_fun_pow (f := fun s : ℝ => s) (x := t) (by fun_prop) 3)
+                rw [deriv_fun_add (by fun_prop) (by fun_prop),
+                  deriv_fun_mul (by fun_prop) (by fun_prop), hpow]
+                simp
+              ext t
+              rw [deriv_fun_mul (by fun_prop) (by fun_prop), h1, hpoly]
+              ring
+            have h5 :
+                deriv (fun t ↦ (3 + 6 * t ^ (2 : ℕ) + t ^ (4 : ℕ)) *
+                  Real.exp (t ^ (2 : ℕ) / 2)) =
+                  fun t ↦ (15 * t + 10 * t ^ (3 : ℕ) + t ^ (5 : ℕ)) *
+                    Real.exp (t ^ (2 : ℕ) / 2) := by
+              have hpoly :
+                  deriv (fun t : ℝ => 3 + 6 * t ^ (2 : ℕ) + t ^ (4 : ℕ)) =
+                    fun t => 12 * t + 4 * t ^ (3 : ℕ) := by
+                ext t
+                have hpow2 : deriv (fun s : ℝ => s ^ (2 : ℕ)) t = 2 * t := by
+                  simpa using
+                    (deriv_fun_pow (f := fun s : ℝ => s) (x := t) (by fun_prop) 2)
+                have hpow4 : deriv (fun s : ℝ => s ^ (4 : ℕ)) t = 4 * t ^ (3 : ℕ) := by
+                  simpa using
+                    (deriv_fun_pow (f := fun s : ℝ => s) (x := t) (by fun_prop) 4)
+                rw [deriv_fun_add (by fun_prop) (by fun_prop),
+                  deriv_fun_add (by fun_prop) (by fun_prop),
+                  deriv_fun_mul (by fun_prop) (by fun_prop), hpow2, hpow4]
+                simp
+                ring
+              ext t
+              rw [deriv_fun_mul (by fun_prop) (by fun_prop), h1, hpoly]
+              ring
+            have h6 :
+                deriv (fun t ↦ (15 * t + 10 * t ^ (3 : ℕ) + t ^ (5 : ℕ)) *
+                  Real.exp (t ^ (2 : ℕ) / 2)) =
+                  fun t ↦ (15 + 45 * t ^ (2 : ℕ) + 15 * t ^ (4 : ℕ) +
+                    t ^ (6 : ℕ)) * Real.exp (t ^ (2 : ℕ) / 2) := by
+              have hpoly :
+                  deriv (fun t : ℝ => 15 * t + 10 * t ^ (3 : ℕ) + t ^ (5 : ℕ)) =
+                    fun t => 15 + 30 * t ^ (2 : ℕ) + 5 * t ^ (4 : ℕ) := by
+                ext t
+                have hpow3 : deriv (fun s : ℝ => s ^ (3 : ℕ)) t = 3 * t ^ (2 : ℕ) := by
+                  simpa using
+                    (deriv_fun_pow (f := fun s : ℝ => s) (x := t) (by fun_prop) 3)
+                have hpow5 : deriv (fun s : ℝ => s ^ (5 : ℕ)) t = 5 * t ^ (4 : ℕ) := by
+                  simpa using
+                    (deriv_fun_pow (f := fun s : ℝ => s) (x := t) (by fun_prop) 5)
+                rw [deriv_fun_add (by fun_prop) (by fun_prop),
+                  deriv_fun_add (by fun_prop) (by fun_prop),
+                  deriv_fun_mul (by fun_prop) (by fun_prop),
+                  deriv_fun_mul (by fun_prop) (by fun_prop), hpow3, hpow5]
+                simp
+                ring
+              ext t
+              rw [deriv_fun_mul (by fun_prop) (by fun_prop), h1, hpoly]
+              ring
+            rw [h1, h2, h3, h4, h5, h6]
+            norm_num
+
+
+open MeasureTheory ProbabilityTheory
+
+noncomputable section
+
+-- Generalization plan (G0):
+-- concept/name: derivative of the standard one-dimensional Gaussian density; orig was hasDerivAt_gaussianPDFReal_zero_one
+-- generality used: scalar real variable and the fixed standard Gaussian parameters (mean 0, variance 1); no measure, finite-dimensional, or optimization assumptions are needed
+-- portable call pattern: Stein and Gaussian integration-by-parts proofs call this pointwise density derivative while varying the scalar test function and its derivative
+-- counterargument checked: this is not paper-local bookkeeping or a caller-side wrapper; Mathlib defines gaussianPDFReal but has no matching derivative theorem, and the pointwise identity is useful across Gaussian proofs
+-- coverage search: searched SOptLib and Mathlib for Gaussian-density derivative and HasDerivAt gaussianPDFReal; only gaussianPDFReal_def and positivity/measurability companions were found, so this theorem fills the derivative gap
+-- minimal hypotheses: all already minimal for the standard Gaussian density; only the evaluation point t is explicit
+
+/-- The standard one-dimensional Gaussian density has derivative `-t` times itself.
+
+Layer: Glue | Gap: Level 1 (Gaussian density calculus)
+Proof: Unfold the standard density, differentiate the quadratic exponent with `HasDerivAt`, and compose with the exponential and constant-product rules.
+Source: Mathlib probability Gaussian density definition and real one-variable calculus (`gaussianPDFReal_def`, `HasDerivAt.exp`, and product rules)
+Used in: Pointwise density differentiation supplied to scalar Gaussian Stein and integration-by-parts identities for zeroth-order oracle analyses
+Book citation: book/FOML/StochasticZerothOrder.json#/algorithm_spec
+Origin algorithm: FOML authors - First-Order Methods in Learning, stochastic zeroth-order random Gaussian search-gradient analysis -/
+theorem hasDerivAt_gaussianPDFReal_zero_one (t : ℝ) :
+    HasDerivAt (gaussianPDFReal 0 1)
+      (-t * gaussianPDFReal 0 1 t) t := by
+  rw [gaussianPDFReal_def]
+  simp only [NNReal.coe_one, sub_zero]
+  let c : ℝ := (√Real.pi)⁻¹ * (√2)⁻¹
+  have hquad : HasDerivAt (fun x : ℝ => -(x ^ (2 : ℕ)) / 2) (-t) t := by
+    have hsq : HasDerivAt (fun x : ℝ => x ^ (2 : ℕ)) (2 * t) t := by
+      simpa using ((hasDerivAt_id t).pow 2)
+    have hdiv : HasDerivAt (fun x : ℝ => x ^ (2 : ℕ) / 2) ((2 * t) / 2) t :=
+      hsq.div_const 2
+    have hneg : HasDerivAt (fun x : ℝ => -(x ^ (2 : ℕ) / 2)) (-((2 * t) / 2)) t :=
+      hdiv.neg
+    convert hneg using 1
+    · ext x
+      ring
+    · ring
+  have hexp :
+      HasDerivAt (fun x : ℝ => Real.exp (-(x ^ (2 : ℕ)) / 2))
+        (Real.exp (-(t ^ (2 : ℕ)) / 2) * (-t)) t := by
+    simpa [mul_comm] using hquad.exp
+  have hconst :
+      HasDerivAt (fun x : ℝ => Real.exp (-(x ^ (2 : ℕ)) / 2) * c)
+        ((Real.exp (-(t ^ (2 : ℕ)) / 2) * (-t)) * c) t :=
+    hexp.mul_const c
+  convert hconst using 1 <;> simp [c, mul_assoc, mul_left_comm, mul_comm]
+
+
+open MeasureTheory ProbabilityTheory
+
+noncomputable section
+
+-- Generalization plan (G0):
+-- concept/name: one-dimensional standard-Gaussian Stein integration-by-parts
+--   identity; orig was gaussianReal_stein_integral_of_density_ibp, renamed away
+--   from algorithm-local wording while keeping the Gaussian-density IBP
+--   contract explicit.
+-- generality used: scalar real test functions `g g'`; standard real Gaussian
+--   law `gaussianReal 0 1`; pointwise `HasDerivAt` hypotheses on the
+--   topological supports required by Mathlib real-line integration by parts;
+--   density-weighted volume integrability for the three products. No
+--   convexity, oracle, filtration, probability-space frame, or finite-dimensional
+--   vector-space assumptions are used.
+-- portable call pattern: scalarized Gaussian Stein proofs in zeroth-order,
+--   random-search, and Gaussian smoothing arguments rewrite a standard Gaussian
+--   expectation through its density, integrate by parts against the Gaussian
+--   density derivative, and return to Gaussian-law notation while changing only
+--   the scalar test function and derivative witness.
+-- counterargument checked: not paper-local traceability because it packages the
+--   standard scalar Gaussian Stein identity from Mathlib density rewriting plus
+--   improper integration by parts; not a pure wrapper around one Mathlib theorem
+--   because the conclusion is under `gaussianReal 0 1` and performs both density
+--   transports around the IBP step. Existing SOptLib hits were Gaussian moment
+--   identities, not this scalar Stein density bridge.
+-- coverage search: searched "integral gaussianReal equals integral derivative
+--   integration by parts density", "Stein identity standard Gaussian integral x
+--   f equals integral derivative", and
+--   "integral_mul_id_gaussianReal_eq_integral_deriv"; hits were only private
+--   algorithm declarations, SOptLib Gaussian moment facts, Mathlib
+--   `MeasureTheory.integral_mul_deriv_eq_deriv_mul_of_integrable`, and
+--   Schwartz-space IBP lemmas. Those are partial, not a full Gaussian-law
+--   Stein statement with these hypotheses.
+-- minimal hypotheses: all algorithm setup fields are removed; the remaining
+--   hypotheses are exactly the derivative and integrability hypotheses consumed
+--   by Mathlib's real-line integration-by-parts theorem and density rewrites.
+
+/-- One-dimensional standard-Gaussian Stein identity from density
+integration by parts.
+
+For real scalar functions `g` and `g'`, if `g'` is the derivative of `g` on the
+support needed for integration by parts, the Gaussian density has the supplied
+derivative on the support of `g`, and the three density-weighted products are
+integrable, then `∫ g t * t dγ = ∫ g' dγ` for the standard real Gaussian law.
+
+Layer: Glue | Gap: Level 1 (standard Gaussian scalar Stein density bridge)
+Proof: rewrite both Gaussian-law integrals as Lebesgue integrals against
+  `gaussianPDFReal 0 1`, apply Mathlib's improper real-line integration by
+  parts to `g` and the Gaussian density, and simplify the density derivative.
+Source: Mathlib standard real Gaussian density API and
+  `MeasureTheory.integral_mul_deriv_eq_deriv_mul_of_integrable`
+Used in: randomized stochastic gradient-free Gaussian smoothing when the
+  finite-difference directional identity is reduced to a one-dimensional
+  scalar Stein integration-by-parts calculation along a Gaussian coordinate
+Book citation: book/FOML/StochasticZerothOrder.json#/algorithm_spec/steps/1
+Origin algorithm: G. Lan, First-Order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic gradient-free method -/
+theorem integral_mul_id_gaussianReal_eq_integral_deriv_of_density_ibp
+    (g g' : ℝ → ℝ)
+    (hg : ∀ t ∈ tsupport (gaussianPDFReal 0 1), HasDerivAt g (g' t) t)
+    (hpdf :
+      ∀ t ∈ tsupport g,
+        HasDerivAt (gaussianPDFReal 0 1)
+          (-t * gaussianPDFReal 0 1 t) t)
+    (hgv' :
+      Integrable (fun t : ℝ => g t * (-t * gaussianPDFReal 0 1 t)))
+    (hg'v : Integrable (fun t : ℝ => g' t * gaussianPDFReal 0 1 t))
+    (hgv : Integrable (fun t : ℝ => g t * gaussianPDFReal 0 1 t)) :
+    (∫ t : ℝ, g t * t ∂gaussianReal 0 1) =
+      ∫ t : ℝ, g' t ∂gaussianReal 0 1 := by
+  have hvar : (1 : NNReal) ≠ 0 := by norm_num
+  have hleft_density :
+      (∫ t : ℝ, g t * t ∂gaussianReal 0 1) =
+        ∫ t : ℝ, gaussianPDFReal 0 1 t * (g t * t) := by
+    simpa [smul_eq_mul, mul_assoc, mul_left_comm, mul_comm] using
+      (ProbabilityTheory.integral_gaussianReal_eq_integral_smul
+        (E := ℝ) (μ := 0) (v := 1) (f := fun t : ℝ => g t * t)
+        hvar)
+  have hright_density :
+      (∫ t : ℝ, g' t ∂gaussianReal 0 1) =
+        ∫ t : ℝ, gaussianPDFReal 0 1 t * g' t := by
+    simpa [smul_eq_mul, mul_comm] using
+      (ProbabilityTheory.integral_gaussianReal_eq_integral_smul
+        (E := ℝ) (μ := 0) (v := 1) (f := g')
+        hvar)
+  have hibp :
+      (∫ t : ℝ, g t * (-t * gaussianPDFReal 0 1 t)) =
+        -∫ t : ℝ, g' t * gaussianPDFReal 0 1 t :=
+    MeasureTheory.integral_mul_deriv_eq_deriv_mul_of_integrable
+      (A := ℝ) (u := g) (v := gaussianPDFReal 0 1)
+      (u' := g') (v' := fun t : ℝ => -t * gaussianPDFReal 0 1 t)
+      hg hpdf hgv' hg'v hgv
+  calc
+    (∫ t : ℝ, g t * t ∂gaussianReal 0 1)
+        = ∫ t : ℝ, gaussianPDFReal 0 1 t * (g t * t) := hleft_density
+    _ = -∫ t : ℝ, g t * (-t * gaussianPDFReal 0 1 t) := by
+          rw [← integral_neg]
+          refine integral_congr_ae ?_
+          exact Filter.Eventually.of_forall fun t => by ring
+    _ = ∫ t : ℝ, g' t * gaussianPDFReal 0 1 t := by rw [hibp]; simp
+    _ = ∫ t : ℝ, gaussianPDFReal 0 1 t * g' t := by
+          refine integral_congr_ae ?_
+          exact Filter.Eventually.of_forall fun t => by ring
+    _ = ∫ t : ℝ, g' t ∂gaussianReal 0 1 := hright_density.symm
+
+
+open MeasureTheory ProbabilityTheory
+
+noncomputable section
+
+-- Generalization plan (G0):
+-- concept/name: one-dimensional standard-Gaussian Stein identity; orig was
+--   gaussianReal_stein_integral_of_hasDerivAt_density_integrable, renamed to
+--   expose the integral equality rather than its algorithm-local role.
+-- generality used: real scalar functions `g g'`, pointwise `HasDerivAt`, the
+--   standard real Gaussian law, and exactly the three density-weighted
+--   integrability hypotheses consumed by real-line integration by parts. No
+--   optimization, convexity, probability-space, or finite-dimensional frame.
+-- portable call pattern: Gaussian smoothing and randomized zeroth-order proofs
+--   supply a scalar line restriction, its derivative, and integrability facts
+--   to replace the Gaussian expectation of `g Z * Z` by that of `g' Z`.
+-- counterargument checked: this is not paper-local traceability or a pure
+--   wrapper; it composes a density-IBP bridge with the independently reusable
+--   Gaussian-density derivative fact. The lower-level bridge alone does not
+--   cover the discharged-density call pattern.
+-- coverage search: searched standard-Gaussian Stein identities and Gaussian
+--   integral-by-parts declarations; Mathlib provides the generic improper IBP
+--   theorem, while SOptLib provides only the lower-level density bridge and
+--   density derivative, so this specialized conclusion is not duplicated.
+-- minimal hypotheses: the pointwise derivative and the three integrability
+--   premises are exactly those required by the lower-level bridge.
+
+/-- For the standard real Gaussian law, the integral of `g t * t` equals the
+integral of `g'` when `g'` is the pointwise derivative of `g` and the three
+density-weighted products needed by integration by parts are integrable.
+
+Layer: Glue | Gap: Level 1 (standard real Gaussian scalar Stein identity)
+Proof: specialize the density-form integration-by-parts bridge with the
+standard Gaussian density derivative theorem and discharge both support
+conditions from the pointwise derivative hypotheses.
+Source: Mathlib real Gaussian density and improper real-line integration by parts,
+combined with the staged Gaussian density derivative and density-IBP bridges
+Used in: Gaussian smoothing and randomized gradient-free analyses after a
+directional finite difference is restricted to a scalar Gaussian coordinate
+Book citation: book/FOML/StochasticZerothOrder.json#/key_lemmas/0
+Origin algorithm: G. Lan, First-Order and Stochastic Optimization Methods for
+Machine Learning, randomized stochastic gradient-free method -/
+theorem integral_mul_id_gaussianReal_eq_integral_deriv
+    (g g' : ℝ → ℝ)
+    (hg : ∀ t : ℝ, HasDerivAt g (g' t) t)
+    (hgv' :
+      Integrable (fun t : ℝ => g t * (-t * gaussianPDFReal 0 1 t)))
+    (hg'v : Integrable (fun t : ℝ => g' t * gaussianPDFReal 0 1 t))
+    (hgv : Integrable (fun t : ℝ => g t * gaussianPDFReal 0 1 t)) :
+    (∫ t : ℝ, g t * t ∂gaussianReal 0 1) =
+      ∫ t : ℝ, g' t ∂gaussianReal 0 1 := by
+  exact integral_mul_id_gaussianReal_eq_integral_deriv_of_density_ibp
+    g g' (fun t _ => hg t)
+    (fun t _ => hasDerivAt_gaussianPDFReal_zero_one t)
+    hgv' hg'v hgv
+
+
+open Finset MeasureTheory
+open scoped BigOperators InnerProductSpace
+
+noncomputable section
+
+-- Generalization plan (G0):
+-- concept/name: finite orthonormal-basis coordinate lifting for scalarized integral identities; orig was gaussian_forward_difference_inner_from_basis_coordinates.
+-- generality used: arbitrary real Hilbert space with a finite orthonormal basis, an arbitrary measure on that space, and pointwise coordinate integral identities; no Gaussian, smoothness, oracle, or probability assumption is used.
+-- portable call pattern: any zeroth-order or coordinatewise stochastic proof that proves scalar integral identities on basis coordinates and then needs the same identity for an arbitrary direction can call this theorem with different basis, measure, scalar weight, and vector field.
+-- counterargument checked: not merely paper traceability because the statement removes all RSGF and Gaussian data; not a pure wrapper around Mathlib because it combines orthonormal-basis expansion with Bochner integral finite-sum linearity and scalar integrability transport.
+-- coverage search: searched "orthonormal basis coordinate integral inner identity", "integral inner equality coordinate orthonormal basis", and "OrthonormalBasis sum repr inner coordinate finite"; closest Mathlib hits were `OrthonormalBasis.sum_repr` and `InnerProductSpace.ext_inner_left_basis`, while closest SOptLib hits were Parseval and coordinate-residual cancellation lemmas with different conclusions.
+-- minimal hypotheses: integrability of `(fun u => a u • u)` and `G` are exactly what the proof uses to derive all scalar coordinate integrability obligations; no finite-dimensional typeclass is needed beyond the supplied finite orthonormal basis index.
+
+/-- Coordinate scalar integral identities along a finite orthonormal basis imply
+the same scalarized identity in every direction.
+
+Layer: Glue | Gap: Level 1 (finite orthonormal-basis coordinate lifting for integral identities)
+Proof: expand the direction in the orthonormal basis, commute finite sums through the scalar Bochner integral, and apply the supplied coordinate identities.
+Source: Mathlib finite orthonormal-basis expansion, continuous-linear-map integrability transport, and Bochner integral linearity.
+Used in: randomized stochastic gradient-free Gaussian smoothing, where one-dimensional coordinate Stein identities are assembled into the arbitrary-direction gradient identity.
+Book citation: book/FOML/StochasticZerothOrder.json#/algorithm_spec
+Origin algorithm: G. Lan, First-Order and Stochastic Optimization Methods for Machine Learning, randomized stochastic gradient-free method -/
+theorem integral_inner_identity_of_orthonormalBasis_coordinates
+    {ι E : Type*} [Fintype ι] [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+    [MeasurableSpace E]
+    (ν : Measure E) (b : OrthonormalBasis ι ℝ E)
+    (a : E → ℝ) (G : E → E) (v : E)
+    (hweighted_int : Integrable (fun u : E => (a u) • u) ν)
+    (hfield_int : Integrable G ν)
+    (hcoord :
+      ∀ i : ι,
+        (∫ u : E, a u * ⟪b i, u⟫_ℝ ∂ν) =
+          ∫ u : E, ⟪b i, G u⟫_ℝ ∂ν) :
+    (∫ u : E, a u * ⟪v, u⟫_ℝ ∂ν) =
+      ∫ u : E, ⟪v, G u⟫_ℝ ∂ν := by
+  classical
+  have hleft_coord_int :
+      ∀ i : ι, Integrable (fun u : E => a u * ⟪b i, u⟫_ℝ) ν := by
+    intro i
+    let Lmap : E →L[ℝ] ℝ := innerSL ℝ (b i)
+    simpa [Lmap, real_inner_smul_right] using
+      Lmap.integrable_comp hweighted_int
+  have hright_coord_int :
+      ∀ i : ι, Integrable (fun u : E => ⟪b i, G u⟫_ℝ) ν := by
+    intro i
+    let Lmap : E →L[ℝ] ℝ := innerSL ℝ (b i)
+    simpa [Lmap] using Lmap.integrable_comp hfield_int
+  have hv_sum :
+      (∑ i : ι, ⟪v, b i⟫_ℝ • (b i : E)) = v := by
+    calc
+      (∑ i : ι, ⟪v, b i⟫_ℝ • (b i : E))
+          = ∑ i : ι, (b.repr v i) • (b i : E) := by
+              refine Finset.sum_congr rfl ?_
+              intro i hi
+              rw [OrthonormalBasis.repr_apply_apply, real_inner_comm]
+      _ = v := by
+              simpa using (b.sum_repr v)
+  have hleft_expand :
+      ∀ u : E,
+        a u * ⟪v, u⟫_ℝ =
+          ∑ i : ι, ⟪v, b i⟫_ℝ * (a u * ⟪b i, u⟫_ℝ) := by
+    intro u
+    have hinner :
+        ⟪v, u⟫_ℝ = ∑ i : ι, ⟪v, b i⟫_ℝ * ⟪b i, u⟫_ℝ := by
+      calc
+        ⟪v, u⟫_ℝ
+            = ⟪(∑ i : ι, ⟪v, b i⟫_ℝ • (b i : E)), u⟫_ℝ := by
+                rw [hv_sum]
+        _ = ∑ i : ι, ⟪⟪v, b i⟫_ℝ • (b i : E), u⟫_ℝ := by
+                rw [sum_inner]
+        _ = ∑ i : ι, ⟪v, b i⟫_ℝ * ⟪b i, u⟫_ℝ := by
+                refine Finset.sum_congr rfl ?_
+                intro i hi
+                rw [real_inner_smul_left]
+    rw [hinner]
+    rw [Finset.mul_sum]
+    refine Finset.sum_congr rfl ?_
+    intro i hi
+    ring
+  have hright_expand :
+      ∀ u : E,
+        ⟪v, G u⟫_ℝ =
+          ∑ i : ι, ⟪v, b i⟫_ℝ * ⟪b i, G u⟫_ℝ := by
+    intro u
+    calc
+      ⟪v, G u⟫_ℝ
+          = ⟪(∑ i : ι, ⟪v, b i⟫_ℝ • (b i : E)), G u⟫_ℝ := by
+              rw [hv_sum]
+      _ = ∑ i : ι, ⟪⟪v, b i⟫_ℝ • (b i : E), G u⟫_ℝ := by
+              rw [sum_inner]
+      _ = ∑ i : ι, ⟪v, b i⟫_ℝ * ⟪b i, G u⟫_ℝ := by
+              refine Finset.sum_congr rfl ?_
+              intro i hi
+              rw [real_inner_smul_left]
+  calc
+    (∫ u : E, a u * ⟪v, u⟫_ℝ ∂ν)
+        = ∫ u : E,
+            ∑ i : ι, ⟪v, b i⟫_ℝ * (a u * ⟪b i, u⟫_ℝ) ∂ν := by
+            refine integral_congr_ae ?_
+            exact Filter.Eventually.of_forall hleft_expand
+    _ = ∑ i : ι,
+          ∫ u : E, ⟪v, b i⟫_ℝ * (a u * ⟪b i, u⟫_ℝ) ∂ν := by
+            rw [integral_finset_sum]
+            intro i hi
+            exact (hleft_coord_int i).const_mul ⟪v, b i⟫_ℝ
+    _ = ∑ i : ι,
+          ⟪v, b i⟫_ℝ * ∫ u : E, a u * ⟪b i, u⟫_ℝ ∂ν := by
+            refine Finset.sum_congr rfl ?_
+            intro i hi
+            rw [integral_const_mul]
+    _ = ∑ i : ι,
+          ⟪v, b i⟫_ℝ * ∫ u : E, ⟪b i, G u⟫_ℝ ∂ν := by
+            refine Finset.sum_congr rfl ?_
+            intro i hi
+            rw [hcoord i]
+    _ = ∑ i : ι,
+          ∫ u : E, ⟪v, b i⟫_ℝ * ⟪b i, G u⟫_ℝ ∂ν := by
+            refine Finset.sum_congr rfl ?_
+            intro i hi
+            rw [integral_const_mul]
+    _ = ∫ u : E,
+          ∑ i : ι, ⟪v, b i⟫_ℝ * ⟪b i, G u⟫_ℝ ∂ν := by
+            rw [integral_finset_sum]
+            intro i hi
+            exact (hright_coord_int i).const_mul ⟪v, b i⟫_ℝ
+    _ = ∫ u : E, ⟪v, G u⟫_ℝ ∂ν := by
+            refine integral_congr_ae ?_
+            exact Filter.Eventually.of_forall fun u => (hright_expand u).symm
+
+
+
+open MeasureTheory ProbabilityTheory
+open scoped InnerProductSpace
+
+-- Generalization plan (G0):
+-- concept/name: integrability of a standard-Gaussian rank-one squared norm; orig was gaussian_linear_oracle_norm_sq_integrable
+-- generality used: an arbitrary finite-dimensional real inner-product space with Borel and second-countable measurable structure, the canonical standard Gaussian measure, and one fixed vector
+-- portable call pattern: Gaussian random-direction and smoothing proofs use this fact to establish the finite second moment of a rank-one estimator; the ambient Hilbert space and fixed vector vary while the integrability conclusion is unchanged
+-- counterargument checked: the exact rank-one integral identity staged separately does not imply integrability because the Bochner integral is total; Mathlib supplies Gaussian norm moments but not this dominated rank-one consequence
+-- coverage search: searched standard Gaussian integrable squared norm inner product scalar multiplication and the precise rank-one L1 shape; IsGaussian.memLp_id and IsGaussian.integrable_dual provide ingredients only, while no SOptLib declaration matches this contract
+-- minimal hypotheses: finite-dimensionality is required by stdGaussian and supplies completeness for Gaussian moment finiteness; no smoothness, oracle, or algorithm assumptions are used
+
+/-- The squared norm of a fixed-vector Gaussian rank-one map is integrable.
+
+Layer: Glue | Gap: Level 1 (standard-Gaussian rank-one square integrability)
+Proof: Dominate the squared rank-one norm by the fixed vector norm squared times the fourth Gaussian norm moment, then apply `Integrable.mono'`.
+Source: Mathlib Gaussian Fernique moments via `IsGaussian.memLp_id` and Hilbert-space Cauchy-Schwarz norm bounds
+Used in: Gaussian random-direction second-moment estimates before integrating or bounding the linear rank-one component of a zeroth-order estimator
+Book citation: book/FOML/StochasticZerothOrder.json#/algorithm_spec/proof_steps/4
+Origin algorithm: G. Lan, First-Order and Stochastic Optimization Methods for Machine Learning, randomized stochastic gradient-free method -/
+theorem integrable_norm_inner_smul_sq_stdGaussian
+    {E : Type*}
+    [NormedAddCommGroup E] [InnerProductSpace ℝ E] [FiniteDimensional ℝ E]
+    [MeasurableSpace E] [BorelSpace E] [SecondCountableTopology E]
+    (g : E) :
+    Integrable (fun u : E => ‖((⟪g, u⟫_ℝ) • u : E)‖ ^ (2 : ℕ))
+      (stdGaussian E) := by
+  have hnorm4_int :
+      Integrable (fun u : E => ‖u‖ ^ (4 : ℕ)) (stdGaussian E) := by
+    have hmem : MemLp id 4 (stdGaussian E) :=
+      IsGaussian.memLp_id (stdGaussian E) 4 (by norm_num)
+    exact (hmem.integrable_norm_rpow (by norm_num) (by norm_num)).congr
+      (ae_of_all _ fun u => by
+        simp only [id, show ENNReal.toReal (4 : ENNReal) = (4 : ℝ) from by norm_num]
+        rw [show (4 : ℝ) = ((4 : ℕ) : ℝ) from by norm_cast]
+        exact Real.rpow_natCast ‖u‖ 4)
+  have hdom_int :
+      Integrable (fun u : E => ‖g‖ ^ (2 : ℕ) * ‖u‖ ^ (4 : ℕ))
+        (stdGaussian E) := by
+    exact (hnorm4_int.const_mul (‖g‖ ^ (2 : ℕ))).congr
+      (ae_of_all _ fun _u => by ring)
+  have hlhs_aesm :
+      AEStronglyMeasurable
+        (fun u : E => ‖((⟪g, u⟫_ℝ) • u : E)‖ ^ (2 : ℕ))
+        (stdGaussian E) := by
+    simpa using
+      (((continuous_const.inner continuous_id).smul continuous_id).norm.pow 2).aestronglyMeasurable
+  have hpoint : ∀ u : E,
+      ‖((⟪g, u⟫_ℝ) • u : E)‖ ^ (2 : ℕ) ≤
+        ‖g‖ ^ (2 : ℕ) * ‖u‖ ^ (4 : ℕ) := by
+    intro u
+    have hbase :
+        ‖((⟪g, u⟫_ℝ) • u : E)‖ ≤ ‖g‖ * ‖u‖ ^ (2 : ℕ) := by
+      rw [norm_smul]
+      calc
+        ‖⟪g, u⟫_ℝ‖ * ‖u‖ ≤ (‖g‖ * ‖u‖) * ‖u‖ := by
+          gcongr
+          exact norm_inner_le_norm (𝕜 := ℝ) _ _
+        _ = ‖g‖ * ‖u‖ ^ (2 : ℕ) := by ring
+    nlinarith [hbase, norm_nonneg ((⟪g, u⟫_ℝ) • u : E),
+      norm_nonneg g, norm_nonneg u]
+  have hpoint' : ∀ u : E,
+      ‖‖((⟪g, u⟫_ℝ) • u : E)‖ ^ (2 : ℕ)‖ ≤
+        ‖g‖ ^ (2 : ℕ) * ‖u‖ ^ (4 : ℕ) := by
+    intro u
+    simpa using hpoint u
+  exact Integrable.mono' hdom_int hlhs_aesm (Filter.Eventually.of_forall hpoint')
+
+
+open MeasureTheory ProbabilityTheory
+open scoped InnerProductSpace
+
+-- Generalization plan (G0):
+-- concept/name: centered standard Gaussian scalar linear functional; orig was gaussian_linear_shift_integral_eq_zero
+-- generality used: a finite-dimensional real inner-product space with measurable and Borel structure; an arbitrary fixed vector g and real scalar mu; the canonical standard Gaussian measure
+-- portable call pattern: Gaussian smoothing and random-direction analyses cancel the expected first-order linear term; the direction vector, scaling parameter, and ambient Euclidean space change while the zero expectation conclusion stays fixed
+-- counterargument checked: this specializes Mathlib's strong-dual Gaussian mean theorem, but the specialization is not a pure rename because it packages the recurring inner-product-with-scaled-identity expression and its continuous-linear-map elaboration at algorithm call sites
+-- coverage search: searched "continuous linear map centered Gaussian identity integral zero" and "integral inner constant scalar multiple identity standard Gaussian zero"; Mathlib's `integral_id_stdGaussian` and `integral_strongDual_stdGaussian` are partial generic ingredients, while SOptLib centering lemmas require caller-supplied centering hypotheses and no existing declaration has this expression-level contract
+-- minimal hypotheses: finite-dimensionality, measurable structure, and Borel compatibility are exactly those required by Mathlib's canonical `stdGaussian`; no second-countability, integrability, probability, smoothness, or optimization assumptions are needed explicitly
+
+/-- The expected inner product of a fixed vector with a scalar multiple of a
+standard Gaussian vector is zero.
+
+Layer: Glue | Gap: Level 0 (standard Gaussian scalar linear-term cancellation)
+Proof: specialize Mathlib's zero integral of a strong dual under `stdGaussian` to the continuous linear functional formed by inner product and scalar multiplication.
+Source: Mathlib multivariate standard Gaussian first-moment and strong-dual integration APIs
+Used in: Gaussian smoothing and random-direction descent bounds when the expected first-order linear Taylor term is canceled before bounding the quadratic remainder
+Book citation: book/FOML/StochasticZerothOrder.json#/algorithm_spec/parameters/1
+Origin algorithm: G. Lan, First-Order and Stochastic Optimization Methods for Machine Learning, randomized stochastic gradient-free method -/
+theorem integral_inner_const_smul_id_stdGaussian_eq_zero
+    {E : Type*}
+    [NormedAddCommGroup E] [InnerProductSpace ℝ E] [FiniteDimensional ℝ E]
+    [MeasurableSpace E] [BorelSpace E]
+    (g : E) (μ : ℝ) :
+    (∫ u : E, ⟪g, μ • u⟫_ℝ ∂(stdGaussian E)) = 0 := by
+  let L : StrongDual ℝ E := (innerSL ℝ g).smulRight μ
+  simpa [L, real_inner_smul_right, mul_comm] using
+    (integral_strongDual_stdGaussian (E := E) L)
+
+
+open MeasureTheory ProbabilityTheory
+open scoped InnerProductSpace
+
+noncomputable section
+
+-- Generalization plan (G0):
+-- concept/name: square-integrability of a centered affine standard-Gaussian shift; orig was gaussian_shift_centered_sq_integrable_const_smul
+-- generality used: arbitrary finite-dimensional real inner-product space with its Borel and second-countable measurable structure, scalar shift and fixed center
+-- portable call pattern: Gaussian smoothing and random-direction proofs establish integrability of a quadratic smoothness term along x + μu; the space, scalar, and center vary while the conclusion is unchanged
+-- counterargument checked: this is not a caller-side rewrite because it packages Gaussian L² closure and is reusable across smoothing algorithms; no existing SOptLib or Mathlib declaration states this centered affine standard-Gaussian contract
+-- coverage search: searched standard-Gaussian, centered affine shift, scalar-multiple, and squared-norm integrability; IsGaussian.memLp_two_id and memLp_two_iff_integrable_sq_norm provide ingredients only, while no matching theorem was found
+-- minimal hypotheses: finite-dimensionality, BorelSpace, and SecondCountableTopology are retained because the standard Gaussian measure and its Gaussian integrability instance require them; no optimization assumptions are used
+
+/-- The squared norm of a centered affine shift is integrable under a standard Gaussian.
+
+Layer: Glue | Gap: Level 1 (standard-Gaussian affine-shift square integrability)
+Proof: obtain `L²` membership of the scalar multiple from Gaussian integrability, convert it to squared-norm integrability, and rewrite the centered difference by additive-group algebra.
+Source: Mathlib multivariate Gaussian Fernique moments, `MemLp` scalar closure, and squared-norm integrability characterization
+Used in: Gaussian smoothing proofs when the quadratic smoothness remainder is integrated along the random direction `x + μu`
+Book citation: book/FOML/StochasticZerothOrder.json#/algorithm_spec
+Origin algorithm: G. Lan, First-Order and Stochastic Optimization Methods for Machine Learning, randomized stochastic gradient-free method -/
+theorem integrable_norm_sub_self_add_const_smul_sq_stdGaussian
+    {E : Type*}
+    [NormedAddCommGroup E] [InnerProductSpace ℝ E] [FiniteDimensional ℝ E]
+    [MeasurableSpace E] [BorelSpace E] [SecondCountableTopology E]
+    (μ : ℝ) (x : E) :
+    Integrable (fun u : E => ‖x - (x + μ • u)‖ ^ (2 : ℕ))
+      (stdGaussian E) := by
+  have hmem :
+      MemLp (fun u : E => μ • u) 2 (stdGaussian E) :=
+    (IsGaussian.memLp_two_id (μ := stdGaussian E)).const_smul μ
+  have hsq :
+      Integrable (fun u : E => ‖μ • u‖ ^ (2 : ℕ)) (stdGaussian E) := by
+    simpa using
+      (memLp_two_iff_integrable_sq_norm hmem.aestronglyMeasurable).1 hmem
+  simpa [sub_eq_add_neg, add_comm, add_left_comm, add_assoc] using hsq
+
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: centered affine-shift squared-norm integral scaling; orig was
+--   local `hshift_sq` inside `gaussianSmoothing_abs_sub_objective_le`, renamed
+--   away from Gaussian smoothing and setup-field vocabulary.
+-- generality used: arbitrary measured real normed vector space, a deterministic
+--   center, and a real scalar; no probability, Gaussian, independence,
+--   convexity, smoothness, completeness, inner-product, or finite-dimensional
+--   assumptions are used.
+-- portable call pattern: stochastic zeroth-order, smoothing, random-direction,
+--   and perturbation proofs evaluate a deterministic shifted second moment
+--   `‖x - (x + μ u)‖²` by reducing it to `μ²` times the direction second
+--   moment while changing the law, center, scalar, and direction space.
+-- counterargument checked: not paper-local traceability because the statement
+--   is the reusable deterministic translation/scaling step behind many random
+--   perturbation moment calculations; not a pure rename because no existing
+--   SOptLib hit packages the affine cancellation and integral scaling in one
+--   theorem.
+-- coverage search: queried `integral norm sub self add const smul squared
+--   equals constant times second moment`, `integral norm affine shift squared
+--   const smul`, `norm sub self add smul equals norm smul`, and LeanSearch for
+--   squared norm of scalar multiple under an integral. Top hits were SOptLib
+--   variance/centering lemmas, L2 closure lemmas, and Mathlib
+--   `MeasureTheory.integral_const_mul`; all were partial rather than this
+--   affine-shift second-moment equality.
+-- minimal hypotheses: all algorithm setup fields are reduced to the measured
+--   normed-space structure and deterministic parameters actually used by the
+--   proof; integrability is not required because Mathlib's Bochner integral
+--   scalar-linearity theorem is unconditional.
+
+/-- The squared norm of a centered deterministic affine shift integrates as the
+scalar square times the direction second moment.
+
+For any measure on a real normed vector space, translating by a fixed center
+cancels pointwise in `x - (x + μ • u)`, leaving the square of the scalar
+multiple of the direction.
+
+Layer: Glue | Gap: Level 0 (affine-shift second-moment scaling)
+Proof: prove the pointwise identity by additive-group algebra and `norm_smul`,
+  then use Bochner integral congruence and `MeasureTheory.integral_const_mul`.
+Source: Mathlib normed real vector spaces, scalar norm identities, and Bochner
+  integral scalar-linearity
+Used in: randomized stochastic gradient-free Gaussian smoothing error estimates
+  when the smoothness quadratic is averaged over random directions
+Book citation: book/FOML/StochasticZerothOrder.json#/algorithm_spec/parameters/2
+Origin algorithm: Lan, First-Order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic gradient-free method -/
+theorem integral_norm_sub_self_add_const_smul_sq_eq_const_mul
+    {E : Type*} [MeasurableSpace E]
+    [SeminormedAddCommGroup E] [NormedSpace ℝ E]
+    (ν : Measure E) (μ : ℝ) (x : E) :
+    (∫ u : E, ‖x - (x + μ • u)‖ ^ (2 : ℕ) ∂ν) =
+      μ ^ (2 : ℕ) * (∫ u : E, ‖u‖ ^ (2 : ℕ) ∂ν) := by
+  calc
+    (∫ u : E, ‖x - (x + μ • u)‖ ^ (2 : ℕ) ∂ν)
+        = ∫ u : E, μ ^ (2 : ℕ) * ‖u‖ ^ (2 : ℕ) ∂ν := by
+            refine integral_congr_ae (Filter.Eventually.of_forall ?_)
+            intro u
+            have hsub : x - (x + μ • u) = -(μ • u) := by
+              abel
+            calc
+              ‖x - (x + μ • u)‖ ^ (2 : ℕ)
+                  = ‖μ • u‖ ^ (2 : ℕ) := by
+                      rw [hsub, norm_neg]
+              _ = μ ^ (2 : ℕ) * ‖u‖ ^ (2 : ℕ) := by
+                  rw [norm_smul]
+                  rw [pow_two, pow_two, Real.norm_eq_abs]
+                  calc
+                    |μ| * ‖u‖ * (|μ| * ‖u‖)
+                        = (|μ| * |μ|) * (‖u‖ * ‖u‖) := by ring
+                    _ = (μ * μ) * (‖u‖ * ‖u‖) := by
+                        rw [abs_mul_abs_self]
+                    _ = μ * μ * ‖u‖ ^ 2 := by rw [pow_two]
+    _ = μ ^ (2 : ℕ) * (∫ u : E, ‖u‖ ^ (2 : ℕ) ∂ν) := by
+      rw [integral_const_mul]
+
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: product integrability from an a.e. norm-fiber integral bound.
+-- generality used: arbitrary measurable spaces W and Smp, arbitrary measures μ and ν with
+--   `SFinite ν`, an arbitrary normed additive codomain E, a product a.e.-strongly
+--   measurable kernel φ, a.e. integrable fixed fibers, and an integrable real bound B.
+--   No probability, independence, convexity, smoothness, oracle, filtration, normed-space
+--   over ℝ, or finite-dimensional assumptions are used.
+-- portable call pattern: stochastic-gradient, zeroth-order, random-query, and
+--   variance-reduction proofs can use this before Fubini when product kernel fiber L1
+--   norms are controlled by a query-dependent budget; W, Smp, E, μ, ν, φ, and B vary
+--   while the dominated product-integrability conclusion stays the same.
+-- counterargument checked: not a Mathlib duplicate because Mathlib `integrable_prod_iff`
+--   reduces the goal to outer norm-integrability but does not package domination by an
+--   integrable bound; not paper-local because the statement is the product-measure core
+--   under existing independent-random-variable transfer lemmas.
+-- coverage search: searched `product integrability norm fiber integral bounded by
+--   integrable function`, `Integrable product a.e. fiber integrable norm integral
+--   dominated`, and semantic Mathlib search for product Bochner integrability under
+--   dominated norm-fiber integrals. Top hits were Mathlib `MeasureTheory.integrable_prod_iff`
+--   and `MeasureTheory.hasFiniteIntegral_prod_iff`, plus SOptLib independent-composition
+--   transfers; these are ingredients or higher-level random-variable corollaries, not this
+--   product-measure core.
+-- minimal hypotheses: `SFinite ν` is exactly the Mathlib product-integrability
+--   requirement, and no pointwise fiber assumptions are retained.
+
+/-- A product-measure kernel is integrable when almost every fixed right fiber is
+integrable and its norm integral is dominated by an integrable left-coordinate bound.
+
+Layer: Glue | Gap: Level 1 (product-measure integrability from norm-fiber L1 domination)
+Proof: rewrite product integrability with Mathlib `integrable_prod_iff`; the a.e.
+  norm-fiber bound and `Integrable.mono` transfer outer integrability from the bound.
+Source: Mathlib product-measure Bochner integration API and ordered real integral
+  monotonicity
+Used in: randomized stochastic gradient-free residual proofs before applying Fubini to
+  a fresh-coordinate product law with a prefix-dependent scalar budget
+Book citation: book/FOML/StochasticZerothOrder.json#/algorithm_spec
+Origin algorithm: Lan, First-Order and Stochastic Optimization Methods for Machine
+  Learning, randomized stochastic gradient-free method -/
+theorem integrable_prod_of_fiber_integral_norm_le_integrable_bound
+    {W Smp E : Type*} [MeasurableSpace W] [MeasurableSpace Smp]
+    [NormedAddCommGroup E]
+    {μ : Measure W} {ν : Measure Smp} [SFinite ν]
+    {φ : W → Smp → E} {B : W → ℝ}
+    (hφ_prod :
+      AEStronglyMeasurable
+        (fun p : W × Smp => φ p.1 p.2) (μ.prod ν))
+    (hfixed_int : ∀ᵐ w ∂μ, Integrable (fun s => φ w s) ν)
+    (hB_int : Integrable B μ)
+    (hfixed_norm_bound : ∀ᵐ w ∂μ, ∫ s, ‖φ w s‖ ∂ν ≤ B w) :
+    Integrable (fun p : W × Smp => φ p.1 p.2) (μ.prod ν) := by
+  rw [MeasureTheory.integrable_prod_iff hφ_prod]
+  refine ⟨hfixed_int, ?_⟩
+  refine Integrable.mono hB_int hφ_prod.norm.integral_prod_right' ?_
+  filter_upwards [hfixed_norm_bound] with w hbound
+  have h_int_nonneg : 0 ≤ ∫ s, ‖φ w s‖ ∂ν :=
+    integral_nonneg fun s => norm_nonneg (φ w s)
+  have hB_nonneg : 0 ≤ B w :=
+    le_trans h_int_nonneg hbound
+  simpa [Real.norm_of_nonneg h_int_nonneg, Real.norm_of_nonneg hB_nonneg] using
+    hbound
+
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: centered L2 preservation under subtracting a deterministic scalar multiple;
+--   orig was `integrable_sq_norm_affine_update_of_l2`, renamed away from stochastic-gradient
+--   update vocabulary to the expression-level affine closure it proves.
+-- generality used: arbitrary measurable sample space, arbitrary measure, normed additive
+--   commutative group with a real normed-space structure, two vector processes, one fixed
+--   center, and one scalar; no probability, independence, convexity, smoothness, filtration,
+--   inner-product, completeness, or finite-dimensional assumptions are used.
+-- portable call pattern: stochastic-gradient, zeroth-order, variance-reduction, and
+--   stochastic approximation proofs use this after an update `x - gamma • g` to keep the
+--   next iterate square-integrable around a deterministic center while changing the law,
+--   state process, direction process, center, and stepsize.
+-- counterargument checked: not paper-local because the statement is the reusable L2 closure
+--   step behind many stochastic update rules; not a pure wrapper because it packages the
+--   centered displacement rewrite together with `MemLp` subtraction and scalar closure.
+-- coverage search: queried `integrable squared norm affine combination L2 sub smul const`,
+--   `MemLp two squared norm integrable sub smul`, and `x minus scalar multiple g minus
+--   constant MemLp two integrable squared norm`. Top hits were SOptLib
+--   `integrable_sq_norm_const_sub_two_stage_affine`, `integrable_sq_norm_const_sub_affine_update`,
+--   and `integrable_sq_norm_sub`, plus Mathlib `memLp_two_iff_integrable_sq_norm`; these are
+--   partial because they either impose an affine-combination/update shape, a finite-measure
+--   center-blend API, or omit deterministic scalar multiplication and centering in one call.
+-- minimal hypotheses: all algorithm setup fields are reduced to a.e. strong measurability
+--   and the two squared-norm integrability hypotheses actually consumed by the proof.
+
+/-- Squared-norm integrability around a fixed center is preserved by subtracting a
+deterministic scalar multiple of another L2 vector process.
+
+Layer: Glue | Gap: Level 1 (centered L2 closure under scalar-subtraction update)
+Proof: convert both squared-norm assumptions to `MemLp` at exponent two, close under
+  deterministic scalar multiplication and subtraction, rewrite the centered update, and
+  convert back by `memLp_two_iff_integrable_sq_norm`.
+Source: Mathlib Lp-space closure, Bochner a.e. strong measurability, and squared-norm
+  integrability characterizations
+Used in: randomized stochastic gradient-free iterate integrability after the update
+  `x_{k+1} = x_k - gamma_k G_mu(x_k, xi_k, u_k)`
+Book citation: book/FOML/StochasticZerothOrder.json#/algorithm_spec/steps/2
+Origin algorithm: Lan, First-Order and Stochastic Optimization Methods for Machine
+  Learning, randomized stochastic gradient-free method -/
+theorem integrable_sq_norm_sub_smul_sub_const_of_l2
+    {Ω E : Type*} [MeasurableSpace Ω]
+    [NormedAddCommGroup E] [NormedSpace ℝ E]
+    {ν : Measure Ω}
+    (x g : Ω → E) (c : E) (γ : ℝ)
+    (hx_aesm : AEStronglyMeasurable x ν)
+    (hg_aesm : AEStronglyMeasurable g ν)
+    (hx_l2 : Integrable (fun ω : Ω => ‖x ω - c‖ ^ (2 : ℕ)) ν)
+    (hg_l2 : Integrable (fun ω : Ω => ‖g ω‖ ^ (2 : ℕ)) ν) :
+    Integrable
+      (fun ω : Ω => ‖(x ω - γ • g ω) - c‖ ^ (2 : ℕ)) ν := by
+  have hx_disp_aesm : AEStronglyMeasurable (fun ω : Ω => x ω - c) ν :=
+    hx_aesm.sub aestronglyMeasurable_const
+  have hx_disp_l2 : MemLp (fun ω : Ω => x ω - c) 2 ν :=
+    (memLp_two_iff_integrable_sq_norm hx_disp_aesm).2 hx_l2
+  have hg_mem_l2 : MemLp g 2 ν :=
+    (memLp_two_iff_integrable_sq_norm hg_aesm).2 hg_l2
+  have hraw_l2 : MemLp (fun ω : Ω => (x ω - c) - γ • g ω) 2 ν :=
+    hx_disp_l2.sub (hg_mem_l2.const_smul γ)
+  have htarget_l2 : MemLp (fun ω : Ω => (x ω - γ • g ω) - c) 2 ν := by
+    refine MemLp.ae_eq ?_ hraw_l2
+    refine Filter.Eventually.of_forall ?_
+    intro ω
+    change (x ω - c) - γ • g ω = (x ω - γ • g ω) - c
+    abel
+  exact (memLp_two_iff_integrable_sq_norm htarget_l2.aestronglyMeasurable).1
+    htarget_l2
+
+
+open Finset MeasureTheory ProbabilityTheory
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: coordinate square monomial moments for a finite product of
+--   independent standard real Gaussian coordinates; orig was the local cluster
+--   `pi_gaussian_sq_moment`/`pi_gaussian_sq_sq_moment`/
+--   `pi_gaussian_sq_sq_sq_moment`, renamed away from the stochastic
+--   zeroth-order algorithm section.
+-- generality used: arbitrary finite index type `ι` with decidable equality;
+--   the measure is the iid product law `Measure.pi (fun _ => gaussianReal 0 1)`;
+--   no filtration, oracle, convexity, smoothness, Hilbert space, or finite
+--   dimensional vector-space structure is used.
+-- portable call pattern: Gaussian smoothing and random-direction moment proofs
+--   expand norm powers into coordinate square monomials, then call this result
+--   for one, two, or three selected coordinates; the finite index type and
+--   selected coordinates vary while the moment formulas stay unchanged.
+-- counterargument checked: not paper-local traceability because the statement
+--   is a standard finite product Gaussian coordinate-moment contract; not a
+--   caller-side expression because it packages product-measure factorization
+--   with repeated-index case analysis; not covered by the one-dimensional
+--   moment bundle, which only supplies scalar `x^2`, `x^4`, and `x^6` moments.
+-- coverage search: queried `finite product standard Gaussian coordinate square
+--   monomial moment repeated indices`, `integral pi gaussianReal square
+--   monomial three coordinates equality cases`, and LeanSearch for finite
+--   product Gaussian squared-coordinate moments; hits were Mathlib
+--   `MeasureTheory.integral_fintype_prod_eq_prod`, the staged scalar
+--   `integral_pow_two_four_six_gaussianReal_zero_one`, and unrelated SOptLib
+--   finite-index product integral expansions, all partial rather than a public
+--   coordinate square monomial moment theorem.
+-- minimal hypotheses: all algorithm setup fields are eliminated; `[Fintype ι]`
+--   is needed for the finite product integral and `[DecidableEq ι]` for the
+--   repeated-coordinate case split.
+
+/-- Coordinate square monomial moments for an iid finite product of standard
+real Gaussian laws, through three selected coordinates.
+
+The theorem gives `E[Z_i^2]`, `E[Z_i^2 Z_j^2]`, and
+`E[Z_i^2 Z_j^2 Z_k^2]`, with the second and third formulas split by equality
+of the selected coordinates.
+
+Layer: Glue | Gap: Level 1 (finite product standard Gaussian square monomial moments)
+Proof: factor each monomial through `MeasureTheory.integral_fintype_prod_eq_prod`,
+  then reduce the finitely many coordinate factors to the scalar standard
+  Gaussian moments `1`, `3`, and `15`.
+Source: Mathlib finite product-measure integration and standard real Gaussian
+  low even moment identities
+Used in: randomized stochastic gradient-free Gaussian direction proofs after
+  expanding powers of coordinate-square sums into one-, two-, and three-factor
+  square monomials
+Book citation: book/FOML/StochasticZerothOrder.json#/algorithm_spec/parameters/1
+Origin algorithm: Lan, First-Order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic gradient-free method -/
+theorem integral_pi_gaussianReal_square_monomial_three
+    {ι : Type*} [Fintype ι] [DecidableEq ι] (i j k : ι) :
+    (∫ z : ι → ℝ, (z i) ^ (2 : ℕ)
+        ∂(Measure.pi fun _ : ι => gaussianReal 0 1) = 1) ∧
+      (∫ z : ι → ℝ, (z i) ^ (2 : ℕ) * (z j) ^ (2 : ℕ)
+          ∂(Measure.pi fun _ : ι => gaussianReal 0 1) =
+        if i = j then 3 else 1) ∧
+        (∫ z : ι → ℝ, (z i) ^ (2 : ℕ) * (z j) ^ (2 : ℕ) * (z k) ^ (2 : ℕ)
+            ∂(Measure.pi fun _ : ι => gaussianReal 0 1) =
+          if i = j then (if j = k then 15 else 3)
+          else if i = k then 3 else if j = k then 3 else 1) := by
+  have hsecond :
+      ∫ x : ℝ, x ^ (2 : ℕ) ∂(gaussianReal 0 1) = 1 :=
+    integral_pow_two_four_six_gaussianReal_zero_one.1
+  have hfourth :
+      ∫ x : ℝ, x ^ (4 : ℕ) ∂(gaussianReal 0 1) = 3 :=
+    integral_pow_two_four_six_gaussianReal_zero_one.2.1
+  have hsixth :
+      ∫ x : ℝ, x ^ (6 : ℕ) ∂(gaussianReal 0 1) = 15 :=
+    integral_pow_two_four_six_gaussianReal_zero_one.2.2
+  have hsq_sq :
+      ∫ x : ℝ, (x ^ (2 : ℕ)) * (x ^ (2 : ℕ)) ∂(gaussianReal 0 1) = 3 := by
+    calc
+      ∫ x : ℝ, (x ^ (2 : ℕ)) * (x ^ (2 : ℕ)) ∂(gaussianReal 0 1)
+          = ∫ x : ℝ, x ^ (4 : ℕ) ∂(gaussianReal 0 1) := by
+              refine MeasureTheory.integral_congr_ae ?_
+              exact Filter.Eventually.of_forall fun x => by ring
+      _ = 3 := hfourth
+  have hsq_sq_sq :
+      ∫ x : ℝ, (x ^ (2 : ℕ)) * (x ^ (2 : ℕ)) * (x ^ (2 : ℕ))
+        ∂(gaussianReal 0 1) = 15 := by
+    calc
+      ∫ x : ℝ, (x ^ (2 : ℕ)) * (x ^ (2 : ℕ)) * (x ^ (2 : ℕ))
+          ∂(gaussianReal 0 1)
+          = ∫ x : ℝ, x ^ (6 : ℕ) ∂(gaussianReal 0 1) := by
+              refine MeasureTheory.integral_congr_ae ?_
+              exact Filter.Eventually.of_forall fun x => by ring
+      _ = 15 := hsixth
+  constructor
+  · have hprod :
+        (fun z : ι → ℝ => (z i) ^ (2 : ℕ)) =
+          fun z => ∏ l, if l = i then (z l) ^ (2 : ℕ) else 1 := by
+      ext z
+      rw [Fintype.prod_ite_eq' (i := i) (f := fun l => (z l) ^ (2 : ℕ))]
+    rw [hprod]
+    calc
+      (∫ z : ι → ℝ, (∏ l, if l = i then (z l) ^ (2 : ℕ) else 1)
+        ∂(Measure.pi fun _ : ι => gaussianReal 0 1))
+          = ∏ l, ∫ x : ℝ, if l = i then x ^ (2 : ℕ) else 1
+              ∂(gaussianReal 0 1) := by
+                simpa using (MeasureTheory.integral_fintype_prod_eq_prod
+                  (f := fun l (x : ℝ) => if l = i then x ^ (2 : ℕ) else 1)
+                  (μ := fun _ : ι => gaussianReal 0 1))
+      _ = 1 := by
+            rw [Finset.prod_eq_mul_prod_diff_singleton_of_mem
+              (h := Finset.mem_univ i)]
+            simp [hsecond]
+            refine Finset.prod_eq_one ?_
+            intro x hx
+            have hxi : x ≠ i := by
+              simpa using hx
+            simp [hxi]
+  constructor
+  · by_cases hij : i = j
+    · subst j
+      have hprod :
+          (fun z : ι → ℝ => (z i) ^ (2 : ℕ) * (z i) ^ (2 : ℕ)) =
+            fun z => ∏ l, if l = i then (z l) ^ (4 : ℕ) else 1 := by
+        ext z
+        rw [Fintype.prod_ite_eq' (i := i) (f := fun l => (z l) ^ (4 : ℕ))]
+        ring
+      rw [hprod]
+      calc
+        (∫ z : ι → ℝ, ∏ l, if l = i then (z l) ^ (4 : ℕ) else 1
+          ∂(Measure.pi fun _ : ι => gaussianReal 0 1))
+            = ∏ l, ∫ x : ℝ, if l = i then x ^ (4 : ℕ) else 1
+                ∂(gaussianReal 0 1) := by
+                  simpa using (MeasureTheory.integral_fintype_prod_eq_prod
+                    (f := fun l (x : ℝ) => if l = i then x ^ (4 : ℕ) else 1)
+                    (μ := fun _ : ι => gaussianReal 0 1))
+        _ = 3 := by
+              rw [Finset.prod_eq_mul_prod_diff_singleton_of_mem
+                (h := Finset.mem_univ i)]
+              simp [hfourth]
+              refine Finset.prod_eq_one ?_
+              intro x hx
+              have hxi : x ≠ i := by
+                simpa using hx
+              simp [hxi]
+      simp
+    · have hprod :
+          (fun z : ι → ℝ => (z i) ^ (2 : ℕ) * (z j) ^ (2 : ℕ)) =
+            fun z => ∏ l, (if l = i then (z l) ^ (2 : ℕ) else 1) *
+              (if l = j then (z l) ^ (2 : ℕ) else 1) := by
+        ext z
+        rw [Finset.prod_mul_distrib, Fintype.prod_ite_eq', Fintype.prod_ite_eq']
+      rw [hprod]
+      calc
+        (∫ z : ι → ℝ,
+            ∏ l, (if l = i then (z l) ^ (2 : ℕ) else 1) *
+              (if l = j then (z l) ^ (2 : ℕ) else 1)
+          ∂(Measure.pi fun _ : ι => gaussianReal 0 1))
+            = ∏ l, ∫ x : ℝ,
+                (if l = i then x ^ (2 : ℕ) else 1) *
+                (if l = j then x ^ (2 : ℕ) else 1) ∂(gaussianReal 0 1) := by
+                  simpa using (MeasureTheory.integral_fintype_prod_eq_prod
+                    (f := fun l (x : ℝ) =>
+                      (if l = i then x ^ (2 : ℕ) else 1) *
+                      (if l = j then x ^ (2 : ℕ) else 1))
+                    (μ := fun _ : ι => gaussianReal 0 1))
+        _ = 1 := by
+              rw [Finset.prod_eq_mul_prod_diff_singleton_of_mem
+                (h := Finset.mem_univ i)]
+              simp [hij, hsecond]
+              refine Finset.prod_eq_one ?_
+              intro x hx
+              have hxi : x ≠ i := by
+                simpa using hx
+              by_cases hxj : x = j
+              · have hji : j ≠ i := by
+                  intro h
+                  exact hij h.symm
+                simp [hxj, hji, hsecond]
+              · simp [hxi, hxj]
+      simp [hij]
+  · have hprod :
+        (fun z : ι → ℝ => (z i) ^ (2 : ℕ) * (z j) ^ (2 : ℕ) * (z k) ^ (2 : ℕ)) =
+          fun z => ∏ l,
+            ((if l = i then (z l) ^ (2 : ℕ) else 1) *
+              (if l = j then (z l) ^ (2 : ℕ) else 1)) *
+              (if l = k then (z l) ^ (2 : ℕ) else 1) := by
+      ext z
+      rw [Finset.prod_mul_distrib, Finset.prod_mul_distrib,
+        Fintype.prod_ite_eq', Fintype.prod_ite_eq', Fintype.prod_ite_eq']
+    rw [hprod]
+    calc
+      (∫ z : ι → ℝ,
+          ∏ l,
+            ((if l = i then (z l) ^ (2 : ℕ) else 1) *
+              (if l = j then (z l) ^ (2 : ℕ) else 1)) *
+              (if l = k then (z l) ^ (2 : ℕ) else 1)
+        ∂(Measure.pi fun _ : ι => gaussianReal 0 1))
+          = ∏ l, ∫ x : ℝ,
+              ((if l = i then x ^ (2 : ℕ) else 1) *
+                (if l = j then x ^ (2 : ℕ) else 1)) *
+                (if l = k then x ^ (2 : ℕ) else 1) ∂(gaussianReal 0 1) := by
+              simpa using (MeasureTheory.integral_fintype_prod_eq_prod
+                (f := fun l (x : ℝ) =>
+                  ((if l = i then x ^ (2 : ℕ) else 1) *
+                    (if l = j then x ^ (2 : ℕ) else 1)) *
+                    (if l = k then x ^ (2 : ℕ) else 1))
+                (μ := fun _ : ι => gaussianReal 0 1))
+      _ = if i = j then (if j = k then 15 else 3)
+          else if i = k then 3 else if j = k then 3 else 1 := by
+            by_cases hij : i = j
+            · subst j
+              by_cases hik : i = k
+              · subst k
+                rw [Finset.prod_eq_mul_prod_diff_singleton_of_mem
+                  (h := Finset.mem_univ i)]
+                simp [hsq_sq_sq]
+                refine Finset.prod_eq_one ?_
+                intro x hx
+                have hxi : x ≠ i := by
+                  simpa using hx
+                simp [hxi]
+              · rw [Finset.prod_eq_mul_prod_diff_singleton_of_mem
+                  (h := Finset.mem_univ i)]
+                simp [hik, hsq_sq]
+                refine Finset.prod_eq_one ?_
+                intro x hx
+                have hxi : x ≠ i := by
+                  simpa using hx
+                by_cases hxk : x = k
+                · have hki : k ≠ i := by
+                    intro h
+                    exact hik h.symm
+                  simp [hxi, hxk, hki, hsecond]
+                · simp [hxi, hxk]
+            · by_cases hik : i = k
+              · subst k
+                rw [Finset.prod_eq_mul_prod_diff_singleton_of_mem
+                  (h := Finset.mem_univ i)]
+                have hji : j ≠ i := by
+                  intro h
+                  exact hij h.symm
+                simp [hij, hji, hsq_sq]
+                refine Finset.prod_eq_one ?_
+                intro x hx
+                have hxi : x ≠ i := by
+                  simpa using hx
+                by_cases hxj : x = j
+                · simp [hxi, hxj, hji, hsecond]
+                · simp [hxi, hxj]
+              · by_cases hjk : j = k
+                · subst k
+                  rw [Finset.prod_eq_mul_prod_diff_singleton_of_mem
+                    (h := Finset.mem_univ j)]
+                  have hji : j ≠ i := by
+                    intro h
+                    exact hij h.symm
+                  simp [hij, hik, hji, hsq_sq]
+                  refine Finset.prod_eq_one ?_
+                  intro x hx
+                  have hxj : x ≠ j := by
+                    simpa using hx
+                  by_cases hxi : x = i
+                  · simp [hxi, hxj, hik, hsecond]
+                  · simp [hxi, hxj]
+                · simp [hij, hik, hjk]
+                  refine Finset.prod_eq_one ?_
+                  intro x hx
+                  have hji : j ≠ i := by
+                    intro h
+                    exact hij h.symm
+                  have hki : k ≠ i := by
+                    intro h
+                    exact hik h.symm
+                  have hkj : k ≠ j := by
+                    intro h
+                    exact hjk h.symm
+                  by_cases hxi : x = i
+                  · have hxj : x ≠ j := by
+                      intro h
+                      exact hij (hxi.symm.trans h)
+                    have hxk : x ≠ k := by
+                      intro h
+                      exact hik (hxi.symm.trans h)
+                    simp [hxi, hxj, hxk, hij, hik, hsecond]
+                  · by_cases hxj : x = j
+                    · have hxk : x ≠ k := by
+                        intro h
+                        exact hjk (hxj.symm.trans h)
+                      simp [hxi, hxj, hxk, hji, hjk, hsecond]
+                    · by_cases hxk : x = k
+                      · simp [hxi, hxj, hxk, hki, hkj, hsecond]
+                      · simp [hxi, hxj, hxk]
+
+
+open Finset MeasureTheory ProbabilityTheory
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: vanishing mixed odd-even coordinate monomial under a finite
+--   iid standard Gaussian product law; orig was `pi_gaussian_mixed_zero`.
+-- generality used: arbitrary finite index type `ι` with decidable equality;
+--   the measure is `Measure.pi (fun _ => gaussianReal 0 1)`; no optimization,
+--   filtration, smoothness, Hilbert-space, or finite-dimensional assumptions.
+-- portable call pattern: Gaussian random-direction expansions contain a factor
+--   `Z_i * Z_k * Z_j^2`; whenever `i ≠ k`, factorization exposes an odd scalar
+--   Gaussian coordinate and the mixed integral cancels.  The index type and
+--   selected coordinates vary across algorithms.
+-- counterargument checked: not paper-local traceability or a caller-side
+--   wrapper: it packages finite product integration, equality cases, and odd
+--   Gaussian cancellation.  The staged even square-monomial theorem does not
+--   cover a product with two unsquared coordinates.
+-- coverage search: searched `finite product Gaussian mixed coordinate monomial
+--   odd zero integral unequal coordinates`; Mathlib provided only the product
+--   integral factorization and scalar Gaussian integral, while the existing
+--   staged square-moment theorem was partial rather than a duplicate.
+-- minimal hypotheses: `[Fintype ι]` is required for finite product integration
+--   and `[DecidableEq ι]` for the coordinate equality split; all setup fields
+--   are eliminated.
+
+/-- A mixed coordinate monomial with an odd coordinate has zero expectation
+under a finite product of independent standard real Gaussian laws whenever the
+two unsquared coordinates are distinct.
+
+Layer: Glue | Gap: Level 1 (finite product Gaussian odd-coordinate cancellation)
+Proof: factor the monomial into coordinate-wise factors with
+  `MeasureTheory.integral_fintype_prod_eq_prod`; in each equality case, one of
+  the distinct unsquared coordinates contributes the scalar zero Gaussian mean.
+Source: Mathlib finite product-measure integration and the standard Gaussian
+  first-moment identity
+Used in: Gaussian random-direction moment expansions, where mixed terms with
+  distinct unsquared coordinates are discarded before summing coordinate cases
+Book citation: book/FOML/StochasticZerothOrder.json#/algorithm_spec/parameters/1
+Origin algorithm: Lan, First-Order and Stochastic Optimization Methods for Machine Learning, randomized stochastic gradient-free method -/
+theorem integral_pi_gaussianReal_mul_mul_sq_eq_zero_of_ne
+    {ι : Type*} [Fintype ι] [DecidableEq ι] (i k j : ι) (hik : i ≠ k) :
+    (∫ z : ι → ℝ, z i * z k * (z j) ^ (2 : ℕ)
+      ∂(Measure.pi fun _ : ι => gaussianReal 0 1)) = 0 := by
+  have h1 : (∫ x : ℝ, x ∂(gaussianReal 0 1)) = 0 := by
+    simpa using (integral_id_gaussianReal (μ := 0) (v := (1 : ℝ≥0)))
+  by_cases hji : j = i
+  · subst j
+    have hprod :
+        (fun z : ι → ℝ => z i * z k * (z i) ^ (2 : ℕ)) =
+          fun z => ∏ l, (if l = i then (z l) ^ (3 : ℕ) else 1) *
+            (if l = k then z l else 1) := by
+      ext z
+      rw [Finset.prod_mul_distrib, Fintype.prod_ite_eq', Fintype.prod_ite_eq']
+      ring
+    rw [hprod]
+    calc
+      (∫ z : ι → ℝ,
+          ∏ l, (if l = i then (z l) ^ (3 : ℕ) else 1) *
+            (if l = k then z l else 1)
+        ∂(Measure.pi fun _ : ι => gaussianReal 0 1))
+          = ∏ l, ∫ x : ℝ,
+              (if l = i then x ^ (3 : ℕ) else 1) *
+              (if l = k then x else 1) ∂(gaussianReal 0 1) := by
+                simpa using (MeasureTheory.integral_fintype_prod_eq_prod
+                  (f := fun l (x : ℝ) =>
+                    (if l = i then x ^ (3 : ℕ) else 1) *
+                    (if l = k then x else 1))
+                  (μ := fun _ : ι => gaussianReal 0 1))
+        _ = 0 := by
+              rw [Finset.prod_eq_zero_iff]
+              refine ⟨k, Finset.mem_univ k, ?_⟩
+              have hki : k ≠ i := by
+                simpa using hik.symm
+              simp [hki, h1]
+  · by_cases hjk : j = k
+    · subst j
+      have hprod :
+          (fun z : ι → ℝ => z i * z k * (z k) ^ (2 : ℕ)) =
+            fun z => ∏ l, (if l = i then z l else 1) *
+              (if l = k then (z l) ^ (3 : ℕ) else 1) := by
+        ext z
+        rw [Finset.prod_mul_distrib, Fintype.prod_ite_eq', Fintype.prod_ite_eq']
+        ring
+      rw [hprod]
+      calc
+        (∫ z : ι → ℝ,
+            ∏ l, (if l = i then z l else 1) *
+              (if l = k then (z l) ^ (3 : ℕ) else 1)
+          ∂(Measure.pi fun _ : ι => gaussianReal 0 1))
+            = ∏ l, ∫ x : ℝ,
+                (if l = i then x else 1) *
+                (if l = k then x ^ (3 : ℕ) else 1) ∂(gaussianReal 0 1) := by
+                  simpa using (MeasureTheory.integral_fintype_prod_eq_prod
+                    (f := fun l (x : ℝ) =>
+                      (if l = i then x else 1) *
+                      (if l = k then x ^ (3 : ℕ) else 1))
+                    (μ := fun _ : ι => gaussianReal 0 1))
+        _ = 0 := by
+              rw [Finset.prod_eq_zero_iff]
+              refine ⟨i, Finset.mem_univ i, ?_⟩
+              simp [hik, h1]
+    · have hprod :
+          (fun z : ι → ℝ => z i * z k * (z j) ^ (2 : ℕ)) =
+            fun z => ∏ l, (if l = i then z l else 1) *
+              (if l = k then z l else 1) *
+              (if l = j then (z l) ^ (2 : ℕ) else 1) := by
+        ext z
+        rw [Finset.prod_mul_distrib, Finset.prod_mul_distrib,
+          Fintype.prod_ite_eq', Fintype.prod_ite_eq', Fintype.prod_ite_eq']
+      rw [hprod]
+      calc
+        (∫ z : ι → ℝ,
+            ∏ l, ((if l = i then z l else 1) * (if l = k then z l else 1)) *
+              (if l = j then (z l) ^ (2 : ℕ) else 1)
+          ∂(Measure.pi fun _ : ι => gaussianReal 0 1))
+            = ∏ l, ∫ x : ℝ,
+                ((if l = i then x else 1) * (if l = k then x else 1)) *
+                  (if l = j then x ^ (2 : ℕ) else 1) ∂(gaussianReal 0 1) := by
+                    simpa using (MeasureTheory.integral_fintype_prod_eq_prod
+                      (f := fun l (x : ℝ) =>
+                        ((if l = i then x else 1) * (if l = k then x else 1)) *
+                          (if l = j then x ^ (2 : ℕ) else 1))
+                      (μ := fun _ : ι => gaussianReal 0 1))
+        _ = 0 := by
+              rw [Finset.prod_eq_zero_iff]
+              refine ⟨i, Finset.mem_univ i, ?_⟩
+              have hij' : i ≠ j := by
+                intro h
+                exact hji h.symm
+              simp [hik, hij', h1]
+
+
+open Finset MeasureTheory ProbabilityTheory
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: fourth mixed moment of a linear form and the squared Euclidean
+--   norm under a finite standard Gaussian product law; orig was
+--   `pi_gaussian_rank_one_fourth_moment_collapse`.
+-- generality used: arbitrary finite index type `ι` with decidable equality and
+--   a real coefficient family `a`; the only measure is the iid product
+--   `Measure.pi (fun _ => gaussianReal 0 1)`, with no Hilbert-space, oracle,
+--   filtration, convexity, or smoothness assumptions.
+-- portable call pattern: Gaussian random-direction and smoothing analyses use
+--   this identity to replace `E[(a dot Z)^2 * sum_j Z_j^2]` by
+--   `(card ι + 2) * sum_i a_i^2`; the dimension index and coefficient vector
+--   vary while the collapse formula stays unchanged.
+-- counterargument checked: this is not paper-local traceability or a one-line
+--   wrapper; it combines an off-diagonal odd-moment cancellation, fourth
+--   coordinate moments, integrability, and finite diagonal aggregation.
+-- coverage search: queried `product standard Gaussian integral square linear
+--   form times sum coordinate squares equals dimension plus two times sum
+--   coefficient squares` and LeanSearch for the corresponding standard
+--   Gaussian expectation; Mathlib covariance and Gaussian MGF results were
+--   partial, while the staged coordinate-square monomial theorem supplies only
+--   an internal ingredient and does not state this linear-form collapse.
+-- minimal hypotheses: `[Fintype ι]` controls the product law and finite sums;
+--   `[DecidableEq ι]` is used for diagonal/off-diagonal splitting; all
+--   algorithm-specific setup and finite-dimensional vector-space assumptions
+--   are eliminated.
+
+/-- For an iid finite family of standard real Gaussians, the fourth mixed
+moment of a linear form and the sum of coordinate squares is `(card ι + 2)`
+times the squared coefficient norm.
+
+Layer: Glue | Gap: Level 1 (finite product Gaussian linear-form fourth moment)
+Proof: expand into coordinate quartic monomials, cancel off-diagonal terms by
+  the vanishing first moment, and evaluate diagonal terms with the standard
+  Gaussian second and fourth coordinate moments.
+Source: Mathlib finite product-measure integration together with standard real
+  Gaussian first moments and finite product Gaussian square monomial moments
+Used in: Gaussian random-direction second-moment bounds for rank-one linear
+  oracle terms after passage to orthonormal-basis coordinates
+Book citation: book/FOML/StochasticZerothOrder.json#/algorithm_spec/parameters/1
+Origin algorithm: Lan, First-Order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic gradient-free method -/
+theorem integral_pi_gaussianReal_linear_sq_mul_sum_sq
+    {ι : Type*} [Fintype ι] [DecidableEq ι] (a : ι → ℝ) :
+    (∫ z : ι → ℝ,
+        ((∑ i, a i * z i) ^ (2 : ℕ)) * (∑ j, (z j) ^ (2 : ℕ))
+        ∂(Measure.pi fun _ : ι => gaussianReal 0 1)) =
+      (((Fintype.card ι : ℝ) + 2) * ∑ i, (a i) ^ (2 : ℕ)) := by
+  have hsq_sq_moment (i j : ι) :
+      (∫ z : ι → ℝ, (z i) ^ (2 : ℕ) * (z j) ^ (2 : ℕ)
+        ∂(Measure.pi fun _ : ι => gaussianReal 0 1)) =
+        if i = j then 3 else 1 :=
+    (integral_pi_gaussianReal_square_monomial_three (i := i) (j := j) (k := i)).2.1
+  have hsq_sq_integrable (i j : ι) :
+      Integrable (fun z : ι → ℝ => (z i) ^ (2 : ℕ) * (z j) ^ (2 : ℕ))
+        (Measure.pi fun _ : ι => gaussianReal 0 1) := by
+    let f : (ι → ℝ) → ℝ := fun z => (z i) ^ (2 : ℕ) * (z j) ^ (2 : ℕ)
+    have hf_meas :
+        AEStronglyMeasurable f (Measure.pi fun _ : ι => gaussianReal 0 1) := by
+      exact (((continuous_apply i).pow 2).mul
+        ((continuous_apply j).pow 2)).aestronglyMeasurable
+    have hf_nonneg : ∀ z : ι → ℝ, 0 ≤ f z := by
+      intro z
+      dsimp [f]
+      positivity
+    refine ⟨hf_meas, ?_⟩
+    have hf_nonneg_ae : 0 ≤ᵐ[Measure.pi fun _ : ι => gaussianReal 0 1] f :=
+      Filter.Eventually.of_forall hf_nonneg
+    rw [MeasureTheory.hasFiniteIntegral_iff_ofReal hf_nonneg_ae]
+    refine lt_top_iff_ne_top.mpr ?_
+    have h_toReal :
+        ENNReal.toReal
+            (∫⁻ z, ENNReal.ofReal (f z)
+              ∂(Measure.pi fun _ : ι => gaussianReal 0 1)) =
+          if i = j then 3 else 1 := by
+      simpa [f, MeasureTheory.integral_eq_lintegral_of_nonneg_ae
+        hf_nonneg_ae hf_meas] using hsq_sq_moment i j
+    intro htop
+    rw [htop, ENNReal.toReal_top] at h_toReal
+    by_cases hij : i = j <;> simp [hij] at h_toReal
+  have hcubic_integrable (i k j : ι) :
+      Integrable (fun z : ι → ℝ => z i * z k * (z j) ^ (2 : ℕ))
+        (Measure.pi fun _ : ι => gaussianReal 0 1) := by
+    let f : (ι → ℝ) → ℝ := fun z => z i * z k * (z j) ^ (2 : ℕ)
+    let g : (ι → ℝ) → ℝ := fun z =>
+      (1 / 2 : ℝ) *
+        (((z i) ^ (2 : ℕ) * (z j) ^ (2 : ℕ)) +
+          ((z k) ^ (2 : ℕ) * (z j) ^ (2 : ℕ)))
+    have hf_meas :
+        AEStronglyMeasurable f (Measure.pi fun _ : ι => gaussianReal 0 1) := by
+      exact (((continuous_apply i).mul (continuous_apply k)).mul
+        ((continuous_apply j).pow 2)).aestronglyMeasurable
+    have hg_int :
+        Integrable g (Measure.pi fun _ : ι => gaussianReal 0 1) := by
+      simpa [g] using
+        ((hsq_sq_integrable i j).add (hsq_sq_integrable k j)).const_mul (1 / 2 : ℝ)
+    have hdom : ∀ z : ι → ℝ, ‖f z‖ ≤ g z := by
+      intro z
+      have hj_nonneg : 0 ≤ z j ^ (2 : ℕ) := by positivity
+      have habs :
+          |z i * z k| ≤ ((z i) ^ (2 : ℕ) + (z k) ^ (2 : ℕ)) / 2 := by
+        by_cases hnonneg : 0 ≤ z i * z k
+        · rw [abs_of_nonneg hnonneg]
+          nlinarith [sq_nonneg (z i - z k)]
+        · rw [abs_of_nonpos (le_of_not_ge hnonneg)]
+          nlinarith [sq_nonneg (z i + z k)]
+      calc
+        ‖f z‖ = |z i * z k| * (z j) ^ (2 : ℕ) := by
+          simp [f, Real.norm_eq_abs, abs_mul, mul_assoc]
+        _ ≤ (((z i) ^ (2 : ℕ) + (z k) ^ (2 : ℕ)) / 2) *
+              (z j) ^ (2 : ℕ) := by gcongr
+        _ = g z := by
+          dsimp [g]
+          ring
+    exact Integrable.mono' hg_int hf_meas (Filter.Eventually.of_forall hdom)
+  have hmixed_zero (i k j : ι) (hik : i ≠ k) :
+      (∫ z : ι → ℝ, z i * z k * (z j) ^ (2 : ℕ)
+        ∂(Measure.pi fun _ : ι => gaussianReal 0 1)) = 0 := by
+    have hfirst : (∫ x : ℝ, x ∂(gaussianReal 0 1)) = 0 := by
+      simpa using (integral_id_gaussianReal (μ := 0) (v := (1 : ℝ≥0)))
+    have hprod :
+        (fun z : ι → ℝ => z i * z k * (z j) ^ (2 : ℕ)) =
+          fun z =>
+            ∏ l, ((if l = i then z l else 1) *
+              (if l = k then z l else 1)) *
+                (if l = j then (z l) ^ (2 : ℕ) else 1) := by
+      ext z
+      rw [Finset.prod_mul_distrib, Finset.prod_mul_distrib,
+        Fintype.prod_ite_eq', Fintype.prod_ite_eq', Fintype.prod_ite_eq']
+    rw [hprod]
+    calc
+      (∫ z : ι → ℝ,
+          ∏ l, ((if l = i then z l else 1) *
+            (if l = k then z l else 1)) *
+              (if l = j then (z l) ^ (2 : ℕ) else 1)
+          ∂(Measure.pi fun _ : ι => gaussianReal 0 1)) =
+          ∏ l, ∫ x : ℝ,
+            ((if l = i then x else 1) * (if l = k then x else 1)) *
+              (if l = j then x ^ (2 : ℕ) else 1)
+            ∂(gaussianReal 0 1) := by
+        simpa using MeasureTheory.integral_fintype_prod_eq_prod
+          (f := fun l (x : ℝ) =>
+            ((if l = i then x else 1) * (if l = k then x else 1)) *
+              (if l = j then x ^ (2 : ℕ) else 1))
+          (μ := fun _ : ι => gaussianReal 0 1)
+      _ = 0 := by
+        rw [Finset.prod_eq_zero_iff]
+        by_cases hji : j = i
+        · refine ⟨k, Finset.mem_univ k, ?_⟩
+          have hki : k ≠ i := by simpa using hik.symm
+          simp [hki, hji, hfirst]
+        · refine ⟨i, Finset.mem_univ i, ?_⟩
+          have hij : i ≠ j := by
+            intro hij
+            exact hji hij.symm
+          simp [hik, hij, hfirst]
+  have h_expand :
+      ∀ z : ι → ℝ,
+        ((∑ i, a i * z i) ^ (2 : ℕ)) * (∑ j, (z j) ^ (2 : ℕ)) =
+          ∑ i, ∑ k, ∑ j,
+            (a i * a k) * (z i * z k * (z j) ^ (2 : ℕ)) := by
+    intro z
+    calc
+      ((∑ i, a i * z i) ^ (2 : ℕ)) * (∑ j, (z j) ^ (2 : ℕ)) =
+          ((∑ i, a i * z i) * (∑ k, a k * z k)) *
+            (∑ j, (z j) ^ (2 : ℕ)) := by ring
+      _ = (∑ i, ∑ k, (a i * z i) * (a k * z k)) *
+            (∑ j, (z j) ^ (2 : ℕ)) := by rw [Finset.sum_mul_sum]
+      _ = ∑ i, (∑ k, (a i * z i) * (a k * z k)) *
+            (∑ j, (z j) ^ (2 : ℕ)) := by rw [Finset.sum_mul]
+      _ = ∑ i, ∑ k, ((a i * z i) * (a k * z k)) *
+            (∑ j, (z j) ^ (2 : ℕ)) := by
+          refine Finset.sum_congr rfl ?_
+          intro i hi
+          rw [Finset.sum_mul]
+      _ = ∑ i, ∑ k, ∑ j,
+            ((a i * z i) * (a k * z k)) * ((z j) ^ (2 : ℕ)) := by
+          refine Finset.sum_congr rfl ?_
+          intro i hi
+          refine Finset.sum_congr rfl ?_
+          intro k hk
+          rw [Finset.mul_sum]
+      _ = ∑ i, ∑ k, ∑ j,
+            (a i * a k) * (z i * z k * (z j) ^ (2 : ℕ)) := by
+          refine Finset.sum_congr rfl ?_
+          intro i hi
+          refine Finset.sum_congr rfl ?_
+          intro k hk
+          refine Finset.sum_congr rfl ?_
+          intro j hj
+          ring
+  have hsum_j (i : ι) :
+      ∑ j : ι, (if i = j then (3 : ℝ) else 1) = (Fintype.card ι : ℝ) + 2 := by
+    calc
+      ∑ j : ι, (if i = j then (3 : ℝ) else 1) =
+          ∑ j : ι, (1 + if i = j then (2 : ℝ) else 0) := by
+        refine Finset.sum_congr rfl ?_
+        intro j hj
+        by_cases hij : i = j <;> simp [hij] <;> norm_num
+      _ = (∑ _j : ι, (1 : ℝ)) +
+          ∑ j : ι, (if i = j then (2 : ℝ) else 0) := by
+        rw [Finset.sum_add_distrib]
+      _ = (Fintype.card ι : ℝ) + 2 := by simp
+  have hterm_int (i k j : ι) :
+      Integrable
+        (fun z : ι → ℝ => (a i * a k) * (z i * z k * (z j) ^ (2 : ℕ)))
+        (Measure.pi fun _ : ι => gaussianReal 0 1) :=
+    (hcubic_integrable i k j).const_mul _
+  have hsum_j_int (i k : ι) :
+      Integrable
+        (fun z : ι → ℝ =>
+          ∑ j, (a i * a k) * (z i * z k * (z j) ^ (2 : ℕ)))
+        (Measure.pi fun _ : ι => gaussianReal 0 1) := by
+    exact MeasureTheory.integrable_finset_sum
+      (μ := Measure.pi fun _ : ι => gaussianReal 0 1)
+      (s := Finset.univ)
+      (f := fun j (z : ι → ℝ) =>
+        (a i * a k) * (z i * z k * (z j) ^ (2 : ℕ)))
+      (by
+        intro j hj
+        exact hterm_int i k j)
+  have hsum_kj_int (i : ι) :
+      Integrable
+        (fun z : ι → ℝ =>
+          ∑ k, ∑ j, (a i * a k) * (z i * z k * (z j) ^ (2 : ℕ)))
+        (Measure.pi fun _ : ι => gaussianReal 0 1) := by
+    exact MeasureTheory.integrable_finset_sum
+      (μ := Measure.pi fun _ : ι => gaussianReal 0 1)
+      (s := Finset.univ)
+      (f := fun k (z : ι → ℝ) =>
+        ∑ j, (a i * a k) * (z i * z k * (z j) ^ (2 : ℕ)))
+      (by
+        intro k hk
+        exact hsum_j_int i k)
+  calc
+    (∫ z : ι → ℝ,
+        ((∑ i, a i * z i) ^ (2 : ℕ)) * (∑ j, (z j) ^ (2 : ℕ))
+        ∂(Measure.pi fun _ : ι => gaussianReal 0 1)) =
+        ∫ z : ι → ℝ,
+          ∑ i, ∑ k, ∑ j,
+            (a i * a k) * (z i * z k * (z j) ^ (2 : ℕ))
+          ∂(Measure.pi fun _ : ι => gaussianReal 0 1) := by
+      refine MeasureTheory.integral_congr_ae ?_
+      exact Filter.Eventually.of_forall h_expand
+    _ = ∑ i, ∑ k, ∑ j,
+          ∫ z : ι → ℝ,
+            (a i * a k) * (z i * z k * (z j) ^ (2 : ℕ))
+            ∂(Measure.pi fun _ : ι => gaussianReal 0 1) := by
+      rw [MeasureTheory.integral_finset_sum _ (fun i _ => hsum_kj_int i)]
+      refine Finset.sum_congr rfl ?_
+      intro i hi
+      rw [MeasureTheory.integral_finset_sum _ (fun k _ => hsum_j_int i k)]
+      refine Finset.sum_congr rfl ?_
+      intro k hk
+      rw [MeasureTheory.integral_finset_sum _ (fun j _ => hterm_int i k j)]
+    _ = ∑ i, ∑ k, ∑ j,
+          (a i * a k) *
+            (∫ z : ι → ℝ, z i * z k * (z j) ^ (2 : ℕ)
+              ∂(Measure.pi fun _ : ι => gaussianReal 0 1)) := by
+      refine Finset.sum_congr rfl ?_
+      intro i hi
+      refine Finset.sum_congr rfl ?_
+      intro k hk
+      refine Finset.sum_congr rfl ?_
+      intro j hj
+      rw [MeasureTheory.integral_const_mul]
+    _ = ∑ i, ∑ k, ∑ j,
+          (a i * a k) *
+            (if i = k then (if i = j then (3 : ℝ) else 1) else 0) := by
+      refine Finset.sum_congr rfl ?_
+      intro i hi
+      refine Finset.sum_congr rfl ?_
+      intro k hk
+      refine Finset.sum_congr rfl ?_
+      intro j hj
+      by_cases hik : i = k
+      · subst k
+        have hsqint :
+            (∫ z : ι → ℝ, z i * z i * (z j) ^ (2 : ℕ)
+              ∂(Measure.pi fun _ : ι => gaussianReal 0 1)) =
+              ∫ z : ι → ℝ, (z i) ^ (2 : ℕ) * (z j) ^ (2 : ℕ)
+                ∂(Measure.pi fun _ : ι => gaussianReal 0 1) := by
+          refine MeasureTheory.integral_congr_ae ?_
+          exact Filter.Eventually.of_forall fun z => by ring
+        rw [hsqint, hsq_sq_moment]
+        by_cases hij : i = j <;> simp [hij]
+      · simp [hik, hmixed_zero i k j hik]
+    _ = ∑ i, ∑ k,
+          if i = k then (a i * a k) * ((Fintype.card ι : ℝ) + 2) else 0 := by
+      refine Finset.sum_congr rfl ?_
+      intro i hi
+      refine Finset.sum_congr rfl ?_
+      intro k hk
+      by_cases hik : i = k
+      · subst k
+        have hdiag :
+            ∑ j : ι,
+                (if i = j then a i * a i * (3 : ℝ) else a i * a i) =
+              (a i * a i) * ((Fintype.card ι : ℝ) + 2) := by
+          calc
+            ∑ j : ι,
+                (if i = j then a i * a i * (3 : ℝ) else a i * a i) =
+                ∑ j : ι,
+                  (a i * a i) * (if i = j then (3 : ℝ) else 1) := by
+              refine Finset.sum_congr rfl ?_
+              intro j hj
+              by_cases hij : i = j <;> simp [hij]
+            _ = (a i * a i) *
+                ∑ j : ι, (if i = j then (3 : ℝ) else 1) := by
+              rw [Finset.mul_sum]
+            _ = (a i * a i) * ((Fintype.card ι : ℝ) + 2) := by
+              rw [hsum_j i]
+        simpa using hdiag
+      · simp [hik]
+    _ = ∑ i, (a i * a i) * ((Fintype.card ι : ℝ) + 2) := by
+      refine Finset.sum_congr rfl ?_
+      intro i hi
+      rw [Finset.sum_eq_single i]
+      · simp
+      · intro k hk hik
+        have hik' : i ≠ k := by
+          intro hki
+          exact hik hki.symm
+        simp [hik']
+      · intro hi_not_mem
+        exact False.elim (hi_not_mem (Finset.mem_univ i))
+    _ = ((Fintype.card ι : ℝ) + 2) * ∑ i, (a i) ^ (2 : ℕ) := by
+      calc
+        ∑ i, (a i * a i) * ((Fintype.card ι : ℝ) + 2) =
+            ∑ i, (((Fintype.card ι : ℝ) + 2) * (a i) ^ (2 : ℕ)) := by
+          refine Finset.sum_congr rfl ?_
+          intro i hi
+          ring
+        _ = ((Fintype.card ι : ℝ) + 2) * ∑ i, (a i) ^ (2 : ℕ) := by
+          rw [Finset.mul_sum]
+
+
+
+open Finset MeasureTheory ProbabilityTheory
+open scoped BigOperators InnerProductSpace
+
+-- Generalization plan (G0):
+-- concept/name: standard Gaussian rank-one second moment; orig was integral_norm_inner_smul_sq_stdGaussian_eq
+-- generality used: a finite-dimensional real inner-product space with Borel and second-countable measurable structure; the vector v is explicit and the measure is the canonical standard Gaussian.
+-- portable call pattern: zeroth-order, random-search, and Gaussian-smoothing analyses rewrite the second moment of the rank-one Gaussian oracle; the ambient Hilbert space and vector change while the dimension-plus-two conclusion stays fixed.
+-- counterargument checked: this is not paper-local traceability or a caller-side expression; it packages orthonormal-basis transport and Parseval around the coordinate fourth-moment collapse. No existing Mathlib/SOptLib theorem had this complete contract.
+-- coverage search: searched standard Gaussian rank-one fourth moment, inner smul Gaussian norm integral, and dimension-plus-two Gaussian second moment; Mathlib covariance results were partial, while integral_pi_gaussianReal_linear_sq_mul_sum_sq supplies only the coordinate ingredient.
+-- minimal hypotheses: finite-dimensionality is needed for the finite orthonormal basis and standard Gaussian coordinate representation; CompleteSpace is inferred from finite-dimensionality and is not an explicit parameter.
+
+/-- The squared norm of a Gaussian rank-one vector has expectation equal to (finrank E + 2) times the squared norm of v.
+
+Layer: Glue | Gap: Level 1 (finite-dimensional Gaussian rank-one second moment)
+Proof: transport the integral through an orthonormal-basis coordinate map, apply the finite product Gaussian linear-form fourth-moment collapse, and finish with the basis coefficient norm identity.
+Source: Mathlib Gaussian measures, finite product integration, and Hilbert-space orthonormal-basis identities
+Used in: zeroth-order and random-direction analyses when bounding the second moment of a rank-one Gaussian oracle
+Book citation: book/FOML/StochasticZerothOrder.json#/algorithm_spec/parameters/1
+Origin algorithm: Lan, First-Order and Stochastic Optimization Methods for Machine Learning, randomized stochastic gradient-free method -/
+theorem integral_norm_inner_smul_sq_stdGaussian
+    {E : Type*}
+    [NormedAddCommGroup E] [InnerProductSpace ℝ E] [FiniteDimensional ℝ E]
+    [MeasurableSpace E] [BorelSpace E] [SecondCountableTopology E]
+    (v : E) :
+    (∫ u : E, ‖⟪v, u⟫_ℝ • u‖ ^ (2 : ℕ) ∂(stdGaussian E)) =
+      ((Module.finrank ℝ E : ℝ) + 2) * ‖v‖ ^ (2 : ℕ) := by
+  classical
+  let n_nat := Module.finrank ℝ E
+  let b : OrthonormalBasis (Fin n_nat) ℝ E := stdOrthonormalBasis ℝ E
+  have hcoord : ∀ z : Fin n_nat → ℝ,
+      ‖⟪v, (∑ i, z i • (b i : E) : E)⟫_ℝ •
+          (∑ i, z i • (b i : E) : E)‖ ^ (2 : ℕ) =
+        ((∑ i, ⟪v, b i⟫_ℝ * z i) ^ (2 : ℕ)) *
+          (∑ j, (z j) ^ (2 : ℕ)) := by
+    intro z
+    have hinner :
+        ⟪v, (∑ i, z i • (b i : E) : E)⟫_ℝ =
+          ∑ i, ⟪v, b i⟫_ℝ * z i := by
+      calc
+        ⟪v, (∑ i, z i • (b i : E) : E)⟫_ℝ =
+            ∑ i, ⟪v, z i • (b i : E)⟫_ℝ := by rw [inner_sum]
+        _ = ∑ i, z i * ⟪v, b i⟫_ℝ := by
+          refine Finset.sum_congr rfl ?_
+          intro i hi
+          rw [inner_smul_right]
+        _ = ∑ i, ⟪v, b i⟫_ℝ * z i := by
+          refine Finset.sum_congr rfl ?_
+          intro i hi
+          ring
+    have hnorm :
+        ‖(∑ i, z i • (b i : E) : E)‖ ^ (2 : ℕ) =
+          ∑ j, (z j) ^ (2 : ℕ) := by
+      simpa using Finset.norm_sq_sum_smul_orthonormalBasis b z
+    rw [norm_smul, pow_two, hinner]
+    calc
+      ‖∑ i, ⟪v, b i⟫_ℝ * z i‖ * ‖∑ i, z i • (b i : E)‖ *
+          (‖∑ i, ⟪v, b i⟫_ℝ * z i‖ * ‖∑ i, z i • (b i : E)‖) =
+          (‖∑ i, ⟪v, b i⟫_ℝ * z i‖ * ‖∑ i, ⟪v, b i⟫_ℝ * z i‖) *
+            (‖∑ i, z i • (b i : E)‖ * ‖∑ i, z i • (b i : E)‖) := by ring
+      _ = ((∑ i, ⟪v, b i⟫_ℝ * z i) ^ (2 : ℕ)) *
+            (∑ j, (z j) ^ (2 : ℕ)) := by
+        rw [show ‖∑ i, z i • (b i : E)‖ * ‖∑ i, z i • (b i : E)‖ =
+            ∑ j, (z j) ^ (2 : ℕ) by simpa [pow_two] using hnorm]
+        let s : ℝ := ∑ i, ⟪v, b i⟫_ℝ * z i
+        have habs : |s| * |s| = s ^ (2 : ℕ) := by
+          calc
+            |s| * |s| = |s| ^ (2 : ℕ) := by simp [pow_two]
+            _ = s ^ (2 : ℕ) := by simpa [pow_two] using (sq_abs s)
+        rw [Real.norm_eq_abs, habs]
+  rw [stdGaussian_eq_map_pi_orthonormalBasis b]
+  rw [MeasureTheory.integral_map
+    (Continuous.aemeasurable (by continuity :
+      Continuous (fun x : Fin n_nat → ℝ => (∑ i, x i • (b i : E) : E))))
+    (Continuous.aestronglyMeasurable (by fun_prop :
+      Continuous (fun u : E => ‖⟪v, u⟫_ℝ • u‖ ^ (2 : ℕ))))]
+  simp_rw [hcoord]
+  rw [integral_pi_gaussianReal_linear_sq_mul_sum_sq]
+  have hcoeff :
+      (∑ i : Fin n_nat, ⟪v, b i⟫_ℝ ^ (2 : ℕ)) = ‖v‖ ^ (2 : ℕ) := by
+    calc
+      (∑ i : Fin n_nat, ⟪v, b i⟫_ℝ ^ (2 : ℕ)) =
+          ∑ i, ⟪v, b i⟫_ℝ * ⟪b i, v⟫_ℝ := by
+        refine Finset.sum_congr rfl ?_
+        intro i hi
+        rw [real_inner_comm]
+        ring
+      _ = ⟪v, v⟫_ℝ := by simpa using (b.sum_inner_mul_inner v v)
+      _ = ‖v‖ ^ (2 : ℕ) := by simpa using (real_inner_self_eq_norm_sq v)
+  simpa [n_nat, hcoeff]
+
+
+open Finset MeasureTheory ProbabilityTheory
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: third moment of the finite-dimensional Gaussian squared norm;
+--   orig was `pi_gaussian_sum_sq_cube_moment_eq`, renamed away from the RSGF setup.
+-- generality used: arbitrary finite index type `ι` and
+--   the iid product measure of standard real Gaussians; no optimization or
+--   ambient Hilbert-space assumptions are used.
+-- portable call pattern: Gaussian direction and smoothing proofs expand a
+--   sixth norm moment into a cube of a coordinate-square sum, changing only
+--   the finite coordinate type while retaining the same closed form.
+-- counterargument checked: this is not paper-local traceability or a caller
+--   expression; it packages finite-sum expansion, product-measure integration,
+--   repeated-index moments, and the resulting chi-square third moment. The
+--   staged coordinate-monomial theorem supplies local moments but not this
+--   aggregation.
+-- coverage search: searched `finite product Gaussian sum squares third moment`,
+--   `integral pi gaussianReal sum sq pow three`, and Mathlib product-integral
+--   APIs; only `integral_pi_gaussianReal_square_monomial_three` covers the
+--   coordinate factors, so the finite aggregation remains a library gap.
+-- minimal hypotheses: `[Fintype ι]` is needed for finite sums and product
+--   integration; equality decisions are localized to the proof.
+
+/-- The third moment of the squared norm of a finite iid standard Gaussian vector.
+
+Layer: Glue | Gap: Level 1 (finite product Gaussian chi-square third moment)
+Proof: Expand the cube into a triple finite sum, exchange finite sums and
+  integrals using integrability of the nonnegative sixth-degree monomials, then
+  apply the repeated-coordinate Gaussian moments and aggregate the index cases.
+Source: Mathlib finite product-measure integration and standard Gaussian even moments
+Used in: Gaussian-direction sixth-moment estimates after converting a Euclidean
+  norm power into a coordinate-square sum over the direction basis
+Book citation: book/FOML/StochasticZerothOrder.json#/algorithm_spec/steps/0
+Origin algorithm: G. Lan, First-Order and Stochastic Optimization Methods for Machine Learning, Randomized Stochastic Gradient Free Method -/
+theorem integral_pi_gaussianReal_sum_sq_pow_three
+    {ι : Type*} [Fintype ι] :
+    (∫ z : ι → ℝ, (∑ i, (z i) ^ (2 : ℕ)) ^ (3 : ℕ)
+      ∂(Measure.pi fun _ : ι => gaussianReal 0 1)) =
+      (Fintype.card ι : ℝ) ^ (3 : ℕ) + 6 * (Fintype.card ι : ℝ) ^ (2 : ℕ) +
+        8 * (Fintype.card ι : ℝ) := by
+  classical
+  have h_expand :
+      ∀ z : ι → ℝ,
+        (∑ i, (z i) ^ (2 : ℕ)) ^ (3 : ℕ) =
+          ∑ i, ∑ j, ∑ k,
+            (z i) ^ (2 : ℕ) * (z j) ^ (2 : ℕ) * (z k) ^ (2 : ℕ) := by
+    intro z
+    calc
+      (∑ i, (z i) ^ (2 : ℕ)) ^ (3 : ℕ)
+          = ((∑ i, (z i) ^ (2 : ℕ)) * (∑ j, (z j) ^ (2 : ℕ))) *
+              (∑ k, (z k) ^ (2 : ℕ)) := by ring
+      _ = (∑ i, ∑ j, (z i) ^ (2 : ℕ) * (z j) ^ (2 : ℕ)) *
+              (∑ k, (z k) ^ (2 : ℕ)) := by rw [Finset.sum_mul_sum]
+      _ = ∑ i, (∑ j, (z i) ^ (2 : ℕ) * (z j) ^ (2 : ℕ)) *
+              (∑ k, (z k) ^ (2 : ℕ)) := by rw [Finset.sum_mul]
+      _ = ∑ i, ∑ j, ((z i) ^ (2 : ℕ) * (z j) ^ (2 : ℕ)) *
+              (∑ k, (z k) ^ (2 : ℕ)) := by
+            refine Finset.sum_congr rfl ?_
+            intro i hi
+            rw [Finset.sum_mul]
+      _ = ∑ i, ∑ j, ∑ k,
+            ((z i) ^ (2 : ℕ) * (z j) ^ (2 : ℕ)) * (z k) ^ (2 : ℕ) := by
+            refine Finset.sum_congr rfl ?_
+            intro i hi
+            refine Finset.sum_congr rfl ?_
+            intro j hj
+            rw [Finset.mul_sum]
+      _ = ∑ i, ∑ j, ∑ k,
+            (z i) ^ (2 : ℕ) * (z j) ^ (2 : ℕ) * (z k) ^ (2 : ℕ) := by
+            refine Finset.sum_congr rfl ?_
+            intro i hi
+            refine Finset.sum_congr rfl ?_
+            intro j hj
+            refine Finset.sum_congr rfl ?_
+            intro k hk
+            ring
+  have hterm_int :
+      ∀ i j k : ι,
+        Integrable
+          (fun z : ι → ℝ =>
+            (z i) ^ (2 : ℕ) * (z j) ^ (2 : ℕ) * (z k) ^ (2 : ℕ))
+          (Measure.pi fun _ : ι => gaussianReal 0 1) := by
+    intro i j k
+    let f : (ι → ℝ) → ℝ := fun z =>
+      (z i) ^ (2 : ℕ) * (z j) ^ (2 : ℕ) * (z k) ^ (2 : ℕ)
+    have hf_meas : AEStronglyMeasurable f
+        (Measure.pi fun _ : ι => gaussianReal 0 1) := by
+      exact ((((continuous_apply i).pow 2).mul ((continuous_apply j).pow 2)).mul
+        ((continuous_apply k).pow 2)).aestronglyMeasurable
+    have hf_nonneg : ∀ z : ι → ℝ, 0 ≤ f z := by
+      intro z
+      dsimp [f]
+      positivity
+    refine ⟨hf_meas, ?_⟩
+    have hf_nonneg_ae : 0 ≤ᵐ[Measure.pi fun _ : ι => gaussianReal 0 1] f :=
+      Filter.Eventually.of_forall hf_nonneg
+    rw [MeasureTheory.hasFiniteIntegral_iff_ofReal hf_nonneg_ae]
+    refine lt_top_iff_ne_top.mpr ?_
+    have h_toReal :
+        ENNReal.toReal (∫⁻ z, ENNReal.ofReal (f z)
+          ∂(Measure.pi fun _ : ι => gaussianReal 0 1)) =
+          if i = j then (if j = k then 15 else 3)
+          else if i = k then 3 else if j = k then 3 else 1 := by
+      simpa [f, MeasureTheory.integral_eq_lintegral_of_nonneg_ae hf_nonneg_ae hf_meas] using
+        (integral_pi_gaussianReal_square_monomial_three (i := i) (j := j) (k := k)).2.2
+    intro htop
+    rw [htop, ENNReal.toReal_top] at h_toReal
+    by_cases hij : i = j
+    · by_cases hjk : j = k <;> simp [hij, hjk] at h_toReal
+    · by_cases hik : i = k
+      · have hkj : k ≠ j := by
+          intro h
+          exact hij (hik.trans h)
+        simp [hij, hik, hkj] at h_toReal
+      · by_cases hjk : j = k <;> simp [hij, hik, hjk] at h_toReal
+  have hsum_k_int :
+      ∀ i j : ι,
+        Integrable
+          (fun z : ι → ℝ =>
+            ∑ k, (z i) ^ (2 : ℕ) * (z j) ^ (2 : ℕ) * (z k) ^ (2 : ℕ))
+          (Measure.pi fun _ : ι => gaussianReal 0 1) := by
+    intro i j
+    exact MeasureTheory.integrable_finset_sum (μ := Measure.pi fun _ : ι => gaussianReal 0 1)
+      (s := Finset.univ)
+      (f := fun k (z : ι → ℝ) => (z i) ^ (2 : ℕ) * (z j) ^ (2 : ℕ) * (z k) ^ (2 : ℕ))
+      (fun k hk => hterm_int i j k)
+  have hsum_jk_int :
+      ∀ i : ι,
+        Integrable
+          (fun z : ι → ℝ =>
+            ∑ j, ∑ k, (z i) ^ (2 : ℕ) * (z j) ^ (2 : ℕ) * (z k) ^ (2 : ℕ))
+          (Measure.pi fun _ : ι => gaussianReal 0 1) := by
+    intro i
+    exact MeasureTheory.integrable_finset_sum (μ := Measure.pi fun _ : ι => gaussianReal 0 1)
+      (s := Finset.univ)
+      (f := fun j (z : ι → ℝ) => ∑ k, (z i) ^ (2 : ℕ) * (z j) ^ (2 : ℕ) * (z k) ^ (2 : ℕ))
+      (fun j hj => hsum_k_int i j)
+  let m : ℝ := Fintype.card ι
+  have hsum_k :
+      ∀ i j : ι,
+        ∑ k : ι, (if i = j then (if j = k then 15 else 3)
+          else if i = k then 3 else if j = k then 3 else 1) =
+          if i = j then 3 * m + 12 else m + 4 := by
+    intro i j
+    by_cases hij : i = j
+    · subst j
+      simpa using (calc
+        ∑ k : ι, (if i = i then (if i = k then (15 : ℝ) else 3)
+            else if i = k then 3 else if i = k then 3 else 1) =
+            ∑ k : ι, (3 + if i = k then (12 : ℝ) else 0) := by
+              refine Finset.sum_congr rfl ?_
+              intro k hk
+              by_cases hik : i = k <;> simp [hik] <;> norm_num
+        _ = 3 * m + 12 := by simp [m, Finset.sum_add_distrib, Finset.mul_sum]; ring)
+    · simpa [hij] using (calc
+        ∑ k : ι, (if i = j then (if j = k then (15 : ℝ) else 3)
+            else if i = k then 3 else if j = k then 3 else 1) =
+            ∑ k : ι, (1 + (if i = k then (2 : ℝ) else 0) +
+              (if j = k then (2 : ℝ) else 0)) := by
+              refine Finset.sum_congr rfl ?_
+              intro k hk
+              by_cases hik : i = k
+              · have hjk : j ≠ k := by intro h; exact hij (hik.trans h.symm)
+                simp [hij, hik, hjk]
+                norm_num
+              · by_cases hjk : j = k <;> simp [hij, hik, hjk] <;> norm_num
+        _ = m + 4 := by simp [m, Finset.sum_add_distrib]; ring)
+  have hsum_j :
+      ∀ i : ι, ∑ j : ι, (if i = j then 3 * m + 12 else m + 4) =
+        m ^ (2 : ℕ) + 6 * m + 8 := by
+    intro i
+    calc
+      ∑ j : ι, (if i = j then 3 * m + 12 else m + 4) =
+          ∑ j : ι, ((m + 4) + if i = j then (2 * m + 8) else 0) := by
+            refine Finset.sum_congr rfl ?_
+            intro j hj
+            by_cases hij : i = j <;> simp [hij] <;> ring
+      _ = m ^ (2 : ℕ) + 6 * m + 8 := by simp [m, Finset.sum_add_distrib]; ring
+  calc
+    (∫ z : ι → ℝ, (∑ i, (z i) ^ (2 : ℕ)) ^ (3 : ℕ)
+      ∂(Measure.pi fun _ : ι => gaussianReal 0 1)) =
+        ∫ z : ι → ℝ, ∑ i, ∑ j, ∑ k,
+          (z i) ^ (2 : ℕ) * (z j) ^ (2 : ℕ) * (z k) ^ (2 : ℕ)
+          ∂(Measure.pi fun _ : ι => gaussianReal 0 1) := by
+            refine MeasureTheory.integral_congr_ae ?_
+            exact Filter.Eventually.of_forall h_expand
+    _ = ∑ i, ∑ j, ∑ k, ∫ z : ι → ℝ,
+          (z i) ^ (2 : ℕ) * (z j) ^ (2 : ℕ) * (z k) ^ (2 : ℕ)
+          ∂(Measure.pi fun _ : ι => gaussianReal 0 1) := by
+          rw [MeasureTheory.integral_finset_sum _ (fun i hi => hsum_jk_int i)]
+          refine Finset.sum_congr rfl ?_
+          intro i hi
+          rw [MeasureTheory.integral_finset_sum _ (fun j hj => hsum_k_int i j)]
+          refine Finset.sum_congr rfl ?_
+          intro j hj
+          rw [MeasureTheory.integral_finset_sum _ (fun k hk => hterm_int i j k)]
+    _ = ∑ i, ∑ j, ∑ k,
+          (if i = j then (if j = k then 15 else 3)
+            else if i = k then 3 else if j = k then 3 else 1) := by
+          refine Finset.sum_congr rfl ?_
+          intro i hi
+          refine Finset.sum_congr rfl ?_
+          intro j hj
+          refine Finset.sum_congr rfl ?_
+          intro k hk
+          exact (integral_pi_gaussianReal_square_monomial_three
+            (i := i) (j := j) (k := k)).2.2
+    _ = ∑ i, ∑ j, (if i = j then 3 * m + 12 else m + 4) := by
+          refine Finset.sum_congr rfl ?_
+          intro i hi
+          refine Finset.sum_congr rfl ?_
+          intro j hj
+          exact hsum_k i j
+    _ = ∑ i : ι, (m ^ (2 : ℕ) + 6 * m + 8) := by
+          refine Finset.sum_congr rfl ?_
+          intro i hi
+          exact hsum_j i
+    _ = (Fintype.card ι : ℝ) ^ (3 : ℕ) + 6 * (Fintype.card ι : ℝ) ^ (2 : ℕ) +
+          8 * (Fintype.card ι : ℝ) := by
+          simp [m]
+          ring
+
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: four-term affine linearity of a Bochner integral; orig was the
+-- private scalar helper `integral_sub_sub_add_const_mul`
+-- generality used: arbitrary measurable space and measure, a real normed
+-- additive group with scalar action, four vector-valued integrable functions,
+-- and three real coefficients; no probability or optimization assumptions
+-- portable call pattern: expected one-step recursions split a current vector
+-- quantity into two negative scalar-action terms and one positive scalar-action
+-- term; the measure, functions, coefficients, and integrability proofs vary
+-- counterargument checked: Mathlib supplies each two-term linearity primitive,
+-- but no single theorem packages this recurring four-term contract; the result
+-- is therefore more than a paper-local rename or caller-side expression
+-- coverage search: searched `integral sub smul sub smul add smul` and
+-- `integral linear combination four terms`; top hits were `integral_add`,
+-- `integral_sub`, and `integral_smul`, all partial rather than this composition
+-- minimal hypotheses: integrability of all four functions is exactly what the
+-- additive and subtractive integral laws require; no completeness assumption
+
+/-- Bochner integration distributes over a four-term vector affine expression.
+
+The scalar coefficients act on the integrand vectors, so the same statement
+applies to real-valued expressions as the specialization `smul_eq_mul`.
+
+Layer: Glue | Gap: Level 1 (four-term Bochner integral linearity)
+Proof: Establish integrability of the scalar multiples and compose `integral_add` with `integral_sub`; rewrite each scalar integral with `integral_smul`.
+Source: Mathlib measure theory Bochner integral linearity (`integral_add`, `integral_sub`, and `integral_smul`)
+Used in: expected one-step descent and squared-distance recursions that separate a current potential, two negative inner-product terms, and a positive squared-oracle term
+Book citation: book/FOML/StochasticZerothOrder.json#/algorithm_spec
+Origin algorithm: G. Lan, First-Order and Stochastic Optimization Methods for Machine Learning, randomized stochastic gradient-free method (RSGF) -/
+theorem integral_sub_smul_sub_smul_add_smul
+    {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    {Ω : Type*} [MeasurableSpace Ω] (μ : Measure Ω)
+    (a b c d : Ω → E) (α β δ : ℝ)
+    (ha : Integrable a μ) (hb : Integrable b μ)
+    (hc : Integrable c μ) (hd : Integrable d μ) :
+    (∫ ω, a ω - α • b ω - β • c ω + δ • d ω ∂μ) =
+      (∫ ω, a ω ∂μ) - α • (∫ ω, b ω ∂μ) -
+        β • (∫ ω, c ω ∂μ) + δ • (∫ ω, d ω ∂μ) := by
+  let A : Ω → E := a
+  let B : Ω → E := fun ω => α • b ω
+  let C : Ω → E := fun ω => β • c ω
+  let D : Ω → E := fun ω => δ • d ω
+  have hA : Integrable A μ := by simpa [A] using ha
+  have hB : Integrable B μ := by simpa [B] using hb.smul α
+  have hC : Integrable C μ := by simpa [C] using hc.smul β
+  have hD : Integrable D μ := by simpa [D] using hd.smul δ
+  change (∫ ω, ((A - B - C + D) ω) ∂μ) =
+    (∫ ω, A ω ∂μ) - α • (∫ ω, b ω ∂μ) -
+      β • (∫ ω, c ω ∂μ) + δ • (∫ ω, d ω ∂μ)
+  change (∫ ω, (A - B - C) ω + D ω ∂μ) =
+    (∫ ω, A ω ∂μ) - α • (∫ ω, b ω ∂μ) -
+      β • (∫ ω, c ω ∂μ) + δ • (∫ ω, d ω ∂μ)
+  rw [integral_add ((hA.sub hB).sub hC) hD]
+  change (∫ ω, (A - B) ω - C ω ∂μ) + (∫ ω, D ω ∂μ) =
+    (∫ ω, A ω ∂μ) - α • (∫ ω, b ω ∂μ) -
+      β • (∫ ω, c ω ∂μ) + δ • (∫ ω, d ω ∂μ)
+  rw [integral_sub (hA.sub hB) hC]
+  change ((∫ ω, A ω - B ω ∂μ) - (∫ ω, C ω ∂μ)) +
+      (∫ ω, D ω ∂μ) =
+    (∫ ω, A ω ∂μ) - α • (∫ ω, b ω ∂μ) -
+      β • (∫ ω, c ω ∂μ) + δ • (∫ ω, d ω ∂μ)
+  rw [integral_sub hA hB]
+  simp [A, B, C, D, integral_smul]
+
+
+open MeasureTheory
+
+noncomputable section
+
+-- Generalization plan (G0):
+-- concept/name: coordinate-fiber decomposition of a finite product-measure integral; orig was pi_gaussian_coordinate_split_integral_finSucc
+-- generality used: arbitrary sigma-finite finite product measure indexed by `Fin (m+1)`; Bochner-valued integrand in any real normed additive group
+-- portable call pattern: stochastic-optimization smoothing and coordinate arguments split one selected product coordinate from the remaining independent coordinates; the coordinate spaces, measures, chosen coordinate, dimension, and integrand change while the Fubini conclusion stays the same
+-- counterargument checked: not paper-local, since the theorem is a reusable product-measure coordinate split; not a pure wrapper over one Mathlib name because it combines `piFinSuccAbove` measure preservation, integrability transport, and product Fubini in the caller-ready orientation
+-- coverage search: queried `finite product measure integral split coordinate fiber measure pi fin succ`; top hits were Mathlib `MeasureTheory.measurePreserving_piFinSuccAbove` and `MeasureTheory.integral_prod_symm`, plus SOptLib weighted finite-index product expansions, so coverage is partial rather than full
+-- minimal hypotheses: product integrability of the original integrand is the only explicit hypothesis beyond the sigma-finiteness required by Mathlib product-measure transport
+
+/-- Split a finite product measure at one selected `Fin (m+1)` coordinate and
+integrate the remaining coordinates outside.
+
+Layer: Glue | Gap: Level 1 (finite product coordinate-fiber integral decomposition)
+Proof: transport the product law along `MeasurableEquiv.piFinSuccAbove`, use measure-preserving integrability transport for the pulled-back integrand, and apply product-measure Fubini in the fiber-first orientation.
+Source: Mathlib finite product measures and Bochner product integration APIs
+Used in: product-measure coordinate arguments where a selected coordinate is isolated before applying a one-dimensional fiber identity
+Book citation: book/FOML/StochasticZerothOrder.json#/algorithm_spec
+Origin algorithm: Lan, First-Order and Stochastic Optimization Methods for Machine Learning, randomized stochastic gradient-free method -/
+theorem integral_pi_eq_integral_coordinate_fiber_piFinSuccAbove
+    {m : ℕ} {α : Fin (m + 1) → Type*} [∀ j, MeasurableSpace (α j)]
+    (μ : ∀ j, Measure (α j)) [∀ j, SigmaFinite (μ j)]
+    {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (i : Fin (m + 1)) (Φ : ((j : Fin (m + 1)) → α j) → E)
+    (hΦ : Integrable Φ (Measure.pi μ)) :
+    (∫ z : ((j : Fin (m + 1)) → α j), Φ z ∂(Measure.pi μ)) =
+      ∫ η : ((j : Fin m) → α (i.succAbove j)),
+        ∫ t : α i,
+          Φ ((MeasurableEquiv.piFinSuccAbove α i).symm (t, η)) ∂(μ i)
+        ∂(Measure.pi fun j : Fin m => μ (i.succAbove j)) := by
+  classical
+  let μfull : Measure (((j : Fin (m + 1)) → α j)) := Measure.pi μ
+  let μcoord : Measure (α i) := μ i
+  let μrest : Measure (((j : Fin m) → α (i.succAbove j))) :=
+    Measure.pi fun j : Fin m => μ (i.succAbove j)
+  let e := MeasurableEquiv.piFinSuccAbove α i
+  have hmp : MeasurePreserving e μfull (μcoord.prod μrest) := by
+    simpa [e, μfull, μcoord, μrest] using
+      (MeasureTheory.measurePreserving_piFinSuccAbove μ i)
+  have hround : ∀ z : ((j : Fin (m + 1)) → α j), e.symm (e z) = z := by
+    intro z
+    change (Fin.insertNthEquiv α i) (z i, i.removeNth z) = z
+    exact Fin.insertNth_self_removeNth i z
+  have hprod_int :
+      Integrable (fun p : α i × (((j : Fin m) → α (i.succAbove j))) => Φ (e.symm p))
+        (μcoord.prod μrest) := by
+    rw [← hmp.integrable_comp_emb e.measurableEmbedding]
+    refine hΦ.congr ?_
+    exact Filter.Eventually.of_forall fun z => by simp [hround z]
+  have hmap := hmp.integral_comp'
+    (fun p : α i × (((j : Fin m) → α (i.succAbove j))) => Φ (e.symm p))
+  calc
+    (∫ z : ((j : Fin (m + 1)) → α j), Φ z ∂μfull)
+        = ∫ z : ((j : Fin (m + 1)) → α j), Φ (e.symm (e z)) ∂μfull := by
+            refine MeasureTheory.integral_congr_ae ?_
+            exact Filter.Eventually.of_forall fun z => by simp [hround z]
+    _ = ∫ p : α i × (((j : Fin m) → α (i.succAbove j))), Φ (e.symm p)
+          ∂(μcoord.prod μrest) := hmap
+    _ = ∫ η : ((j : Fin m) → α (i.succAbove j)),
+          ∫ t : α i, Φ (e.symm (t, η)) ∂μcoord ∂μrest := by
+            simpa using
+              (MeasureTheory.integral_prod_symm
+                (fun p : α i × (((j : Fin m) → α (i.succAbove j))) => Φ (e.symm p))
+                hprod_int)
+
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: product integral equals the integral of identified fiber means; orig was
+--   `rsgfOracle_product_integral_eq_objective_forward_difference_of_integrable`.
+-- generality used: arbitrary measurable spaces, arbitrary SFinite measures, and an arbitrary
+--   real normed additive codomain; no probability, independence, oracle, objective, convexity,
+--   smoothness, inner-product, completeness, or finite-dimensional assumptions are used.
+-- portable call pattern: stochastic-gradient, zeroth-order, Monte Carlo, and variance-reduction
+--   proofs identify conditional or fixed-query means before replacing a joint product expectation
+--   by the expectation of those means; both measures, the vector-valued kernel, and the fiber-mean
+--   function may change.
+-- counterargument checked: Mathlib already proves the underlying Fubini equality, but does not
+--   package substitution of an independently established, named fiber-mean function; this
+--   hypothesis-reorganization bridge is the stable proof boundary used by callers.
+-- coverage search: searched `product integral equals integral fiber integral integrable Bochner
+--   Fubini`, `integral_prod of integrable function equals iterated integral`, and semantically
+--   searched Mathlib for an integrable Banach-valued product function. The top hits were
+--   `MeasureTheory.integral_prod_symm`, `MeasureTheory.integral_prod`, and
+--   `MeasureTheory.integral_integral`; they supply Fubini but not the a.e. identification with a
+--   separately supplied fiber-mean function. No SOptLib declaration had this shape.
+-- minimal hypotheses: product integrability and an a.e. fiber-mean identity are sufficient; the
+--   source's probability instances and pointwise fiber identity are weakened away.
+
+/-- The integral of an integrable kernel over a reversed product measure equals the
+integral of any function that agrees almost everywhere with its fixed-first-argument means.
+
+Layer: Glue | Gap: Level 1 (product Fubini equality with identified fiber means)
+Proof: apply Mathlib's Bochner `integral_prod_symm` theorem to reverse the iteration order,
+then replace the inner fiber integral by the supplied a.e. mean identity.
+Source: Mathlib product-measure Bochner integration and Fubini-Tonelli API
+Used in: randomized stochastic gradient-free unbiasedness, where integrating the
+finite-difference oracle over samples yields the objective forward difference before the
+remaining Gaussian-direction expectation is evaluated
+Book citation: book/FOML/StochasticZerothOrder.json#/assumptions/4
+Origin algorithm: Lan, First-Order and Stochastic Optimization Methods for Machine Learning,
+randomized stochastic gradient-free method -/
+theorem integral_prod_eq_integral_fiber_integral_of_integrable
+    {A B E : Type*} [MeasurableSpace A] [MeasurableSpace B]
+    [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (muA : Measure A) (muB : Measure B) [SFinite muA] [SFinite muB]
+    (K : A → B → E) (M : A → E)
+    (hK : Integrable (fun z : B × A => K z.2 z.1) (muB.prod muA))
+    (hM : ∀ᵐ a ∂muA, ∫ b, K a b ∂muB = M a) :
+    (∫ z : B × A, K z.2 z.1 ∂(muB.prod muA)) = ∫ a, M a ∂muA := by
+  calc
+    (∫ z : B × A, K z.2 z.1 ∂(muB.prod muA)) =
+        ∫ a : A, ∫ b : B, K a b ∂muB ∂muA := by
+          simpa using
+            (MeasureTheory.integral_prod_symm
+              (μ := muB) (ν := muA)
+              (f := fun z : B × A => K z.2 z.1) hK)
+    _ = ∫ a, M a ∂muA := MeasureTheory.integral_congr_ae hM
+
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: product-law a.e. strong measurability transfer from strongly
+--   measurable query representatives to an a.e.-strongly measurable query; orig was
+--   rsgfOracle_random_query_aestronglyMeasurable_of_aesm.
+-- generality used: arbitrary query and sample measurable spaces, an arbitrary
+--   topological parameter space, an arbitrary topological codomain, arbitrary
+--   query/sample measures with `SFinite` on the sample law, and a strong-query
+--   product measurability premise. No probability, independence, convexity,
+--   smoothness, oracle, normed-space, inner-product, completeness, or
+--   finite-dimensional assumptions are used.
+-- portable call pattern: adaptive stochastic-gradient and zeroth-order proofs can
+--   evaluate a sample kernel at a random query that is known only up to a.e.
+--   strong measurability after first proving the same product-law conclusion for
+--   strongly measurable queries; the query law, sample law, kernel, and parameter
+--   carrier vary while the representative-transfer conclusion stays fixed.
+-- counterargument checked: not paper-local because the statement contains no
+--   oracle or RSGF terminology and is a reusable upgrade from a.e. query
+--   measurability to product-kernel measurability; not a duplicate because
+--   SOptLib currently has only the continuous/fiber strong-query theorem
+--   `aestronglyMeasurable_prod_of_continuous_ae_of_fiber`.
+-- coverage search: searched `AEStronglyMeasurable product continuous fiber
+--   aestrongly measurable`, `aestrongly measurable product compose first
+--   coordinate congr ae`, and `AEStronglyMeasurable representative mk ae_eq_mk
+--   product fst prod`; top SOptLib hit was the strong-query theorem this lemma
+--   can lift,
+--   while independent-composition and target-sigma representative lemmas cover
+--   different random-variable pullback situations. Mathlib semantic search was
+--   attempted for the same contract but the LeanSearch API was unavailable.
+-- minimal hypotheses: the theorem weakens only the query premise from
+--   `StronglyMeasurable` to `AEStronglyMeasurable`; `SFinite νSample` is retained
+--   because the product projection a.e. transfer uses it.
+
+/-- A product-kernel measurability theorem for strongly measurable parameter maps
+extends to an a.e.-strongly measurable parameter map by choosing a representative.
+
+Layer: Glue | Gap: Level 1 (product-law a.e. representative transfer for random queries)
+Proof: choose the strongly measurable representative of the query, apply the supplied strong-query product theorem, then transfer the conclusion across the product-law a.e. equality induced by the first projection.
+Source: Mathlib a.e.-strongly measurable representative and product-measure projection APIs
+Used in: randomized stochastic gradient-free oracle proofs where an adaptive iterate is known only a.e. strongly measurable before adjoining fresh sample and Gaussian-direction randomness
+Book citation: book/FOML/StochasticZerothOrder.json#/algorithm_spec
+Origin algorithm: Lan, First-Order and Stochastic Optimization Methods for Machine Learning, randomized stochastic gradient-free method -/
+theorem aestronglyMeasurable_prod_of_continuous_ae_of_fiber_of_aestronglyMeasurable
+    {Q Sample ι V : Type*}
+    [MeasurableSpace Q] [MeasurableSpace Sample] [TopologicalSpace ι]
+    [TopologicalSpace V]
+    (νQ : Measure Q) (νSample : Measure Sample) [SFinite νSample]
+    (kernel : ι → Sample → V) (queryPoint : Q → ι)
+    (hqueryPoint : AEStronglyMeasurable queryPoint νQ)
+    (hstrong_query :
+      ∀ queryPoint' : Q → ι,
+        StronglyMeasurable queryPoint' →
+          AEStronglyMeasurable
+            (fun p : Q × Sample => kernel (queryPoint' p.1) p.2)
+            (νQ.prod νSample)) :
+    AEStronglyMeasurable
+      (fun p : Q × Sample => kernel (queryPoint p.1) p.2)
+      (νQ.prod νSample) := by
+  let queryPoint' : Q → ι := hqueryPoint.mk queryPoint
+  have hqueryPoint'_sm : StronglyMeasurable queryPoint' :=
+    hqueryPoint.stronglyMeasurable_mk
+  have hrep :
+      AEStronglyMeasurable
+        (fun p : Q × Sample => kernel (queryPoint' p.1) p.2)
+      (νQ.prod νSample) :=
+    hstrong_query queryPoint' hqueryPoint'_sm
+  have hquery_prod :
+      (fun p : Q × Sample => queryPoint p.1) =ᵐ[νQ.prod νSample]
+        fun p => queryPoint' p.1 :=
+    (Measure.quasiMeasurePreserving_fst (μ := νQ) (ν := νSample)).ae_eq_comp
+      hqueryPoint.ae_eq_mk
+  exact hrep.congr <| hquery_prod.mono fun p hp => by
+    simp [queryPoint', hp]
+
+
+open MeasureTheory
+
+noncomputable section
+
+-- Generalization plan (G0):
+-- concept/name: coordinate-complement decomposition of a finite iid product-measure integral; orig was rsgfPrefixLaw_coordinate_resampling_integral
+-- generality used: arbitrary finite index type with decidable equality, one sigma-finite coordinate measure, and a Bochner-valued observable in any real normed additive group
+-- portable call pattern: finite-prefix stochastic algorithms split one selected fresh sample coordinate from the rest of an iid prefix law before applying a fiberwise expectation identity; the index type, sample type, coordinate law, selected coordinate, and observable change while the nested-integral conclusion stays the same
+-- counterargument checked: not paper-local traceability because the statement is a reusable product-measure/Fubini decomposition; not a duplicate of the existing `Fin (m+1)` staged theorem because this one works directly for arbitrary finite index types and subtype complements rather than `piFinSuccAbove`
+-- coverage search: queried `finite product measure integral split coordinate complement nested integral` and `integral pi measure subtype complement coordinate update product`; top relevant hits were Mathlib `MeasureTheory.integral_prod_symm`, `MeasureTheory.measurePreserving_piEquivPiSubtypeProd`, and staged `integral_pi_eq_integral_coordinate_fiber_piFinSuccAbove`, giving partial coverage but no direct arbitrary finite subtype-complement statement
+-- minimal hypotheses: product integrability of the original observable is the only explicit analytic hypothesis beyond sigma-finiteness required for Mathlib product-measure transport
+
+/-- Split a finite iid product-measure integral at one selected coordinate,
+integrating the complement outside and a fresh selected coordinate inside.
+
+Layer: Glue | Gap: Level 1 (finite product coordinate-complement integral decomposition)
+Proof: transport the product law along `MeasurableEquiv.piEquivPiSubtypeProd`,
+collapse the singleton selected-coordinate subtype with `MeasurableEquiv.piUnique`,
+and apply product-measure Fubini to the pulled-back integrand.
+Source: Mathlib finite product measures, subtype Pi measurable equivalences, and Bochner product integration APIs
+Used in: finite-prefix stochastic zeroth-order residual cancellation after resampling the current sample coordinate independently of the strict prefix
+Book citation: book/FOML/StochasticZerothOrder.json#/algorithm_spec
+Origin algorithm: Lan, First-Order and Stochastic Optimization Methods for Machine Learning, randomized stochastic gradient-free method -/
+theorem integral_pi_eq_integral_subtype_compl_integral_coordinate
+    {ι S : Type*} [Fintype ι] [DecidableEq ι] [MeasurableSpace S]
+    (ν : Measure S) [SigmaFinite ν]
+    {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (R : ι) (Φ : (ι → S) → E)
+    (hΦ : Integrable Φ (Measure.pi (fun _ : ι => ν))) :
+    (∫ ζ : ι → S, Φ ζ ∂Measure.pi (fun _ : ι => ν)) =
+      ∫ η : ({Q : ι // Q ≠ R} → S),
+        ∫ z : S,
+          Φ (fun Q : ι => if h : Q = R then z else η ⟨Q, h⟩) ∂ν
+        ∂(Measure.pi (fun _ : {Q : ι // Q ≠ R} => ν)) := by
+  classical
+  let p : ι → Prop := fun Q => Q ≠ R
+  let e := MeasurableEquiv.piEquivPiSubtypeProd (fun _ : ι => S) p
+  let μfull : Measure (ι → S) := Measure.pi (fun _ : ι => ν)
+  let μrest : Measure ({Q : ι // Q ≠ R} → S) :=
+    Measure.pi (fun _ : {Q : ι // Q ≠ R} => ν)
+  let μcoord : Measure ({Q : ι // ¬ Q ≠ R} → S) :=
+    Measure.pi (fun _ : {Q : ι // ¬ Q ≠ R} => ν)
+  haveI : ∀ _ : ι, SigmaFinite ν := fun _ => inferInstance
+  haveI : ∀ _ : {Q : ι // Q ≠ R}, SigmaFinite ν := fun _ => inferInstance
+  haveI : ∀ _ : {Q : ι // ¬ Q ≠ R}, SigmaFinite ν := fun _ => inferInstance
+  haveI : Subsingleton {Q : ι // ¬ Q ≠ R} :=
+    ⟨fun a b => by
+      apply Subtype.ext
+      exact (of_not_not a.2).trans (of_not_not b.2).symm⟩
+  haveI : Inhabited {Q : ι // ¬ Q ≠ R} := ⟨⟨R, by simp⟩⟩
+  haveI : Unique {Q : ι // ¬ Q ≠ R} :=
+    { default := default
+      uniq := fun a => Subsingleton.elim a default }
+  have hmp : MeasurePreserving e μfull (μrest.prod μcoord) := by
+    simpa [e, μfull, μrest, μcoord, p] using
+      (MeasureTheory.measurePreserving_piEquivPiSubtypeProd
+        (μ := fun _ : ι => ν) p)
+  have hprod_int :
+      Integrable
+        (fun q : ({Q : ι // Q ≠ R} → S) × ({Q : ι // ¬ Q ≠ R} → S) =>
+          Φ (e.symm q)) (μrest.prod μcoord) := by
+    rw [← hmp.integrable_comp_emb e.measurableEmbedding]
+    exact hΦ.congr (Filter.Eventually.of_forall fun ζ => by simp [e])
+  have hmap := hmp.integral_comp'
+    (fun q : ({Q : ι // Q ≠ R} → S) × ({Q : ι // ¬ Q ≠ R} → S) =>
+      Φ (e.symm q))
+  have hinner : ∀ η : ({Q : ι // Q ≠ R} → S),
+      (∫ c : ({Q : ι // ¬ Q ≠ R} → S), Φ (e.symm (η, c)) ∂μcoord) =
+        ∫ z : S,
+          Φ (fun Q : ι => if h : Q = R then z else η ⟨Q, h⟩) ∂ν := by
+    intro η
+    let es := MeasurableEquiv.piUnique (fun _ : {Q : ι // ¬ Q ≠ R} => S)
+    have hmpu : MeasurePreserving es μcoord ν := by
+      simpa [es, μcoord] using
+        (MeasureTheory.measurePreserving_piUnique
+          (fun _ : {Q : ι // ¬ Q ≠ R} => ν))
+    have hmapu := hmpu.integral_comp'
+      (fun z : S => Φ (e.symm (η, es.symm z)))
+    calc
+      (∫ c : ({Q : ι // ¬ Q ≠ R} → S), Φ (e.symm (η, c)) ∂μcoord)
+          = ∫ c : ({Q : ι // ¬ Q ≠ R} → S),
+              Φ (e.symm (η, es.symm (es c))) ∂μcoord := by
+                refine integral_congr_ae ?_
+                exact Filter.Eventually.of_forall fun c => by
+                  change Φ (e.symm (η, c)) = Φ (e.symm (η, es.symm (es c)))
+                  rw [show es.symm (es c) = c from es.symm_apply_apply c]
+      _ = ∫ z : S, Φ (e.symm (η, es.symm z)) ∂ν := hmapu
+      _ = ∫ z : S,
+            Φ (fun Q : ι => if h : Q = R then z else η ⟨Q, h⟩) ∂ν := by
+              refine integral_congr_ae ?_
+              exact Filter.Eventually.of_forall fun z => by
+                apply congrArg Φ
+                funext Q
+                by_cases hQR : Q = R
+                · simp [e, es, p, hQR]
+                · simp [e, es, p, hQR]
+  calc
+    (∫ ζ : ι → S, Φ ζ ∂Measure.pi (fun _ : ι => ν))
+        = ∫ ζ : ι → S, Φ ζ ∂μfull := by rfl
+    _ = ∫ ζ : ι → S, Φ (e.symm (e ζ)) ∂μfull := by
+            refine integral_congr_ae ?_
+            exact Filter.Eventually.of_forall fun ζ => by simp [e]
+    _ = ∫ q : ({Q : ι // Q ≠ R} → S) × ({Q : ι // ¬ Q ≠ R} → S),
+          Φ (e.symm q) ∂(μrest.prod μcoord) := hmap
+    _ = ∫ η : ({Q : ι // Q ≠ R} → S),
+          ∫ c : ({Q : ι // ¬ Q ≠ R} → S),
+            Φ (e.symm (η, c)) ∂μcoord ∂μrest := by
+            exact MeasureTheory.integral_prod _ hprod_int
+    _ = ∫ η : ({Q : ι // Q ≠ R} → S),
+        ∫ z : S,
+          Φ (fun Q : ι => if h : Q = R then z else η ⟨Q, h⟩) ∂ν
+        ∂(Measure.pi (fun _ : {Q : ι // Q ≠ R} => ν)) := by
+          refine integral_congr_ae ?_
+          exact Filter.Eventually.of_forall fun η => by
+            simpa [μrest] using hinner η
+
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: measure-preserving replacement of one coordinate in a finite iid product;
+--   orig was rsgfPrefixLaw_replace_coordinate_measurePreserving
+-- generality used: finite decidable index type, arbitrary measurable sample space, and an
+--   arbitrary probability measure; no topology, vector space, or optimization assumptions
+-- portable call pattern: finite-prefix stochastic proofs resampling a selected coordinate;
+--   the index type, sample type, marginal law, and selected coordinate may all change
+-- counterargument checked: not paper-local and not a one-line wrapper, since the result composes
+--   product splitting, deletion of the old coordinate, and singleton-coordinate reinsertion
+-- coverage search: queried finite product coordinate update/resampling measure preservation;
+--   Mathlib has measurePreserving_piEquivPiSubtypeProd and measurePreserving_piUnique as partial
+--   ingredients, while SOptLib and the current staging registry have no theorem with this contract
+-- minimal hypotheses: IsProbabilityMeasure is essential to discard the replaced coordinate;
+--   all remaining assumptions are required to form and update the finite product
+
+/-- Replacing one coordinate of a finite iid product by a fresh draw preserves its product law.
+
+Layer: Glue | Gap: Level 1 (finite product coordinate-resampling invariance)
+Proof: split the product into the selected coordinate and its complement, discard the old selected coordinate, and reinsert the fresh sample through the singleton Pi equivalence.
+Source: Mathlib finite product measures, subtype Pi measurable equivalences, and measure-preserving product composition
+Used in: finite-prefix stochastic proofs that replace the current sample by an independent draw before applying a fiberwise expectation identity
+Book citation: book/FOML/StochasticZerothOrder.json#/algorithm_spec
+Origin algorithm: Lan, First-Order and Stochastic Optimization Methods for Machine Learning, randomized stochastic gradient-free method -/
+theorem measurePreserving_update_coordinate_prod_pi
+    {ι A : Type*} [Fintype ι] [DecidableEq ι] [MeasurableSpace A]
+    (ν : Measure A) [IsProbabilityMeasure ν] (i : ι) :
+    MeasurePreserving
+      (fun q : (ι → A) × A => Function.update q.1 i q.2)
+      ((Measure.pi fun _ : ι => ν).prod ν)
+      (Measure.pi fun _ : ι => ν) := by
+  let p : ι → Prop := fun j => j ≠ i
+  let e := MeasurableEquiv.piEquivPiSubtypeProd (fun _ : ι => A) p
+  let μfull : Measure (ι → A) := Measure.pi (fun _ : ι => ν)
+  let μrest : Measure ({j : ι // j ≠ i} → A) :=
+    Measure.pi (fun _ : {j : ι // j ≠ i} => ν)
+  let μcoord : Measure ({j : ι // ¬j ≠ i} → A) :=
+    Measure.pi (fun _ : {j : ι // ¬j ≠ i} => ν)
+  haveI : IsProbabilityMeasure μcoord := by
+    dsimp [μcoord]
+    infer_instance
+  haveI : Subsingleton {j : ι // ¬j ≠ i} :=
+    ⟨fun a b => by
+      apply Subtype.ext
+      exact (of_not_not a.2).trans (of_not_not b.2).symm⟩
+  haveI : Inhabited {j : ι // ¬j ≠ i} := ⟨⟨i, by simp⟩⟩
+  haveI : Unique {j : ι // ¬j ≠ i} :=
+    { default := default
+      uniq := fun a => Subsingleton.elim a default }
+  let es := MeasurableEquiv.piUnique
+    (fun _ : {j : ι // ¬j ≠ i} => A)
+  have hmp_e : MeasurePreserving e μfull (μrest.prod μcoord) := by
+    simpa [e, μfull, μrest, μcoord, p] using
+      (MeasureTheory.measurePreserving_piEquivPiSubtypeProd
+        (μ := fun _ : ι => ν) p)
+  have hmp_es : MeasurePreserving es μcoord ν := by
+    simpa [es, μcoord] using
+      (MeasureTheory.measurePreserving_piUnique
+        (fun _ : {j : ι // ¬j ≠ i} => ν))
+  have hdrop :
+      MeasurePreserving
+        (fun q : (({j : ι // j ≠ i} → A) × ({j : ι // ¬j ≠ i} → A)) × A =>
+          (q.1.1, q.2))
+        ((μrest.prod μcoord).prod ν) (μrest.prod ν) := by
+    simpa [Function.comp_def] using
+      ((measurePreserving_fst (μ := μrest) (ν := μcoord)).prod
+        (MeasurePreserving.id ν))
+  have hinsert :
+      MeasurePreserving
+        (fun q : ({j : ι // j ≠ i} → A) × A => e.symm (q.1, es.symm q.2))
+        (μrest.prod ν) μfull := by
+    have hprod :
+        MeasurePreserving (Prod.map id es.symm) (μrest.prod ν)
+          (μrest.prod μcoord) := by
+      exact (MeasurePreserving.id μrest).prod (MeasurePreserving.symm es hmp_es)
+    exact (MeasurePreserving.symm e hmp_e).comp hprod
+  have hsplit_input :
+      MeasurePreserving
+        (fun q : (ι → A) × A => (e q.1, q.2))
+        (μfull.prod ν) ((μrest.prod μcoord).prod ν) := by
+    exact hmp_e.prod (MeasurePreserving.id ν)
+  have hsplit_update :
+      (fun q : (ι → A) × A => Function.update q.1 i q.2) =
+        (fun q : ({j : ι // j ≠ i} → A) × A => e.symm (q.1, es.symm q.2)) ∘
+          (fun q : (({j : ι // j ≠ i} → A) × ({j : ι // ¬j ≠ i} → A)) × A =>
+            (q.1.1, q.2)) ∘
+          (fun q : (ι → A) × A => (e q.1, q.2)) := by
+    funext q j
+    by_cases hj : j = i
+    · have hnotpi : ¬p i := by
+        intro hp
+        exact hp rfl
+      simp [e, es, Function.update, hj, hnotpi]
+    · have hp : p j := hj
+      simp [e, es, Function.update, hj, hp]
+  change MeasurePreserving _ (μfull.prod ν) μfull
+  rw [hsplit_update]
+  exact hinsert.comp (hdrop.comp hsplit_input)
+
+
+open MeasureTheory
+
+noncomputable section
+
+-- Generalization plan (G0):
+-- concept/name: sampled-coordinate kernel integral bound from a fresh-fiber bound; orig was rsgf_prefix_oracle_sq_integral_le_gap_integral
+-- generality used: arbitrary finite coordinate index type, arbitrary measurable coordinate sample type, arbitrary state type, one probability coordinate law, a real kernel, and a prefix-dependent real majorant
+-- portable call pattern: finite iid prefix algorithms resample the current sample coordinate by an independent fresh draw, use state invariance under that coordinate replacement, and transfer a fixed-prefix moment bound to the sampled-coordinate expectation; the index type, coordinate law, state map, kernel, and majorant change while the conclusion stays the same
+-- counterargument checked: not paper-local traceability because this is a probability/Fubini transfer independent of zeroth-order oracle notation; not a one-line wrapper because it packages map-measure replacement, a.e. congruence, product Fubini, and outer integral monotonicity
+-- coverage search: queried `integral sampled coordinate kernel less equal fresh fiber bound measure preserving update product`, `integral map measure preserving product integral mono ae bound`, and LeanSearch `product measure integral kernel bounded by integral of fiberwise bound after measure preserving map`; closest hits were SOptLib `integral_comp_le_integral_comp_bound_of_indep_fixed_integral_bound_aestronglyMeasurable`, staged `integral_pi_eq_integral_subtype_compl_integral_coordinate`, and Mathlib `MeasurePreserving.integral_comp'`, all partial because they either assume an independent random-variable formulation, only split the product integral, or only provide one map-integral step
+-- minimal hypotheses: product integrability of the fresh-kernel and integrability of the majorant are required for Fubini and monotonicity; sampled-kernel a.e. strong measurability is required for `integral_map`; state invariance under coordinate update is the only structural hypothesis
+
+/-- Bound a sampled-coordinate kernel integral by a prefix integral from a
+fresh-fiber bound.
+
+For a finite iid product law, replacing the selected coordinate by an
+independent fresh draw preserves the product law. If the state map is unchanged
+by that replacement and every fresh fiber is bounded by a prefix majorant, then
+the sampled-coordinate integral is bounded by the integral of that majorant.
+
+Layer: Glue | Gap: Level 1 (finite iid sampled-coordinate integral transfer)
+Proof: prove coordinate-refresh measure preservation by splitting the finite product law into the selected coordinate and its complement, rewrite the sampled integral with `integral_map`, apply product-measure Fubini, and use `integral_mono` with the supplied fresh-fiber bound.
+Source: Mathlib finite product measures, measure-preserving maps, Bochner product integration, and ordered real integral monotonicity
+Used in: randomized stochastic gradient-free prefix moment bounds where the current oracle sample is replaced by a fresh independent fiber before integrating a fixed-prefix oracle budget
+Book citation: book/FOML/StochasticZerothOrder.json#/algorithm_spec
+Origin algorithm: Lan, First-Order and Stochastic Optimization Methods for Machine Learning, randomized stochastic gradient-free method -/
+theorem integral_sampled_coordinate_kernel_le_of_fresh_fiber_bound
+    {ι Z E : Type*} [Fintype ι] [DecidableEq ι] [MeasurableSpace Z]
+    (ν : Measure Z) [IsProbabilityMeasure ν] (R : ι)
+    (X : (ι → Z) → E) (K : E → Z → ℝ) (B : (ι → Z) → ℝ)
+    (h_sample_aesm :
+      AEStronglyMeasurable
+        (fun ζ : ι → Z => K (X ζ) (ζ R)) (Measure.pi (fun _ : ι => ν)))
+    (h_prod_int :
+      Integrable
+        (fun q : (ι → Z) × Z => K (X q.1) q.2)
+        ((Measure.pi (fun _ : ι => ν)).prod ν))
+    (hB_int : Integrable B (Measure.pi (fun _ : ι => ν)))
+    (hX_update : ∀ (ζ : ι → Z) (z : Z), X (Function.update ζ R z) = X ζ)
+    (hfiber_bound :
+      ∀ ζ : ι → Z, (∫ z : Z, K (X ζ) z ∂ν) ≤ B ζ) :
+    (∫ ζ : ι → Z, K (X ζ) (ζ R) ∂Measure.pi (fun _ : ι => ν)) ≤
+      ∫ ζ : ι → Z, B ζ ∂Measure.pi (fun _ : ι => ν) := by
+  classical
+  let μfull : Measure (ι → Z) := Measure.pi (fun _ : ι => ν)
+  let replace : (ι → Z) × Z → ι → Z := fun q => Function.update q.1 R q.2
+  have hreplace :
+      MeasurePreserving replace (μfull.prod ν) μfull := by
+    let p : ι → Prop := fun j => j ≠ R
+    let e := MeasurableEquiv.piEquivPiSubtypeProd (fun _ : ι => Z) p
+    let μrest : Measure ({j : ι // j ≠ R} → Z) :=
+      Measure.pi (fun _ : {j : ι // j ≠ R} => ν)
+    let μcoord : Measure ({j : ι // ¬ j ≠ R} → Z) :=
+      Measure.pi (fun _ : {j : ι // ¬ j ≠ R} => ν)
+    haveI : IsProbabilityMeasure μcoord := by
+      dsimp [μcoord]
+      infer_instance
+    haveI : Subsingleton {j : ι // ¬ j ≠ R} :=
+      ⟨fun a b => by
+        apply Subtype.ext
+        exact (of_not_not a.2).trans (of_not_not b.2).symm⟩
+    haveI : Inhabited {j : ι // ¬ j ≠ R} := ⟨⟨R, by simp⟩⟩
+    haveI : Unique {j : ι // ¬ j ≠ R} :=
+      { default := default
+        uniq := fun a => Subsingleton.elim a default }
+    let es := MeasurableEquiv.piUnique
+      (fun _ : {j : ι // ¬ j ≠ R} => Z)
+    have hmp_e : MeasurePreserving e μfull (μrest.prod μcoord) := by
+      simpa [e, μfull, μrest, μcoord, p] using
+        (MeasureTheory.measurePreserving_piEquivPiSubtypeProd
+          (μ := fun _ : ι => ν) p)
+    have hmp_es : MeasurePreserving es μcoord ν := by
+      simpa [es, μcoord] using
+        (MeasureTheory.measurePreserving_piUnique
+          (fun _ : {j : ι // ¬ j ≠ R} => ν))
+    have hdrop :
+        MeasurePreserving
+          (fun q : (({j : ι // j ≠ R} → Z) ×
+              ({j : ι // ¬ j ≠ R} → Z)) × Z => (q.1.1, q.2))
+          ((μrest.prod μcoord).prod ν) (μrest.prod ν) := by
+      simpa [Function.comp_def] using
+        ((measurePreserving_fst (μ := μrest) (ν := μcoord)).prod
+          (MeasurePreserving.id ν))
+    have hinsert :
+        MeasurePreserving
+          (fun q : ({j : ι // j ≠ R} → Z) × Z => e.symm (q.1, es.symm q.2))
+          (μrest.prod ν) μfull := by
+      have hprod :
+          MeasurePreserving (Prod.map id es.symm) (μrest.prod ν)
+            (μrest.prod μcoord) := by
+        exact (MeasurePreserving.id μrest).prod (MeasurePreserving.symm es hmp_es)
+      exact (MeasurePreserving.symm e hmp_e).comp hprod
+    have hsplit_input :
+        MeasurePreserving
+          (fun q : (ι → Z) × Z => (e q.1, q.2))
+          (μfull.prod ν) ((μrest.prod μcoord).prod ν) := by
+      exact hmp_e.prod (MeasurePreserving.id ν)
+    have hsplit_update :
+        replace =
+          (fun q : ({j : ι // j ≠ R} → Z) × Z => e.symm (q.1, es.symm q.2)) ∘
+            (fun q : (({j : ι // j ≠ R} → Z) ×
+                ({j : ι // ¬ j ≠ R} → Z)) × Z => (q.1.1, q.2)) ∘
+            (fun q : (ι → Z) × Z => (e q.1, q.2)) := by
+      funext q j
+      by_cases hj : j = R
+      · have hnotp : ¬ p j := by
+          intro hp
+          exact hp hj
+        have hnotpR : ¬ p R := by
+          intro hp
+          exact hp rfl
+        simp [replace, e, es, hj, hnotpR]
+      · have hp : p j := hj
+        simp [replace, e, es, hj, hp]
+    rw [hsplit_update]
+    exact hinsert.comp (hdrop.comp hsplit_input)
+  let Φ : (ι → Z) → ℝ := fun ζ => K (X ζ) (ζ R)
+  let Ψ : (ι → Z) × Z → ℝ := fun q => K (X q.1) q.2
+  have hΦ_map_aesm :
+      AEStronglyMeasurable Φ (Measure.map replace (μfull.prod ν)) := by
+    rw [hreplace.map_eq]
+    simpa [Φ, μfull] using h_sample_aesm
+  have hmap :
+      (∫ ζ : ι → Z, Φ ζ ∂μfull) =
+        ∫ q : (ι → Z) × Z, Φ (replace q) ∂(μfull.prod ν) := by
+    calc
+      (∫ ζ : ι → Z, Φ ζ ∂μfull)
+          =
+        ∫ ζ : ι → Z, Φ ζ ∂Measure.map replace (μfull.prod ν) := by
+          rw [hreplace.map_eq]
+      _ = ∫ q : (ι → Z) × Z, Φ (replace q) ∂(μfull.prod ν) := by
+          exact integral_map hreplace.aemeasurable hΦ_map_aesm
+  have hreplace_point :
+      (fun q : (ι → Z) × Z => Φ (replace q)) =ᵐ[μfull.prod ν] Ψ := by
+    exact Filter.Eventually.of_forall fun q => by
+      simp [Φ, Ψ, replace, hX_update q.1 q.2]
+  have hprod :
+      (∫ q : (ι → Z) × Z, Ψ q ∂(μfull.prod ν)) =
+        ∫ ζ : ι → Z, ∫ z : Z, Ψ (ζ, z) ∂ν ∂μfull := by
+    exact integral_prod Ψ h_prod_int
+  have hinner_int :
+      Integrable (fun ζ : ι → Z => ∫ z : Z, Ψ (ζ, z) ∂ν) μfull :=
+    h_prod_int.integral_prod_left
+  have hinner_le :
+      (∫ ζ : ι → Z, ∫ z : Z, Ψ (ζ, z) ∂ν ∂μfull) ≤
+        ∫ ζ : ι → Z, B ζ ∂μfull := by
+    exact integral_mono hinner_int hB_int (fun ζ => by simpa [Ψ] using hfiber_bound ζ)
+  calc
+    (∫ ζ : ι → Z, K (X ζ) (ζ R) ∂Measure.pi (fun _ : ι => ν))
+        = ∫ ζ : ι → Z, Φ ζ ∂μfull := by
+            rfl
+    _ = ∫ q : (ι → Z) × Z, Φ (replace q) ∂(μfull.prod ν) := hmap
+    _ = ∫ q : (ι → Z) × Z, Ψ q ∂(μfull.prod ν) := by
+          exact integral_congr_ae hreplace_point
+    _ = ∫ ζ : ι → Z, ∫ z : Z, Ψ (ζ, z) ∂ν ∂μfull := hprod
+    _ ≤ ∫ ζ : ι → Z, B ζ ∂μfull := hinner_le
+    _ = ∫ ζ : ι → Z, B ζ ∂Measure.pi (fun _ : ι => ν) := by
+          rfl
+
+
+open MeasureTheory
+
+noncomputable section
+
+-- Generalization plan (G0):
+-- concept/name: a.e.-strong measurability of a sampled-coordinate kernel evaluated at an adapted finite-prefix query; orig was rsgf_prefix_sampled_oracle_aestronglyMeasurable_of_iterate
+-- generality used: arbitrary finite coordinate index type, arbitrary measurable coordinate sample type, arbitrary query type with topology, arbitrary topological output type, and one sigma-finite nonzero coordinate law
+-- portable call pattern: finite-prefix stochastic-gradient, zeroth-order, randomized-coordinate, and sample-average proofs first show that a query is measurable and invariant under resampling the fresh coordinate, then need measurability of the sampled kernel at that coordinate; the coordinate law, query map, and kernel change while the conclusion stays the same
+-- counterargument checked: not paper-local traceability because the statement has no optimization vocabulary and packages finite product splitting, adapted-query descent to the complement, product-law kernel measurability, and transport back to the original prefix law; not a duplicate of Mathlib or SOptLib because existing product-law pullback lemmas do not include the finite-prefix adapted-coordinate resampling step
+-- coverage search: queried `aestrongly measurable update coordinate pi measure adapted query kernel`, `AEStronglyMeasurable function update coordinate kernel finite type pi`, and `finite prefix product law sampled coordinate kernel aestronglyMeasurable adapted query`; closest hits were SOptLib `aestronglyMeasurable_prod_of_continuous_ae_of_fiber`, `aestronglyMeasurable_comp_of_indep_product_law`, and Mathlib `AEStronglyMeasurable.prodMk_right`, all partial because they handle product laws or fibers but not the finite iid prefix coordinate split with adapted-query invariance
+-- minimal hypotheses: coordinate law is sigma-finite and nonzero, which is enough for the iid product split, singleton-coordinate transport, and product-projection descent; no algebra, convexity, smoothness, filtration, finite-dimensionality, probability normalization, or global measurability assumptions are used
+
+/-- A sampled-coordinate kernel is a.e.-strongly measurable on a finite iid
+product prefix when its query is adapted away from the sampled coordinate.
+
+The query may be only a.e.-strongly measurable under the full prefix law. The
+proof splits off the selected coordinate, uses the invariance hypothesis to view
+the query as a function of the remaining coordinates, applies the supplied
+product-law kernel measurability theorem, and transports the result back.
+
+Layer: Glue | Gap: Level 1 (finite iid sampled-coordinate kernel measurability)
+Proof: split the finite product law into the selected coordinate and its complement using `MeasurableEquiv.piEquivPiSubtypeProd`, obtain complement-query measurability with `AEStronglyMeasurable.of_comp_fst`, apply the product-law kernel measurability premise, and compose back through the splitting equivalence.
+Source: Mathlib finite product measures and a.e.-strong measurability transport over product measures
+Used in: randomized stochastic gradient-free prefix adaptedness when the current query is measurable before the fresh zeroth-order sample is read and the sampled direction must be measurable under the prefix law
+Book citation: book/FOML/StochasticZerothOrder.json#/algorithm_spec
+Origin algorithm: Lan, First-Order and Stochastic Optimization Methods for Machine Learning, randomized stochastic gradient-free method -/
+theorem aestronglyMeasurable_sampled_coordinate_kernel_of_adapted_query
+    {ι Z X E : Type*} [Fintype ι] [DecidableEq ι]
+    [MeasurableSpace Z] [TopologicalSpace X] [TopologicalSpace E]
+    (ν : Measure Z) [SigmaFinite ν] [NeZero ν] (R : ι)
+    (query : (ι → Z) → X) (kernel : X → Z → E)
+    (hquery : AEStronglyMeasurable query (Measure.pi (fun _ : ι => ν)))
+    (hkernel :
+      ∀ Y : ({j : ι // j ≠ R} → Z) → X,
+        AEStronglyMeasurable Y
+          (Measure.pi (fun _ : {j : ι // j ≠ R} => ν)) →
+          AEStronglyMeasurable
+            (fun p : ({j : ι // j ≠ R} → Z) × Z =>
+              kernel (Y p.1) p.2)
+            ((Measure.pi (fun _ : {j : ι // j ≠ R} => ν)).prod ν))
+    (hquery_update : ∀ (ζ : ι → Z) (z : Z),
+      query (Function.update ζ R z) = query ζ) :
+    AEStronglyMeasurable
+      (fun ζ : ι → Z => kernel (query ζ) (ζ R))
+      (Measure.pi (fun _ : ι => ν)) := by
+  classical
+  let μfull : Measure (ι → Z) := Measure.pi (fun _ : ι => ν)
+  let μrest : Measure ({j : ι // j ≠ R} → Z) :=
+    Measure.pi (fun _ : {j : ι // j ≠ R} => ν)
+  let μcoord : Measure ({j : ι // ¬ j ≠ R} → Z) :=
+    Measure.pi (fun _ : {j : ι // ¬ j ≠ R} => ν)
+  let e := MeasurableEquiv.piEquivPiSubtypeProd
+    (fun _ : ι => Z) (fun j : ι => j ≠ R)
+  haveI : SFinite ν := inferInstance
+  haveI : SFinite μcoord := inferInstance
+  haveI : SFinite μrest := inferInstance
+  haveI : Subsingleton {j : ι // ¬ j ≠ R} :=
+    ⟨fun a b => by
+      apply Subtype.ext
+      exact (of_not_not a.2).trans (of_not_not b.2).symm⟩
+  haveI : Inhabited {j : ι // ¬ j ≠ R} := ⟨⟨R, by simp⟩⟩
+  haveI : Unique {j : ι // ¬ j ≠ R} :=
+    { default := default
+      uniq := fun a => Subsingleton.elim a default }
+  let es := MeasurableEquiv.piUnique
+    (fun _ : {j : ι // ¬ j ≠ R} => Z)
+  let z0 : Z := Classical.choose
+    (MeasureTheory.nonempty_of_measure_ne_zero (μ := ν) (s := Set.univ)
+      (Measure.measure_univ_ne_zero.2 (NeZero.ne ν)))
+  let queryRest : ({j : ι // j ≠ R} → Z) → X := fun η =>
+    query (fun j : ι => if h : j = R then z0 else η ⟨j, h⟩)
+  have hmp : MeasurePreserving e μfull (μrest.prod μcoord) := by
+    simpa [e, μfull, μrest, μcoord] using
+      (MeasureTheory.measurePreserving_piEquivPiSubtypeProd
+        (μ := fun _ : ι => ν) (fun j : ι => j ≠ R))
+  have hmp_symm : MeasurePreserving e.symm (μrest.prod μcoord) μfull :=
+    MeasurePreserving.symm e hmp
+  have hmpu : MeasurePreserving es μcoord ν := by
+    simpa [es, μcoord] using
+      (MeasureTheory.measurePreserving_piUnique
+        (fun _ : {j : ι // ¬ j ≠ R} => ν))
+  have hμcoord_ne : μcoord ≠ 0 := by
+    intro hzero
+    exact NeZero.ne ν (by
+      rw [← hmpu.map_eq]
+      simp [hzero])
+  have hquery_full : AEStronglyMeasurable query μfull := by
+    simpa [μfull] using hquery
+  have hquery_split :
+      AEStronglyMeasurable
+        (fun q : ({j : ι // j ≠ R} → Z) ×
+            ({j : ι // ¬ j ≠ R} → Z) =>
+          query (e.symm q))
+        (μrest.prod μcoord) := by
+    change AEStronglyMeasurable (query ∘ e.symm) (μrest.prod μcoord)
+    exact hquery_full.comp_measurePreserving hmp_symm
+  have hqueryRest_comp :
+      AEStronglyMeasurable
+        (fun q : ({j : ι // j ≠ R} → Z) ×
+            ({j : ι // ¬ j ≠ R} → Z) =>
+          queryRest q.1)
+        (μrest.prod μcoord) := by
+    refine hquery_split.congr (Filter.Eventually.of_forall ?_)
+    intro q
+    have hsymm :
+        e.symm q =
+          (fun i : ι => if h : i = R then es q.2 else q.1 ⟨i, h⟩) := by
+      funext i
+      by_cases hi : i = R
+      · subst i
+        have hidx : (⟨R, by simp⟩ : {i : ι // ¬ i ≠ R}) = default :=
+          Subsingleton.elim _ _
+        simp [e, es, hidx]
+        exact congrArg q.2 (Subsingleton.elim _ _)
+      · simp [e, es, hi]
+    change query (e.symm q) = queryRest q.1
+    rw [hsymm]
+    let ζ0 : ι → Z := fun j : ι => if h : j = R then z0 else q.1 ⟨j, h⟩
+    have hupdate :
+        (fun j : ι => if h : j = R then es q.2 else q.1 ⟨j, h⟩) =
+          Function.update ζ0 R (es q.2) := by
+      funext j
+      by_cases hj : j = R
+      · subst hj
+        simp [ζ0]
+      · simp [ζ0, Function.update, hj]
+    rw [hupdate, hquery_update ζ0 (es q.2)]
+  have hqueryRest :
+      AEStronglyMeasurable queryRest μrest := by
+    exact MeasureTheory.AEStronglyMeasurable.of_comp_fst hqueryRest_comp
+      hμcoord_ne
+  have hprod :
+      AEStronglyMeasurable
+        (fun q : ({j : ι // j ≠ R} → Z) × Z =>
+          kernel (queryRest q.1) q.2)
+        (μrest.prod ν) := by
+    simpa [μrest] using hkernel queryRest hqueryRest
+  have hprod_map :
+      MeasurePreserving
+        (fun q : ({j : ι // j ≠ R} → Z) ×
+            ({j : ι // ¬ j ≠ R} → Z) =>
+          (q.1, es q.2))
+        (μrest.prod μcoord) (μrest.prod ν) := by
+    simpa [Prod.map_map, Function.comp_def] using
+      (MeasurePreserving.id μrest).prod hmpu
+  have hsplit :
+      AEStronglyMeasurable
+        (fun q : ({j : ι // j ≠ R} → Z) ×
+            ({j : ι // ¬ j ≠ R} → Z) =>
+          kernel (query (e.symm q)) ((e.symm q) R))
+        (μrest.prod μcoord) := by
+    have hraw :
+        AEStronglyMeasurable
+          ((fun q : ({j : ι // j ≠ R} → Z) × Z =>
+            kernel (queryRest q.1) q.2) ∘
+              (fun q : ({j : ι // j ≠ R} → Z) ×
+                  ({j : ι // ¬ j ≠ R} → Z) =>
+                (q.1, es q.2)))
+          (μrest.prod μcoord) :=
+      hprod.comp_measurePreserving hprod_map
+    refine hraw.congr (Filter.Eventually.of_forall ?_)
+    intro q
+    have hsymm :
+        e.symm q =
+          (fun i : ι => if h : i = R then es q.2 else q.1 ⟨i, h⟩) := by
+      funext i
+      by_cases hi : i = R
+      · subst i
+        have hidx : (⟨R, by simp⟩ : {i : ι // ¬ i ≠ R}) = default :=
+          Subsingleton.elim _ _
+        simp [e, es, hidx]
+        exact congrArg q.2 (Subsingleton.elim _ _)
+      · simp [e, es, hi]
+    have hquery_eq : query (e.symm q) = queryRest q.1 := by
+      rw [hsymm]
+      let ζ0 : ι → Z := fun j : ι => if h : j = R then z0 else q.1 ⟨j, h⟩
+      have hupdate :
+          (fun j : ι => if h : j = R then es q.2 else q.1 ⟨j, h⟩) =
+            Function.update ζ0 R (es q.2) := by
+        funext j
+        by_cases hj : j = R
+        · subst hj
+          simp [ζ0]
+        · simp [ζ0, Function.update, hj]
+      rw [hupdate, hquery_update ζ0 (es q.2)]
+    have hcoord : (e.symm q) R = es q.2 := by
+      rw [hsymm]
+      simp
+    simp [Function.comp_def, hquery_eq, hcoord]
+  have hfull :
+      AEStronglyMeasurable
+        (fun ζ : ι → Z => kernel (query ζ) (ζ R))
+        μfull := by
+    have hcomp :
+        AEStronglyMeasurable
+          (fun ζ : ι → Z => kernel (query (e.symm (e ζ))) ((e.symm (e ζ)) R))
+          μfull := by
+      change AEStronglyMeasurable
+        ((fun q : ({j : ι // j ≠ R} → Z) ×
+            ({j : ι // ¬ j ≠ R} → Z) =>
+          kernel (query (e.symm q)) ((e.symm q) R)) ∘ e) μfull
+      exact hsplit.comp_measurePreserving hmp
+    exact hcomp.congr (Filter.Eventually.of_forall fun ζ => by simp [e])
+  simpa [μfull] using hfull
+
+
+open MeasureTheory ProbabilityTheory
+open scoped InnerProductSpace
+
+-- Generalization plan (G0):
+-- concept/name: Hilbert-space second-moment centering identity; orig was the
+--   local `hsecond_eq` block in `sampleGradient_secondMoment_le`, renamed away
+--   from sample-gradient and setup-field vocabulary.
+-- generality used: arbitrary measurable sample space, a probability measure,
+--   a complete real inner-product normed additive group, Bochner integrability
+--   of the vector, square-integrability of the centered residual, and the
+--   Bochner mean identity; no convexity, smoothness, oracle, filtration, or
+--   finite-dimensional assumptions are used.
+-- portable call pattern: stochastic-gradient, zeroth-order, control-variate,
+--   and variance-reduction proofs convert a centered residual second moment
+--   plus a deterministic mean into the uncentered second moment while changing
+--   the sample law, Hilbert space, random vector, and mean identity source.
+-- counterargument checked: not paper-local traceability because this is the
+--   standard Hilbert-valued variance decomposition around a Bochner mean; not a
+--   pure wrapper because it packages cross-term centering, integral additivity,
+--   and probability-space constant integration. Existing SOptLib hits give
+--   finite weighted variance identities or centered-to-uncentered inequalities,
+--   but not this continuous-measure equality with a constant mean.
+-- coverage search: searched `integral norm squared equals centered norm squared
+--   plus mean norm squared Bochner integral probability` and `variance
+--   decomposition Hilbert random vector integral norm square mean`; top hits
+--   were `integral_norm_sq_sub_le_integral_norm_sq_of_inner_sub_zero`,
+--   `integral_weighted_norm_sq_sub_le_of_centered_inner_eq_zero`,
+--   `finset_weighted_variance_eq_second_moment_sub_norm_mean_sq`, and
+--   `integral_inner_sub_mean_eq_zero_of_integral_eq`, all partial. LeanSearch
+--   for the same Hilbert-valued random-variable identity was attempted but the
+--   remote API was unreachable in this environment.
+-- minimal hypotheses: all algorithm setup fields are reduced to the vector
+--   integrability, centered square integrability, probability measure, and mean
+--   equality actually used by the proof.
+
+/-- A Hilbert-valued random vector's uncentered second moment splits into its
+centered second moment plus the squared norm of its Bochner mean.
+
+If `G` is Bochner integrable under a probability measure and its integral is
+the deterministic vector `m`, then the cross term in
+`G = (G - m) + m` has zero integral, giving the usual second-moment
+decomposition.
+
+Layer: Glue | Gap: Level 1 (Hilbert second-moment centering identity)
+Proof: expand `‖(G - m) + m‖²` by the real Hilbert norm-square identity, cancel
+  the cross term using `integral_inner_sub_mean_eq_zero_of_integral_eq`, and
+  integrate constants using the probability measure normalization.
+Source: Mathlib Bochner integral linearity and real inner-product norm-square
+  identities, plus SOptLib's centered Bochner integral scalarization lemma
+Used in: randomized stochastic gradient-free proofs when Assumption 13 converts
+  a stochastic-gradient centered variance bound into an uncentered second-moment
+  bound
+Book citation: book/FOML/StochasticZerothOrder.json#/main_theorem/proof/4
+Origin algorithm: Lan, First-Order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic gradient-free method -/
+theorem integral_norm_sq_eq_integral_norm_sq_sub_mean_add_norm_sq_of_integral_eq
+    {Ω E : Type*} [MeasurableSpace Ω]
+    [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
+    (μ : Measure Ω) [IsProbabilityMeasure μ]
+    (G : Ω → E) (m : E)
+    (hG_int : Integrable G μ)
+    (hcenter_sq : Integrable (fun ω => ‖G ω - m‖ ^ (2 : ℕ)) μ)
+    (hmean : (∫ ω, G ω ∂μ) = m) :
+    (∫ ω, ‖G ω‖ ^ (2 : ℕ) ∂μ) =
+      (∫ ω, ‖G ω - m‖ ^ (2 : ℕ) ∂μ) + ‖m‖ ^ (2 : ℕ) := by
+  have hcross :=
+    integral_inner_sub_mean_eq_zero_of_integral_eq μ G m m hG_int hmean
+  calc
+    (∫ ω, ‖G ω‖ ^ (2 : ℕ) ∂μ)
+        = ∫ ω, (‖G ω - m‖ ^ (2 : ℕ) +
+            2 * ⟪G ω - m, m⟫_ℝ + ‖m‖ ^ (2 : ℕ)) ∂μ := by
+            refine integral_congr_ae (Filter.Eventually.of_forall ?_)
+            intro ω
+            calc
+              ‖G ω‖ ^ (2 : ℕ) = ‖(G ω - m) + m‖ ^ (2 : ℕ) := by
+                rw [sub_add_cancel]
+              _ = ‖G ω - m‖ ^ (2 : ℕ) +
+                    2 * ⟪G ω - m, m⟫_ℝ + ‖m‖ ^ (2 : ℕ) := by
+                simpa using norm_add_sq_real (G ω - m) m
+    _ = (∫ ω, (‖G ω - m‖ ^ (2 : ℕ) +
+            2 * ⟪G ω - m, m⟫_ℝ) ∂μ) +
+          ∫ _ω : Ω, ‖m‖ ^ (2 : ℕ) ∂μ := by
+            rw [integral_add]
+            · exact hcenter_sq.add (hcross.1.const_mul 2)
+            · exact integrable_const (c := ‖m‖ ^ (2 : ℕ))
+    _ = ((∫ ω, ‖G ω - m‖ ^ (2 : ℕ) ∂μ) +
+            ∫ ω, 2 * ⟪G ω - m, m⟫_ℝ ∂μ) +
+          ∫ _ω : Ω, ‖m‖ ^ (2 : ℕ) ∂μ := by
+            rw [integral_add]
+            · exact hcenter_sq
+            · exact hcross.1.const_mul 2
+    _ = (∫ ω, ‖G ω - m‖ ^ (2 : ℕ) ∂μ) + ‖m‖ ^ (2 : ℕ) := by
+            rw [integral_const_mul]
+            simp [hcross.2]
+
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: L2 closure of pointwise addition; orig was integrable_norm_sq_add_of_integrable_norm_sq
+-- generality used: arbitrary measurable domain and measure, with only a normed additive commutative group as codomain
+-- portable call pattern: stochastic optimization, martingale, and random-iterate proofs add two changing L2 vector processes and need squared-norm integrability of their pointwise sum
+-- counterargument checked: not paper-local and not a pure rename; Mathlib exposes the MemLp conversion and addition edges separately, while this packages the recurring squared-norm integrability contract and complements SOptLib's subtraction theorem
+-- coverage search: queried `integrable squared norm of sum of functions`, `MemLp add integrable norm square`, and `integrable_sq_norm_add`; Mathlib provides `memLp_two_iff_integrable_sq_norm` and `MemLp.add`, while SOptLib has only the subtraction companion `integrable_sq_norm_sub` and stronger specialized affine or finite-sum results
+-- minimal hypotheses: both a.e. strong measurability hypotheses are required by the L2 characterizations; no finite-measure, probability, scalar-action, inner-product, completeness, or finite-dimensional assumption is used
+
+/-- The squared norm of the sum of two L2 vector processes is integrable.
+
+Layer: Glue | Gap: Level 1 (squared-norm integrability closure under addition)
+Proof: convert both squared-norm integrability hypotheses to `MemLp` at exponent two, apply `MemLp.add`, and convert the resulting L2 membership back to squared-norm integrability.
+Source: Mathlib measure-theoretic L2 characterization `memLp_two_iff_integrable_sq_norm` and `MemLp.add`
+Used in: decentralized stochastic communication sliding when affine primal and dual updates are assembled from square-integrable state, disagreement, and oracle processes; likewise in martingale and random-iterate L2 closure steps
+Book citation: book/research/Source.json#/algorithm_spec
+Origin algorithm: Guanghui Lan, First-order and Stochastic Optimization Methods for Machine Learning, Stochastic Decentralized Communication Sliding -/
+theorem integrable_sq_norm_add
+    {Omega E : Type*} [MeasurableSpace Omega] [NormedAddCommGroup E]
+    {mu : Measure Omega} {f g : Omega → E}
+    (hf_meas : AEStronglyMeasurable f mu)
+    (hg_meas : AEStronglyMeasurable g mu)
+    (hf_sq : Integrable (fun omega => ‖f omega‖ ^ 2) mu)
+    (hg_sq : Integrable (fun omega => ‖g omega‖ ^ 2) mu) :
+    Integrable (fun omega => ‖f omega + g omega‖ ^ 2) mu := by
+  have hf_l2 : MemLp f 2 mu :=
+    (memLp_two_iff_integrable_sq_norm hf_meas).2 hf_sq
+  have hg_l2 : MemLp g 2 mu :=
+    (memLp_two_iff_integrable_sq_norm hg_meas).2 hg_sq
+  exact
+    (memLp_two_iff_integrable_sq_norm (hf_meas.add hg_meas)).1
+      (hf_l2.add hg_l2)
+
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: squared-norm integrability under deterministic scalar multiplication; orig was integrable_norm_sq_const_smul_of_integrable_norm_sq
+-- generality used: arbitrary measurable domain, measure, normed scalar and target types, and a norm-compatible scalar action; no additive structure, process measurability, probability, completeness, vector-space, inner-product, or finite-dimensional assumptions
+-- portable call pattern: stochastic-gradient, decentralized, martingale, and random-iterate proofs scale an L2 vector process by a deterministic stepsize or weight while the measure, process, space, and scalar change
+-- counterargument checked: not paper-local and not a pure rename; Mathlib closes integrability under constant multiplication, while this packages the norm-compatibility rewrite needed for the recurring squared-norm contract
+-- coverage search: queried `integrable squared norm scalar multiplication norm compatible scalar action`; SOptLib hits were only stronger affine-update, mini-batch, and Gaussian-specialized results
+-- minimal hypotheses: only the norms, scalar action, and norm compatibility used by `norm_smul` are retained; integrability of the squared norm already supplies the scalar measurability needed by `Integrable.const_mul`
+
+/-- The squared norm of a deterministic scalar multiple is integrable whenever the
+original squared norm is integrable.
+
+Layer: Glue | Gap: Level 1 (squared-norm integrability closure under deterministic scalar multiplication)
+Proof: rewrite the squared norm with `norm_smul` and close integrability under multiplication by the constant `‖c‖ ^ 2`.
+Source: Mathlib norm-compatible scalar action and `MeasureTheory.Integrable.const_mul`
+Used in: decentralized stochastic communication sliding when primal extrapolation differences and dual disagreement increments are multiplied by deterministic iteration weights; likewise in stochastic-gradient and martingale L2 closure steps
+Book citation: book/research/Source.json#/algorithm_spec
+Origin algorithm: Guanghui Lan, First-order and Stochastic Optimization Methods for Machine Learning, Stochastic Decentralized Communication Sliding -/
+theorem integrable_sq_norm_const_smul
+    {Omega 𝕜 E : Type*} [MeasurableSpace Omega]
+    [Norm 𝕜] [Norm E] [SMul 𝕜 E] [NormSMulClass 𝕜 E]
+    {mu : Measure Omega} {f : Omega → E} (c : 𝕜)
+    (hf_sq : Integrable (fun omega => ‖f omega‖ ^ 2) mu) :
+    Integrable (fun omega => ‖c • f omega‖ ^ 2) mu := by
+  simpa only [norm_smul, mul_pow] using hf_sq.const_mul (‖c‖ ^ 2)
+
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: coordinatewise L2 transport through a continuous linear map; orig was generated_network_coordinate_norm_sq_integrable
+-- generality used: arbitrary measure on a measurable domain, finite dependent input and output products of normed additive commutative groups over any nontrivially normed field, and an arbitrary continuous linear map between them
+-- portable call pattern: finite-agent, block-coordinate, and product-state algorithms apply a changing linear communication or coupling operator to a coordinatewise L2 process and need any selected output coordinate to remain L2
+-- counterargument checked: not paper-local and not a pure wrapper; the proof composes finite-product L2 assembly, continuous-linear-map transport, output evaluation, and the squared-norm characterization into one recurring mathematical contract
+-- coverage search: queried `continuous linear map finite product coordinate squared norm integrable from coordinate squared norm integrable`, `integrable squared norm continuous linear map`, and `MemLp continuous linear map finite pi coordinate`; Mathlib provides `memLp_pi_iff`, `MemLp.continuousLinearMap_comp`, `MemLp.eval`, and `memLp_two_iff_integrable_sq_norm` as separate edges, while no Mathlib or SOptLib declaration covers their composite conclusion
+-- minimal hypotheses: coordinate measurability is weakened to a.e. strong measurability; finiteness is needed only for assembling each product L2 membership; no measurable structure on coordinate spaces, finite measure, probability, completeness, second-countability, Borel, inner-product, or finite-dimensional assumption is used
+
+/-- Coordinatewise square-integrability is preserved in each coordinate after a
+continuous linear map between finite dependent products.
+
+Layer: Glue | Gap: Level 1 (finite-product coordinatewise L2 transport through a continuous linear map)
+Proof: assemble the input process in `MemLp` using `MemLp.of_eval`, transport it through the continuous linear map, evaluate the selected output coordinate, and convert back with `memLp_two_iff_integrable_sq_norm`.
+Source: Mathlib finite-product Lp characterization in `MeasureTheory.SpecificCodomains.Pi` and continuous-linear-map transport in `MeasureTheory.Function.LpSpace.Basic`
+Used in: decentralized communication sliding when coordinatewise second moments of a product state must imply a second moment for one agent after applying the network operator; likewise for finite block-coupling and product-state linear updates
+Book citation: book/research/Source.json#/algorithm_spec
+Origin algorithm: Guanghui Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic decentralized communication sliding -/
+theorem integrable_sq_norm_apply_continuousLinearMap_of_coordinate_sq_integrable
+    {𝕜 Ω ι κ : Type*} [NontriviallyNormedField 𝕜]
+    [MeasurableSpace Ω] [Fintype ι] [Fintype κ]
+    {E : ι → Type*} [∀ j, NormedAddCommGroup (E j)] [∀ j, NormedSpace 𝕜 (E j)]
+    {F : κ → Type*} [∀ k, NormedAddCommGroup (F k)] [∀ k, NormedSpace 𝕜 (F k)]
+    (μ : Measure Ω) (A : (∀ j, E j) →L[𝕜] (∀ k, F k))
+    (z : Ω → (∀ j, E j))
+    (hz_meas : ∀ j, AEStronglyMeasurable (fun ω => z ω j) μ)
+    (hz_sq : ∀ j, Integrable (fun ω => ‖z ω j‖ ^ 2) μ)
+    (k : κ) :
+    Integrable (fun ω => ‖A (z ω) k‖ ^ 2) μ := by
+  have hz_l2 : MemLp z 2 μ :=
+    MemLp.of_eval fun j =>
+      (memLp_two_iff_integrable_sq_norm (hz_meas j)).2 (hz_sq j)
+  have hAz_l2 : MemLp (fun ω => A (z ω)) 2 μ :=
+    hz_l2.continuousLinearMap_comp A
+  have hk_l2 : MemLp (fun ω => A (z ω) k) 2 μ := hAz_l2.eval k
+  exact
+    (memLp_two_iff_integrable_sq_norm hk_l2.aestronglyMeasurable).1 hk_l2
+
+
+open MeasureTheory
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: finite-path squared-distance integrability from an increment-energy bound; orig was generated_sdcs_inner_query_direction_sq_integrable
+-- generality used: an arbitrary normed additive commutative group over a finite measure; measurable path, residual, and forcing processes; their required squared moments; and an a.e. finite-prefix increment-energy estimate
+-- portable call pattern: stochastic proximal, mirror, implicit, and nested inner-loop analyses whose query path, residual process, forcing process, reference point, step scale, and proof of the increment-energy budget vary while the finite-horizon squared-distance conclusion is unchanged
+-- counterargument checked: this is not paper-local traceability or a one-line wrapper because it composes finite-path Cauchy--Schwarz, L2 closure for residual and forcing envelopes, and integrable domination to propagate a second moment to every endpoint
+-- coverage search: searched `finite path squared distance integrable from initial squared distance and increment energy bound`, `endpoint squared distance integrable of sum squared increments integrable`, `integrable squared norm finite path increment energy majorant`, and the Mathlib semantic equivalent; SOptLib's diameter and affine-update lemmas cover different hypotheses, while `sum_sq_increment_le_of_telescoping_energy` supplies the pointwise budget but not this integrability consequence
+-- minimal hypotheses: no probability, completeness, inner-product, finite-dimensional, convexity, independence, or positivity assumptions are used; measurability is required only for the displayed random processes, and the increment-energy estimate is weakened from pointwise to almost everywhere
+
+/-- Every endpoint of a measurable finite path has integrable squared distance
+from a fixed reference when its initial squared distance, residual squares, and
+forcing square are integrable and its accumulated squared increments satisfy the
+displayed finite-energy bound almost everywhere.
+
+Layer: Glue | Gap: Level 1 (finite-path squared-distance integrability from an increment-energy envelope)
+Proof: build an integrable envelope from the residual, forcing, and initial-distance moments, bound endpoint displacement by the number of increments times their squared-energy sum, and apply integrable domination.
+Source: Mathlib Bochner integrability closure under finite sums and scalar multiplication, finite-sum Cauchy--Schwarz, and norm-square domination; SOptLib finite-measure L2-to-L1 integrability
+Used in: finite-horizon stochastic proximal, mirror, implicit, and nested inner-loop moment inductions after a pointwise increment-energy estimate has been established
+Book citation: book/research/Source.json#/algorithm_spec/steps
+Origin algorithm: Lan, First-Order and Stochastic Optimization Methods for Machine Learning, stochastic decentralized communication sliding -/
+theorem finite_path_sq_distance_integrable_of_increment_energy_bound
+    {Ω E : Type*} [MeasurableSpace Ω] [NormedAddCommGroup E]
+    (μ : Measure Ω) [IsFiniteMeasure μ]
+    (u : Ω → ℕ → E) (delta : ℕ → Ω → E) (w : Ω → E)
+    (xRef : E) (eta M C : ℝ)
+    (hu_meas : ∀ r, AEStronglyMeasurable (fun ω => u ω r) μ)
+    (hdelta_meas : ∀ r, AEStronglyMeasurable (delta r) μ)
+    (hw_meas : AEStronglyMeasurable w μ)
+    (hdelta_sq : ∀ r, Integrable (fun ω => ‖delta r ω‖ ^ 2) μ)
+    (hw_sq : Integrable (fun ω => ‖w ω‖ ^ 2) μ)
+    (hzero : Integrable (fun ω => ‖xRef - u ω 0‖ ^ 2) μ)
+    (hincrement : ∀ t, ∀ᵐ ω ∂μ,
+      (∑ r ∈ Finset.range t, ‖u ω (r + 1) - u ω r‖ ^ 2) ≤
+        (4 / eta ^ 2) *
+            (∑ r ∈ Finset.range t, (‖delta r ω‖ + M + ‖w ω‖ + C) ^ 2) +
+          (8 * C / eta) * ‖u ω 0 - xRef‖) :
+    ∀ t, Integrable (fun ω => ‖xRef - u ω t‖ ^ 2) μ := by
+  classical
+  intro t
+  let R : Ω → ℝ := fun ω =>
+    (4 / eta ^ 2) *
+        (∑ r ∈ Finset.range t, (‖delta r ω‖ + M + ‖w ω‖ + C) ^ 2) +
+      (8 * C / eta) * ‖u ω 0 - xRef‖
+  have hterm : ∀ r, Integrable
+      (fun ω => (‖delta r ω‖ + M + ‖w ω‖ + C) ^ 2) μ := by
+    intro r
+    have hdom : Integrable
+        (fun ω => 4 * ‖delta r ω‖ ^ 2 + 4 * M ^ 2 +
+          4 * ‖w ω‖ ^ 2 + 4 * C ^ 2) μ := by
+      exact (((hdelta_sq r).const_mul 4).add (integrable_const (c := 4 * M ^ 2)))
+        |>.add (hw_sq.const_mul 4) |>.add (integrable_const (c := 4 * C ^ 2))
+    have htarget_meas : AEStronglyMeasurable
+        (fun ω => (‖delta r ω‖ + M + ‖w ω‖ + C) ^ 2) μ :=
+      (((((hdelta_meas r).norm.add aestronglyMeasurable_const).add hw_meas.norm).add
+        aestronglyMeasurable_const).aemeasurable.pow_const 2).aestronglyMeasurable
+    refine Integrable.mono' hdom htarget_meas ?_
+    filter_upwards with ω
+    rw [Real.norm_of_nonneg (sq_nonneg _)]
+    nlinarith [sq_nonneg (‖delta r ω‖ - M),
+      sq_nonneg (‖delta r ω‖ - ‖w ω‖),
+      sq_nonneg (‖delta r ω‖ - C),
+      sq_nonneg (M - ‖w ω‖), sq_nonneg (M - C),
+      sq_nonneg (‖w ω‖ - C)]
+  have hR : Integrable R μ := by
+    have hsum : Integrable
+        (fun ω => ∑ r ∈ Finset.range t,
+          (‖delta r ω‖ + M + ‖w ω‖ + C) ^ 2) μ :=
+      MeasureTheory.integrable_finset_sum (s := Finset.range t)
+        (fun r _hr => hterm r)
+    have hu0_meas : AEStronglyMeasurable (fun ω => u ω 0 - xRef) μ :=
+      (hu_meas 0).sub aestronglyMeasurable_const
+    have hu0_sq : Integrable (fun ω => ‖u ω 0 - xRef‖ ^ 2) μ := by
+      simpa [norm_sub_rev] using hzero
+    have hu0_norm : Integrable (fun ω => ‖u ω 0 - xRef‖) μ :=
+      (integrable_of_integrable_norm_sq hu0_meas hu0_sq).norm
+    exact (hsum.const_mul (4 / eta ^ 2)).add
+      (hu0_norm.const_mul (8 * C / eta))
+  have hpath : ∀ ω,
+      ‖u ω t - u ω 0‖ ^ 2 ≤
+        (t : ℝ) * ∑ r ∈ Finset.range t, ‖u ω (r + 1) - u ω r‖ ^ 2 := by
+    intro ω
+    have hsumvec : u ω t - u ω 0 =
+        ∑ r ∈ Finset.range t, (u ω (r + 1) - u ω r) := by
+      have hs := Finset.sum_range_sub' (u ω) t
+      calc
+        u ω t - u ω 0 = -(u ω 0 - u ω t) := by abel
+        _ = -(∑ r ∈ Finset.range t, (u ω r - u ω (r + 1))) := by rw [hs]
+        _ = ∑ r ∈ Finset.range t, (u ω (r + 1) - u ω r) := by
+          rw [← Finset.sum_neg_distrib]
+          apply Finset.sum_congr rfl
+          intro r _hr
+          abel
+    calc
+      ‖u ω t - u ω 0‖ ^ 2 =
+          ‖∑ r ∈ Finset.range t, (u ω (r + 1) - u ω r)‖ ^ 2 := by rw [hsumvec]
+      _ ≤ (∑ r ∈ Finset.range t, ‖u ω (r + 1) - u ω r‖) ^ 2 := by
+        gcongr
+        exact norm_sum_le _ _
+      _ ≤ ((Finset.range t).card : ℝ) *
+          ∑ r ∈ Finset.range t, ‖u ω (r + 1) - u ω r‖ ^ 2 :=
+        sq_sum_le_card_mul_sum_sq
+      _ = (t : ℝ) *
+          ∑ r ∈ Finset.range t, ‖u ω (r + 1) - u ω r‖ ^ 2 := by simp
+  have hdom : Integrable
+      (fun ω => 2 * ‖xRef - u ω 0‖ ^ 2 + 2 * (t : ℝ) * R ω) μ :=
+    (hzero.const_mul 2).add (hR.const_mul (2 * (t : ℝ)))
+  have htarget_meas : AEStronglyMeasurable
+      (fun ω => ‖xRef - u ω t‖ ^ 2) μ :=
+    ((aestronglyMeasurable_const.sub (hu_meas t)).norm.aemeasurable.pow_const 2)
+      |>.aestronglyMeasurable
+  refine Integrable.mono' hdom htarget_meas ?_
+  filter_upwards [hincrement t] with ω hprefix
+  rw [Real.norm_of_nonneg (sq_nonneg _)]
+  have hsplit := SOptLib.norm_add_sq_le_two_mul_norm_sq_add_two_mul_norm_sq
+    (xRef - u ω 0) (u ω 0 - u ω t)
+  have ht0 : 0 ≤ (t : ℝ) := by positivity
+  have hp := mul_le_mul_of_nonneg_left hprefix
+    (mul_nonneg (show 0 ≤ (2 : ℝ) by norm_num) ht0)
+  have hpath' := hpath ω
+  have heq : (xRef - u ω 0) + (u ω 0 - u ω t) = xRef - u ω t := by abel
+  rw [heq] at hsplit
+  rw [norm_sub_rev (u ω 0) (u ω t)] at hsplit
+  change _ ≤ 2 * ‖xRef - u ω 0‖ ^ 2 + 2 * (t : ℝ) * R ω
+  nlinarith
+
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: paired integrability and integral budgets for nonnegative branches
+--   dominated by scaled residuals; orig was
+--   `theorem811_expected_residual_branch_moment_bounds`.
+-- generality used: arbitrary measurable space, arbitrary measure, three real-valued
+--   functions, two nonnegative real scales, and one real integral budget; no
+--   probability, finite-dimensionality, convexity, smoothness, oracle, or filtration
+--   assumptions are used.
+-- portable call pattern: residual, feasibility, and stationarity analyses can change
+--   the measure, residual process, two nonnegative certificate processes, scale factors,
+--   and aggregate budget while retaining paired integrability and expectation bounds.
+-- counterargument checked: this is not paper-local traceability or a pure rename;
+--   Mathlib provides the single-function domination and integral-monotonicity steps,
+--   but not the paired contract that transports one residual budget to two branches.
+-- coverage search: queried `two nonnegative measurable functions integrable integral
+--   upper bounds scaled integrable residual` and `integrable and integral le of
+--   nonnegative pointwise dominated by constant multiple`; top hits were Mathlib
+--   `Integrable.mono'`, `integral_mono_ae`, and `integral_const_mul`, plus SOptLib
+--   `integrable_of_nonneg_sq_integrable_integral_le_sq_bound_add_one` and
+--   `integrable_of_le_integrable_weighted_finset_sum`, all partial rather than full.
+-- minimal hypotheses: source pointwise measurability, nonnegativity, and domination are
+--   weakened to a.e. strong measurability and a.e. order; scalar nonnegativity is needed
+--   only to transport the residual integral budget, and no sign assumption on the
+--   residual itself is required.
+
+/-- Two nonnegative branches dominated by scaled copies of one integrable residual are
+integrable and inherit the corresponding scaled integral budgets.
+
+The residual need not be nonnegative separately: each domination hypothesis already
+forces its relevant scaled copy to be nonnegative almost everywhere.
+
+Layer: Glue | Gap: Level 1 (paired scaled-residual integrability and integral bounds)
+Proof: apply `Integrable.mono'` to each nonnegative branch, then combine
+  `integral_mono_ae` with `integral_const_mul` and the residual integral budget.
+Source: Mathlib Bochner integrability under domination and monotonicity of real-valued
+  integrals
+Used in: stochastic primal-dual residual analyses that extract primal and dual terminal
+  second-moment certificates from one integrable aggregate residual estimate
+Book citation: book/research/Source.json#/main_theorem/proof/9
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine
+  Learning, Stochastic Decentralized Communication Sliding -/
+theorem two_nonnegative_integrable_integral_le_of_scaled_residual_bounds
+    {Omega : Type*} [MeasurableSpace Omega] (mu : Measure Omega)
+    (residual first second : Omega -> Real) (cFirst cSecond R : Real)
+    (hfirst_meas : AEStronglyMeasurable first mu)
+    (hsecond_meas : AEStronglyMeasurable second mu)
+    (hresidual_int : Integrable residual mu)
+    (hfirst_nonneg : 0 ≤ᵐ[mu] first)
+    (hsecond_nonneg : 0 ≤ᵐ[mu] second)
+    (hcFirst : 0 <= cFirst) (hcSecond : 0 <= cSecond)
+    (hfirst_le : first ≤ᵐ[mu] fun omega => cFirst * residual omega)
+    (hsecond_le : second ≤ᵐ[mu] fun omega => cSecond * residual omega)
+    (hresidual_le : (∫ omega, residual omega ∂mu) <= R) :
+    (Integrable first mu ∧ (∫ omega, first omega ∂mu) <= cFirst * R) ∧
+      (Integrable second mu ∧ (∫ omega, second omega ∂mu) <= cSecond * R) := by
+  have hfirst_int : Integrable first mu := by
+    refine Integrable.mono' (hresidual_int.const_mul cFirst) hfirst_meas ?_
+    filter_upwards [hfirst_nonneg, hfirst_le] with omega hnonneg hle
+    rw [Real.norm_of_nonneg hnonneg]
+    exact hle
+  have hsecond_int : Integrable second mu := by
+    refine Integrable.mono' (hresidual_int.const_mul cSecond) hsecond_meas ?_
+    filter_upwards [hsecond_nonneg, hsecond_le] with omega hnonneg hle
+    rw [Real.norm_of_nonneg hnonneg]
+    exact hle
+  constructor
+  · refine ⟨hfirst_int, ?_⟩
+    calc
+      (∫ omega, first omega ∂mu) <=
+          ∫ omega, cFirst * residual omega ∂mu :=
+        integral_mono_ae hfirst_int (hresidual_int.const_mul cFirst) hfirst_le
+      _ = cFirst * ∫ omega, residual omega ∂mu := by
+        rw [integral_const_mul]
+      _ <= cFirst * R := mul_le_mul_of_nonneg_left hresidual_le hcFirst
+  · refine ⟨hsecond_int, ?_⟩
+    calc
+      (∫ omega, second omega ∂mu) <=
+          ∫ omega, cSecond * residual omega ∂mu :=
+        integral_mono_ae hsecond_int (hresidual_int.const_mul cSecond) hsecond_le
+      _ = cSecond * ∫ omega, residual omega ∂mu := by
+        rw [integral_const_mul]
+      _ <= cSecond * R := mul_le_mul_of_nonneg_left hresidual_le hcSecond
+
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: expectation bound for a nonnegative scaled sum from two second-moment
+--   budgets; orig was `theorem811_expected_scaledPerturbation_norm_le_of_residual_budget`.
+-- generality used: arbitrary measurable space with a probability measure, three
+--   real-valued processes, a nonnegative real scale, an arbitrary deterministic offset,
+--   and two real second-moment budgets; no normed space, finite-dimensionality,
+--   convexity, smoothness, oracle, independence, or filtration assumptions are used.
+-- portable call pattern: stochastic primal-dual, distributed, and feasibility proofs
+--   can change the probability law, target residual process, two component norm
+--   processes, scale, deterministic offset, and second-moment budgets while retaining
+--   the same expected scaled-sum bound.
+-- counterargument checked: this is not paper-local traceability or a pure wrapper;
+--   it packages two L2-to-L1 passages, the integrability needed for the affine
+--   majorant, integral monotonicity, and expectation linearity into one reusable
+--   stochastic estimate.
+-- coverage search: queried `integral nonnegative upper bound scale square root second
+--   moment constant` and `nonnegative integral bounded by square root integral square`;
+--   SOptLib `integral_nonneg_le_of_integral_sq_le_sq` covers one component and
+--   `integrable_of_nonneg_sq_integrable_integral_le_sq_bound_add_one` supplies its L1
+--   integrability, while Mathlib integral monotonicity and linearity are only partial
+--   coverage of the two-component scaled conclusion.
+-- minimal hypotheses: source pointwise assumptions are weakened to almost-everywhere
+--   nonnegativity and domination; component measurability and budget nonnegativity are
+--   derived from square integrability, nonnegativity, and the moment bounds.
+
+/-- A nonnegative process dominated by a scaled sum of two nonnegative processes and a
+constant has expectation bounded by the corresponding square-root second-moment budgets.
+
+The two budget nonnegativity facts are consequences of the moment bounds, so they are not
+required separately. The deterministic offset need not be nonnegative.
+
+Layer: Glue | Gap: Level 1 (scaled two-process L2-to-L1 expectation bound)
+Proof: apply the scalar probability L2-to-L1 bound to each component, recover their L1
+  integrability from square integrability, integrate the affine pointwise majorant, and
+  multiply the summed expectation bounds by the nonnegative scale.
+Source: SOptLib scalar probability second-moment contraction and Mathlib Bochner integral
+  monotonicity and linearity APIs
+Used in: stochastic primal-dual and distributed feasibility analyses that bound an expected
+  terminal residual by two component second moments and a deterministic initial offset
+Book citation: book/research/Source.json#/main_theorem/proof/11
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning,
+  Stochastic Decentralized Communication Sliding -/
+theorem integral_nonnegative_le_scale_mul_sqrt_second_moments_add_const
+    {Omega : Type*} [MeasurableSpace Omega] (mu : Measure Omega)
+    [IsProbabilityMeasure mu]
+    (target first second : Omega -> Real)
+    (scale offset firstBudget secondBudget : Real)
+    (hfirst_sq_int : Integrable (fun omega => first omega ^ 2) mu)
+    (hsecond_sq_int : Integrable (fun omega => second omega ^ 2) mu)
+    (htarget_nonneg : 0 ≤ᵐ[mu] target)
+    (hfirst_nonneg : 0 ≤ᵐ[mu] first)
+    (hsecond_nonneg : 0 ≤ᵐ[mu] second)
+    (hscale_nonneg : 0 <= scale)
+    (hfirst_moment : (∫ omega, first omega ^ 2 ∂mu) <= firstBudget)
+    (hsecond_moment : (∫ omega, second omega ^ 2 ∂mu) <= secondBudget)
+    (htarget_le : target ≤ᵐ[mu]
+      fun omega => scale * (first omega + second omega + offset)) :
+    (∫ omega, target omega ∂mu) <=
+      scale * (Real.sqrt firstBudget + Real.sqrt secondBudget + offset) := by
+  have hfirstBudget_nonneg : 0 <= firstBudget :=
+    le_trans (integral_nonneg fun omega => sq_nonneg (first omega)) hfirst_moment
+  have hsecondBudget_nonneg : 0 <= secondBudget :=
+    le_trans (integral_nonneg fun omega => sq_nonneg (second omega)) hsecond_moment
+  have hfirst_expected :
+      (∫ omega, first omega ∂mu) <= Real.sqrt firstBudget := by
+    refine integral_nonneg_le_of_integral_sq_le_sq hfirst_sq_int hfirst_nonneg
+      (Real.sqrt_nonneg _) ?_
+    simpa [Real.sq_sqrt hfirstBudget_nonneg] using hfirst_moment
+  have hsecond_expected :
+      (∫ omega, second omega ∂mu) <= Real.sqrt secondBudget := by
+    refine integral_nonneg_le_of_integral_sq_le_sq hsecond_sq_int hsecond_nonneg
+      (Real.sqrt_nonneg _) ?_
+    simpa [Real.sq_sqrt hsecondBudget_nonneg] using hsecond_moment
+  have hfirst_int : Integrable first mu :=
+    (integrable_of_nonneg_sq_integrable_integral_le_sq_bound_add_one
+      hfirst_sq_int hfirst_nonneg hfirst_moment).1
+  have hsecond_int : Integrable second mu :=
+    (integrable_of_nonneg_sq_integrable_integral_le_sq_bound_add_one
+      hsecond_sq_int hsecond_nonneg hsecond_moment).1
+  have hmajorant_int :
+      Integrable (fun omega => scale * (first omega + second omega + offset)) mu := by
+    exact ((hfirst_int.add hsecond_int).add (integrable_const (c := offset))).const_mul scale
+  calc
+    (∫ omega, target omega ∂mu) <=
+        ∫ omega, scale * (first omega + second omega + offset) ∂mu :=
+      integral_mono_of_nonneg htarget_nonneg hmajorant_int htarget_le
+    _ = scale *
+        ((∫ omega, first omega ∂mu) + (∫ omega, second omega ∂mu) + offset) := by
+      rw [integral_const_mul]
+      congr 1
+      change ∫ omega, (first + second) omega + (fun _ : Omega => offset) omega ∂mu = _
+      rw [integral_add (hfirst_int.add hsecond_int) (integrable_const (c := offset))]
+      simp [integral_add hfirst_int hsecond_int]
+    _ <= scale * (Real.sqrt firstBudget + Real.sqrt secondBudget + offset) := by
+      exact mul_le_mul_of_nonneg_left
+        (by linarith [hfirst_expected, hsecond_expected])
+        hscale_nonneg
+
+
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: perturbation bound for second-moment integrals by the
+--   squared L2 error and its geometric cross term; orig was
+--   `abs_integral_abs_sq_sub_integral_abs_sq_le_l2_error_cross`
+-- generality used: functions valued in a normed additive commutative group on
+--   an arbitrary measurable space and arbitrary measure, assuming only membership
+--   of both functions in L2; no probability, finite-measure, convexity,
+--   smoothness, oracle, or dimension assumptions
+-- portable call pattern: approximation, coupling, and comparison-process proofs
+--   replace either scalar L2 process and the ambient measure while transferring
+--   control of their squared second moments through the same L2 error bound
+-- counterargument checked: this is not paper-local traceability or a pure
+--   caller-side expression; it packages pointwise square perturbation,
+--   integrability closure, integral monotonicity, and Holder into one reusable bound
+-- coverage search: symbol queries for "absolute difference integrals squared
+--   scalar functions bounded by integral squared error cross term L2" and
+--   "second moments difference upper bound L2 error square plus product norms"
+--   found no covering SOptLib declaration; Mathlib semantic search returned only
+--   component results such as `norm_integral_le_integral_norm`, L2 inner-product
+--   identities, and `abs_sub_sq`, so coverage is partial rather than duplicative
+-- minimal hypotheses: both `MemLp` hypotheses are needed to make the two square
+--   integrals, their difference, and the Holder cross term integrable; all are minimal
+
+/-- The absolute difference of two second-moment integrals is bounded by
+the integral squared error plus twice its geometric cross term with the reference process.
+
+Layer: Glue | Gap: Level 1 (L2 second-moment perturbation bound)
+Proof: bound the pointwise difference of squared norms using the reverse triangle inequality, integrate the resulting bound, and control the cross integral by the p=q=2 Holder inequality.
+Source: Mathlib Bochner integral norm and monotonicity inequalities, `MemLp.integrable_mul`, and the p=q=2 case of `MeasureTheory.integral_mul_le_Lp_mul_Lq_of_nonneg`
+Used in: comparison-process and coupling arguments that transfer finite-horizon second-moment estimates from an approximating process to the actual stochastic iterate
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/17/proof/9
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem abs_integral_sq_sub_integral_sq_le_integral_error_sq_add_cross
+    {Ω E : Type*} [MeasurableSpace Ω] [NormedAddCommGroup E] {μ : Measure Ω}
+    {x u : Ω → E} (hx : MemLp x 2 μ) (hu : MemLp u 2 μ) :
+    |(∫ ω, ‖x ω‖ ^ 2 ∂μ) - (∫ ω, ‖u ω‖ ^ 2 ∂μ)| ≤
+      (∫ ω, ‖x ω - u ω‖ ^ 2 ∂μ) +
+        2 * Real.sqrt (∫ ω, ‖x ω - u ω‖ ^ 2 ∂μ) *
+          Real.sqrt (∫ ω, ‖u ω‖ ^ 2 ∂μ) := by
+  classical
+  have hsquare_integrable :
+      ∀ {f : Ω → E}, MemLp f 2 μ → Integrable (fun ω => ‖f ω‖ ^ 2) μ := by
+    intro f hf
+    simpa using
+      (memLp_two_iff_integrable_sq_norm hf.aestronglyMeasurable).1 hf
+  have hpoint : ∀ a b : E,
+      |(‖a‖ ^ 2 - ‖b‖ ^ 2)| ≤ ‖a - b‖ ^ 2 + 2 * ‖a - b‖ * ‖b‖ := by
+    intro a b
+    have hfactor :
+        ‖a‖ ^ 2 - ‖b‖ ^ 2 = (‖a‖ - ‖b‖) * (‖a‖ + ‖b‖) := by ring
+    have hnorm_add : ‖a‖ + ‖b‖ ≤ ‖a - b‖ + 2 * ‖b‖ := by
+      have htri : ‖a‖ ≤ ‖a - b‖ + ‖b‖ := by
+        calc
+          ‖a‖ = ‖(a - b) + b‖ := by rw [sub_add_cancel]
+          _ ≤ ‖a - b‖ + ‖b‖ := norm_add_le _ _
+      linarith
+    calc
+      |(‖a‖ ^ 2 - ‖b‖ ^ 2)| =
+          |‖a‖ - ‖b‖| * (‖a‖ + ‖b‖) := by
+            rw [hfactor, abs_mul, abs_of_nonneg (add_nonneg (norm_nonneg _) (norm_nonneg _))]
+      _ ≤ ‖a - b‖ * (‖a‖ + ‖b‖) :=
+        mul_le_mul_of_nonneg_right (abs_norm_sub_norm_le a b)
+          (add_nonneg (norm_nonneg _) (norm_nonneg _))
+      _ ≤ ‖a - b‖ * (‖a - b‖ + 2 * ‖b‖) :=
+        mul_le_mul_of_nonneg_left hnorm_add (norm_nonneg _)
+      _ = ‖a - b‖ ^ 2 + 2 * ‖a - b‖ * ‖b‖ := by ring
+  have hholder : ∀ {f g : Ω → E}, MemLp f 2 μ → MemLp g 2 μ →
+      (∫ ω, ‖f ω‖ * ‖g ω‖ ∂μ) ≤
+        Real.sqrt (∫ ω, ‖f ω‖ ^ 2 ∂μ) *
+          Real.sqrt (∫ ω, ‖g ω‖ ^ 2 ∂μ) := by
+    intro f g hf hg
+    have hpq : (2 : ℝ).HolderConjugate (2 : ℝ) := by
+      rw [Real.holderConjugate_iff_eq_conjExponent (by norm_num : (1 : ℝ) < 2)]
+      norm_num
+    have hf_norm : MemLp (fun ω : Ω => ‖f ω‖) (ENNReal.ofReal (2 : ℝ)) μ := by
+      simpa using hf.norm
+    have hg_norm : MemLp (fun ω : Ω => ‖g ω‖) (ENNReal.ofReal (2 : ℝ)) μ := by
+      simpa using hg.norm
+    have h := MeasureTheory.integral_mul_le_Lp_mul_Lq_of_nonneg
+      (μ := μ) hpq
+      (Filter.Eventually.of_forall fun ω => norm_nonneg (f ω))
+      (Filter.Eventually.of_forall fun ω => norm_nonneg (g ω))
+      hf_norm hg_norm
+    have hf_pow :
+        (∫ ω, ‖f ω‖ ^ (2 : ℝ) ∂μ) = ∫ ω, ‖f ω‖ ^ 2 ∂μ := by
+      refine integral_congr_ae ?_
+      filter_upwards with ω
+      rw [Real.rpow_two]
+    have hg_pow :
+        (∫ ω, ‖g ω‖ ^ (2 : ℝ) ∂μ) = ∫ ω, ‖g ω‖ ^ 2 ∂μ := by
+      refine integral_congr_ae ?_
+      filter_upwards with ω
+      rw [Real.rpow_two]
+    simpa [hf_pow, hg_pow, Real.sqrt_eq_rpow] using h
+  let A : Ω → ℝ := fun ω => ‖x ω - u ω‖ ^ 2
+  let D : Ω → ℝ := fun ω => ‖x ω‖ ^ 2 - ‖u ω‖ ^ 2
+  let R : Ω → ℝ := fun ω => A ω + 2 * (‖x ω - u ω‖ * ‖u ω‖)
+  have hx_sq_int : Integrable (fun ω => ‖x ω‖ ^ 2) μ :=
+    hsquare_integrable hx
+  have hu_sq_int : Integrable (fun ω => ‖u ω‖ ^ 2) μ :=
+    hsquare_integrable hu
+  have hdiff_mem : MemLp (fun ω => x ω - u ω) 2 μ := hx.sub hu
+  have hA_int : Integrable A μ := by
+    simpa [A] using hsquare_integrable hdiff_mem
+  have hcross_int : Integrable (fun ω => ‖x ω - u ω‖ * ‖u ω‖) μ := by
+    have hprod : Integrable
+        (fun ω : Ω => ‖(fun ω : Ω => x ω - u ω) ω‖ * ‖u ω‖) μ := by
+      simpa [Pi.mul_apply] using
+        (MemLp.integrable_mul hdiff_mem.norm hu.norm :
+          Integrable ((fun ω : Ω => ‖x ω - u ω‖) *
+            (fun ω : Ω => ‖u ω‖)) μ)
+    simpa using hprod
+  have hD_int : Integrable D μ := hx_sq_int.sub hu_sq_int
+  have hR_int : Integrable R μ := hA_int.add (hcross_int.const_mul 2)
+  have hraw :
+      |(∫ ω, ‖x ω‖ ^ 2 ∂μ) - (∫ ω, ‖u ω‖ ^ 2 ∂μ)| ≤
+        ∫ ω, R ω ∂μ := by
+    calc
+      |(∫ ω, ‖x ω‖ ^ 2 ∂μ) - (∫ ω, ‖u ω‖ ^ 2 ∂μ)| =
+          |∫ ω, D ω ∂μ| := by
+            dsimp [D]
+            rw [MeasureTheory.integral_sub hx_sq_int hu_sq_int]
+      _ ≤ ∫ ω, |D ω| ∂μ := by
+            simpa [Real.norm_eq_abs] using
+              (MeasureTheory.norm_integral_le_integral_norm (μ := μ) D)
+      _ ≤ ∫ ω, R ω ∂μ := by
+            exact MeasureTheory.integral_mono hD_int.abs hR_int
+              (fun ω => by
+                dsimp [R, A, D]
+                simpa [mul_assoc] using hpoint (x ω) (u ω))
+  have hcross := hholder hdiff_mem hu
+  calc
+    |(∫ ω, ‖x ω‖ ^ 2 ∂μ) - (∫ ω, ‖u ω‖ ^ 2 ∂μ)| ≤
+        ∫ ω, R ω ∂μ := hraw
+    _ =
+        (∫ ω, ‖x ω - u ω‖ ^ 2 ∂μ) +
+          2 * (∫ ω, ‖x ω - u ω‖ * ‖u ω‖ ∂μ) := by
+          dsimp [R, A]
+          rw [MeasureTheory.integral_add hA_int (hcross_int.const_mul 2)]
+          rw [MeasureTheory.integral_const_mul]
+    _ ≤
+        (∫ ω, ‖x ω - u ω‖ ^ 2 ∂μ) +
+          2 * Real.sqrt (∫ ω, ‖x ω - u ω‖ ^ 2 ∂μ) *
+            Real.sqrt (∫ ω, ‖u ω‖ ^ 2 ∂μ) := by
+          nlinarith [hcross]
+
+
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: absolute expectation bound from a scalar second-moment budget;
+--   orig was `abs_integral_le_sqrt_of_sq_integral_le`
+-- generality used: an arbitrary measurable sample space and probability measure,
+--   a real-valued process, a.e. strong measurability, and integrability of its
+--   square; no optimization, oracle, independence, finite-dimensional, convexity,
+--   or smoothness assumptions
+-- portable call pattern: stochastic approximation, distributed optimization, and
+--   variance-reduction proofs vary the scalar observable, probability law, and
+--   nonnegative second-moment budget while retaining the same absolute-mean bound
+-- counterargument checked: this is a short composition, but not a pure rename or
+--   paper-local wrapper; it exposes the recurring square-root endpoint obtained by
+--   combining second-moment contraction with monotonicity of the real square root
+-- coverage search: searched `absolute integral bounded by square root integral
+--   square probability measure` and `sq integral le integral sq probability
+--   measure`; SOptLib's `sq_integral_le_integral_sq` supplies only the squared-mean
+--   contraction, while Mathlib semantic search returned variance and absolute-
+--   integral component lemmas but no declaration with this complete conclusion
+-- minimal hypotheses: the source premise `0 ≤ B` is omitted because it is not
+--   used by `Real.sqrt_le_sqrt`; measurability and square integrability are exactly
+--   the hypotheses required by `sq_integral_le_integral_sq`
+
+/-- The absolute integral of a real random variable is at most the square root of
+any upper bound on its second moment.
+
+Layer: Glue | Gap: Level 1 (absolute mean bound from a second-moment budget)
+Proof: apply the scalar probability second-moment contraction, compose it with the supplied budget, and use monotonicity of `Real.sqrt` together with `sqrt (x ^ 2) = |x|`.
+Source: SOptLib `sq_integral_le_integral_sq` and Mathlib real square-root order identities
+Used in: stochastic approximation and distributed-optimization arguments that convert a pointwise-in-time scalar second-moment estimate into an absolute deterministic mean bound
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/16/proof/2
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem abs_integral_le_sqrt_of_integral_sq_le
+    {Omega : Type*} [MeasurableSpace Omega]
+    (mu : Measure Omega) [IsProbabilityMeasure mu]
+    (Z : Omega → Real) (B : Real)
+    (hZ_meas : AEStronglyMeasurable Z mu)
+    (hZ_sq_int : Integrable (fun omega => Z omega ^ 2) mu)
+    (hZ_sq_bound : (∫ omega, Z omega ^ 2 ∂mu) ≤ B) :
+    |∫ omega, Z omega ∂mu| ≤ Real.sqrt B := by
+  have hmean_sq :
+      (∫ omega, Z omega ∂mu) ^ 2 ≤ B :=
+    le_trans (sq_integral_le_integral_sq hZ_meas hZ_sq_int) hZ_sq_bound
+  calc
+    |∫ omega, Z omega ∂mu| =
+        Real.sqrt ((∫ omega, Z omega ∂mu) ^ 2) := by
+          rw [Real.sqrt_sq_eq_abs]
+    _ ≤ Real.sqrt B := Real.sqrt_le_sqrt hmean_sq
+
+
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: absolute expectation bound for a selected member from a finite
+--   total second-moment budget; orig was
+--   `abs_integral_le_sqrt_of_sq_integral_finset_sum_bound`
+-- generality used: an arbitrary finite subset of an arbitrary index type, an
+--   arbitrary measurable sample space with a probability measure, and `MemLp 2`
+--   only for the selected real-valued member; no independence, finite-dimensional,
+--   convexity, smoothness, or optimization assumptions
+-- portable call pattern: finite-horizon stochastic approximation, distributed
+--   optimization, and variance-reduction proofs vary the process, finite index
+--   window, selected index, probability law, and total energy budget while using
+--   the same coordinatewise absolute-mean conclusion
+-- counterargument checked: the result composes a short finite-sum selection step
+--   with the scalar L2-to-mean endpoint, but is not a pure rename: callers with
+--   only a total finite-window energy estimate would otherwise repeat the
+--   nonnegative-summand extraction and square-integrability conversion
+-- coverage search: searched `absolute integral upper bound square root finite sum
+--   integral squares selected member probability` and `finset single term integral
+--   square less than sum second moments mean bound`; SOptLib and this round's
+--   `abs_integral_le_sqrt_of_integral_sq_le` cover only the scalar endpoint, while
+--   Mathlib semantic search returned finite Cauchy--Schwarz and variance lemmas but
+--   no declaration with this finite-budget selection contract
+-- minimal hypotheses: the source's `MemLp 2` assumption for every natural-number
+--   index is narrowed to the selected member, and `0 <= B` is omitted because it
+--   follows from the nonnegative finite sum and its upper bound and is not needed
+--   by the scalar endpoint
+
+/-- A finite total second-moment budget bounds the absolute integral of each
+selected square-integrable member by the square root of that budget.
+
+Layer: Glue | Gap: Level 1 (selected absolute mean bound from a finite total second-moment budget)
+Proof: bound the selected nonnegative square integral by the finite sum, then apply the scalar probability L2-to-mean bound to the selected member.
+Source: Mathlib `Finset.single_le_sum`, nonnegativity of integrals, and SOptLib `abs_integral_le_sqrt_of_integral_sq_le`
+Used in: finite-horizon stochastic and distributed-optimization estimates that turn a summed output-energy budget into a pointwise-in-time deterministic mean bound
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/16/proof/2
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem abs_integral_le_sqrt_of_finset_sum_integral_sq_le
+    {Omega i : Type*} [MeasurableSpace Omega]
+    (mu : Measure Omega) [IsProbabilityMeasure mu]
+    (I : Finset i) (out : Omega -> i -> Real) (t : i) (B : Real)
+    (hout_mem : MemLp (fun omega => out omega t) 2 mu)
+    (ht : t ∈ I)
+    (hsum :
+      Finset.sum I (fun s => ∫ omega, out omega s ^ 2 ∂mu) <= B) :
+    |∫ omega, out omega t ∂mu| <= Real.sqrt B := by
+  classical
+  have hterm_le_sum :
+      (∫ omega, out omega t ^ 2 ∂mu) <=
+        Finset.sum I (fun s => ∫ omega, out omega s ^ 2 ∂mu) :=
+    Finset.single_le_sum
+      (s := I) (f := fun s => ∫ omega, out omega s ^ 2 ∂mu)
+      (fun s _hs => integral_nonneg fun omega => sq_nonneg (out omega s)) ht
+  have hout_sq_int : Integrable (fun omega => out omega t ^ 2) mu := by
+    have hraw : Integrable (fun omega => ‖out omega t‖ ^ 2) mu :=
+      (memLp_two_iff_integrable_sq_norm hout_mem.aestronglyMeasurable).1 hout_mem
+    simpa [Real.norm_eq_abs, sq_abs] using hraw
+  exact abs_integral_le_sqrt_of_integral_sq_le mu (fun omega => out omega t) B
+    hout_mem.aestronglyMeasurable hout_sq_int (le_trans hterm_le_sum hsum)
+
+
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: absolute difference of expectations bounded by an `L²` difference
+--   budget; orig was `abs_integral_sub_integral_le_sqrt_of_sq_integral_le`
+-- generality used: an arbitrary measurable sample space and probability measure,
+--   two integrable real-valued observables, and integrability of their squared
+--   difference; no optimization, oracle, independence, finite-dimensional,
+--   convexity, or smoothness assumptions
+-- portable call pattern: stochastic comparison and distributed-optimization
+--   proofs vary the actual and reference scalar observables, probability law,
+--   and second-moment error budget while retaining the same difference-of-means
+--   conclusion
+-- counterargument checked: this composes integral subtraction with the existing
+--   one-observable square-root endpoint, but it is not a pure rename or merely
+--   paper-local traceability because it packages the recurring two-observable
+--   transport contract and discharges the difference measurability internally
+-- coverage search: searched `absolute difference of integrals bounded by square
+--   root integral squared difference probability measure`, `abs integral sub
+--   integral le sqrt integral square sub`, and Mathlib LeanSearch for the full
+--   probability-space statement; Mathlib `MeasureTheory.integral_sub` and staged
+--   `abs_integral_le_sqrt_of_integral_sq_le` give partial components, but no hit
+--   gives this complete two-observable bound
+-- minimal hypotheses: removed the source's explicit difference-measurability
+--   hypothesis because it follows from individual integrability, and removed
+--   `0 ≤ B` because square-root monotonicity only needs the supplied moment bound
+
+/-- The absolute difference between two real expectations is at most the square
+root of any upper bound on the second moment of their pointwise difference.
+
+Layer: Glue | Gap: Level 1 (difference-of-expectations bound from an L² difference budget)
+Proof: rewrite the difference of integrals as the integral of the difference, then apply the scalar absolute-mean bound obtained from second-moment contraction.
+Source: Mathlib Bochner integral subtraction and SOptLib scalar probability second-moment contraction
+Used in: stochastic comparison and distributed-optimization transport steps that turn a mean-square error between an actual scalar output and a reference process into a deterministic difference-of-means bound
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/16/proof/2
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem abs_integral_sub_integral_le_sqrt_of_integral_sq_sub_le
+    {Omega : Type*} [MeasurableSpace Omega]
+    (mu : Measure Omega) [IsProbabilityMeasure mu]
+    (actual reference : Omega → Real) (B : Real)
+    (hactual_int : Integrable actual mu)
+    (hreference_int : Integrable reference mu)
+    (hdiff_sq_int : Integrable (fun omega => (actual omega - reference omega) ^ 2) mu)
+    (hdiff_sq_bound : (∫ omega, (actual omega - reference omega) ^ 2 ∂mu) ≤ B) :
+    |(∫ omega, actual omega ∂mu) - (∫ omega, reference omega ∂mu)| ≤ Real.sqrt B := by
+  rw [← MeasureTheory.integral_sub hactual_int hreference_int]
+  exact abs_integral_le_sqrt_of_integral_sq_le mu
+    (fun omega => actual omega - reference omega) B
+    (hactual_int.sub hreference_int).aestronglyMeasurable hdiff_sq_int hdiff_sq_bound
+
+
+
+open MeasureTheory
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: normalized finite-horizon integral squared-norm control of a
+--   floor-block mismatch by raw second moments; orig was
+--   `average_l2_floor_block_mismatch_integral_bound_of_average_bound`
+-- generality used: an arbitrary measure, a seminormed additive commutative
+--   group, a positive natural period, and horizon-local integrability of raw
+--   squared norms; no probability, scalar action, inner product, completeness,
+--   finite-dimensionality, convexity, smoothness, or oracle assumptions
+-- portable call pattern: periodic, epoch, and mini-batch stochastic-process
+--   proofs change the measure, normed output process, period, horizon, and raw
+--   second-moment budget while retaining the same floor-block mismatch bound
+-- counterargument checked: this is not paper-local traceability or a pure
+--   wrapper because it composes squared-norm difference control under an
+--   integral with positive-stride sampling and floor-division aggregation;
+--   the already staged increment theorem instead assumes adjacent-increment
+--   energy and therefore does not cover this raw-second-moment contract
+-- coverage search: symbol queries for `finite average integral squared norm
+--   floor block mismatch upper bound average second moment`, `normalized sum
+--   floor block representative average bound`, and `integral norm squared
+--   difference bounded by two integrals norm squared`, plus Mathlib semantic
+--   searches for the full contract and the pointwise norm-square inequality,
+--   found only the constituent normalized stride/floor lemmas, Mathlib
+--   norm-square identities, and the distinct increment-energy theorem
+-- minimal hypotheses: positivity of the period, raw squared-norm integrability
+--   only below `T`, and raw normalized bounds only at `T` and `T * p`;
+--   the source probability instance, global integrability, difference
+--   integrability, threshold scale, and factorization `C * alpha ^ 2` are unused
+
+/-- Raw second-moment bounds at a horizon and its complete-period enlargement
+control the normalized integral squared-norm mismatch from each time to its
+floor-block representative.
+
+Layer: Glue | Gap: Level 1 (integrated floor-block mismatch from raw second moments)
+Proof: split each squared-norm difference into two raw squared norms, transfer the bound through the integral, and combine normalized positive-stride sampling with floor-division block aggregation.
+Source: Mathlib Bochner integral monotonicity and seminorm triangle inequalities, together with normalized finite-range stride and floor-division aggregation
+Used in: periodic and epoch stochastic-process analyses that convert raw iterate or output second-moment budgets into within-block representative mismatch budgets
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/6
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem finite_average_integral_norm_sq_floor_block_mismatch_le_of_average_bound
+    {Omega E : Type*} [MeasurableSpace Omega]
+    [SeminormedAddCommGroup E]
+    (mu : Measure Omega) (out : Omega -> Nat -> E)
+    (p T : Nat) (B : Real) (hp : 0 < p)
+    (hout_int : forall t, t < T ->
+      Integrable (fun omega => ‖out omega t‖ ^ 2) mu)
+    (havg_T :
+      (T : Real)⁻¹ *
+          Finset.sum (Finset.range T) (fun t =>
+            ∫ omega, ‖out omega t‖ ^ 2 ∂mu) <=
+        B)
+    (havg_mul :
+      ((T * p : Nat) : Real)⁻¹ *
+          Finset.sum (Finset.range (T * p)) (fun t =>
+            ∫ omega, ‖out omega t‖ ^ 2 ∂mu) <=
+        B) :
+    (T : Real)⁻¹ *
+        Finset.sum (Finset.range T) (fun t =>
+          ∫ omega,
+            ‖out omega t - out omega ((t / p) * p)‖ ^ 2 ∂mu) <=
+      2 * B + 2 * ((p : Real) * ((p : Real) * B)) := by
+  classical
+  let d : Nat -> Real := fun t =>
+    ∫ omega, ‖out omega t - out omega ((t / p) * p)‖ ^ 2 ∂mu
+  let e : Nat -> Real := fun t =>
+    ∫ omega, ‖out omega t‖ ^ 2 ∂mu
+  let floorE : Nat -> Real := fun t => e ((t / p) * p)
+  let sampledE : Nat -> Real := fun k => e (k * p)
+  have he_nonneg : forall t, 0 <= e t := by
+    intro t
+    dsimp [e]
+    exact integral_nonneg fun omega => sq_nonneg _
+  have hsample_nonneg : forall k, k < T -> 0 <= sampledE k := by
+    intro k _hk
+    exact he_nonneg (k * p)
+  have hpoint : forall t, t < T -> d t <= 2 * e t + 2 * floorE t := by
+    intro t ht
+    have hfloor : (t / p) * p < T :=
+      lt_of_le_of_lt (Nat.div_mul_le_self t p) ht
+    let A : Omega -> Real := fun omega =>
+      ‖out omega t - out omega ((t / p) * p)‖ ^ 2
+    let C : Omega -> Real := fun omega =>
+      2 * ‖out omega t‖ ^ 2 +
+        2 * ‖out omega ((t / p) * p)‖ ^ 2
+    have hC_int : Integrable C mu := by
+      dsimp [C]
+      exact
+        ((hout_int t ht).const_mul 2).add
+          ((hout_int ((t / p) * p) hfloor).const_mul 2)
+    have hA_nonneg : 0 ≤ᵐ[mu] A :=
+      Filter.Eventually.of_forall fun omega => sq_nonneg _
+    have hAC : A ≤ᵐ[mu] C := by
+      refine Filter.Eventually.of_forall ?_
+      intro omega
+      dsimp [A, C]
+      simpa [sub_eq_add_neg, norm_neg] using
+        SOptLib.norm_add_sq_le_two_mul_norm_sq_add_two_mul_norm_sq
+          (out omega t) (-out omega ((t / p) * p))
+    have hmono : (∫ omega, A omega ∂mu) <= ∫ omega, C omega ∂mu :=
+      integral_mono_of_nonneg hA_nonneg hC_int hAC
+    have hC_eq :
+        (∫ omega, C omega ∂mu) =
+          2 * (∫ omega, ‖out omega t‖ ^ 2 ∂mu) +
+            2 * (∫ omega, ‖out omega ((t / p) * p)‖ ^ 2 ∂mu) := by
+      dsimp [C]
+      rw [integral_add, integral_const_mul, integral_const_mul]
+      · exact (hout_int t ht).const_mul 2
+      · exact (hout_int ((t / p) * p) hfloor).const_mul 2
+    simpa [d, e, floorE, A, hC_eq] using hmono
+  have hsample_avg :
+      (T : Real)⁻¹ * Finset.sum (Finset.range T) sampledE <=
+        (p : Real) * B := by
+    simpa [sampledE, e] using
+      normalized_sum_stride_mul_le_period_mul_normalized_sum
+        p T e B hp he_nonneg havg_mul
+  have hfloor_avg :
+      (T : Real)⁻¹ * Finset.sum (Finset.range T) floorE <=
+        (p : Real) * ((p : Real) * B) := by
+    have hphase : forall t, t < T ->
+        floorE t <= (1 : Real) * sampledE (t / p) := by
+      intro t _ht
+      simp [floorE, sampledE]
+    simpa [mul_assoc] using
+      normalized_sum_le_period_mul_of_floor_div_majorant
+        p T floorE sampledE (1 : Real) ((p : Real) * B) hp
+        (by norm_num) hsample_nonneg hphase hsample_avg
+  have hsum :
+      Finset.sum (Finset.range T) d <=
+        2 * Finset.sum (Finset.range T) e +
+          2 * Finset.sum (Finset.range T) floorE := by
+    calc
+      Finset.sum (Finset.range T) d <=
+          Finset.sum (Finset.range T) (fun t =>
+            2 * e t + 2 * floorE t) :=
+        Finset.sum_le_sum fun t ht => hpoint t (by simpa using ht)
+      _ =
+          2 * Finset.sum (Finset.range T) e +
+            2 * Finset.sum (Finset.range T) floorE := by
+        rw [Finset.sum_add_distrib, <- Finset.mul_sum, <- Finset.mul_sum]
+  calc
+    (T : Real)⁻¹ * Finset.sum (Finset.range T) d <=
+        (T : Real)⁻¹ *
+          (2 * Finset.sum (Finset.range T) e +
+            2 * Finset.sum (Finset.range T) floorE) :=
+      mul_le_mul_of_nonneg_left hsum
+        (inv_nonneg.mpr (Nat.cast_nonneg T))
+    _ =
+        2 * ((T : Real)⁻¹ * Finset.sum (Finset.range T) e) +
+          2 * ((T : Real)⁻¹ * Finset.sum (Finset.range T) floorE) := by
+      ring
+    _ <= 2 * B + 2 * ((p : Real) * ((p : Real) * B)) :=
+      add_le_add
+        (mul_le_mul_of_nonneg_left havg_T (by norm_num))
+        (mul_le_mul_of_nonneg_left hfloor_avg (by norm_num))
+
+
+
+open MeasureTheory
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: normalized finite-horizon integral squared-norm control of a
+--   floor-block mismatch by adjacent-increment energy; orig was
+--   `average_l2_floor_block_mismatch_integral_bound_of_increment_average_bound`
+-- generality used: an arbitrary measure, a seminormed additive commutative
+--   group, a positive natural period, and horizon-local integrability of the
+--   adjacent-increment squared norms; no probability, scalar action, inner
+--   product, completeness, finite-dimensionality, or optimization assumptions
+-- portable call pattern: periodic, epoch, and mini-batch stochastic trajectory
+--   proofs change the measure, normed path, block period, horizon, and supplied
+--   adjacent-increment energy budget while retaining the period-squared
+--   floor-block mismatch conclusion
+-- counterargument checked: this is not paper-local traceability or a pure
+--   wrapper because it composes a pathwise floor-block telescope, Bochner
+--   integral monotonicity and finite-sum interchange, exact block reindexing,
+--   and normalized block-majorant aggregation into one reusable contract
+-- coverage search: queried `finite average integral squared norm floor block
+--   mismatch bounded by adjacent increment energy`, `normalized integral norm
+--   square floor division block increment bound`, and the corresponding
+--   Mathlib semantic statement; Mathlib returned only unrelated average and
+--   periodic-integral facts, SOptLib's
+--   `finite_path_sq_distance_integrable_of_increment_energy_bound` has a
+--   different integrability conclusion, and the staged
+--   `norm_sq_sub_floor_block_le_period_mul_sum_increment_norm_sq` and
+--   `normalized_sum_le_period_mul_of_floor_div_majorant` cover only the two
+--   constituent transitions
+-- minimal hypotheses: positivity of the period is needed by the pathwise
+--   floor-block estimate; increment integrability is restricted to `T * p`,
+--   and the source probability-measure instance and global integrability are
+--   unused
+
+/-- A normalized finite-horizon integral adjacent-increment budget controls the
+integral squared-norm mismatch from each time to its floor-block start, with a
+period-squared factor.
+
+Layer: Glue | Gap: Level 1 (integrated floor-block mismatch from adjacent-increment energy)
+Proof: integrate the pathwise floor-block increment-energy estimate, reindex the complete blocks into the `T * p` increment horizon, and apply the normalized floor-division block-majorant bound.
+Source: Mathlib Bochner integral monotonicity and finite-sum interchange, together with finite-range block reindexing, the floor-block path-energy estimate, and normalized block-majorant aggregation
+Used in: periodic and epoch-based stochastic trajectory analyses that convert a finite-horizon one-step motion budget into an averaged within-block iterate-mismatch budget
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/6
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem finite_average_integral_norm_sq_floor_block_mismatch_le_of_increment_bound
+    {Omega E : Type*} [MeasurableSpace Omega]
+    [SeminormedAddCommGroup E]
+    (mu : Measure Omega) (out : Omega -> Nat -> E)
+    (p T : Nat) (B : Real) (hp : 0 < p)
+    (hinc_int : forall u, u < T * p ->
+      Integrable (fun omega =>
+        ‖out omega (u + 1) - out omega u‖ ^ 2) mu)
+    (hinc_bound :
+      (T : Real)⁻¹ *
+          Finset.sum (Finset.range (T * p)) (fun u =>
+            ∫ omega, ‖out omega (u + 1) - out omega u‖ ^ 2 ∂mu) <=
+        B) :
+    (T : Real)⁻¹ *
+        Finset.sum (Finset.range T) (fun t =>
+          ∫ omega,
+            ‖out omega t - out omega ((t / p) * p)‖ ^ 2 ∂mu) <=
+      (p : Real) ^ 2 * B := by
+  classical
+  let d : Nat -> Real := fun t =>
+    ∫ omega, ‖out omega t - out omega ((t / p) * p)‖ ^ 2 ∂mu
+  let inc : Nat -> Real := fun u =>
+    ∫ omega, ‖out omega (u + 1) - out omega u‖ ^ 2 ∂mu
+  let blockInc : Nat -> Real := fun k =>
+    Finset.sum (Finset.range p) (fun j => inc (k * p + j))
+  have hd_nonneg : forall t, t < T -> 0 <= d t := by
+    intro t _ht
+    dsimp [d]
+    exact integral_nonneg fun omega => sq_nonneg _
+  have hblock_nonneg : forall k, k < T -> 0 <= blockInc k := by
+    intro k _hk
+    dsimp [blockInc, inc]
+    exact Finset.sum_nonneg fun j _hj =>
+      integral_nonneg fun omega => sq_nonneg _
+  have hphase : forall t, t < T -> d t <= (p : Real) * blockInc (t / p) := by
+    intro t ht
+    let rhs : Omega -> Real := fun omega =>
+      (p : Real) *
+        Finset.sum (Finset.range p) (fun j =>
+          ‖out omega ((t / p) * p + j + 1) -
+            out omega ((t / p) * p + j)‖ ^ 2)
+    have hindex : forall j, j < p -> (t / p) * p + j < T * p := by
+      intro j hj
+      have hk_lt : t / p < T :=
+        lt_of_le_of_lt (Nat.div_le_self t p) ht
+      have hwithin : (t / p) * p + j < (t / p + 1) * p := by
+        simpa [Nat.add_mul] using
+          (Nat.add_lt_add_left hj ((t / p) * p))
+      have hblocks : (t / p + 1) * p <= T * p :=
+        Nat.mul_le_mul_right p (Nat.succ_le_iff.mpr hk_lt)
+      exact lt_of_lt_of_le hwithin hblocks
+    have hrhs_int : Integrable rhs mu := by
+      dsimp [rhs]
+      exact
+        (integrable_finset_sum (Finset.range p)
+          (fun j hj => by
+            have hj_lt : j < p := by simpa using hj
+            simpa [Nat.add_assoc] using
+              hinc_int ((t / p) * p + j) (hindex j hj_lt))).const_mul
+          (p : Real)
+    have hleft_nonneg :
+        0 ≤ᵐ[mu]
+          (fun omega : Omega =>
+            ‖out omega t - out omega ((t / p) * p)‖ ^ 2) :=
+      Filter.Eventually.of_forall fun omega => sq_nonneg _
+    have hpointwise :
+        (fun omega : Omega =>
+            ‖out omega t - out omega ((t / p) * p)‖ ^ 2) ≤ᵐ[mu] rhs := by
+      refine Filter.Eventually.of_forall ?_
+      intro omega
+      exact
+        norm_sq_sub_floor_block_le_period_mul_sum_increment_norm_sq
+          p hp (out omega) t
+    have hmono :
+        (∫ omega,
+            ‖out omega t - out omega ((t / p) * p)‖ ^ 2 ∂mu) <=
+          ∫ omega, rhs omega ∂mu :=
+      integral_mono_of_nonneg hleft_nonneg hrhs_int hpointwise
+    have hrhs_eq :
+        (∫ omega, rhs omega ∂mu) =
+          (p : Real) * blockInc (t / p) := by
+      dsimp [rhs, blockInc, inc]
+      rw [integral_const_mul, integral_finset_sum]
+      intro j hj
+      have hj_lt : j < p := by simpa using hj
+      simpa [Nat.add_assoc] using
+        hinc_int ((t / p) * p + j) (hindex j hj_lt)
+    simpa [d, hrhs_eq] using hmono
+  have hblock_bound :
+      (T : Real)⁻¹ * Finset.sum (Finset.range T) blockInc <= B := by
+    have hblocks_eq :
+        Finset.sum (Finset.range T) blockInc =
+          Finset.sum (Finset.range (T * p)) inc := by
+      simpa [blockInc] using
+        (sum_range_mul_eq_sum_blocks inc T p).symm
+    simpa [inc, hblocks_eq] using hinc_bound
+  have hbase :=
+    normalized_sum_le_period_mul_of_floor_div_majorant
+      p T d blockInc (p : Real) B hp (Nat.cast_nonneg p)
+      hblock_nonneg hphase hblock_bound
+  simpa [d, pow_two] using hbase
+
+
+
+open MeasureTheory
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: normalized finite-horizon integral squared-norm control of a
+--   positive-stride index mismatch; orig was
+--   `average_l2_index_mismatch_integral_bound_of_average_bound`
+-- generality used: an arbitrary measure, a seminormed additive commutative
+--   group, a positive natural stride, and horizon-local integrability of raw
+--   squared norms; no probability, scalar action, inner product, completeness,
+--   finite-dimensionality, convexity, smoothness, or oracle assumptions
+-- portable call pattern: delayed, subsampled, periodic, and epoch stochastic-
+--   process proofs change the measure, normed process, stride, horizon, and raw
+--   second-moment budget while retaining the same stride-mismatch estimate
+-- counterargument checked: this is not paper-local traceability or a pure
+--   wrapper because it converts raw norm-square integrability into an
+--   integrated mismatch majorant and composes it with sparse-to-dense stride
+--   aggregation; the floor-block theorem has a different representative and
+--   an additional period factor
+-- coverage search: symbol queries for `finite average integral norm squared
+--   stride mismatch upper bound average second moment` and `integral squared
+--   norm difference bounded by two squared norms integrable`, plus a Mathlib
+--   semantic search for the integrated inequality, found the strict component
+--   `normalized_sum_mismatch_le_two_add_two_period_mul_of_average_bound`, the
+--   distinct floor-block theorem, Lp triangle inequalities, and no declaration
+--   with this complete contract
+-- minimal hypotheses: positivity of the stride, raw squared-norm integrability
+--   only below `T * p`, and raw normalized bounds only at `T` and `T * p`;
+--   the source probability instance, global and difference integrability,
+--   threshold scale, and factorization `C * alpha ^ 2` are unused
+
+/-- Raw second-moment bounds at a horizon and its stride enlargement control
+the normalized integral squared-norm mismatch between times `k` and `k * p`.
+
+Layer: Glue | Gap: Level 1 (integrated positive-stride mismatch from raw second moments)
+Proof: dominate each squared-norm difference by twice the two raw squared norms, transfer this bound through the integral, and apply normalized positive-stride mismatch aggregation.
+Source: Mathlib Bochner integral monotonicity and seminorm triangle inequalities, together with finite-range positive-stride sparse-to-dense aggregation
+Used in: delayed, subsampled, periodic, and epoch stochastic-process estimates that convert raw iterate or output second-moment budgets into stride-index mismatch budgets
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/6
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem finite_average_integral_norm_sq_stride_mismatch_le
+    {Omega E : Type*} [MeasurableSpace Omega]
+    [SeminormedAddCommGroup E]
+    (mu : Measure Omega) (out : Omega -> Nat -> E)
+    (p T : Nat) (B : Real) (hp : 0 < p)
+    (hout_int : forall t, t < T * p ->
+      Integrable (fun omega => ‖out omega t‖ ^ 2) mu)
+    (havg_T :
+      (T : Real)⁻¹ *
+          Finset.sum (Finset.range T) (fun t =>
+            ∫ omega, ‖out omega t‖ ^ 2 ∂mu) <=
+        B)
+    (havg_mul :
+      ((T * p : Nat) : Real)⁻¹ *
+          Finset.sum (Finset.range (T * p)) (fun t =>
+            ∫ omega, ‖out omega t‖ ^ 2 ∂mu) <=
+        B) :
+    (T : Real)⁻¹ *
+        Finset.sum (Finset.range T) (fun k =>
+          ∫ omega, ‖out omega k - out omega (k * p)‖ ^ 2 ∂mu) <=
+      2 * B + 2 * ((p : Real) * B) := by
+  classical
+  let d : Nat -> Real := fun k =>
+    ∫ omega, ‖out omega k - out omega (k * p)‖ ^ 2 ∂mu
+  let e : Nat -> Real := fun t =>
+    ∫ omega, ‖out omega t‖ ^ 2 ∂mu
+  have he_nonneg : forall t, t < T * p -> 0 <= e t := by
+    intro t _ht
+    dsimp [e]
+    exact integral_nonneg fun omega => sq_nonneg _
+  have hd : forall k, k < T -> d k <= 2 * e k + 2 * e (k * p) := by
+    intro k hk
+    have hkmul : k * p < T * p :=
+      (Nat.mul_lt_mul_right hp).2 hk
+    have hkraw : k < T * p :=
+      lt_of_le_of_lt (Nat.le_mul_of_pos_right k hp) hkmul
+    let A : Omega -> Real := fun omega =>
+      ‖out omega k - out omega (k * p)‖ ^ 2
+    let C : Omega -> Real := fun omega =>
+      2 * ‖out omega k‖ ^ 2 + 2 * ‖out omega (k * p)‖ ^ 2
+    have hC_int : Integrable C mu := by
+      dsimp [C]
+      exact
+        ((hout_int k hkraw).const_mul 2).add
+          ((hout_int (k * p) hkmul).const_mul 2)
+    have hA_nonneg : 0 ≤ᵐ[mu] A :=
+      Filter.Eventually.of_forall fun omega => sq_nonneg _
+    have hAC : A ≤ᵐ[mu] C := by
+      refine Filter.Eventually.of_forall ?_
+      intro omega
+      dsimp [A, C]
+      simpa [sub_eq_add_neg, norm_neg] using
+        SOptLib.norm_add_sq_le_two_mul_norm_sq_add_two_mul_norm_sq
+          (out omega k) (-out omega (k * p))
+    have hmono : (∫ omega, A omega ∂mu) <= ∫ omega, C omega ∂mu :=
+      integral_mono_of_nonneg hA_nonneg hC_int hAC
+    have hC_eq :
+        (∫ omega, C omega ∂mu) =
+          2 * (∫ omega, ‖out omega k‖ ^ 2 ∂mu) +
+            2 * (∫ omega, ‖out omega (k * p)‖ ^ 2 ∂mu) := by
+      dsimp [C]
+      rw [integral_add, integral_const_mul, integral_const_mul]
+      · exact (hout_int k hkraw).const_mul 2
+      · exact (hout_int (k * p) hkmul).const_mul 2
+    simpa [d, e, A, hC_eq] using hmono
+  simpa [d, e] using
+    normalized_sum_mismatch_le_two_add_two_period_mul_of_average_bound
+      p T d e B hp he_nonneg hd havg_T havg_mul
+
+
+
+open MeasureTheory
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: normalized finite-horizon integral squared-norm bound for an
+--   additive decomposition; orig was average_l2_triangle_combine_two_errors.
+-- generality used: an arbitrary measure and a seminormed additive commutative
+--   group; no probability, scalar action, inner product, completeness, or
+--   finite-dimensional structure is used.
+-- portable call pattern: stochastic approximation, distributed optimization,
+--   and variance-reduction proofs change the measure, horizon, component error
+--   processes, scale, and budget constants while combining the same pointwise
+--   two-component error decomposition.
+-- counterargument checked: this is not paper-local traceability or a pure
+--   wrapper because it packages pointwise norm-square Young control, Bochner
+--   integral monotonicity, finite-horizon aggregation, normalization, and two
+--   independently supplied component budgets into one reusable contract.
+-- coverage search: symbol queries `finite average integral squared norm
+--   additive decomposition component bounds`, `integral norm squared sum
+--   additive decomposition component bounds`, and `norm add squared less than
+--   two squared norms`, plus Mathlib semantic search for the full finite-sum
+--   integral shape, found only the component lemmas
+--   `SOptLib.norm_add_sq_le_two_mul_norm_sq_add_two_mul_norm_sq` and
+--   `integral_le_integral_affine_combination`; no existing declaration covers
+--   the normalized finite-horizon budget combination.
+-- minimal hypotheses: integrability and the additive decomposition are assumed
+--   only at indices in `Finset.range T`; all source probability and
+--   real-valued-process assumptions are removed.
+
+/-- Two normalized finite-horizon integral squared-norm budgets bound the
+integral squared-norm budget of their pointwise sum.
+
+Layer: Glue | Gap: Level 1 (finite-horizon integrated L2 error composition)
+Proof: apply the binary norm-square Young inequality pointwise, transport it
+  through each integral with affine integral monotonicity, sum over the finite
+  horizon, and insert the two normalized component bounds.
+Source: Mathlib Bochner integral monotonicity and finite-sum algebra, together
+  with SOptLib's binary norm-square Young and affine integral bounds
+Used in: slow-stable stochastic approximation comparisons that combine a slow
+  recursion error budget with a stable remainder budget before transferring the
+  result to the full process
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/6
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem finite_average_integral_norm_sq_add_le_of_component_bounds
+    {Omega E : Type*} [MeasurableSpace Omega]
+    [SeminormedAddCommGroup E]
+    (mu : Measure Omega) (a b total : Omega -> Nat -> E)
+    {T : Nat} {Ca Cb scale : Real}
+    (ha_int : forall t, t ∈ Finset.range T ->
+      Integrable (fun omega => ‖a omega t‖ ^ 2) mu)
+    (hb_int : forall t, t ∈ Finset.range T ->
+      Integrable (fun omega => ‖b omega t‖ ^ 2) mu)
+    (htotal_int : forall t, t ∈ Finset.range T ->
+      Integrable (fun omega => ‖total omega t‖ ^ 2) mu)
+    (hdecomp : forall t, t ∈ Finset.range T -> forall omega,
+      total omega t = a omega t + b omega t)
+    (ha_bound :
+      (T : Real)⁻¹ *
+          Finset.sum (Finset.range T) (fun t =>
+            ∫ omega, ‖a omega t‖ ^ 2 ∂mu) <=
+        Ca * scale ^ 2)
+    (hb_bound :
+      (T : Real)⁻¹ *
+          Finset.sum (Finset.range T) (fun t =>
+            ∫ omega, ‖b omega t‖ ^ 2 ∂mu) <=
+        Cb * scale ^ 2) :
+    (T : Real)⁻¹ *
+        Finset.sum (Finset.range T) (fun t =>
+          ∫ omega, ‖total omega t‖ ^ 2 ∂mu) <=
+      (2 * Ca + 2 * Cb) * scale ^ 2 := by
+  classical
+  have hper_time :
+      forall t, t ∈ Finset.range T ->
+        (∫ omega, ‖total omega t‖ ^ 2 ∂mu) <=
+          2 * (∫ omega, ‖a omega t‖ ^ 2 ∂mu) +
+            2 * (∫ omega, ‖b omega t‖ ^ 2 ∂mu) := by
+    intro t ht
+    let A : Omega -> Real := fun omega => ‖total omega t‖ ^ 2
+    let B : Omega -> Real := fun omega => ‖a omega t‖ ^ 2
+    let C : Omega -> Real := fun omega => ‖b omega t‖ ^ 2
+    have hpoint : A <= fun omega => 2 * B omega + 2 * C omega := by
+      intro omega
+      dsimp [A, B, C]
+      rw [hdecomp t ht omega]
+      exact SOptLib.norm_add_sq_le_two_mul_norm_sq_add_two_mul_norm_sq _ _
+    simpa [A, B, C] using
+      integral_le_integral_affine_combination mu A B C 2 2
+        (by simpa [A] using htotal_int t ht)
+        (by simpa [B] using ha_int t ht)
+        (by simpa [C] using hb_int t ht)
+        hpoint
+  have hsum :
+      Finset.sum (Finset.range T) (fun t =>
+          ∫ omega, ‖total omega t‖ ^ 2 ∂mu) <=
+        Finset.sum (Finset.range T) (fun t =>
+          2 * (∫ omega, ‖a omega t‖ ^ 2 ∂mu) +
+            2 * (∫ omega, ‖b omega t‖ ^ 2 ∂mu)) :=
+    Finset.sum_le_sum fun t ht => hper_time t ht
+  calc
+    (T : Real)⁻¹ *
+        Finset.sum (Finset.range T) (fun t =>
+          ∫ omega, ‖total omega t‖ ^ 2 ∂mu) <=
+      (T : Real)⁻¹ *
+        Finset.sum (Finset.range T) (fun t =>
+          2 * (∫ omega, ‖a omega t‖ ^ 2 ∂mu) +
+            2 * (∫ omega, ‖b omega t‖ ^ 2 ∂mu)) :=
+      mul_le_mul_of_nonneg_left hsum (inv_nonneg.mpr (Nat.cast_nonneg T))
+    _ =
+      2 * ((T : Real)⁻¹ *
+        Finset.sum (Finset.range T) (fun t =>
+          ∫ omega, ‖a omega t‖ ^ 2 ∂mu)) +
+      2 * ((T : Real)⁻¹ *
+        Finset.sum (Finset.range T) (fun t =>
+          ∫ omega, ‖b omega t‖ ^ 2 ∂mu)) := by
+      rw [Finset.sum_add_distrib, <- Finset.mul_sum, <- Finset.mul_sum]
+      ring
+    _ <= 2 * (Ca * scale ^ 2) + 2 * (Cb * scale ^ 2) :=
+      add_le_add
+        (mul_le_mul_of_nonneg_left ha_bound (by norm_num))
+        (mul_le_mul_of_nonneg_left hb_bound (by norm_num))
+    _ = (2 * Ca + 2 * Cb) * scale ^ 2 := by ring
+
+
+
+open MeasureTheory
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: finite summed second-moment bound from a three-component
+--   decomposition; orig was
+--   `block_start_average_l2_sum_bound_of_projected_stable_scalar_components`
+-- generality used: an arbitrary finite index set, arbitrary measure, and a
+--   seminormed additive commutative group; no probability, scalar-vector-space,
+--   completeness, finite-dimensionality, convexity, smoothness, or oracle
+--   assumptions are used
+-- portable call pattern: stochastic comparison, error-feedback, and
+--   signal-plus-two-perturbation proofs vary the four processes, finite horizon,
+--   measure, and three aggregate second-moment budgets while retaining the same
+--   aggregate conclusion
+-- counterargument checked: this is not paper-local traceability or a caller-side
+--   expression because it packages two nested norm-square Young bounds,
+--   integrability closure, integral monotonicity, and finite-sum budget
+--   aggregation; the recurring expressions are standard norms and integrals, so
+--   no new formula definition is warranted
+-- coverage search: symbol queries for "finite sum integral squared norm upper
+--   bound three component decomposition" and "norm squared of sum upper bound
+--   component norm squares" found only partial results, principally
+--   `SOptLib.norm_add_sq_le_two_mul_norm_sq_add_two_mul_norm_sq`, finite-average
+--   Jensen bounds, and martingale cross-term identities; Mathlib semantic search
+--   found `add_sq_le` and inner-product parallelogram laws, none of which covers
+--   the integrated finite-sum three-budget conclusion
+-- minimal hypotheses: decomposition and all four integrability hypotheses are
+--   restricted to indices in the finite set; direct aggregate budgets replace
+--   the source's stronger common-factor bounds
+
+/-- A finite sum of second moments is controlled by three component budgets
+when the process is their pointwise sum.
+
+Layer: Glue | Gap: Level 1 (three-component finite-horizon second-moment aggregation)
+Proof: apply the binary norm-square Young inequality twice, integrate the pointwise bound using the supplied integrability, then sum and apply the three aggregate budgets.
+Source: Mathlib Bochner integral linearity and monotonicity, finite-sum algebra, and SOptLib `norm_add_sq_le_two_mul_norm_sq_add_two_mul_norm_sq`
+Used in: stochastic comparison and error-feedback analyses that combine an approximation error, a stable response, and a boundary or residual component into one finite-horizon L2 budget
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/6
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem sum_integral_norm_sq_le_of_three_component_decomposition
+    {ι Ω E : Type*} [MeasurableSpace Ω] [SeminormedAddCommGroup E]
+    (μ : Measure Ω) (s : Finset ι)
+    (actual err u v : Ω → ι → E)
+    (hactual_int :
+      ∀ i ∈ s, Integrable (fun ω => ‖actual ω i‖ ^ 2) μ)
+    (herr_int :
+      ∀ i ∈ s, Integrable (fun ω => ‖err ω i‖ ^ 2) μ)
+    (hu_int :
+      ∀ i ∈ s, Integrable (fun ω => ‖u ω i‖ ^ 2) μ)
+    (hv_int :
+      ∀ i ∈ s, Integrable (fun ω => ‖v ω i‖ ^ 2) μ)
+    (hdecomp :
+      ∀ (ω : Ω) (i : ι), i ∈ s →
+        actual ω i = err ω i + u ω i + v ω i)
+    {Berr Bu Bv : ℝ}
+    (herr_sum_bound :
+      ∑ i ∈ s, ∫ ω, ‖err ω i‖ ^ 2 ∂μ ≤ Berr)
+    (hu_sum_bound :
+      ∑ i ∈ s, ∫ ω, ‖u ω i‖ ^ 2 ∂μ ≤ Bu)
+    (hv_sum_bound :
+      ∑ i ∈ s, ∫ ω, ‖v ω i‖ ^ 2 ∂μ ≤ Bv) :
+    ∑ i ∈ s, ∫ ω, ‖actual ω i‖ ^ 2 ∂μ ≤
+      2 * Berr + 4 * Bu + 4 * Bv := by
+  classical
+  have hper_index :
+      ∀ i ∈ s,
+        (∫ ω, ‖actual ω i‖ ^ 2 ∂μ) ≤
+          2 * (∫ ω, ‖err ω i‖ ^ 2 ∂μ) +
+            (4 * (∫ ω, ‖u ω i‖ ^ 2 ∂μ) +
+              4 * (∫ ω, ‖v ω i‖ ^ 2 ∂μ)) := by
+    intro i hi
+    let A : Ω → ℝ := fun ω => ‖actual ω i‖ ^ 2
+    let R : Ω → ℝ := fun ω => ‖err ω i‖ ^ 2
+    let U : Ω → ℝ := fun ω => ‖u ω i‖ ^ 2
+    let V : Ω → ℝ := fun ω => ‖v ω i‖ ^ 2
+    let M : Ω → ℝ := fun ω => 2 * R ω + (4 * U ω + 4 * V ω)
+    have hM_int : Integrable M μ :=
+      ((herr_int i hi).const_mul 2).add
+        (((hu_int i hi).const_mul 4).add ((hv_int i hi).const_mul 4))
+    have hpoint : A ≤ M := by
+      intro ω
+      have hfirst :=
+        SOptLib.norm_add_sq_le_two_mul_norm_sq_add_two_mul_norm_sq
+          (err ω i) (u ω i + v ω i)
+      have hsecond :=
+        SOptLib.norm_add_sq_le_two_mul_norm_sq_add_two_mul_norm_sq
+          (u ω i) (v ω i)
+      dsimp [A, R, U, V, M]
+      rw [hdecomp ω i hi, add_assoc]
+      nlinarith
+    have hmono : (∫ ω, A ω ∂μ) ≤ ∫ ω, M ω ∂μ :=
+      MeasureTheory.integral_mono (hactual_int i hi) hM_int hpoint
+    calc
+      (∫ ω, ‖actual ω i‖ ^ 2 ∂μ) = ∫ ω, A ω ∂μ := by rfl
+      _ ≤ ∫ ω, M ω ∂μ := hmono
+      _ =
+          2 * (∫ ω, R ω ∂μ) +
+            (4 * (∫ ω, U ω ∂μ) + 4 * (∫ ω, V ω ∂μ)) := by
+            dsimp [M]
+            rw [MeasureTheory.integral_add]
+            · rw [MeasureTheory.integral_add]
+              · rw [MeasureTheory.integral_const_mul]
+                rw [MeasureTheory.integral_const_mul]
+                rw [MeasureTheory.integral_const_mul]
+              · exact (hu_int i hi).const_mul 4
+              · exact (hv_int i hi).const_mul 4
+            · exact (herr_int i hi).const_mul 2
+            · exact ((hu_int i hi).const_mul 4).add
+                ((hv_int i hi).const_mul 4)
+      _ =
+          2 * (∫ ω, ‖err ω i‖ ^ 2 ∂μ) +
+            (4 * (∫ ω, ‖u ω i‖ ^ 2 ∂μ) +
+              4 * (∫ ω, ‖v ω i‖ ^ 2 ∂μ)) := by rfl
+  have hsum :
+      (∑ i ∈ s, ∫ ω, ‖actual ω i‖ ^ 2 ∂μ) ≤
+        ∑ i ∈ s,
+          (2 * (∫ ω, ‖err ω i‖ ^ 2 ∂μ) +
+            (4 * (∫ ω, ‖u ω i‖ ^ 2 ∂μ) +
+              4 * (∫ ω, ‖v ω i‖ ^ 2 ∂μ))) :=
+    Finset.sum_le_sum fun i hi => hper_index i hi
+  calc
+    (∑ i ∈ s, ∫ ω, ‖actual ω i‖ ^ 2 ∂μ) ≤
+        ∑ i ∈ s,
+          (2 * (∫ ω, ‖err ω i‖ ^ 2 ∂μ) +
+            (4 * (∫ ω, ‖u ω i‖ ^ 2 ∂μ) +
+              4 * (∫ ω, ‖v ω i‖ ^ 2 ∂μ))) := hsum
+    _ =
+        2 * (∑ i ∈ s, ∫ ω, ‖err ω i‖ ^ 2 ∂μ) +
+          4 * (∑ i ∈ s, ∫ ω, ‖u ω i‖ ^ 2 ∂μ) +
+          4 * (∑ i ∈ s, ∫ ω, ‖v ω i‖ ^ 2 ∂μ) := by
+        simp_rw [Finset.sum_add_distrib]
+        simp_rw [← Finset.mul_sum]
+        ring
+    _ ≤ 2 * Berr + 4 * Bu + 4 * Bv := by
+      nlinarith [herr_sum_bound, hu_sum_bound, hv_sum_bound]
+
+
+
+open scoped BigOperators
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: normalized finite-horizon second-moment contraction for a
+--   scalar multiple; orig was
+--   c3_stationarity_functional_floor_of_average_iterate_mean_square
+-- generality used: an arbitrary measurable sample space, probability measure,
+--   finite natural-number horizon, real scalar multiplier, and a family of
+--   real processes whose scalar images are in `L²`; no optimization, oracle, normed-space,
+--   finite-dimensional, convexity, smoothness, or independence assumptions
+-- portable call pattern: quadratic-gradient, linear-observation, and scalar
+--   component analyses vary the horizon, probability law, process, and linear
+--   multiplier while using the same normalized second-moment upper bound
+-- counterargument checked: the statement is not paper-local traceability or a
+--   pure rename; it packages the recurring finite-horizon aggregation and
+--   common quadratic scaling beyond the one-process Jensen inequality
+-- coverage search: searched `normalized finite sum squared integral bounded by
+--   integral square scalar multiplication probability MemLp` and `sum sq
+--   integral le sum integral sq of MemLp`; SOptLib's
+--   `sq_integral_le_integral_sq` supplies the pointwise contraction, while
+--   Mathlib and SOptLib contain no matching normalized finite-horizon theorem
+-- minimal hypotheses: per-time `MemLp 2` is required only for the scalar image
+--   `lambda * Z`; when `lambda` is nonzero this recovers `Z ∈ L²`, and when it
+--   is zero the conclusion is immediate; no positivity of the multiplier or
+--   horizon is needed
+
+/-- The normalized sum of squared scalar-multiple expectations is bounded by
+the normalized sum of the corresponding second moments.
+
+Layer: Glue | Gap: Level 1 (normalized finite-horizon second-moment contraction)
+Proof: split on whether the scalar is zero; otherwise recover `Z ∈ L²` from the scalar-image hypothesis, apply `sq_integral_le_integral_sq` at each time, and aggregate the scaled bounds over the normalized horizon.
+Source: SOptLib scalar probability second-moment contraction `sq_integral_le_integral_sq`, Mathlib `MemLp` square-integrability characterization, and finite ordered sums
+Used in: quadratic-gradient and linear-component stationarity analyses that convert a finite-horizon mean-square floor for expected iterates into a lower bound for expected squared linear images
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/16/proof/2
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem normalized_sum_sq_integral_le_normalized_sum_integral_sq_mul
+    {Omega : Type*} [MeasurableSpace Omega]
+    (P : Measure Omega) [IsProbabilityMeasure P]
+    (T : Nat) (lambda : Real) (Z : Nat → Omega → Real)
+    (hZ : ∀ t ∈ Finset.range T,
+      MemLp (fun omega => lambda * Z t omega) 2 P) :
+    ((T : Real)⁻¹) *
+        Finset.sum (Finset.range T) (fun t =>
+          lambda ^ 2 * |∫ omega, Z t omega ∂P| ^ 2) ≤
+      ((T : Real)⁻¹) *
+        Finset.sum (Finset.range T) (fun t =>
+          ∫ omega, |lambda * Z t omega| ^ 2 ∂P) := by
+  by_cases hlambda : lambda = 0
+  · simp [hlambda]
+  have hpoint :
+      ∀ t ∈ Finset.range T,
+        lambda ^ 2 * |∫ omega, Z t omega ∂P| ^ 2 ≤
+          ∫ omega, |lambda * Z t omega| ^ 2 ∂P := by
+    intro t ht
+    have hZt : MemLp (Z t) 2 P := by
+      refine MemLp.ae_eq (ae_of_all P fun omega => ?_)
+        ((hZ t ht).const_smul lambda⁻¹)
+      change lambda⁻¹ * (lambda * Z t omega) = Z t omega
+      simp [hlambda]
+    have hZ_sq : Integrable (fun omega => Z t omega ^ 2) P := by
+      simpa [Real.norm_eq_abs, sq_abs] using
+        (memLp_two_iff_integrable_sq_norm hZt.aestronglyMeasurable).1 hZt
+    have hjensen :
+        (∫ omega, Z t omega ∂P) ^ 2 ≤ ∫ omega, Z t omega ^ 2 ∂P :=
+      sq_integral_le_integral_sq hZt.aestronglyMeasurable hZ_sq
+    calc
+      lambda ^ 2 * |∫ omega, Z t omega ∂P| ^ 2 =
+          lambda ^ 2 * (∫ omega, Z t omega ∂P) ^ 2 := by
+            rw [sq_abs]
+      _ ≤ lambda ^ 2 * ∫ omega, Z t omega ^ 2 ∂P :=
+        mul_le_mul_of_nonneg_left hjensen (sq_nonneg lambda)
+      _ = ∫ omega, |lambda * Z t omega| ^ 2 ∂P := by
+        rw [← MeasureTheory.integral_const_mul]
+        congr 1
+        funext omega
+        simp only [abs_mul, mul_pow, sq_abs]
+  exact mul_le_mul_of_nonneg_left
+    (Finset.sum_le_sum hpoint)
+    (inv_nonneg.mpr (Nat.cast_nonneg T))
+
+
+
+-- Generalization plan (G0):
+-- concept/name: product-valued sample-prefix sigma-algebra refinement by
+--   time-coordinate generators; orig was
+--   `canonical_pair_oracle_strictPast_le_coordinate_past_iSup`
+-- generality used: arbitrary sample space `Omega`, coordinate type `I`, and
+--   measurable coordinate value type `S`; no measurable structure on `Omega`,
+--   probability measure, independence, finiteness, oracle, or optimization
+--   assumptions are used
+-- portable call pattern: stochastic gradient, distributed optimization, and
+--   mini-batch proofs can flatten a prefix of table-valued observations into
+--   scalar time-coordinate generators while changing the sample space,
+--   coordinate type, value type, process, and cutoff
+-- counterargument checked: this is not paper-local traceability or a pure
+--   rename; it composes the Pi measurable-space representation, comap over an
+--   indexed supremum, and reindexing from nested prefix coordinates to pairs
+-- coverage search: searched `prefix sigma algebra table samples coordinate
+--   comap supremum` and `pi measurable space comap indexed supremum coordinates`;
+--   Mathlib provides `MeasurableSpace.pi` and
+--   `MeasurableSpace.comap_iSup`, while SOptLib
+--   `sampleWindowMeasurableSpace_eq_comap` concerns a finite Nat window of
+--   scalar samples and does not flatten arbitrary table coordinates, so
+--   coverage is partial
+-- minimal hypotheses: `[MeasurableSpace S]` is the only hypothesis; all
+--   ambient measurability, probability, independence, and finite-coordinate
+--   assumptions from the source context are unnecessary
+
+/-- The sigma-algebra generated by a strict prefix of product-valued samples
+is below the supremum generated by their individual time-coordinate samples.
+
+Layer: Glue | Gap: Level 1 (product-valued sample-prefix coordinate refinement)
+Proof: expand the Pi measurable space and commute `comap` with its indexed supremum, then insert every nested time-coordinate generator into the pair-indexed supremum.
+Source: Mathlib Pi measurable-space construction, measurable-space `comap_iSup`, and complete-lattice indexed-supremum APIs
+Used in: stochastic push-pull freshness arguments that refine the strict history of node-indexed noise tables to the sigma-algebra generated by earlier scalar node coordinates
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/assumptions/6
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem pi_prefixMeasurableSpace_le_timeCoordinate_iSup
+    {Omega I S : Type*} [MeasurableSpace S]
+    (xi : Nat -> Omega -> (I -> S)) (t : Nat) :
+    (⨆ j < t,
+        MeasurableSpace.comap (xi j)
+          (by infer_instance : MeasurableSpace (I -> S))) ≤
+      ⨆ q ∈ ({q : Nat × I | q.1 < t} : Set (Nat × I)),
+        MeasurableSpace.comap (fun omega : Omega => xi q.1 omega q.2)
+          (by infer_instance : MeasurableSpace S) := by
+  refine iSup_le fun j => iSup_le fun hj => ?_
+  rw [MeasurableSpace.pi, MeasurableSpace.comap_iSup]
+  refine iSup_le fun i => ?_
+  calc
+    MeasurableSpace.comap (xi j)
+        (MeasurableSpace.comap (fun x : I -> S => x i) inferInstance) =
+        MeasurableSpace.comap (fun omega : Omega => xi j omega i)
+          inferInstance := by
+      simp [MeasurableSpace.comap_comp, Function.comp_def]
+    _ ≤ ⨆ q ∈ ({q : Nat × I | q.1 < t} : Set (Nat × I)),
+        MeasurableSpace.comap (fun omega : Omega => xi q.1 omega q.2)
+          inferInstance := by
+      exact le_iSup_of_le (j, i) (le_iSup_of_le hj le_rfl)
+
+
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: equality of conditional expectations on a generated sigma-algebra
+--   from equality of integrals on measurable preimages; the original name already
+--   exposes this paper-free mathematical contract
+-- generality used: arbitrary source and statistic measurable spaces, arbitrary
+--   real Banach target, arbitrary measure, measurable statistic, integrable
+--   functions, and sigma-finiteness only for the measure trimmed to the generated
+--   sigma-algebra; no probability, oracle, optimization, or finite-dimensional
+--   assumptions are used
+-- portable call pattern: probability, martingale, and stochastic-optimization
+--   proofs vary the statistic, measure, and two integrable random vectors while
+--   retaining equality of their integrals on every measurable statistic preimage
+--   to identify their conditional expectations
+-- counterargument checked: although this specializes Mathlib's conditional-
+--   expectation uniqueness theorem, it is not a pure rename or caller-side
+--   expression: it packages the recurring comap measurable-set representation
+--   and both conditional-expectation integral transfers behind the natural
+--   preimage-level hypothesis used by generated-sigma-algebra arguments
+-- coverage search: semantic and symbol searches for conditional-expectation
+--   equality from preimage set integrals found Mathlib
+--   ae_eq_condExp_of_forall_setIntegral_eq as the underlying general component,
+--   while SOptLib condExp_oracle_noise_eq_zero_of_setIntegral_zero is restricted
+--   to an oracle deviation and a zero target; no existing declaration has this
+--   two-function comap contract, so coverage is partial
+-- minimal hypotheses: ambient finite-measure was weakened to sigma-finiteness of
+--   the trimmed generated sigma-algebra; measurability of the statistic and
+--   integrability of both functions are each used, and all remaining hypotheses
+--   are minimal for the stated preimage interface
+
+/-- Two integrable functions have equal conditional expectations with respect to
+the sigma-algebra generated by a measurable statistic when their integrals agree
+on every measurable preimage under that statistic.
+
+Layer: Glue | Gap: Level 1 (generated-sigma-algebra conditional-expectation uniqueness)
+Proof: apply Mathlib's conditional-expectation uniqueness theorem to one conditional expectation, represent each comap-measurable event as a measurable preimage, and transfer its set integral back to the corresponding original function.
+Source: Mathlib conditional expectation uniqueness, set-integral transport, and measurable-space comap APIs
+Used in: martingale-noise and cross-node covariance arguments that identify a conditional mean from event integrals indexed by an observed random statistic
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/assumptions/6
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem condExp_comap_eq_of_preimage_setIntegral_eq
+    {Omega S F : Type*} [mOmega : MeasurableSpace Omega] [MeasurableSpace S]
+    [NormedAddCommGroup F] [NormedSpace Real F] [CompleteSpace F]
+    (mu : Measure Omega) (Y : Omega → S) (hY : Measurable Y)
+    [SigmaFinite (mu.trim hY.comap_le)]
+    (f g : Omega → F)
+    (hf : Integrable f mu) (hg : Integrable g mu)
+    (hpre : ∀ C : Set S, MeasurableSet C →
+      (∫ omega in Y ⁻¹' C, f omega ∂mu) = ∫ omega in Y ⁻¹' C, g omega ∂mu) :
+    condExp (MeasurableSpace.comap Y inferInstance) mu f =ᵐ[mu]
+      condExp (MeasurableSpace.comap Y inferInstance) mu g := by
+  refine MeasureTheory.ae_eq_condExp_of_forall_setIntegral_eq
+    (μ := mu) (m := MeasurableSpace.comap Y inferInstance)
+    hY.comap_le hg ?_ ?_ ?_
+  · intro A _hA _hAfinite
+    exact MeasureTheory.integrable_condExp.integrableOn
+  · intro A hA _hAfinite
+    obtain ⟨C, hC, rfl⟩ := MeasurableSpace.measurableSet_comap.mp hA
+    rw [MeasureTheory.setIntegral_condExp hY.comap_le hf hA]
+    exact hpre C hC
+  · exact MeasureTheory.stronglyMeasurable_condExp.aestronglyMeasurable
+
+
+
+open MeasureTheory
+open scoped ENNReal
+
+-- Generalization plan (G0):
+-- concept/name: conditional expectation equals zero from vanishing integrals on
+--   conditioning-measurable sets; orig was the local `hzero` block inside
+--   `conditionalMeanZero_conditionalExpectationEq`
+-- generality used: arbitrary measurable sample space, arbitrary real Banach
+--   target, arbitrary measure and sub-sigma-algebra with sigma-finite trimmed
+--   measure, and an integrable random variable; no probability, filtration,
+--   oracle, topology, or finite-dimensional assumptions are used
+-- portable call pattern: martingale-difference, stochastic-approximation, and
+--   distributed-noise proofs vary the measure, conditioning sigma-algebra,
+--   Banach target, and random variable while retaining zero integrals on
+--   finite-measure conditioning events to establish a zero conditional expectation
+-- counterargument checked: this is a short specialization of Mathlib's
+--   conditional-expectation uniqueness theorem, but not a pure rename: it
+--   packages the recurring zero comparison function, its local integrability
+--   and measurability obligations, and the orientation of the event-integral
+--   hypothesis into the natural martingale-difference interface
+-- coverage search: semantic and symbol searches for conditional expectation
+--   zero from measurable-set integrals found Mathlib
+--   `ae_eq_condExp_of_forall_setIntegral_eq` as the underlying general theorem
+--   and SOptLib `condExp_oracle_noise_eq_zero_of_setIntegral_zero` as an
+--   oracle-deviation specialization; neither has this paper-free raw-function
+--   interface, so coverage is partial
+-- minimal hypotheses: ambient finite measure was weakened to sigma-finiteness
+--   of the trimmed measure; the Banach-space structure, sub-sigma-algebra
+--   relation, integrability, and finite-measure eventwise zero-integral hypothesis
+--   are exactly those consumed by Mathlib conditional-expectation uniqueness
+
+/-- An integrable Banach-valued function has zero conditional expectation when
+its integral vanishes on every finite-measure set measurable in the conditioning
+sigma-algebra.
+
+Layer: Glue | Gap: Level 1 (eventwise centering to zero conditional expectation)
+Proof: specialize Mathlib's conditional-expectation uniqueness theorem to the
+  zero comparison function, discharging its local integrability and strong
+  measurability obligations by simplification.
+Source: Mathlib conditional-expectation uniqueness and Bochner set-integral APIs
+Used in: converting nodewise event-form conditional centering into the raw zero
+  conditional-expectation identity used by stochastic push--pull noise proofs
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/assumptions/6
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem condExp_eq_zero_of_setIntegral_eq_zero
+    {Omega E : Type*} [mOmega : MeasurableSpace Omega]
+    [NormedAddCommGroup E] [NormedSpace Real E] [CompleteSpace E]
+    (mu : Measure Omega) (m : MeasurableSpace Omega) (hm : m ≤ mOmega)
+    [SigmaFinite (mu.trim hm)] (Z : Omega → E) (hZ : Integrable Z mu)
+    (hzero : ∀ s : Set Omega, @MeasurableSet Omega m s →
+      mu s < ∞ → (∫ omega in s, Z omega ∂mu) = 0) :
+    condExp m mu Z =ᵐ[mu] 0 := by
+  have hzero_condExp : (fun _ : Omega => (0 : E)) =ᵐ[mu] condExp m mu Z := by
+    refine MeasureTheory.ae_eq_condExp_of_forall_setIntegral_eq
+      (μ := mu) (m := m) hm hZ ?_ ?_ ?_
+    · intro s _hs _hfinite
+      simp
+    · intro s hs _hfinite
+      simpa using (hzero s hs _hfinite).symm
+    · exact stronglyMeasurable_zero.aestronglyMeasurable
+  exact hzero_condExp.symm
+
+
+
+open MeasureTheory
+open Filter
+open scoped ENNReal
+
+-- Generalization plan (G0):
+-- concept/name: conditional-expectation upper bound from eventwise integral
+--   domination; orig was conditionalSecondMomentBound_condExp_setIntegral_bridge
+-- generality used: an arbitrary measurable space, measure, sub-sigma-algebra,
+--   integrable real random variable, real constant, and sigma-finiteness of the
+--   trimmed measure; no probability, optimization, oracle, finite-dimensional,
+--   or nonnegativity assumptions are used
+-- portable call pattern: variance, tail, and stochastic-oracle arguments vary
+--   the measure, conditioning sigma-algebra, scalar random variable, and bound
+--   while retaining the eventwise inequality that identifies an a.e. upper bound
+--   for the conditional expectation
+-- counterargument checked: this is not paper-local traceability or a pure
+--   wrapper; it composes conditional-expectation integral transport, trim
+--   transport, and the local integral characterization of a.e. order, while the
+--   existing SOptLib oracle bridge only treats an oracle-specific equality to zero
+-- coverage search: searched `conditional expectation upper bound constant from
+--   set integral inequality measurable sets`, `ae le iff setIntegral le constant
+--   measure`, and the full semantic contract; Mathlib provides
+--   ae_le_of_forall_setIntegral_le, setIntegral_condExp, and trim transport as
+--   components, while SOptLib condExp_oracle_noise_eq_zero_of_setIntegral_zero is
+--   oracle-specific and equality-valued, so coverage is partial
+-- minimal hypotheses: ambient finiteness is weakened to sigma-finiteness of the
+--   trimmed measure; integrability of Z, the sub-sigma-algebra relation, and the
+--   eventwise bound are all used; no finite-dimensional hypothesis is present
+
+/-- If the integral of an integrable real random variable on every finite-measure
+conditioning event is at most a constant times that event's measure, then its
+conditional expectation is almost everywhere at most that constant.
+
+Layer: Glue | Gap: Level 1 (eventwise integral domination to conditional-expectation bound)
+Proof: transfer conditional-expectation and constant set integrals to the sigma-finite trimmed measure, then apply Mathlib's local integral characterization of almost-everywhere nonnegativity to their difference.
+Source: Mathlib conditional expectation set-integral identity, measurable-space trim transport, and a.e. order from set-integral inequalities
+Used in: conditional variance, tail, and stochastic-oracle estimates that turn bounds on every past-measurable event into an almost-sure conditional-moment bound
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/assumptions/6
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem condExp_le_const_of_setIntegral_le
+    {Omega : Type*} [mOmega : MeasurableSpace Omega]
+    (mu : Measure Omega) (m : MeasurableSpace Omega)
+    (Z : Omega → Real) (c : Real)
+    (hm : m ≤ mOmega) [SigmaFinite (mu.trim hm)]
+    (hZ : Integrable Z mu)
+    (hset : ∀ A : Set Omega, @MeasurableSet Omega m A →
+      mu A < ∞ →
+      (∫ x in A, Z x ∂mu) ≤ c * mu.real A) :
+    condExp m mu Z ≤ᵐ[mu] fun _ => c := by
+  refine @ae_le_of_ae_le_trim Omega m mOmega mu Real inferInstance hm
+    (condExp m mu Z) (fun _ => c) ?_
+  rw [← eventually_sub_nonneg]
+  refine ae_nonneg_of_forall_setIntegral_nonneg_of_sigmaFinite ?_ ?_
+  · intro A hA hA_finite
+    exact (integrableOn_const hA_finite.ne).sub
+      (Integrable.trim hm integrable_condExp stronglyMeasurable_condExp).integrableOn
+  · intro A hA hA_finite
+    have hA_finite_mu : mu A < ∞ := by
+      rwa [← trim_measurableSet_eq hm hA]
+    have hconst : IntegrableOn (fun _ : Omega => c) A (mu.trim hm) :=
+      integrableOn_const hA_finite.ne
+    have hcond : IntegrableOn (condExp m mu Z) A (mu.trim hm) :=
+      (Integrable.trim hm integrable_condExp
+        stronglyMeasurable_condExp).integrableOn
+    rw [integral_sub' hconst hcond,
+      sub_nonneg,
+      ← setIntegral_trim hm stronglyMeasurable_const hA,
+      ← setIntegral_trim hm stronglyMeasurable_condExp hA,
+      setIntegral_condExp hm hZ hA]
+    simpa [setIntegral_const, mul_comm] using hset A hA hA_finite_mu
+
+
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: coordinatewise MemLp transport through a zero-preserving Lipschitz map on a finite-product subtype; orig was `correctedLift_comp_memLp_of_coordinate_memLp`
+-- generality used: arbitrary finite coordinate type, measurable source and measure, normed additive commutative coordinate and target groups, zero-containing subset of the finite product, arbitrary ENNReal exponent, and a zero-preserving Lipschitz map; no probability, finite-measure, completeness, vector-space, inner-product, or finite-dimensional assumptions
+-- portable call pattern: finite-agent consensus, constrained product-state, and block-coordinate stochastic proofs assemble coordinatewise Lp processes in a changing subtype and transport them through a changing zero-preserving Lipschitz correction or observation map while retaining the same composed MemLp conclusion
+-- counterargument checked: this is not paper-local traceability or a pure wrapper because the subtype carrier need not be a normed additive group, so Mathlib's `LipschitzWith.comp_memLp` cannot be applied directly; the theorem combines finite-product Lp assembly, recovery of subtype-valued strong measurability through the isometric coercion, and Lipschitz norm domination
+-- coverage search: searched `finite pi coordinate MemLp iff coordinate MemLp`, `subtype finite product coordinate MemLp composed Lipschitz map zero`, and `LipschitzWith comp MemLp zero`; Mathlib provides `memLp_pi_iff`, `MemLp.of_eval`, and `LipschitzWith.comp_memLp`, while SOptLib has continuous-linear finite-product L2 transport, but none covers a Lipschitz map whose domain is an arbitrary zero-containing product subtype
+-- minimal hypotheses: `[Fintype I]` is exactly what assembles coordinatewise MemLp membership; `0 ∈ s` and `g ⟨0, _⟩ = 0` provide the comparison point for norm domination; all source probability, Hilbert, completeness, and finite-dimensional assumptions are dropped
+
+/-- Coordinatewise `Lᵖ` membership of a finite-product process is preserved by
+a zero-preserving Lipschitz map defined on a zero-containing subtype.
+
+Layer: Glue | Gap: Level 1 (Lipschitz Lp transport from a finite-product subtype)
+Proof: assemble the ambient finite-product process with `memLp_pi_iff`, recover strong measurability of the subtype-valued process through its isometric coercion, and use the Lipschitz estimate from the distinguished zero element as an Lp norm majorant.
+Source: Mathlib finite-product Lp characterization in `MeasureTheory.SpecificCodomains.Pi` and Lipschitz composition estimates from `MeasureTheory.Function.LpSpace.Basic`
+Used in: finite-agent gradient-tracking moment proofs when coordinatewise L2 tracker errors are packaged in a zero-sum carrier and passed through a corrected-lift map; likewise for constrained product-state corrections and block observations
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/algorithm_spec
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem memLp_comp_lipschitz_subtype_pi_of_coordinate_memLp
+    {I Ω E F : Type*} [Fintype I] [MeasurableSpace Ω]
+    [NormedAddCommGroup E] [NormedAddCommGroup F]
+    (μ : Measure Ω) (s : Set (I → E)) (X : Ω → s) (g : s → F)
+    (p : ENNReal) (K : NNReal) (hzero : (0 : I → E) ∈ s)
+    (hX : ∀ i : I, MemLp (fun ω => (X ω).1 i) p μ)
+    (hg : LipschitzWith K g) (hg_zero : g ⟨0, hzero⟩ = 0) :
+    MemLp (fun ω => g (X ω)) p μ := by
+  have hval : MemLp (fun ω => (X ω).1) p μ :=
+    memLp_pi_iff.mpr hX
+  have hX_meas : AEStronglyMeasurable X μ := by
+    apply isometry_subtype_coe.isEmbedding.aestronglyMeasurable_comp_iff.mp
+    simpa only [Function.comp_apply] using hval.aestronglyMeasurable
+  refine hval.of_le_mul (c := (K : ℝ))
+    (hg.continuous.comp_aestronglyMeasurable hX_meas) ?_
+  filter_upwards with ω
+  simpa [hg_zero, Subtype.dist_eq, dist_zero_right] using
+    hg.dist_le_mul (X ω) ⟨0, hzero⟩
+
+
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: integrability of a countable measurable-cylinder indicator; orig
+--   was `crossNodeCylinder_wellDefined`, renamed away from cross-node and
+--   conditional-expectation paper vocabulary
+-- generality used: arbitrary countable coordinate type, measurable source and
+--   coordinate codomain, arbitrary finite measure, measurable coordinate maps,
+--   and measurable coordinate events; no probability, filtration,
+--   independence, oracle, vector-space, or finite-dimensional assumptions
+-- portable call pattern: distributed stochastic-gradient, countable-agent
+--   consensus, and countable-coordinate sampling proofs form simultaneous
+--   measurable coordinate events before conditioning; the coordinate type,
+--   sample codomain, maps, events, measure, and time interpretation vary while
+--   integrability of the real cylinder indicator remains unchanged
+-- counterargument checked: not paper-local traceability because the statement
+--   contains no algorithm or oracle objects; not a pure wrapper because it
+--   packages the reusable countable-coordinate cylinder measurability step with
+--   indicator integrability rather than merely renaming one existing theorem
+-- coverage search: symbol searches for `countable coordinate cylinder indicator
+--   integrable of measurable maps events finite measure`, `indicator of
+--   measurable set integrable finite measure`, and `countable intersection
+--   preimage measurable coordinate maps` found SOptLib's generic
+--   `integrable_of_measurable_bounded_real` and Mathlib's
+--   `Integrable.indicator`, `MeasurableSet.iInter`, and
+--   `MeasurableSet.preimage`; these are partial ingredients, with no existing
+--   countable-cylinder theorem of this signature
+-- minimal hypotheses: `Countable I` supplies the countable intersection;
+--   coordinate/event measurability and `IsFiniteMeasure μ` are exactly what the
+--   proof uses, and no source oracle-law hypothesis survives
+
+/-- The real indicator of a countable cylinder of measurable coordinate events is
+integrable under a finite measure.
+
+Each coordinate map may differ, as may its measurable target event. The
+simultaneous event is measurable as a countable intersection of measurable
+preimages, so its constant-one indicator is integrable on a finite measure
+space.
+
+Layer: Glue | Gap: Level 1 (countable measurable-cylinder indicator integrability)
+Proof: express the cylinder as the intersection of its coordinate preimages,
+  prove it measurable coordinatewise, and apply integrability of a constant
+  function restricted by a measurable indicator.
+Source: Mathlib `MeasurableSet.iInter`, `MeasurableSet.preimage`, and
+  `MeasureTheory.Integrable.indicator`
+Used in: same-time finite-agent noise-event conditioning, where the joint
+  cylinder indicator must be integrable before its conditional expectation is
+  placed in the nonfallback branch
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/assumptions/6
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem countableCylinderIndicator_integrable
+    {I Ω S : Type*} [Countable I] [MeasurableSpace Ω] [MeasurableSpace S]
+    (μ : Measure Ω) [IsFiniteMeasure μ]
+    (X : I → Ω → S) (events : I → Set S)
+    (hX : ∀ i, Measurable (X i))
+    (hevents : ∀ i, MeasurableSet (events i)) :
+    Integrable
+      ({ω : Ω | ∀ i : I, X i ω ∈ events i}.indicator
+        (fun _ : Ω => (1 : ℝ))) μ := by
+  classical
+  have hcylinder : MeasurableSet {ω : Ω | ∀ i : I, X i ω ∈ events i} := by
+    rw [show {ω : Ω | ∀ i : I, X i ω ∈ events i} =
+        ⋂ i : I, {ω : Ω | X i ω ∈ events i} by
+      ext ω
+      simp]
+    exact MeasurableSet.iInter (fun i => (hevents i).preimage (hX i))
+  exact (integrable_const (1 : ℝ)).indicator hcylinder
+
+
+
+open MeasureTheory
+open scoped BigOperators ENNReal
+
+-- Generalization plan (G0):
+-- concept/name: finite-horizon integral energy contraction for increments of a
+--   finite uniform mean; orig was the local block
+--   finite_average_integral_sq_finite_mean_increment_le_coordinate_energy.
+-- generality used: an arbitrary measure, a finite coordinate type,
+--   and a real normed additive commutative group; only `MemLp 2` of each
+--   coordinate increment is used, with no probability, inner-product,
+--   completeness, or finite-dimensional assumption.
+-- portable call pattern: distributed, ensemble, and finite-component methods
+--   change the coordinate type, sample measure, normed trajectory, and horizon
+--   while charging the integrated increments of their arithmetic mean to the
+--   summed coordinate increment energy.
+-- counterargument checked: this is not paper-local traceability or a one-line
+--   wrapper because it packages increment integrability, finite-mean algebra,
+--   pointwise Jensen contraction, integral monotonicity, and horizon
+--   aggregation; the existing pointwise theorem alone does not provide that
+--   measure-level contract.
+-- coverage search: symbol queries `finite sum integral squared norm finite
+--   uniform mean increment bounded by inverse cardinality coordinate increment
+--   energy integrable` and `finite horizon sum integrals arithmetic mean
+--   increments coordinate energy` found the partial SOptLib theorem
+--   `norm_sq_inv_card_smul_sum_le_inv_card_mul_sum_norm_sq`; Mathlib semantic
+--   search found scalar `sum_div_card_sq_le_sum_sq_div_card` and Jensen facts,
+--   but no integrated finite-horizon vector-valued result.
+-- minimal hypotheses: coordinate-increment `MemLp 2` is required only on the
+--   selected horizon; all paper oracle, probability, scalar-value,
+--   inner-product, completeness, and finite-dimensional assumptions are
+--   removed.
+
+/-- The finite-horizon integral energy of increments of a uniform finite mean
+is at most inverse cardinality times the corresponding coordinate energy.
+
+Layer: Glue | Gap: Level 1 (integrated finite-mean increment energy contraction)
+Proof: derive integrability of the mean-increment square and coordinate energy
+  from the coordinate `MemLp 2` assumptions, apply the finite-average
+  squared-norm bound pointwise under integral monotonicity, and sum over the
+  horizon.
+Source: Mathlib `MemLp`, finite-sum scalar algebra, and Bochner integral monotonicity APIs, together with SOptLib's finite-average squared-norm inequality
+Used in: distributed and finite-ensemble trajectory estimates that convert a
+  coordinate displacement-energy budget into an adjacent-increment budget for
+  the arithmetic mean trajectory
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/6
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem finite_sum_integral_norm_sq_finite_mean_increment_le_coordinate_energy
+    {Omega E I : Type*} [MeasurableSpace Omega]
+    [Fintype I]
+    [NormedAddCommGroup E] [NormedSpace Real E]
+    (mu : Measure Omega) (X : Omega -> Nat -> I -> E) (H : Nat)
+    (hX : forall u, u ∈ Finset.range H -> forall i,
+      MemLp (fun omega => X omega (u + 1) i - X omega u i) 2 mu) :
+    (∑ u ∈ Finset.range H,
+        ∫ omega,
+          ‖(Fintype.card I : Real)⁻¹ • (∑ i : I, X omega (u + 1) i) -
+              (Fintype.card I : Real)⁻¹ • (∑ i : I, X omega u i)‖ ^ 2 ∂mu) <=
+      (Fintype.card I : Real)⁻¹ *
+        ∑ u ∈ Finset.range H,
+          ∫ omega, ∑ i : I, ‖X omega (u + 1) i - X omega u i‖ ^ 2 ∂mu := by
+  classical
+  cases isEmpty_or_nonempty I with
+  | inl hI =>
+      letI := hI
+      simp
+  | inr hI =>
+      letI := hI
+      let cardInv : Real := (Fintype.card I : Real)⁻¹
+      have hstep :
+          ∀ u ∈ Finset.range H,
+            (∫ omega,
+                ‖(Fintype.card I : Real)⁻¹ • (∑ i : I, X omega (u + 1) i) -
+                    (Fintype.card I : Real)⁻¹ • (∑ i : I, X omega u i)‖ ^ 2 ∂mu) <=
+              cardInv *
+                ∫ omega, ∑ i : I, ‖X omega (u + 1) i - X omega u i‖ ^ 2 ∂mu := by
+        intro u hu
+        have hsum_mem :
+            MemLp
+              (fun omega =>
+                ∑ i : I, (X omega (u + 1) i - X omega u i)) 2 mu := by
+          apply memLp_finset_sum Finset.univ
+          intro i _hi
+          exact hX u hu i
+        have hmean_mem :
+            MemLp
+              (fun omega =>
+                (Fintype.card I : Real)⁻¹ • (∑ i : I, X omega (u + 1) i) -
+                  (Fintype.card I : Real)⁻¹ • (∑ i : I, X omega u i)) 2 mu := by
+          have hscaled := hsum_mem.const_smul cardInv
+          apply hscaled.ae_eq
+          refine Filter.Eventually.of_forall ?_
+          intro omega
+          simp [cardInv, Finset.sum_sub_distrib, smul_sub]
+        have hleft_int :
+            Integrable
+              (fun omega =>
+                ‖(Fintype.card I : Real)⁻¹ • (∑ i : I, X omega (u + 1) i) -
+                    (Fintype.card I : Real)⁻¹ • (∑ i : I, X omega u i)‖ ^ 2) mu :=
+          (memLp_two_iff_integrable_sq_norm hmean_mem.aestronglyMeasurable).1
+            hmean_mem
+        have hcoord_int :
+            Integrable
+              (fun omega =>
+                ∑ i : I, ‖X omega (u + 1) i - X omega u i‖ ^ 2) mu := by
+          apply integrable_finset_sum Finset.univ
+          intro i _hi
+          exact
+            (memLp_two_iff_integrable_sq_norm
+              (hX u hu i).aestronglyMeasurable).1 (hX u hu i)
+        have hpoint :
+            (fun omega =>
+              ‖(Fintype.card I : Real)⁻¹ • (∑ i : I, X omega (u + 1) i) -
+                  (Fintype.card I : Real)⁻¹ • (∑ i : I, X omega u i)‖ ^ 2) ≤ᵐ[mu]
+            (fun omega =>
+              cardInv * ∑ i : I, ‖X omega (u + 1) i - X omega u i‖ ^ 2) := by
+          refine Filter.Eventually.of_forall ?_
+          intro omega
+          have hcard : 0 < (Finset.univ : Finset I).card := by
+            simpa using (Fintype.card_pos : 0 < Fintype.card I)
+          have haverage :=
+            norm_sq_inv_card_smul_sum_le_inv_card_mul_sum_norm_sq
+              (Finset.univ : Finset I)
+              (fun i => X omega (u + 1) i - X omega u i) hcard
+          simpa [cardInv, Finset.sum_sub_distrib, smul_sub] using haverage
+        have hmono :
+            (∫ omega,
+                ‖(Fintype.card I : Real)⁻¹ • (∑ i : I, X omega (u + 1) i) -
+                    (Fintype.card I : Real)⁻¹ • (∑ i : I, X omega u i)‖ ^ 2 ∂mu) <=
+              ∫ omega,
+                cardInv * ∑ i : I,
+                  ‖X omega (u + 1) i - X omega u i‖ ^ 2 ∂mu := by
+          exact MeasureTheory.integral_mono_ae hleft_int
+            (hcoord_int.const_mul cardInv) hpoint
+        simpa only [MeasureTheory.integral_const_mul] using hmono
+      calc
+        (∑ u ∈ Finset.range H,
+            ∫ omega,
+              ‖(Fintype.card I : Real)⁻¹ • (∑ i : I, X omega (u + 1) i) -
+                  (Fintype.card I : Real)⁻¹ • (∑ i : I, X omega u i)‖ ^ 2 ∂mu) <=
+            ∑ u ∈ Finset.range H,
+              cardInv *
+                ∫ omega, ∑ i : I,
+                  ‖X omega (u + 1) i - X omega u i‖ ^ 2 ∂mu :=
+          Finset.sum_le_sum hstep
+        _ = (Fintype.card I : Real)⁻¹ *
+            ∑ u ∈ Finset.range H,
+              ∫ omega, ∑ i : I,
+                ‖X omega (u + 1) i - X omega u i‖ ^ 2 ∂mu := by
+          dsimp [cardInv]
+          rw [Finset.mul_sum]
+
+
+-- Generalization plan (G0):
+-- concept/name: finite_average_integral_sq_abs_sub_le_average_error_sq_add_cross
+--   exposes a finite-horizon L2 second-moment perturbation bound; orig was
+--   `finite_average_square_moment_abs_sub_le_l2_error_cross`
+-- generality used: processes valued in any normed additive commutative group,
+--   on an arbitrary measurable space with an arbitrary measure; only L2
+--   membership on the indices in the finite horizon is assumed
+-- portable call pattern: finite-horizon approximation and coupling arguments
+--   change the actual/reference processes, horizon, carrier, and measure while
+--   retaining the same normalized second-moment transfer inequality
+-- counterargument checked: this is not paper-local traceability or a pure
+--   wrapper; it composes the pointwise L2 perturbation estimate with finite-sum
+--   triangle and Cauchy--Schwarz bounds, including normalization under a square root
+-- coverage search: symbol queries for "finite average squared norm difference
+--   error cross" and "absolute difference integral norm squared bounded integral
+--   difference squared plus cross" found the pointwise
+--   `abs_integral_sq_sub_integral_sq_le_integral_error_sq_add_cross`,
+--   `Real.sum_sqrt_mul_sqrt_le`, and unrelated finite-average norm bounds, but
+--   no theorem covering this normalized finite-horizon conclusion; Mathlib
+--   LeanSearch likewise returned only component finite-average and L2 results
+-- minimal hypotheses: arbitrary measure and `NormedAddCommGroup` suffice; L2
+--   membership is required only for `t ∈ Finset.range T`, with no probability,
+--   finite-measure, inner-product, completeness, or finite-dimensional assumption
+
+
+open MeasureTheory
+
+/-- The absolute difference of two finite averages of squared L2 norms is bounded by
+the average squared error plus twice its geometric cross term with the reference average.
+
+Layer: Glue | Gap: Level 1 (finite-average L2 second-moment perturbation bound)
+Proof: apply the pointwise L2 second-moment perturbation bound, sum via the triangle inequality, and control the finite cross sum by `Real.sum_sqrt_mul_sqrt_le`; nonnegative normalization is then moved under the square root.
+Source: SOptLib pointwise L2 second-moment perturbation bound and Mathlib finite-sum Cauchy--Schwarz for square roots
+Used in: finite-horizon comparison-process and coupling proofs that transfer averaged second-moment estimates from a reference process to stochastic iterates
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/17/proof/9
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem finite_average_integral_sq_abs_sub_le_average_error_sq_add_cross
+    {Ω E : Type*} [MeasurableSpace Ω] [NormedAddCommGroup E] {μ : Measure Ω}
+    (T : ℕ) (x u : ℕ → Ω → E)
+    (hx : ∀ t ∈ Finset.range T, MemLp (x t) 2 μ)
+    (hu : ∀ t ∈ Finset.range T, MemLp (u t) 2 μ) :
+    |((T : ℝ)⁻¹ *
+        Finset.sum (Finset.range T) (fun t =>
+          ∫ ω, ‖x t ω‖ ^ 2 ∂μ)) -
+      ((T : ℝ)⁻¹ *
+        Finset.sum (Finset.range T) (fun t =>
+          ∫ ω, ‖u t ω‖ ^ 2 ∂μ))| ≤
+      ((T : ℝ)⁻¹ *
+        Finset.sum (Finset.range T) (fun t =>
+          ∫ ω, ‖x t ω - u t ω‖ ^ 2 ∂μ)) +
+        2 * Real.sqrt
+          (((T : ℝ)⁻¹ *
+              Finset.sum (Finset.range T) (fun t =>
+                ∫ ω, ‖x t ω - u t ω‖ ^ 2 ∂μ)) *
+            ((T : ℝ)⁻¹ *
+              Finset.sum (Finset.range T) (fun t =>
+                ∫ ω, ‖u t ω‖ ^ 2 ∂μ))) := by
+  classical
+  let r : ℝ := (T : ℝ)⁻¹
+  let A : ℕ → ℝ := fun t => ∫ ω, ‖x t ω‖ ^ 2 ∂μ
+  let B : ℕ → ℝ := fun t => ∫ ω, ‖u t ω‖ ^ 2 ∂μ
+  let D : ℕ → ℝ := fun t => ∫ ω, ‖x t ω - u t ω‖ ^ 2 ∂μ
+  let C : ℕ → ℝ := fun t => Real.sqrt (D t) * Real.sqrt (B t)
+  have hr_nonneg : 0 ≤ r := by
+    dsimp [r]
+    exact inv_nonneg.mpr (Nat.cast_nonneg T)
+  have hD_nonneg : ∀ t : ℕ, 0 ≤ D t := by
+    intro t
+    dsimp [D]
+    exact integral_nonneg fun ω => sq_nonneg _
+  have hB_nonneg : ∀ t : ℕ, 0 ≤ B t := by
+    intro t
+    dsimp [B]
+    exact integral_nonneg fun ω => sq_nonneg _
+  have hper :
+      ∀ t ∈ Finset.range T, |A t - B t| ≤ D t + 2 * C t := by
+    intro t ht
+    dsimp [A, B, D, C]
+    simpa [mul_assoc] using
+      abs_integral_sq_sub_integral_sq_le_integral_error_sq_add_cross
+        (μ := μ) (hx t ht) (hu t ht)
+  have hsum_abs :
+      |Finset.sum (Finset.range T) (fun t => A t) -
+          Finset.sum (Finset.range T) (fun t => B t)| ≤
+        Finset.sum (Finset.range T) (fun t => D t + 2 * C t) := by
+    calc
+      |Finset.sum (Finset.range T) (fun t => A t) -
+          Finset.sum (Finset.range T) (fun t => B t)| =
+          |Finset.sum (Finset.range T) (fun t => A t - B t)| := by
+            rw [Finset.sum_sub_distrib]
+      _ ≤ Finset.sum (Finset.range T) (fun t => |A t - B t|) := by
+            simpa using
+              (Finset.abs_sum_le_sum_abs
+                (s := Finset.range T) (f := fun t => A t - B t))
+      _ ≤ Finset.sum (Finset.range T) (fun t => D t + 2 * C t) := by
+            exact Finset.sum_le_sum fun t ht => hper t ht
+  have hcs :
+      Finset.sum (Finset.range T) (fun t => C t) ≤
+        Real.sqrt (Finset.sum (Finset.range T) (fun t => D t)) *
+          Real.sqrt (Finset.sum (Finset.range T) (fun t => B t)) := by
+    dsimp [C]
+    exact Real.sum_sqrt_mul_sqrt_le (Finset.range T) hD_nonneg hB_nonneg
+  have hSD_nonneg : 0 ≤ Finset.sum (Finset.range T) (fun t => D t) :=
+    Finset.sum_nonneg fun t _ht => hD_nonneg t
+  have hSB_nonneg : 0 ≤ Finset.sum (Finset.range T) (fun t => B t) :=
+    Finset.sum_nonneg fun t _ht => hB_nonneg t
+  have hscaled_cross :
+      r * Finset.sum (Finset.range T) (fun t => C t) ≤
+        Real.sqrt
+          ((r * Finset.sum (Finset.range T) (fun t => D t)) *
+            (r * Finset.sum (Finset.range T) (fun t => B t))) := by
+    have hmul := mul_le_mul_of_nonneg_left hcs hr_nonneg
+    have hsqrt_eq :
+        r *
+            (Real.sqrt (Finset.sum (Finset.range T) (fun t => D t)) *
+              Real.sqrt (Finset.sum (Finset.range T) (fun t => B t))) =
+          Real.sqrt
+            ((r * Finset.sum (Finset.range T) (fun t => D t)) *
+              (r * Finset.sum (Finset.range T) (fun t => B t))) := by
+      have hleft_nonneg :
+          0 ≤ r * Finset.sum (Finset.range T) (fun t => D t) :=
+        mul_nonneg hr_nonneg hSD_nonneg
+      have hright_nonneg :
+          0 ≤ r * Finset.sum (Finset.range T) (fun t => B t) :=
+        mul_nonneg hr_nonneg hSB_nonneg
+      have hr_sqrt_sq : Real.sqrt r * Real.sqrt r = r := by
+        rw [← sq, Real.sq_sqrt hr_nonneg]
+      calc
+        r *
+            (Real.sqrt (Finset.sum (Finset.range T) (fun t => D t)) *
+              Real.sqrt (Finset.sum (Finset.range T) (fun t => B t))) =
+            (Real.sqrt r * Real.sqrt r) *
+              (Real.sqrt (Finset.sum (Finset.range T) (fun t => D t)) *
+                Real.sqrt (Finset.sum (Finset.range T) (fun t => B t))) := by
+              rw [hr_sqrt_sq]
+        _ =
+            (Real.sqrt r *
+                Real.sqrt (Finset.sum (Finset.range T) (fun t => D t))) *
+              (Real.sqrt r *
+                Real.sqrt (Finset.sum (Finset.range T) (fun t => B t))) := by
+              ring
+        _ =
+            Real.sqrt (r * Finset.sum (Finset.range T) (fun t => D t)) *
+              Real.sqrt (r * Finset.sum (Finset.range T) (fun t => B t)) := by
+              rw [Real.sqrt_mul hr_nonneg]
+              rw [Real.sqrt_mul hr_nonneg]
+        _ =
+            Real.sqrt
+              ((r * Finset.sum (Finset.range T) (fun t => D t)) *
+                (r * Finset.sum (Finset.range T) (fun t => B t))) := by
+              rw [Real.sqrt_mul hleft_nonneg]
+    exact le_trans hmul (le_of_eq hsqrt_eq)
+  calc
+    |r * Finset.sum (Finset.range T) (fun t => A t) -
+        r * Finset.sum (Finset.range T) (fun t => B t)| =
+        r * |Finset.sum (Finset.range T) (fun t => A t) -
+          Finset.sum (Finset.range T) (fun t => B t)| := by
+          rw [← mul_sub, abs_mul, abs_of_nonneg hr_nonneg]
+    _ ≤ r * Finset.sum (Finset.range T) (fun t => D t + 2 * C t) := by
+          exact mul_le_mul_of_nonneg_left hsum_abs hr_nonneg
+    _ =
+        r * Finset.sum (Finset.range T) (fun t => D t) +
+          2 * (r * Finset.sum (Finset.range T) (fun t => C t)) := by
+          rw [Finset.sum_add_distrib, ← Finset.mul_sum]
+          ring
+    _ ≤
+        r * Finset.sum (Finset.range T) (fun t => D t) +
+          2 * Real.sqrt
+            ((r * Finset.sum (Finset.range T) (fun t => D t)) *
+              (r * Finset.sum (Finset.range T) (fun t => B t))) := by
+          nlinarith [hscaled_cross]
+    _ =
+      ((T : ℝ)⁻¹ *
+        Finset.sum (Finset.range T) (fun t =>
+          ∫ ω, ‖x t ω - u t ω‖ ^ 2 ∂μ)) +
+        2 * Real.sqrt
+          (((T : ℝ)⁻¹ *
+              Finset.sum (Finset.range T) (fun t =>
+                ∫ ω, ‖x t ω - u t ω‖ ^ 2 ∂μ)) *
+            ((T : ℝ)⁻¹ *
+              Finset.sum (Finset.range T) (fun t =>
+                ∫ ω, ‖u t ω‖ ^ 2 ∂μ))) := by
+          rfl
+
+/-! Phase 4 batch 18: probability and finite-horizon aggregation bridges. -/
+
+/-! Promoted from Staging/finite_horizon_integral_affine_recursion_le_majorant_sum.lean. -/
+
+open MeasureTheory
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: finite-horizon integral bound for an affine recurrence by the
+--   sum of its deterministic majorant; orig was `finite_l2_recursion_uniform_bound`
+-- generality used: arbitrary measurable sample type and measure, two real-valued
+--   natural-time processes, nonnegative scalar recurrence coefficients and forcing
+--   budget, finite-horizon integrability, and a pointwise affine upper recurrence;
+--   no probability, filtration, independence, normed-space, or finite-dimensional
+--   assumptions are used
+-- portable call pattern: stochastic-recursion, consensus-filter, and recursive-
+--   estimator proofs instantiate the state and forcing processes while changing the
+--   measure, horizon, affine coefficients, and uniform forcing budget, and retain the
+--   same deterministic finite-horizon integral majorant
+-- counterargument checked: this is not paper-local traceability or a caller-side
+--   expression because it packages induction through Bochner-integral monotonicity,
+--   integral linearity, and deterministic recurrence comparison
+-- coverage search: searched `finite horizon integral affine recurrence bounded by
+--   deterministic majorant sum`, `integral recurrence upper bound integrable forcing
+--   uniform bound`, and `integral affine scalar recurrence uniform forcing bound
+--   deterministic recursion`; the closest hits were `geometric_lower_bound_of_affine_recurrence`,
+--   `finite_stable_recurrence_sq_sum_le`, and finite-window telescope lemmas, whose
+--   conclusions do not provide this measure-level integral comparison, so coverage is partial
+-- minimal hypotheses: the paper setup and squared-operator coefficient are replaced by
+--   nonnegative `a` and `b`; only integrability on the used horizon, an initial
+--   integral bound, the forcing integral bound, and an almost-everywhere recurrence
+--   are retained
+
+namespace SOptLib
+
+/-- Integrals of a finite scalar process satisfying an affine recurrence almost
+everywhere are bounded by the sum of the corresponding deterministic majorant.
+
+The forcing process need not be pointwise nonnegative, and the measure need not
+be finite or probabilistic; only its integrals are assumed uniformly bounded.
+
+Layer: Glue | Gap: Level 1 (finite-horizon integral affine-recurrence comparison)
+Proof: inductively compare each process integral with the primitive-recursive majorant, using
+  Bochner-integral monotonicity and linearity, then bound the selected nonnegative
+  majorant term by its finite range sum.
+Source: Mathlib Bochner-integral monotonicity and linearity, finite-sum order lemmas,
+  and natural-number primitive recursion and induction
+Used in: period-window innovation estimates and recursive stochastic-filter moment
+  bounds after a pointwise affine step and a uniform forcing expectation are available
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/6
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem finite_horizon_integral_affine_recursion_le_majorant_sum
+    {Omega : Type*} [MeasurableSpace Omega] (mu : Measure Omega)
+    (m : Nat) (Y Eta : Nat -> Omega -> Real) (a b C : Real)
+    (ha_nonneg : 0 <= a) (hb_nonneg : 0 <= b) (hC_nonneg : 0 <= C)
+    (hY0 : (∫ omega, Y 0 omega ∂mu) <= 0)
+    (hY_int : forall n : Nat, n <= m -> Integrable (fun omega => Y n omega) mu)
+    (hEta_int : forall n : Nat, n < m -> Integrable (fun omega => Eta n omega) mu)
+    (hEta_bound : forall n : Nat, n < m -> (∫ omega, Eta n omega ∂mu) <= C)
+    (hrec : forall n : Nat, n < m ->
+      Y (n + 1) ≤ᵐ[mu] fun omega => a * Y n omega + b * Eta n omega) :
+    forall n : Nat, n <= m ->
+      (∫ omega, Y n omega ∂mu) <=
+        Finset.sum (Finset.range (m + 1))
+          (fun n => Nat.rec 0 (fun _ prev => a * prev + b * C) n) := by
+  classical
+  let D : Nat -> Real := fun n =>
+    Nat.rec 0 (fun _ prev => a * prev + b * C) n
+  have hD_nonneg : forall n : Nat, 0 <= D n := by
+    intro n
+    induction n with
+    | zero => simp [D]
+    | succ n ih =>
+        rw [show D (n + 1) = a * D n + b * C by simp [D]]
+        positivity
+  have hD_bound : forall n : Nat, n <= m ->
+      (∫ omega, Y n omega ∂mu) <= D n := by
+    intro n
+    induction n with
+    | zero =>
+        intro _hn
+        simpa [D] using hY0
+    | succ n ih =>
+        intro hn_succ
+        have hn_lt : n < m := Nat.lt_of_succ_le hn_succ
+        have hn_le : n <= m := Nat.le_of_lt hn_lt
+        have hYnext_int : Integrable (fun omega => Y (n + 1) omega) mu :=
+          hY_int (n + 1) hn_succ
+        have hrhs_int :
+            Integrable (fun omega => a * Y n omega + b * Eta n omega) mu :=
+          ((hY_int n hn_le).const_mul a).add ((hEta_int n hn_lt).const_mul b)
+        calc
+          (∫ omega, Y (n + 1) omega ∂mu) <=
+              ∫ omega, a * Y n omega + b * Eta n omega ∂mu :=
+            integral_mono_ae hYnext_int hrhs_int (hrec n hn_lt)
+          _ = a * (∫ omega, Y n omega ∂mu) +
+                b * (∫ omega, Eta n omega ∂mu) := by
+            rw [integral_add ((hY_int n hn_le).const_mul a)
+              ((hEta_int n hn_lt).const_mul b), integral_const_mul,
+              integral_const_mul]
+          _ <= a * D n + b * C :=
+            add_le_add
+              (mul_le_mul_of_nonneg_left (ih hn_le) ha_nonneg)
+              (mul_le_mul_of_nonneg_left (hEta_bound n hn_lt) hb_nonneg)
+          _ = D (n + 1) := by simp [D]
+  intro n hn
+  have hn_mem : n ∈ Finset.range (m + 1) :=
+    Finset.mem_range.mpr (Nat.lt_succ_iff.mpr hn)
+  have hD_le_sum :
+      D n <= Finset.sum (Finset.range (m + 1)) D :=
+    Finset.single_le_sum (fun k _hk => hD_nonneg k) hn_mem
+  exact le_trans (hD_bound n hn) (by simpa [D] using hD_le_sum)
+
+end SOptLib
+
+/-! Promoted from Staging/finite_average_le_of_floor_div_majorant_and_integral_stride_mismatch.lean. -/
+
+open MeasureTheory
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: normalized finite-average bound from a floor-division block
+--   majorant plus an integrated squared-norm stride mismatch; orig was
+--   `finite_phase_average_l2_integral_bound_of_block_majorant_and_stable_mismatch`
+-- generality used: an arbitrary measure, a seminormed additive commutative
+--   group, real-valued error and block sequences, a positive natural stride,
+--   and horizon-local integrability; no probability, scalar action, inner
+--   product, completeness, finite-dimensionality, convexity, smoothness, or
+--   oracle assumptions are used
+-- portable call pattern: periodic, delayed, subsampled, epoch, and mini-batch
+--   stochastic-process analyses change the error sequence, block energy,
+--   normed process, stride, horizon, and supplied block/raw-moment budgets
+--   while retaining the same normalized conclusion
+-- counterargument checked: this is not paper-local traceability or a pure
+--   rename; it packages the recurring top-level composition of a floor-divided
+--   block majorant with a stride-mismatch remainder whose budget must first be
+--   derived from two raw second-moment bounds
+-- coverage search: queries `finite average upper bound floor division block
+--   majorant integral squared norm stride mismatch raw second moment bounds`
+--   and `normalized sum upper bound of pointwise block majorant plus integral
+--   norm squared process mismatch` found the strict components
+--   `normalized_sum_le_period_mul_add_of_floor_div_majorant` and
+--   `finite_average_integral_norm_sq_stride_mismatch_le`, plus distinct
+--   floor-block mismatch results, but no declaration with the combined contract
+-- minimal hypotheses: positivity of the stride, nonnegativity of the block
+--   coefficient and block sequence on the horizon, horizon-local pointwise
+--   majorization, raw squared-norm integrability below `T * p`, and the three
+--   supplied normalized bounds are all used; the source probability instance,
+--   global hypotheses, difference integrability, and common `alpha ^ 2`
+--   factorization are removed
+
+/-- A floor-divided block majorant with an integrated squared-norm stride
+mismatch is controlled by the block budget and two raw second-moment budgets.
+
+Layer: Glue | Gap: Level 1 (block-majorant aggregation with integrated stride mismatch)
+Proof: derive the normalized stride-mismatch remainder from the two raw second-moment bounds, then apply the normalized floor-division majorant theorem with that remainder.
+Source: Mathlib Bochner integral monotonicity and seminorm triangle inequalities, together with finite-range floor-division and positive-stride aggregation
+Used in: periodic, delayed, subsampled, epoch, and mini-batch stochastic-process estimates that combine a block-boundary energy majorant with an output or iterate stride-mismatch remainder
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/6
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem finite_average_le_of_floor_div_majorant_and_integral_stride_mismatch
+    {Omega E : Type*} [MeasurableSpace Omega]
+    [SeminormedAddCommGroup E]
+    (mu : Measure Omega) (p T : Nat)
+    (f g : Nat -> Real) (out : Omega -> Nat -> E)
+    (A B D : Real) (hp : 0 < p)
+    (hA_nonneg : 0 <= A)
+    (hg_nonneg : forall k, k < T -> 0 <= g k)
+    (hout_int : forall t, t < T * p ->
+      Integrable (fun omega => ‖out omega t‖ ^ 2) mu)
+    (hmajorant : forall t, t < T ->
+      f t <= A * g (t / p) +
+        ∫ omega, ‖out omega t - out omega (t * p)‖ ^ 2 ∂mu)
+    (hblock :
+      (T : Real)⁻¹ * Finset.sum (Finset.range T) g <= B)
+    (havg_T :
+      (T : Real)⁻¹ *
+          Finset.sum (Finset.range T) (fun t =>
+            ∫ omega, ‖out omega t‖ ^ 2 ∂mu) <=
+        D)
+    (havg_mul :
+      ((T * p : Nat) : Real)⁻¹ *
+          Finset.sum (Finset.range (T * p)) (fun t =>
+            ∫ omega, ‖out omega t‖ ^ 2 ∂mu) <=
+        D) :
+    (T : Real)⁻¹ * Finset.sum (Finset.range T) f <=
+      (A * (p : Real)) * B + (2 * D + 2 * ((p : Real) * D)) := by
+  let r : Nat -> Real := fun t =>
+    ∫ omega, ‖out omega t - out omega (t * p)‖ ^ 2 ∂mu
+  have hremainder :
+      (T : Real)⁻¹ * Finset.sum (Finset.range T) r <=
+        2 * D + 2 * ((p : Real) * D) := by
+    simpa [r] using
+      finite_average_integral_norm_sq_stride_mismatch_le
+        mu out p T D hp hout_int havg_T havg_mul
+  exact
+    normalized_sum_le_period_mul_add_of_floor_div_majorant
+      p T f g r A B (2 * D + 2 * ((p : Real) * D)) hp hA_nonneg
+        hg_nonneg (fun t ht => by simpa [r] using hmajorant t ht)
+        hblock hremainder
+
+/-! Promoted from Staging/exists_small_parameter_abs_integral_ge_half_of_l2_error_le_mul_sq.lean. -/
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: existence of a uniform small-parameter absolute mean margin from
+--   a quadratic `L²` approximation rate; orig was
+--   `initial_mean_margin_from_l2_alpha_sq_block`
+-- generality used: an arbitrary measurable sample space with a probability
+--   measure, a real-valued parameterized observable, a nonzero real target, a
+--   nonnegative quadratic-error coefficient, and a positive admissible radius;
+--   no optimization, oracle, independence, finite-dimensional, convexity, or
+--   smoothness assumptions
+-- portable call pattern: perturbation, spectral, and stochastic-approximation
+--   proofs vary the observable family, deterministic nonzero target, quadratic
+--   `L²` coefficient, and admissible parameter radius while reusing the same
+--   smaller radius on which the absolute expectation retains half the target
+--   magnitude
+-- counterargument checked: the result is not paper-local traceability or a
+--   one-line wrapper; existing APIs separately transport an `L²` error to mean
+--   closeness and mean closeness to an absolute margin, while this theorem adds
+--   the nontrivial uniform radius selection and quadratic-to-linear scaling
+-- coverage search: searched `exists small positive parameter absolute integral
+--   lower bound half target L2 error constant times parameter squared`,
+--   `absolute integral lower bound half target of integral squared difference
+--   bounded by constant times parameter squared`, and Mathlib LeanSearch for
+--   the full probabilistic statement; staged
+--   `abs_integral_sub_integral_le_sqrt_of_integral_sq_sub_le` and
+--   `le_abs_of_abs_sub_le_of_add_le_abs` are partial components, and no hit
+--   supplies the small-parameter existence conclusion
+-- minimal hypotheses: integrability and the squared-error bound are required
+--   only for positive parameters within the supplied admissible radius; the
+--   source's algorithm-specific setup and explicit difference measurability are
+--   removed, while coefficient nonnegativity and target nonvanishing are the
+--   scalar conditions used to construct a positive radius
+
+/-- A quadratic `L²` approximation to a nonzero constant has absolute mean at
+least half the target magnitude for all sufficiently small positive parameters.
+
+Layer: Glue | Gap: Level 1 (uniform small-parameter mean margin from a quadratic L² error rate)
+Proof: choose a radius using `sqrt C + 1`, turn the quadratic second-moment bound into a linear difference-of-means bound by Cauchy--Schwarz, and transfer the resulting half-target closeness to an absolute lower bound.
+Source: Mathlib Bochner integration on probability spaces and real square-root/order arithmetic, composed through SOptLib's L² mean-transport and absolute-margin lemmas
+Used in: perturbation, spectral slow-mode, and stochastic-approximation arguments that preserve a nonzero deterministic signal in expectation throughout a sufficiently small positive-parameter regime
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/16/proof/2
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem exists_small_parameter_abs_integral_ge_half_of_l2_error_le_mul_sq
+    {Omega : Type*} [MeasurableSpace Omega]
+    (mu : Measure Omega) [IsProbabilityMeasure mu]
+    (Z : Real → Omega → Real) (target C alphaMax : Real)
+    (htarget : 0 < |target|) (hC : 0 ≤ C) (halphaMax : 0 < alphaMax)
+    (hZ_int : ∀ alpha, 0 < alpha → alpha ≤ alphaMax → Integrable (Z alpha) mu)
+    (herror_sq_int : ∀ alpha, 0 < alpha → alpha ≤ alphaMax →
+      Integrable (fun omega ↦ (Z alpha omega - target) ^ 2) mu)
+    (herror_sq_le : ∀ alpha, 0 < alpha → alpha ≤ alphaMax →
+      (∫ omega, (Z alpha omega - target) ^ 2 ∂mu) ≤ C * alpha ^ 2) :
+    ∃ alphaSmall : Real,
+      0 < alphaSmall ∧ alphaSmall ≤ alphaMax ∧
+        ∀ alpha, 0 < alpha → alpha ≤ alphaSmall →
+          |target| / 2 ≤ |∫ omega, Z alpha omega ∂mu| := by
+  let R : Real := Real.sqrt C + 1
+  let cutoff : Real := |target| / (2 * R)
+  let alphaSmall : Real := min alphaMax cutoff
+  have hR_pos : 0 < R := by
+    dsimp [R]
+    positivity
+  have hcutoff_pos : 0 < cutoff := by
+    dsimp [cutoff]
+    positivity
+  have halphaSmall_pos : 0 < alphaSmall := by
+    exact lt_min halphaMax hcutoff_pos
+  refine ⟨alphaSmall, halphaSmall_pos, min_le_left _ _, ?_⟩
+  intro alpha halpha_pos halpha_le
+  have halpha_le_max : alpha ≤ alphaMax :=
+    le_trans halpha_le (min_le_left alphaMax cutoff)
+  have halpha_le_cutoff : alpha ≤ cutoff :=
+    le_trans halpha_le (min_le_right alphaMax cutoff)
+  have hclose_sqrt :
+      |(∫ omega, Z alpha omega ∂mu) - target| ≤
+        Real.sqrt (C * alpha ^ 2) := by
+    have h := abs_integral_sub_integral_le_sqrt_of_integral_sq_sub_le
+      mu (Z alpha) (fun _omega : Omega ↦ target) (C * alpha ^ 2)
+      (hZ_int alpha halpha_pos halpha_le_max) (integrable_const _)
+      (herror_sq_int alpha halpha_pos halpha_le_max)
+      (herror_sq_le alpha halpha_pos halpha_le_max)
+    simpa using h
+  have hsqrt_alpha :
+      Real.sqrt (C * alpha ^ 2) = Real.sqrt C * alpha := by
+    rw [Real.sqrt_mul hC]
+    rw [Real.sqrt_sq_eq_abs, abs_of_pos halpha_pos]
+  have hlinear : Real.sqrt C * alpha ≤ |target| / 2 := by
+    have hsmall_mul : alpha * R ≤ |target| / 2 := by
+      have hle_div : alpha ≤ |target| / (2 * R) := by
+        simpa [cutoff] using halpha_le_cutoff
+      calc
+        alpha * R ≤ (|target| / (2 * R)) * R :=
+          mul_le_mul_of_nonneg_right hle_div hR_pos.le
+        _ = |target| / 2 := by
+          field_simp [ne_of_gt hR_pos]
+    have hsqrt_le_R : Real.sqrt C ≤ R := by
+      dsimp [R]
+      linarith
+    calc
+      Real.sqrt C * alpha ≤ R * alpha :=
+        mul_le_mul_of_nonneg_right hsqrt_le_R halpha_pos.le
+      _ = alpha * R := by ring
+      _ ≤ |target| / 2 := hsmall_mul
+  have hclose :
+      |(∫ omega, Z alpha omega ∂mu) - target| ≤ |target| / 2 := by
+    rw [hsqrt_alpha] at hclose_sqrt
+    exact hclose_sqrt.trans hlinear
+  apply le_abs_of_abs_sub_le_of_add_le_abs
+    (∫ omega, Z alpha omega ∂mu) target (|target| / 2) (|target| / 2)
+    hclose
+  linarith [abs_nonneg target]
+
+/-! Promoted from Staging/integrable_dependentProductNormSq_and_centered_of_coordinate_memLp.lean. -/
+
+open MeasureTheory
+open scoped BigOperators
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: coordinatewise L2 closure for raw and uniformly centered
+--   finite-product squared-norm energies; orig was the local pair of helpers
+--   `hfrobenius_of_coordinate_l2` and `hconsensus_of_coordinate_l2`.
+-- generality used: an arbitrary measure on a measurable space, a finite
+--   coordinate type, and a real normed vector space; no nonemptiness, finite-measure,
+--   probability, inner-product, completeness, finite-dimensional, oracle, or
+--   network assumption is used.
+-- portable call pattern: decentralized, block-coordinate, and finite-ensemble
+--   proofs change the coordinate type, normed carrier, random family, and
+--   measure while reusing integrability of both raw product energy and energy
+--   after subtracting the random uniform coordinate mean.
+-- counterargument checked: the raw-energy half occurs paper-locally and
+--   Mathlib supplies its component L2 closure lemmas, but neither Mathlib nor
+--   SOptLib packages the paired raw-and-centered finite-product conclusion;
+--   the centered half additionally constructs the random finite mean in L2.
+-- coverage search: queried `coordinatewise MemLp finite family integrable
+--   dependent product squared norm and centered by uniform mean`, `finite
+--   family L2 coordinates integrable sum squared norms subtract average`, and
+--   the Mathlib semantic equivalents; top partial hits were
+--   `memLp_two_iff_integrable_sq_norm`, `memLp_finset_sum`,
+--   `SOptLib.dependentProductNormSq`, and `SOptLib.finiteUniformAverage`, with
+--   no full-signature match.
+-- minimal hypotheses: `[Fintype ι]` forms the two finite energies, and the
+--   real normed-space structure is exactly what forms and scales the coordinate
+--   mean; coordinatewise `MemLp · 2 μ` supplies all measurability and moment
+--   hypotheses, while the empty coordinate type is handled without a separate
+--   nonemptiness assumption.
+
+/-- Coordinatewise `L²` membership of a finite random family makes both its
+raw squared-norm energy and its uniformly centered squared-norm energy
+integrable.
+
+Layer: Glue | Gap: Level 1 (raw and uniformly centered finite-product L2 energy closure)
+Proof: convert each coordinate `MemLp` hypothesis to squared-norm integrability and sum it; then close `MemLp` under the finite sum, scalar multiplication, and coordinatewise subtraction that form the random uniform mean, and apply the same energy argument to the centered family.
+Source: Mathlib `MemLp` closure under finite sums, scalar multiplication, and subtraction together with `memLp_two_iff_integrable_sq_norm`; SOptLib finite-product energy and finite-uniform-average definitions
+Used in: finite-horizon decentralized consensus and gradient-tracking moment proofs that require integrable Frobenius energies for both a node state and its disagreement from the arithmetic network mean
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/assumptions/3
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem integrable_dependentProductNormSq_and_centered_of_coordinate_memLp
+    {Ω ι E : Type*} [MeasurableSpace Ω]
+    [Fintype ι]
+    [NormedAddCommGroup E] [NormedSpace ℝ E]
+    {μ : Measure Ω} (X : Ω → ι → E)
+    (hX : ∀ i : ι, MemLp (fun ω => X ω i) 2 μ) :
+    Integrable (fun ω => dependentProductNormSq (X ω)) μ ∧
+      Integrable
+        (fun ω => dependentProductNormSq
+          (fun i => X ω i -
+            (Fintype.card ι : ℝ)⁻¹ • ∑ j : ι, X ω j)) μ := by
+  classical
+  have henergy
+      (Y : Ω → ι → E)
+      (hY : ∀ i : ι, MemLp (fun ω => Y ω i) 2 μ) :
+      Integrable (fun ω => dependentProductNormSq (Y ω)) μ := by
+    simp only [dependentProductNormSq_def]
+    apply integrable_finset_sum Finset.univ
+    intro i _hi
+    exact (memLp_two_iff_integrable_sq_norm
+      (hY i).aestronglyMeasurable).1 (hY i)
+  have hmean : MemLp
+      (fun ω => (Fintype.card ι : ℝ)⁻¹ • ∑ j : ι, X ω j) 2 μ := by
+    have hsum : MemLp (fun ω => ∑ i : ι, X ω i) 2 μ := by
+      apply memLp_finset_sum Finset.univ
+      intro i _hi
+      exact hX i
+    simpa only using hsum.const_smul ((Fintype.card ι : ℝ)⁻¹)
+  have hcentered : ∀ i : ι,
+      MemLp (fun ω => X ω i -
+        (Fintype.card ι : ℝ)⁻¹ • ∑ j : ι, X ω j) 2 μ := by
+    intro i
+    exact (hX i).sub hmean
+  exact ⟨henergy X hX,
+    henergy (fun ω i => X ω i -
+      (Fintype.card ι : ℝ)⁻¹ • ∑ j : ι, X ω j) hcentered⟩
+
+end SOptLib
+
+/-! Promoted from Staging/integral_abs_mul_abs_le_sqrt_integral_sq_mul_sqrt_integral_sq.lean. -/
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: norm-valued L2 integral Cauchy--Schwarz in square-root moment form;
+--   orig was integral_abs_mul_abs_le_sqrt_integral_abs_sq_mul_sqrt_integral_abs_sq
+-- generality used: independently typed normed-group-valued functions on an
+--   arbitrary measurable space with an arbitrary measure, assuming only L2 membership; no probability,
+--   finite-measure, convexity, smoothness, oracle, or dimension assumptions
+-- portable call pattern: stochastic comparison, covariance, and coupling proofs
+--   change the measure and the two L2 random variables while retaining
+--   the same product-moment upper bound
+-- counterargument checked: this is not paper-local traceability; although it is
+--   a specialization of Mathlib Holder, the square-root second-moment conclusion
+--   is a stable mathematical interface repeatedly consumed by stochastic proofs
+-- coverage search: searches for "integral absolute product upper bound L2 square
+--   root moments" and the precise product-of-square-roots shape found Mathlib
+--   `integral_mul_norm_le_Lp_mul_Lq` and
+--   `integral_mul_le_Lp_mul_Lq_of_nonneg` as real-power Holder components, and
+--   SOptLib weighted-energy and probability L2-to-L1 bounds; none states this
+--   arbitrary-measure square-root product-moment contract, so coverage is partial
+-- minimal hypotheses: both MemLp hypotheses are required by Holder; all other
+--   source-specific assumptions have been eliminated
+
+/-- The integral of the product of the norms of two L2 functions is
+bounded by the product of the square roots of their second moments.
+
+Layer: Glue | Gap: Level 1 (norm-valued L2 integral Cauchy--Schwarz square-root form)
+Proof: apply Mathlib's norm Holder integral inequality to the two scalar norm functions at conjugate exponents two, then rewrite real powers as squares and square roots.
+Source: Mathlib `MeasureTheory.integral_mul_norm_le_Lp_mul_Lq`, `MemLp.norm`, and real square-root and real-power identities
+Used in: stochastic comparison-process and coupling arguments bounding an error-reference cross moment by their two L2 energies
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/17/proof/9
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem integral_norm_mul_norm_le_sqrt_integral_norm_sq_mul_sqrt_integral_norm_sq
+    {Ω E F : Type*} [MeasurableSpace Ω]
+    [NormedAddCommGroup E] [NormedAddCommGroup F] {μ : Measure Ω}
+    {f : Ω → E} {g : Ω → F} (hf : MemLp f 2 μ) (hg : MemLp g 2 μ) :
+    (∫ ω, ‖f ω‖ * ‖g ω‖ ∂μ) ≤
+      Real.sqrt (∫ ω, ‖f ω‖ ^ 2 ∂μ) *
+        Real.sqrt (∫ ω, ‖g ω‖ ^ 2 ∂μ) := by
+  have hpq : (2 : ℝ).HolderConjugate (2 : ℝ) := by
+    rw [Real.holderConjugate_iff_eq_conjExponent (by norm_num : (1 : ℝ) < 2)]
+    norm_num
+  have hf_norm : MemLp (fun ω : Ω => ‖f ω‖) (ENNReal.ofReal (2 : ℝ)) μ := by
+    simpa using hf.norm
+  have hg_norm : MemLp (fun ω : Ω => ‖g ω‖) (ENNReal.ofReal (2 : ℝ)) μ := by
+    simpa using hg.norm
+  have hholder :
+      (∫ ω, ‖f ω‖ * ‖g ω‖ ∂μ) ≤
+        (∫ ω, ‖f ω‖ ^ (2 : ℝ) ∂μ) ^ ((1 : ℝ) / 2) *
+          (∫ ω, ‖g ω‖ ^ (2 : ℝ) ∂μ) ^ ((1 : ℝ) / 2) := by
+    simpa only [Real.norm_eq_abs, abs_norm] using
+      (MeasureTheory.integral_mul_norm_le_Lp_mul_Lq
+        (μ := μ) hpq hf_norm hg_norm)
+  have hf_pow :
+      (∫ ω, ‖f ω‖ ^ (2 : ℝ) ∂μ) = ∫ ω, ‖f ω‖ ^ 2 ∂μ := by
+    refine integral_congr_ae ?_
+    filter_upwards with ω
+    rw [Real.rpow_two]
+  have hg_pow :
+      (∫ ω, ‖g ω‖ ^ (2 : ℝ) ∂μ) = ∫ ω, ‖g ω‖ ^ 2 ∂μ := by
+    refine integral_congr_ae ?_
+    filter_upwards with ω
+    rw [Real.rpow_two]
+  simpa [hf_pow, hg_pow, Real.sqrt_eq_rpow] using hholder
+
+/-! Promoted from Staging/integral_norm_sq_lipschitz_sub_scaled_le_two.lean. -/
+
+open MeasureTheory
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: integrated squared mapped mismatch under a scaled input perturbation; orig was the local `hgradient_bound` block, renamed `integral_norm_sq_lipschitz_sub_scaled_le_two`
+-- generality used: an arbitrary measure, a real seminormed input space, a seminormed additive output group, arbitrary random base/reference/perturbation functions, and an a.e. Lipschitz estimate only at the sampled pair; no probability, measurability-space structure on the carriers, inner product, completeness, finite dimension, convexity, smoothness, or oracle assumptions
+-- portable call pattern: stochastic gradient, proximal, and distributed-optimization proofs can change the sample space, measure, Lipschitz map, base and reference processes, perturbation process, scale, and Lipschitz coefficient while retaining the same two-energy control of the mapped mismatch
+-- counterargument checked: this is not paper-local traceability or a pure wrapper because it packages Lipschitz-square transport, the scaled two-term perturbation split, and Bochner integral domination into the recurring L2 energy estimate used by stochastic algorithms
+-- coverage search: queried `integral norm squared Lipschitz upper bound scaled perturbation`, `norm squared Lipschitz sub scalar multiple two`, and the Mathlib semantic equivalent; top partial hits were `LipschitzWith.norm_sub_le`, `lipschitzWith_iff_norm_sub_le`, `SOptLib.norm_add_sq_le_two_mul_norm_sq_add_two_mul_norm_sq`, and oracle-specific second-moment transfer lemmas, with no declaration covering the complete integrated two-energy conclusion
+-- minimal hypotheses: global Lipschitzness is weakened to the a.e. estimate along `c - alpha • eta` and `x`; the measure is arbitrary, the scale and Lipschitz coefficient need no sign assumptions because they enter squared, the two right-hand energies are integrable, and the dominated left-hand square is only assumed a.e. strongly measurable
+
+/-- The integrated squared mismatch of an a.e. Lipschitz map after a scaled
+input perturbation is bounded by twice the base displacement energy plus twice
+the scaled perturbation energy, both multiplied by the squared Lipschitz factor.
+
+Layer: Glue | Gap: Level 1 (integrated Lipschitz scaled-perturbation energy bound)
+Proof: square the pointwise Lipschitz estimate, split the input displacement into the base difference and scaled perturbation with the binary norm-square Young inequality, then integrate the resulting domination and distribute the integral over the two integrable energies.
+Source: Mathlib Bochner integral monotonicity and scalar linearity together with SOptLib's binary norm-square Young inequality
+Used in: stochastic and distributed descent proofs that control a gradient or operator mismatch at a noise-perturbed center by the center-reference energy and the perturbation energy
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/4/proof/4
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem integral_norm_sq_lipschitz_sub_scaled_le_two
+    {Ω E F : Type*} [MeasurableSpace Ω]
+    [SeminormedAddCommGroup E] [NormedSpace ℝ E]
+    [SeminormedAddGroup F]
+    (μ : Measure Ω) (f : E → F) (c x eta : Ω → E) (alpha L : ℝ)
+    (hmap_sq : AEStronglyMeasurable
+      (fun omega => ‖f (c omega - alpha • eta omega) - f (x omega)‖ ^ 2) μ)
+    (hbase_sq : Integrable (fun omega => ‖c omega - x omega‖ ^ 2) μ)
+    (heta_sq : Integrable (fun omega => ‖eta omega‖ ^ 2) μ)
+    (hlip : ∀ᵐ omega ∂μ,
+      ‖f (c omega - alpha • eta omega) - f (x omega)‖ ≤
+        L * ‖(c omega - alpha • eta omega) - x omega‖) :
+    (∫ omega, ‖f (c omega - alpha • eta omega) - f (x omega)‖ ^ 2 ∂μ) ≤
+      2 * L ^ 2 * (∫ omega, ‖c omega - x omega‖ ^ 2 ∂μ) +
+        2 * L ^ 2 * alpha ^ 2 * (∫ omega, ‖eta omega‖ ^ 2 ∂μ) := by
+  have hpoint : ∀ᵐ omega ∂μ,
+      ‖f (c omega - alpha • eta omega) - f (x omega)‖ ^ 2 ≤
+        2 * L ^ 2 * ‖c omega - x omega‖ ^ 2 +
+          2 * L ^ 2 * alpha ^ 2 * ‖eta omega‖ ^ 2 := by
+    filter_upwards [hlip] with omega hlip_omega
+    have hlip_sq :
+        ‖f (c omega - alpha • eta omega) - f (x omega)‖ ^ 2 ≤
+          L ^ 2 * ‖(c omega - alpha • eta omega) - x omega‖ ^ 2 := by
+      have hright_nonneg :
+          0 ≤ L * ‖(c omega - alpha • eta omega) - x omega‖ :=
+        (norm_nonneg _).trans hlip_omega
+      simpa [mul_pow] using
+        ((sq_le_sq₀ (norm_nonneg _) hright_nonneg).2 hlip_omega)
+    have hsplit :
+        (c omega - alpha • eta omega) - x omega =
+          (c omega - x omega) + (-(alpha • eta omega)) := by
+      abel
+    have hperturb :
+        ‖(c omega - alpha • eta omega) - x omega‖ ^ 2 ≤
+          2 * ‖c omega - x omega‖ ^ 2 +
+            2 * alpha ^ 2 * ‖eta omega‖ ^ 2 := by
+      rw [hsplit]
+      have hsum := norm_add_sq_le_two_mul_norm_sq_add_two_mul_norm_sq
+        (c omega - x omega) (-(alpha • eta omega))
+      calc
+        ‖c omega - x omega + -(alpha • eta omega)‖ ^ 2 ≤
+            2 * ‖c omega - x omega‖ ^ 2 +
+              2 * ‖-(alpha • eta omega)‖ ^ 2 := hsum
+        _ = 2 * ‖c omega - x omega‖ ^ 2 +
+            2 * alpha ^ 2 * ‖eta omega‖ ^ 2 := by
+          rw [norm_neg, norm_smul, Real.norm_eq_abs, mul_pow, sq_abs]
+          ring
+    calc
+      ‖f (c omega - alpha • eta omega) - f (x omega)‖ ^ 2 ≤
+          L ^ 2 * ‖(c omega - alpha • eta omega) - x omega‖ ^ 2 := hlip_sq
+      _ ≤ L ^ 2 *
+          (2 * ‖c omega - x omega‖ ^ 2 +
+            2 * alpha ^ 2 * ‖eta omega‖ ^ 2) :=
+        mul_le_mul_of_nonneg_left hperturb (sq_nonneg L)
+      _ = 2 * L ^ 2 * ‖c omega - x omega‖ ^ 2 +
+          2 * L ^ 2 * alpha ^ 2 * ‖eta omega‖ ^ 2 := by
+        ring
+  have hright :=
+    (hbase_sq.const_mul (2 * L ^ 2)).add
+      (heta_sq.const_mul (2 * L ^ 2 * alpha ^ 2))
+  have hmap_sq_int : Integrable
+      (fun omega => ‖f (c omega - alpha • eta omega) - f (x omega)‖ ^ 2) μ :=
+    hright.mono_nonneg hmap_sq
+      (ae_of_all μ fun omega => sq_nonneg
+        ‖f (c omega - alpha • eta omega) - f (x omega)‖)
+      hpoint
+  have hmono := integral_mono_ae hmap_sq_int hright hpoint
+  simpa only [Pi.add_apply,
+    integral_add
+      (hbase_sq.const_mul (2 * L ^ 2))
+      (heta_sq.const_mul (2 * L ^ 2 * alpha ^ 2)),
+    integral_const_mul] using hmono
+
+end SOptLib
+
+/-! Promoted from Staging/memLp_matrix_smulVec_add_of_coordinate_memLp.lean. -/
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: matrix-weighted finite-sum plus coordinate forcing closure for MemLp; orig was an unnamed repeated local proof in `generated_pushpull_coordinate_memLp`
+-- generality used: arbitrary measurable source and measure, finite column index, normed scalar ring, normed additive commutative target group, module structure with bounded scalar action, arbitrary row index and ENNReal exponent; no finite measure, probability, codomain measurable space, completeness, inner product, or finite dimension
+-- portable call pattern: finite-agent stochastic recursions form a changing row of a matrix-weighted state from coordinatewise Lp processes and add a changing coordinate forcing process while the agent types, scalar field, coefficients, processes, exponent, and measure vary
+-- counterargument checked: this is not paper-local traceability; although its proof composes short Mathlib closure edges, no existing declaration exposes the reusable matrix-affine coordinatewise contract needed at recursion call sites
+-- coverage search: searched `MemLp finite matrix weighted sum coordinatewise plus forcing process`, `MemLp finite sum constant scalar multiplication add`, and LeanSearch for finite sums of scalar multiples plus a MemLp process; Mathlib provides only `memLp_finset_sum`, `MemLp.const_smul`, and `MemLp.add`, while SOptLib's closest finite-product theorem transports through a zero-preserving Lipschitz map on a subtype and has a different conclusion
+-- minimal hypotheses: finiteness is required only for the summed column type; every coordinate hypothesis is pointwise in that type, and the selected forcing coordinate alone is assumed MemLp
+
+/-- A matrix-weighted finite sum of coordinatewise `Lᵖ` processes remains in
+`Lᵖ` after adding an `Lᵖ` forcing process at the selected row.
+
+Layer: Glue | Gap: Level 1 (matrix-affine coordinatewise Lp closure)
+Proof: close each deterministic scalar multiple with `MemLp.const_smul`, assemble the finite row sum using `memLp_finset_sum`, and add the selected forcing process with `MemLp.add`.
+Source: Mathlib measure-theoretic `MemLp` closure under deterministic scalar multiplication, finite sums, and addition in `MeasureTheory.Function.LpSeminorm`
+Used in: finite-agent stochastic push-pull, consensus, and gradient-tracking recursions when a matrix-mixed state coordinate is combined with an Lp innovation or forcing coordinate
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/algorithm_spec/steps
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem memLp_matrix_smulVec_add_of_coordinate_memLp
+    {Ω I J 𝕜 E : Type*} [MeasurableSpace Ω] [Fintype J]
+    [NormedRing 𝕜] [NormedAddCommGroup E] [Module 𝕜 E] [IsBoundedSMul 𝕜 E]
+    {μ : Measure Ω} (A : I → J → 𝕜) (X : J → Ω → E)
+    (U : I → Ω → E) (p : ENNReal) (i : I)
+    (hX : ∀ j : J, MemLp (X j) p μ) (hU : MemLp (U i) p μ) :
+    MemLp (fun ω => (∑ j : J, A i j • X j ω) + U i ω) p μ := by
+  classical
+  have hsum : MemLp (fun ω => ∑ j : J, A i j • X j ω) p μ := by
+    apply memLp_finset_sum Finset.univ
+    intro j _hj
+    exact (hX j).const_smul (A i j)
+  exact hsum.add hU
+
+/-! Promoted from Staging/memLp_two_comp_lipschitz_of_finiteMeasure.lean. -/
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: finite-measure L2 preservation under an uncentered Lipschitz
+--   composition; orig was `memLp_two_comp_lipschitz`, renamed to expose the
+--   decisive finite-measure assumption.
+-- generality used: arbitrary measurable source, finite measure, independent
+--   normed additive commutative input and output groups, an NNReal Lipschitz
+--   constant, and an L2 input; no probability, measurable codomain, vector
+--   space, inner-product, completeness, or finite-dimensional structure.
+-- portable call pattern: stochastic-gradient, gradient-tracking, and
+--   distributed-optimization proofs pass changing L2 iterate or state
+--   processes through changing Lipschitz gradient, observation, or correction
+--   maps whose value at zero need not vanish.
+-- counterargument checked: this is not paper-local traceability or a pure
+--   rename; Mathlib's composition theorem requires the map to vanish at zero,
+--   while this result packages centering and finite-measure constant add-back.
+-- coverage search: searched `MemLp composition Lipschitz finite measure without
+--   mapping zero to zero`, `uncentered Lipschitz composition MemLp finite
+--   measure`, and `LipschitzWith comp MemLp finite measure constant add`;
+--   Mathlib `LipschitzWith.comp_memLp` is the closest hit but requires
+--   `f 0 = 0`, while SOptLib's
+--   `integrable_sq_norm_grad_of_lipschitz_grad_centered_l2` has a different
+--   centered-input premise and only a scalar squared-norm conclusion.
+-- minimal hypotheses: all retained hypotheses are used; finite measure is
+--   needed only to add the generally nonzero constant `f 0` back in L2.
+
+/-- An arbitrary Lipschitz map preserves `L²` membership on a finite measure
+space, without requiring the map to vanish at zero.
+
+Layer: Glue | Gap: Level 1 (uncentered Lipschitz composition in L2)
+Proof: subtract the map's value at zero, apply Mathlib's zero-preserving `LipschitzWith.comp_memLp`, and add the constant value back using finite-measure `memLp_const`.
+Source: Mathlib `MeasureTheory.Function.LpSpace.Basic` Lipschitz composition and finite-measure constant `MemLp` APIs
+Used in: stochastic push-pull gradient tracking when L2 node iterates are composed with nonzero component-gradient maps; also in stochastic-gradient and observation models with uncentered Lipschitz outputs
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/algorithm_spec/steps/2
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem memLp_two_comp_lipschitz_of_finiteMeasure
+    {Ω E F : Type*} [MeasurableSpace Ω]
+    [NormedAddCommGroup E] [NormedAddCommGroup F]
+    {μ : Measure Ω} [IsFiniteMeasure μ]
+    (f : E → F) (K : NNReal) (hf : LipschitzWith K f)
+    {X : Ω → E} (hX : MemLp X 2 μ) :
+    MemLp (fun ω => f (X ω)) 2 μ := by
+  have hcentered : LipschitzWith K (fun x => f x - f 0) := by
+    intro x y
+    simpa only [edist_sub_right] using hf x y
+  have hcentered_l2 : MemLp (fun ω => f (X ω) - f 0) 2 μ := by
+    simpa only [Function.comp_apply] using
+      hcentered.comp_memLp (by simp) hX
+  have hsum : MemLp (fun ω => (f (X ω) - f 0) + f 0) 2 μ :=
+    hcentered_l2.add (memLp_const (f 0))
+  refine MemLp.ae_eq ?_ hsum
+  exact Filter.Eventually.of_forall fun ω => by simp
+
+/-! Promoted from Staging/linearResponseTerm_secondMoment_le_of_geometric_action_bounds.lean. -/
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: second-moment bound for one current-or-past linear-response term
+--   under geometric action bounds; orig was `noiseJointCoefficient_expected_frobenius_le`
+-- generality used: an arbitrary measure, finite dependent family of seminormed additive
+--   groups, a time-indexed random input, abstract propagator and innovation maps, an
+--   invariant predicate, nonnegative geometric action constants, integrability of the
+--   input and selected response energies, and one input second-moment budget; no
+--   probability, independence, inner-product, completeness, finite-dimensionality,
+--   network, oracle, convexity, or smoothness assumptions are used
+-- portable call pattern: stable stochastic linear recursions, consensus filters, and
+--   distributed gradient-tracking proofs change the propagator, innovation map, invariant
+--   carrier, geometric constants, random input process, and measure while retaining the
+--   same one-term second-moment conclusion
+-- counterargument checked: this is not paper-local traceability or a pure wrapper because
+--   it composes two root-energy action estimates, squares their geometric gain, transports
+--   the bound through a Bochner integral, and handles the distinct current-input branch;
+--   the underlying response formula is kept inline because a generic propagator/innovation
+--   expression alone would not provide a sufficiently substantive Model API
+-- coverage search: queries `linear response term second moment upper bound geometric action
+--   bounds current past input budget`, `integral squared norm operator action bounded by
+--   squared gain times second moment`, and `piecewise current past geometric response second
+--   moment bound` found Mathlib `ContinuousLinearMap.le_opNorm`, SOptLib
+--   `dependentProductNormSq`, and the staged orthogonal finite-response aggregation theorem,
+--   but no declaration with this one-term current-or-past transfer contract
+-- minimal hypotheses: the source probability measure is weakened to an arbitrary measure;
+--   the common finite-dimensional Hilbert carrier is weakened to a dependent finite family
+--   of seminormed additive groups; only the selected input/response integrability, selected
+--   input moment budget, invariant preservation, and pointwise action bounds are retained
+
+namespace SOptLib
+
+/-- One current-or-past linear-response term has second moment at most the input
+budget times the square of its geometric action gain.
+
+At the current time the response is the input itself.  At a strictly earlier
+time an innovation enters an invariant carrier and is then propagated with a
+geometrically decaying root-energy bound.
+
+Layer: Glue | Gap: Level 1 (current-or-past geometric linear-response second-moment transfer)
+Proof: split on whether the input is current, compose the innovation and propagator root-energy bounds in the past case, square the resulting nonnegative gain, and apply Bochner integral monotonicity followed by the input moment budget.
+Source: Mathlib Bochner integral monotonicity and real square-root order algebra, together with SOptLib finite dependent-product squared energy
+Used in: stable stochastic recursions and distributed gradient-tracking filters when bounding one present or historical random input after a geometrically contractive linear response
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem response_term_second_moment_le_of_geometric_action_bounds
+    {Omega iota : Type*} [MeasurableSpace Omega] [Fintype iota]
+    {E : iota -> Type*} [forall i, SeminormedAddGroup (E i)]
+    (mu : Measure Omega) (xi : Nat -> Omega -> forall i, E i)
+    (propagate : Nat -> Nat -> (forall i, E i) -> forall i, E i)
+    (innovation : Nat -> (forall i, E i) -> forall i, E i)
+    (invariant : (forall i, E i) -> Prop)
+    (K D rate budget : Real) (t j : Nat)
+    (hK : 0 <= K) (hD : 0 <= D) (hrate : 0 <= rate)
+    (hpropagate : forall s n x, invariant x ->
+      Real.sqrt (dependentProductNormSq (propagate s n x)) <=
+        K * rate ^ n * Real.sqrt (dependentProductNormSq x))
+    (hinnovation_invariant : forall s x, invariant (innovation s x))
+    (hinnovation_action : forall s x,
+      Real.sqrt (dependentProductNormSq (innovation s x)) <=
+        D * Real.sqrt (dependentProductNormSq x))
+    (hresponse_integrable : Integrable (fun omega =>
+      dependentProductNormSq
+        (if j = t then xi j omega
+        else propagate (j + 1) (t - 1 - j) (innovation j (xi j omega)))) mu)
+    (hinput_integrable : Integrable (fun omega =>
+      dependentProductNormSq (xi j omega)) mu)
+    (hinput_secondMoment :
+      integral mu (fun omega => dependentProductNormSq (xi j omega)) <= budget) :
+    integral mu (fun omega => dependentProductNormSq
+      (if j = t then xi j omega
+      else propagate (j + 1) (t - 1 - j) (innovation j (xi j omega)))) <=
+      (if j = t then 1
+      else K ^ 2 * D ^ 2 * (rate ^ 2) ^ (t - 1 - j)) * budget := by
+  classical
+  by_cases hjt : j = t
+  · simpa [hjt] using hinput_secondMoment
+  · have hgain_nonneg :
+        0 <= K * rate ^ (t - 1 - j) * D :=
+      mul_nonneg (mul_nonneg hK (pow_nonneg hrate _)) hD
+    have hroot (omega : Omega) :
+        Real.sqrt (dependentProductNormSq
+          (propagate (j + 1) (t - 1 - j) (innovation j (xi j omega)))) <=
+          (K * rate ^ (t - 1 - j) * D) *
+            Real.sqrt (dependentProductNormSq (xi j omega)) := by
+      calc
+        _ <= K * rate ^ (t - 1 - j) *
+              Real.sqrt (dependentProductNormSq (innovation j (xi j omega))) :=
+          hpropagate (j + 1) (t - 1 - j) _
+            (hinnovation_invariant j (xi j omega))
+        _ <= K * rate ^ (t - 1 - j) *
+              (D * Real.sqrt (dependentProductNormSq (xi j omega))) :=
+          mul_le_mul_of_nonneg_left (hinnovation_action j (xi j omega))
+            (mul_nonneg hK (pow_nonneg hrate _))
+        _ = _ := by ring
+    have henergy (omega : Omega) :
+        dependentProductNormSq
+            (propagate (j + 1) (t - 1 - j) (innovation j (xi j omega))) <=
+          (K * rate ^ (t - 1 - j) * D) ^ 2 *
+            dependentProductNormSq (xi j omega) := by
+      have hsquare :=
+        (sq_le_sq₀ (Real.sqrt_nonneg _)
+          (mul_nonneg hgain_nonneg (Real.sqrt_nonneg _))).2 (hroot omega)
+      rw [Real.sq_sqrt (dependentProductNormSq_nonneg _), mul_pow,
+        Real.sq_sqrt (dependentProductNormSq_nonneg _)] at hsquare
+      exact hsquare
+    have hintegral :
+        integral mu (fun omega => dependentProductNormSq
+          (propagate (j + 1) (t - 1 - j) (innovation j (xi j omega)))) <=
+          (K * rate ^ (t - 1 - j) * D) ^ 2 *
+            integral mu (fun omega => dependentProductNormSq (xi j omega)) := by
+      calc
+        _ <= integral mu (fun omega =>
+            (K * rate ^ (t - 1 - j) * D) ^ 2 *
+              dependentProductNormSq (xi j omega)) := by
+          apply integral_mono_ae
+          · simpa [hjt] using hresponse_integrable
+          · exact hinput_integrable.const_mul _
+          · exact Filter.Eventually.of_forall henergy
+        _ = _ := by rw [integral_const_mul]
+    have hscaled :
+        (K * rate ^ (t - 1 - j) * D) ^ 2 *
+            integral mu (fun omega => dependentProductNormSq (xi j omega)) <=
+          (K * rate ^ (t - 1 - j) * D) ^ 2 * budget :=
+      mul_le_mul_of_nonneg_left hinput_secondMoment (sq_nonneg _)
+    calc
+      integral mu (fun omega => dependentProductNormSq
+        (if j = t then xi j omega
+        else propagate (j + 1) (t - 1 - j) (innovation j (xi j omega)))) =
+          integral mu (fun omega => dependentProductNormSq
+            (propagate (j + 1) (t - 1 - j) (innovation j (xi j omega)))) := by
+        simp [hjt]
+      _ <= (K * rate ^ (t - 1 - j) * D) ^ 2 * budget :=
+        hintegral.trans hscaled
+      _ = (if j = t then 1
+          else K ^ 2 * D ^ 2 * (rate ^ 2) ^ (t - 1 - j)) * budget := by
+        simp only [if_neg hjt]
+        rw [mul_pow, mul_pow, ← pow_mul, ← pow_mul]
+        ring
+
+end SOptLib
+
+/-! Promoted from Staging/integral_dependentProductNormSq_le_card_mul_of_coordinate_secondMoment_le.lean. -/
+
+open MeasureTheory
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: cardinality bound for the integrated dependent-product energy from uniform coordinate second moments; orig was noiseTable_expected_frobeniusNormSq_le
+-- generality used: arbitrary measure on a measurable sample type, finite dependent coordinate family of types equipped with norms, coordinate square integrability, and a uniform coordinate integral bound; no probability, oracle, additive-group, inner-product, completeness, or finite-dimensional assumptions
+-- portable call pattern: distributed, block-coordinate, and product-space stochastic algorithms aggregate coordinatewise noise or estimator second-moment budgets into a full finite-product energy bound while changing the coordinate spaces, random process, measure, and common budget
+-- counterargument checked: this is not paper-local traceability or a pure wrapper because it packages the recurring integral/finite-sum interchange and uniform coordinate-budget aggregation for the named dependent-product energy; the closest weighted finite-window theorem uses a common carrier and an explicit weighted sum rather than a dependent product
+-- coverage search: queried `integral dependent product norm squared upper bound finite coordinates uniform second moment` and `integral finite sum coordinate norm squared less than cardinality times uniform bound`; closest hits were `finite_weighted_oracle_second_moment_integral_le`, `integral_scaled_finset_sum_le_scaled_sum_of_integral_bounds`, and `dependentProductNormSq_def`, all partial rather than the dependent-family cardinality contract
+-- minimal hypotheses: source probability, Borel, oracle, common coordinate carrier, inner-product, completeness, and finite-dimensional assumptions were dropped; finite coordinate square integrability and the coordinate integral bounds are exactly those consumed by integral linearity and finite-sum monotonicity
+
+/-- Uniform coordinate second-moment bounds give a cardinality-times-budget
+bound for the integral of finite dependent-product squared energy.
+
+Layer: Glue | Gap: Level 1 (finite dependent-product second-moment aggregation)
+Proof: unfold the dependent-product energy, commute the Bochner integral with
+  the finite coordinate sum using coordinate square integrability, sum the
+  coordinate bounds, and evaluate the constant finite sum by cardinality.
+Source: Mathlib Bochner integral finite-sum linearity and ordered real finite-sum
+  algebra, together with SOptLib finite dependent-product squared energy
+Used in: distributed gradient-tracking and block stochastic algorithms that turn
+  uniform coordinate noise second moments into a full product-state energy budget
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/assumptions/6
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem integral_dependent_product_norm_sq_le_card_mul_of_coordinate_second_moment_le
+    {Omega iota : Type*} [MeasurableSpace Omega] [Fintype iota]
+    {E : iota -> Type*} [forall i, Norm (E i)]
+    (mu : Measure Omega) (X : Omega -> forall i, E i) (C : Real)
+    (hX_int : forall i, Integrable (fun omega => ‖X omega i‖ ^ 2) mu)
+    (hX_bound : forall i, (∫ omega, ‖X omega i‖ ^ 2 ∂mu) <= C) :
+    (∫ omega, SOptLib.dependentProductNormSq (X omega) ∂mu) <=
+      (Fintype.card iota : Real) * C := by
+  classical
+  simp only [SOptLib.dependentProductNormSq_def]
+  rw [MeasureTheory.integral_finset_sum]
+  · calc
+      (∑ i : iota, ∫ omega, ‖X omega i‖ ^ 2 ∂mu) <=
+          ∑ _i : iota, C := by
+        exact Finset.sum_le_sum fun i _hi => hX_bound i
+      _ = (Fintype.card iota : Real) * C := by simp
+  · exact fun i _hi => hX_int i
+
+/-! Promoted from Staging/integral_sq_finset_sum_le_card_sq_mul_of_uniform.lean. -/
+-- Generalization plan (G0):
+-- concept/name: integral square of a finite sum bounded by squared cardinality
+--   times a uniform component budget; orig was
+--   `quadraticRestrictedPeriodNoiseWindowEnvelope_secondMoment_bound`
+-- generality used: arbitrary index and measurable-space types, an arbitrary measure,
+--   a finite index set, and real-valued functions whose squares are integrable;
+--   no probability, finite-measure, nonnegativity, independence, oracle, normed-space,
+--   completeness, or finite-dimensional assumptions are used
+-- portable call pattern: stochastic mini-batch, finite-window noise, and ensemble
+--   process proofs change the finite window, scalar processes, measure, and uniform
+--   component second-moment budget while retaining the same squared-sum integral bound
+-- counterargument checked: this is not paper-local traceability or a pure wrapper;
+--   it packages pointwise finite Cauchy--Schwarz, integral monotonicity, finite-sum
+--   integral exchange, and aggregation of a uniform component budget
+-- coverage search: queries `integral square finite sum bounded by cardinality squared
+--   uniform component integral bound`, `sq sum le card mul sum sq integral finset
+--   uniform bound`, and the Mathlib semantic equivalent found the partial results
+--   `sq_sum_le_card_mul_sum_sq`, `MeasureTheory.integrable_finset_sum`,
+--   `integral_sqrt_sum_sq_norm_le_sqrt_card_mul_sq_of_ae_bound`, and
+--   `integral_inv_card_sum_le_integral_sqrt_sum_sq_div_sqrt_card`, but no declaration
+--   covering the complete arbitrary-measure second-moment contract
+-- minimal hypotheses: square integrability is required only for indices in the supplied
+--   finset and the component integral bound is pointwise on that finset; all stronger
+--   source assumptions and scalar nonnegativity were removed
+
+
+open scoped BigOperators
+
+open MeasureTheory
+
+/-- The integral of the square of a finite sum of real functions is at most the
+square of the cardinality times a uniform bound on the component square integrals.
+
+Layer: Glue | Gap: Level 1 (finite-sum second-moment bound from a uniform component budget)
+Proof: apply `sq_sum_le_card_mul_sum_sq` pointwise under integral monotonicity, commute the finite sum with the integral, and sum the uniform component bounds.
+Source: Mathlib Chebyshev finite-sum inequality and Bochner integral monotonicity, scalar multiplication, and finite-sum linearity
+Used in: stochastic mini-batch and finite noise-window estimates that replace uniformly bounded component second moments by a second-moment bound for their unnormalized aggregate
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/4
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem integral_sq_finset_sum_le_card_sq_mul_of_uniform
+    {Ω ι : Type*} [MeasurableSpace Ω] (μ : Measure Ω) (s : Finset ι)
+    (f : ι → Ω → ℝ) (B : ℝ)
+    (hf_int : ∀ i ∈ s, Integrable (fun ω => f i ω ^ 2) μ)
+    (hf_bound : ∀ i ∈ s, (∫ ω, f i ω ^ 2 ∂μ) ≤ B) :
+    (∫ ω, (∑ i ∈ s, f i ω) ^ 2 ∂μ) ≤ (s.card : ℝ) ^ 2 * B := by
+  have hright_int :
+      Integrable
+        (fun ω =>
+          (s.card : ℝ) * ∑ i ∈ s, f i ω ^ 2) μ :=
+    (integrable_finset_sum s hf_int).const_mul (s.card : ℝ)
+  have hpointwise :
+      (fun ω => (∑ i ∈ s, f i ω) ^ 2) ≤ᵐ[μ]
+        (fun ω => (s.card : ℝ) * ∑ i ∈ s, f i ω ^ 2) :=
+    Filter.Eventually.of_forall fun ω =>
+      sq_sum_le_card_mul_sum_sq
+  calc
+    (∫ ω, (∑ i ∈ s, f i ω) ^ 2 ∂μ) ≤
+        ∫ ω, (s.card : ℝ) * ∑ i ∈ s, f i ω ^ 2 ∂μ :=
+      integral_mono_of_nonneg
+        (Filter.Eventually.of_forall fun ω => sq_nonneg _)
+        hright_int hpointwise
+    _ = (s.card : ℝ) * ∑ i ∈ s, ∫ ω, f i ω ^ 2 ∂μ := by
+      rw [integral_const_mul, integral_finset_sum]
+      exact hf_int
+    _ ≤ (s.card : ℝ) * ((s.card : ℝ) * B) := by
+      apply mul_le_mul_of_nonneg_left _ (Nat.cast_nonneg _)
+      calc
+        ∑ i ∈ s, ∫ ω, f i ω ^ 2 ∂μ ≤ ∑ _i ∈ s, B :=
+          Finset.sum_le_sum fun i hi => hf_bound i hi
+        _ = (s.card : ℝ) * B := by simp
+    _ = (s.card : ℝ) ^ 2 * B := by ring
+
+/-! Promoted from Staging/exists_linear_sum_integral_bound_of_pathwise_initial_add_sum_bound.lean. -/
+
+open MeasureTheory
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: existence of a linear integrated finite-energy budget from an
+--   almost-everywhere initial-plus-forcing sum bound; orig was
+--   `quadratic_restricted_projected_stable_average_duhamel_l2_budget`
+-- generality used: arbitrary parameter and measurable sample types, an arbitrary
+--   measure, real-valued initial, input, and response energies, and nonnegative
+--   scalar coefficients and integral budgets; no probability, independence,
+--   normed-space, finite-dimensional, convexity, or smoothness assumptions are used
+-- portable call pattern: stochastic linear-system, consensus-filter, and recursive-
+--   estimator proofs vary the admissible parameter family, response and forcing
+--   energies, measure, horizon, coefficients, and moment budgets while retaining the
+--   same uniform linear-in-horizon integrated response-energy conclusion
+-- counterargument checked: this is not paper-local traceability or a one-line
+--   wrapper; it packages the expectation lift of an a.e. finite-energy estimate,
+--   both finite-sum integral exchanges, uniform forcing-budget aggregation, and the
+--   final horizon absorption into one reusable contract
+-- coverage search: queries `exists linear sum integral bound pathwise initial plus
+--   finite sum uniform integral bound`, `integral finite sum pointwise bound uniform
+--   moments linear horizon`, and the Mathlib semantic equivalent found
+--   `integral_finset_sum_le_of_pointwise_finset_sum_le`,
+--   `MeasureTheory.integral_finset_sum`, and
+--   `finite_horizon_integral_affine_recursion_le_majorant_sum`; these cover only the
+--   expectation lift, sum exchange, or a one-step affine recurrence, not this
+--   initial-plus-forcing uniform linear-budget composition, so coverage is partial
+-- minimal hypotheses: the parameter predicate records only caller admissibility;
+--   integrability is required separately for the three energy families, the
+--   finite-sum estimate is almost everywhere, and only the coefficient sign
+--   assumptions needed to preserve the two integral bounds are retained
+
+/-- An almost-everywhere initial-plus-forcing finite-energy bound and uniform integral
+budgets yield a response-energy sum bounded linearly in the horizon, uniformly
+over every admissible parameter.
+
+Layer: Glue | Gap: Level 1 (a.e. finite-energy bound to uniform linear integral budget)
+Proof: integrate the a.e. domination by Bochner-integral monotonicity, commute
+  both finite sums with integration, aggregate the uniform input bounds, and absorb
+  the initial and forcing terms into one nonnegative linear constant.
+Source: Mathlib Bochner-integral monotonicity and finite-sum linearity, finite-sum
+  order bounds, and ordered-ring arithmetic
+Used in: stable stochastic linear-system response estimates that combine a
+  deterministic initial-plus-Duhamel forcing-energy bound with uniform initial and
+  innovation second moments before time averaging
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/4
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem exists_linear_sum_integral_bound_of_ae_initial_add_sum_bound
+    {Omega Param : Type*} [MeasurableSpace Omega]
+    (mu : Measure Omega) (admissible : Param -> Prop)
+    (initialEnergy : Param -> Omega -> Real)
+    (inputEnergy responseEnergy : Param -> Nat -> Omega -> Real)
+    (A B Cz Cxi : Real)
+    (hA_nonneg : 0 <= A) (hB_nonneg : 0 <= B)
+    (hinitial_int : forall p, admissible p -> Integrable (initialEnergy p) mu)
+    (hinput_int : forall p, admissible p -> forall k, Integrable (inputEnergy p k) mu)
+    (hresponse_int :
+      forall p, admissible p -> forall t, Integrable (responseEnergy p t) mu)
+    (hae_bound : forall p, admissible p -> forall N,
+      (fun omega =>
+        Finset.sum (Finset.range (N + 1)) (fun t => responseEnergy p t omega)) ≤ᵐ[mu]
+        (fun omega =>
+          A * initialEnergy p omega +
+            B * Finset.sum (Finset.range N) (fun k => inputEnergy p k omega)))
+    (hinitial_bound : forall p, admissible p ->
+      (∫ omega, initialEnergy p omega ∂mu) <= Cz)
+    (hinput_bound : forall p, admissible p -> forall k,
+      (∫ omega, inputEnergy p k omega ∂mu) <= Cxi) :
+    exists C : Real, 0 <= C /\
+      forall p, admissible p -> forall T : Nat,
+        Finset.sum (Finset.range T)
+            (fun t => ∫ omega, responseEnergy p t omega ∂mu) <=
+          C * (T : Real) := by
+  classical
+  let C : Real := |A * Cz| + |B * Cxi|
+  refine ⟨C, ?_, ?_⟩
+  · dsimp [C]
+    positivity
+  intro p hp T
+  cases T with
+  | zero => simp
+  | succ N =>
+  have hN_nonneg : 0 <= (N : Real) := by positivity
+  have hresponse_sum_int :
+      Integrable
+        (fun omega =>
+          Finset.sum (Finset.range (N + 1))
+            (fun t => responseEnergy p t omega)) mu :=
+    integrable_finset_sum (Finset.range (N + 1))
+      (fun t _ht => hresponse_int p hp t)
+  have hinput_sum_int :
+      Integrable
+        (fun omega =>
+          Finset.sum (Finset.range N) (fun k => inputEnergy p k omega)) mu :=
+    integrable_finset_sum (Finset.range N) (fun k _hk => hinput_int p hp k)
+  have hright_int :
+      Integrable
+        (fun omega =>
+          A * initialEnergy p omega +
+            B * Finset.sum (Finset.range N)
+              (fun k => inputEnergy p k omega)) mu :=
+    ((hinitial_int p hp).const_mul A).add (hinput_sum_int.const_mul B)
+  have hmono :
+      (∫ omega,
+          Finset.sum (Finset.range (N + 1))
+            (fun t => responseEnergy p t omega) ∂mu) <=
+        ∫ omega,
+          A * initialEnergy p omega +
+            B * Finset.sum (Finset.range N)
+              (fun k => inputEnergy p k omega) ∂mu :=
+    integral_mono_ae hresponse_sum_int hright_int (hae_bound p hp N)
+  have hinput_sum_bound :
+      Finset.sum (Finset.range N)
+          (fun k => ∫ omega, inputEnergy p k omega ∂mu) <=
+        Cxi * (N : Real) := by
+    calc
+      Finset.sum (Finset.range N)
+          (fun k => ∫ omega, inputEnergy p k omega ∂mu) <=
+          Finset.sum (Finset.range N) (fun _k => Cxi) := by
+        exact Finset.sum_le_sum fun k _hk => hinput_bound p hp k
+      _ = Cxi * (N : Real) := by simp [mul_comm]
+  have hintegral_bound :
+      Finset.sum (Finset.range (N + 1))
+          (fun t => ∫ omega, responseEnergy p t omega ∂mu) <=
+        A * Cz + B * (Cxi * (N : Real)) := by
+    calc
+      Finset.sum (Finset.range (N + 1))
+          (fun t => ∫ omega, responseEnergy p t omega ∂mu) =
+          ∫ omega,
+            Finset.sum (Finset.range (N + 1))
+              (fun t => responseEnergy p t omega) ∂mu := by
+        rw [integral_finset_sum]
+        exact fun t _ht => hresponse_int p hp t
+      _ <= ∫ omega,
+          A * initialEnergy p omega +
+            B * Finset.sum (Finset.range N)
+              (fun k => inputEnergy p k omega) ∂mu := hmono
+      _ = A * (∫ omega, initialEnergy p omega ∂mu) +
+            B * Finset.sum (Finset.range N)
+              (fun k => ∫ omega, inputEnergy p k omega ∂mu) := by
+        rw [integral_add ((hinitial_int p hp).const_mul A)
+          (hinput_sum_int.const_mul B)]
+        rw [integral_const_mul, integral_const_mul, integral_finset_sum]
+        exact fun k _hk => hinput_int p hp k
+      _ <= A * Cz + B * (Cxi * (N : Real)) :=
+        add_le_add
+          (mul_le_mul_of_nonneg_left (hinitial_bound p hp) hA_nonneg)
+          (mul_le_mul_of_nonneg_left hinput_sum_bound hB_nonneg)
+  have habs_bound :
+      A * Cz + B * (Cxi * (N : Real)) <=
+        |A * Cz| + |B * Cxi| * (N : Real) := by
+    rw [← mul_assoc B Cxi (N : Real)]
+    exact add_le_add (le_abs_self (A * Cz))
+      (mul_le_mul_of_nonneg_right (le_abs_self (B * Cxi)) hN_nonneg)
+  calc
+    Finset.sum (Finset.range (N + 1))
+        (fun t => ∫ omega, responseEnergy p t omega ∂mu) <=
+        A * Cz + B * (Cxi * (N : Real)) := hintegral_bound
+    _ <= |A * Cz| + |B * Cxi| * (N : Real) := habs_bound
+    _ <= (|A * Cz| + |B * Cxi|) * ((N + 1 : Nat) : Real) := by
+      push_cast
+      nlinarith [abs_nonneg (A * Cz), abs_nonneg (B * Cxi)]
+    _ = C * ((N + 1 : Nat) : Real) := by rfl
+
+/-! Promoted from Staging/integral_sq_affine_forcing_sum_le_of_parts.lean. -/
+-- Generalization plan (G0):
+-- concept/name: integrated square budget for an affine forcing from separate
+--   component budgets; orig was `slow_ar_difference_forcing_square_sum_bound_of_parts`
+-- generality used: arbitrary measurable sample type and measure, real-valued base
+--   and residual processes, a scalar coefficient with a scale-sensitive bound, and
+--   prefix second-moment budgets; no probability, finite-measure, independence,
+--   normed-space, completeness, or finite-dimensional assumptions are used
+-- portable call pattern: stochastic recurrence, perturbed linear-system, and
+--   tracking-error proofs change the coefficient, scale, component processes,
+--   measure, and component energy constants while retaining the same affine-forcing
+--   prefix-energy conclusion
+-- counterargument checked: this is not paper-local traceability or a pure wrapper;
+--   it packages pointwise squared-sum domination, Bochner integral monotonicity,
+--   prefix aggregation, coefficient scaling, and two energy budgets
+-- coverage search: queries `integral squared affine sum upper bound component energy
+--   budgets coefficient bound`, `finite prefix sum integral square linear combination
+--   bounded by two component sums`, and the Mathlib semantic equivalent found only
+--   partial results such as `MeasureTheory.integral_finset_sum`,
+--   `MeasureTheory.memLp_two_iff_integrable_sq`, and finite-sum Cauchy--Schwarz
+--   inequalities; no Mathlib or SOptLib declaration covers the complete contract
+-- minimal hypotheses: the source's probability-measure instance and nonnegativity
+--   assumptions on the two budget constants and separate affine-square integrability
+--   are removed; only the two component squares must be integrable
+
+
+open MeasureTheory
+open scoped BigOperators
+
+/-- Separate prefix second-moment budgets control the integrated squared energy of a
+scaled base process plus a residual process.
+
+Layer: Glue | Gap: Level 1 (affine-forcing prefix energy from component budgets)
+Proof: dominate each squared affine sum by twice the two component squares, integrate and sum the pointwise bounds, then combine the coefficient-scale estimate with the two supplied prefix budgets.
+Source: Mathlib absolute-value triangle inequality, ordered powers, Bochner integral monotonicity and linearity, and finite-sum order arithmetic
+Used in: stochastic recurrence and perturbed linear-system comparisons that combine a scale-small multiplier error acting on a base process with a separately controlled residual forcing
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/6
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem integral_sq_affine_forcing_sum_le_of_parts
+    {Ω : Type*} [MeasurableSpace Ω] (μ : Measure Ω)
+    {coeffScale alpha Cbase Cres coeff : ℝ}
+    (hcoeff_bound : |coeff| ≤ coeffScale * alpha ^ 2)
+    (base residual : Ω → ℕ → ℝ)
+    (hbase_sq_int :
+      ∀ k : ℕ, Integrable (fun ω : Ω => |base ω k| ^ 2) μ)
+    (hresidual_sq_int :
+      ∀ k : ℕ, Integrable (fun ω : Ω => |residual ω k| ^ 2) μ)
+    (hbase_sum_bound :
+      ∀ N : ℕ,
+        Finset.sum (Finset.range N) (fun k =>
+          ∫ ω, |base ω k| ^ 2 ∂μ) ≤
+          Cbase * (N : ℝ))
+    (hresidual_sum_bound :
+      ∀ N : ℕ,
+        Finset.sum (Finset.range N) (fun k =>
+          ∫ ω, |residual ω k| ^ 2 ∂μ) ≤
+          Cres * alpha ^ 4 * (N : ℝ)) :
+    ∀ N : ℕ,
+      Finset.sum (Finset.range N) (fun k =>
+        ∫ ω, |coeff * base ω k + residual ω k| ^ 2 ∂μ) ≤
+        (2 * coeffScale ^ 2 * Cbase + 2 * Cres) *
+          alpha ^ 4 * (N : ℝ) := by
+  classical
+  have hcoeff_sq :
+      coeff ^ 2 ≤ coeffScale ^ 2 * alpha ^ 4 := by
+    have hsq :=
+      pow_le_pow_left₀ (abs_nonneg coeff) hcoeff_bound 2
+    calc
+      coeff ^ 2 = |coeff| ^ 2 := by rw [sq_abs]
+      _ ≤ (coeffScale * alpha ^ 2) ^ 2 := hsq
+      _ = coeffScale ^ 2 * alpha ^ 4 := by ring
+  have hcoeff_budget_nonneg : 0 ≤ coeffScale ^ 2 * alpha ^ 4 := by
+    positivity
+  intro N
+  have hterm_bound :
+      ∀ k : ℕ,
+        (∫ ω, |coeff * base ω k + residual ω k| ^ 2 ∂μ) ≤
+          2 * coeff ^ 2 * (∫ ω, |base ω k| ^ 2 ∂μ) +
+            2 * (∫ ω, |residual ω k| ^ 2 ∂μ) := by
+    intro k
+    let upper : Ω → ℝ := fun ω =>
+      2 * coeff ^ 2 * |base ω k| ^ 2 +
+        2 * |residual ω k| ^ 2
+    have hupper_int : Integrable upper μ := by
+      exact ((hbase_sq_int k).const_mul (2 * coeff ^ 2)).add
+        ((hresidual_sq_int k).const_mul 2)
+    have hmono :
+        (∫ ω, |coeff * base ω k + residual ω k| ^ 2 ∂μ) ≤
+          ∫ ω, upper ω ∂μ := by
+      exact integral_mono_of_nonneg
+        (Filter.Eventually.of_forall fun ω => sq_nonneg _)
+        hupper_int
+        (Filter.Eventually.of_forall fun ω => by
+          have hle :
+              |coeff * base ω k + residual ω k| ≤
+                |coeff * base ω k| + |residual ω k| :=
+            abs_add_le _ _
+          have hsq_le :
+              |coeff * base ω k + residual ω k| ^ 2 ≤
+                (|coeff * base ω k| + |residual ω k|) ^ 2 :=
+            pow_le_pow_left₀ (abs_nonneg _) hle 2
+          have hcross :
+              0 ≤ (|coeff * base ω k| - |residual ω k|) ^ 2 :=
+            sq_nonneg _
+          have hbasic :
+              |coeff * base ω k + residual ω k| ^ 2 ≤
+                2 * |coeff * base ω k| ^ 2 +
+                  2 * |residual ω k| ^ 2 := by
+            nlinarith
+          have hmul :
+              |coeff * base ω k| ^ 2 =
+                coeff ^ 2 * |base ω k| ^ 2 := by
+            rw [abs_mul, mul_pow, sq_abs]
+          dsimp [upper]
+          rw [hmul] at hbasic
+          simpa [mul_assoc] using hbasic)
+    calc
+      (∫ ω, |coeff * base ω k + residual ω k| ^ 2 ∂μ) ≤
+          ∫ ω, upper ω ∂μ := hmono
+      _ = 2 * coeff ^ 2 * (∫ ω, |base ω k| ^ 2 ∂μ) +
+            2 * (∫ ω, |residual ω k| ^ 2 ∂μ) := by
+        dsimp [upper]
+        rw [integral_add]
+        · rw [integral_const_mul, integral_const_mul]
+        · exact (hbase_sq_int k).const_mul (2 * coeff ^ 2)
+        · exact (hresidual_sq_int k).const_mul 2
+  have hsum_terms :
+      Finset.sum (Finset.range N) (fun k =>
+        ∫ ω, |coeff * base ω k + residual ω k| ^ 2 ∂μ) ≤
+        2 * coeff ^ 2 *
+            Finset.sum (Finset.range N) (fun k =>
+              ∫ ω, |base ω k| ^ 2 ∂μ) +
+          2 * Finset.sum (Finset.range N) (fun k =>
+              ∫ ω, |residual ω k| ^ 2 ∂μ) := by
+    calc
+      Finset.sum (Finset.range N) (fun k =>
+          ∫ ω, |coeff * base ω k + residual ω k| ^ 2 ∂μ) ≤
+          Finset.sum (Finset.range N) (fun k =>
+            2 * coeff ^ 2 * (∫ ω, |base ω k| ^ 2 ∂μ) +
+              2 * (∫ ω, |residual ω k| ^ 2 ∂μ)) :=
+        Finset.sum_le_sum fun k _hk => hterm_bound k
+      _ = 2 * coeff ^ 2 *
+            Finset.sum (Finset.range N) (fun k =>
+              ∫ ω, |base ω k| ^ 2 ∂μ) +
+          2 * Finset.sum (Finset.range N) (fun k =>
+              ∫ ω, |residual ω k| ^ 2 ∂μ) := by
+        simp [Finset.sum_add_distrib, Finset.mul_sum, mul_assoc]
+  have hbase_sum_nonneg :
+      0 ≤ Finset.sum (Finset.range N) (fun k =>
+        ∫ ω, |base ω k| ^ 2 ∂μ) := by
+    exact Finset.sum_nonneg fun k _hk =>
+      integral_nonneg fun ω => sq_nonneg |base ω k|
+  have hbase_part :
+      2 * coeff ^ 2 *
+          Finset.sum (Finset.range N) (fun k =>
+            ∫ ω, |base ω k| ^ 2 ∂μ) ≤
+        2 * coeffScale ^ 2 * Cbase * alpha ^ 4 * (N : ℝ) := by
+    calc
+      2 * coeff ^ 2 *
+          Finset.sum (Finset.range N) (fun k =>
+            ∫ ω, |base ω k| ^ 2 ∂μ) ≤
+          2 * (coeffScale ^ 2 * alpha ^ 4) *
+            (Cbase * (N : ℝ)) := by
+        exact mul_le_mul
+          (mul_le_mul_of_nonneg_left hcoeff_sq (by norm_num))
+          (hbase_sum_bound N) hbase_sum_nonneg
+          (mul_nonneg (by norm_num) hcoeff_budget_nonneg)
+      _ = 2 * coeffScale ^ 2 * Cbase * alpha ^ 4 * (N : ℝ) := by
+        ring
+  have hresidual_part :
+      2 * Finset.sum (Finset.range N) (fun k =>
+          ∫ ω, |residual ω k| ^ 2 ∂μ) ≤
+        2 * Cres * alpha ^ 4 * (N : ℝ) := by
+    calc
+      2 * Finset.sum (Finset.range N) (fun k =>
+          ∫ ω, |residual ω k| ^ 2 ∂μ) ≤
+          2 * (Cres * alpha ^ 4 * (N : ℝ)) :=
+        mul_le_mul_of_nonneg_left (hresidual_sum_bound N) (by norm_num)
+      _ = 2 * Cres * alpha ^ 4 * (N : ℝ) := by ring
+  calc
+    Finset.sum (Finset.range N) (fun k =>
+        ∫ ω, |coeff * base ω k + residual ω k| ^ 2 ∂μ) ≤
+        2 * coeff ^ 2 *
+            Finset.sum (Finset.range N) (fun k =>
+              ∫ ω, |base ω k| ^ 2 ∂μ) +
+          2 * Finset.sum (Finset.range N) (fun k =>
+              ∫ ω, |residual ω k| ^ 2 ∂μ) := hsum_terms
+    _ ≤ 2 * coeffScale ^ 2 * Cbase * alpha ^ 4 * (N : ℝ) +
+          2 * Cres * alpha ^ 4 * (N : ℝ) :=
+      add_le_add hbase_part hresidual_part
+    _ = (2 * coeffScale ^ 2 * Cbase + 2 * Cres) *
+          alpha ^ 4 * (N : ℝ) := by ring
+
+/-! Promoted from Staging/abs_integral_le_linear_scale_of_geometric_convolution_envelope.lean. -/
+
+open MeasureTheory
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: absolute mean bound from a linearly scaled geometric-convolution
+--   envelope; orig was the `hpoint` through `hmean_abs` local proof block in
+--   `quadratic_restricted_stable_boundary_output_mean_abs_le_linear_stepsize`.
+-- generality used: real-valued functions on an arbitrary measurable space with
+--   an arbitrary probability measure; no algorithm, oracle, independence,
+--   convexity, smoothness, or finite-dimensional assumptions are used.
+-- portable call pattern: a stable stochastic linear recursion changes its
+--   output process, initial envelope size, contraction, forcing process, and
+--   uniform first-moment bound while retaining the same explicit linear-scale
+--   absolute expectation bound.
+-- counterargument checked: this is not a caller-side expression or thin rename;
+--   it composes pathwise domination, Bochner integrability, finite-sum integral
+--   exchange, and a uniform geometric-gain estimate. Existing APIs cover only
+--   the individual integral or deterministic geometric-sum steps.
+-- coverage search: symbol queries for "absolute integral upper bound pathwise
+--   geometric convolution envelope uniform integral bound" and "integral
+--   geometric convolution bounded forcing mean linear scale" found only
+--   `linearDuhamelResponse_norm_le_geometric_convolution` and square-energy
+--   variants; Mathlib semantic search found general norm/absolute integral
+--   bounds. `sum_range_geometric_reverse_mul_le_div_one_sub` covers the final
+--   deterministic series bound, so coverage is partial rather than duplicate.
+-- minimal hypotheses: probability normalization is used for the constant
+--   initial envelope; integrability is required only for the output and each
+--   forcing term; all sign and contraction assumptions are used by monotonicity
+--   or the geometric bound.
+
+/-- A pathwise linearly scaled geometric-convolution envelope with uniformly
+bounded forcing means gives an explicit linear-scale bound on the absolute mean.
+
+Layer: Glue | Gap: Level 1 (absolute mean bound for a geometric-convolution envelope)
+Proof: integrate the pathwise envelope using Bochner integral monotonicity,
+  exchange the finite forcing sum with the integral, and bound its mean by the
+  reversed finite geometric-series estimate.
+Source: Mathlib Bochner integral monotonicity and finite-sum linearity, together
+  with the discrete geometric-series gain bound
+Used in: stable stochastic linear-recursion proofs that turn a pathwise impulse
+  envelope and uniform forcing first moments into a pointwise-in-time mean bound
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/3
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem abs_integral_le_linear_scale_of_geometric_convolution_envelope
+    {Ω : Type*} [MeasurableSpace Ω]
+    (μ : Measure Ω) [IsProbabilityMeasure μ]
+    (out : Ω → ℝ) (Z : Ω → ℕ → ℝ)
+    (scale theta A L : ℝ) (k : ℕ)
+    (hout : Integrable out μ)
+    (hZ_int : ∀ j < k, Integrable (fun ω => Z ω j) μ)
+    (hscale_nonneg : 0 ≤ scale)
+    (htheta_nonneg : 0 ≤ theta) (htheta_lt_one : theta < 1)
+    (hA_nonneg : 0 ≤ A) (hL_nonneg : 0 ≤ L)
+    (hZ_integral_le : ∀ j < k, (∫ ω, Z ω j ∂μ) ≤ L)
+    (hpoint : ∀ᵐ ω ∂μ,
+      |out ω| ≤ scale *
+        (theta ^ k * A + Finset.sum (Finset.range k) (fun j =>
+          theta ^ (k - 1 - j) * Z ω j))) :
+    |∫ ω, out ω ∂μ| ≤ scale * (A + L / (1 - theta)) := by
+  let env : Ω → ℝ := fun ω =>
+    theta ^ k * A + Finset.sum (Finset.range k) (fun j =>
+      theta ^ (k - 1 - j) * Z ω j)
+  have henv_int : Integrable env μ := by
+    have hsum_int : Integrable (fun ω : Ω =>
+        Finset.sum (Finset.range k) (fun j =>
+          theta ^ (k - 1 - j) * Z ω j)) μ := by
+      exact integrable_finset_sum (Finset.range k) (fun j _ =>
+        (hZ_int j (Finset.mem_range.mp ‹j ∈ Finset.range k›)).const_mul
+          (theta ^ (k - 1 - j)))
+    exact (integrable_const (theta ^ k * A)).add hsum_int
+  have henv_integral_le : (∫ ω, env ω ∂μ) ≤ A + L / (1 - theta) := by
+    have hforcing_integral_le :
+        Finset.sum (Finset.range k) (fun j =>
+            theta ^ (k - 1 - j) * (∫ ω, Z ω j ∂μ)) ≤
+          Finset.sum (Finset.range k) (fun j =>
+            theta ^ (k - 1 - j) * L) := by
+      apply Finset.sum_le_sum
+      intro j hj
+      exact mul_le_mul_of_nonneg_left (hZ_integral_le j (Finset.mem_range.mp hj))
+        (pow_nonneg htheta_nonneg (k - 1 - j))
+    have hgeom :
+        Finset.sum (Finset.range k) (fun j =>
+          theta ^ (k - 1 - j) * L) ≤ L / (1 - theta) :=
+      sum_range_geometric_reverse_mul_le_div_one_sub
+        theta L k htheta_nonneg htheta_lt_one hL_nonneg
+    calc
+      (∫ ω, env ω ∂μ) =
+          theta ^ k * A + Finset.sum (Finset.range k) (fun j =>
+            theta ^ (k - 1 - j) * (∫ ω, Z ω j ∂μ)) := by
+            rw [MeasureTheory.integral_add]
+            · rw [MeasureTheory.integral_const]
+              simp
+              rw [MeasureTheory.integral_finset_sum]
+              · apply Finset.sum_congr rfl
+                intro j _
+                rw [MeasureTheory.integral_const_mul]
+              · intro j _
+                exact (hZ_int j (Finset.mem_range.mp ‹j ∈ Finset.range k›)).const_mul
+                  (theta ^ (k - 1 - j))
+            · exact integrable_const _
+            · exact integrable_finset_sum (Finset.range k) (fun j _ =>
+                (hZ_int j (Finset.mem_range.mp ‹j ∈ Finset.range k›)).const_mul
+                  (theta ^ (k - 1 - j)))
+      _ ≤ A + L / (1 - theta) := by
+            have hpow_le : theta ^ k * A ≤ A := by
+              have htheta_le_one : theta ≤ 1 := le_of_lt htheta_lt_one
+              have hpow_le_one : theta ^ k ≤ 1 :=
+                pow_le_one₀ htheta_nonneg htheta_le_one
+              exact mul_le_of_le_one_left hA_nonneg hpow_le_one
+            exact add_le_add hpow_le (le_trans hforcing_integral_le hgeom)
+  calc
+    |∫ ω, out ω ∂μ| ≤ ∫ ω, |out ω| ∂μ := abs_integral_le_integral_abs
+    _ ≤ ∫ ω, scale * env ω ∂μ := by
+      exact integral_mono_ae hout.abs (henv_int.const_mul scale) hpoint
+    _ = scale * (∫ ω, env ω ∂μ) := by
+      rw [MeasureTheory.integral_const_mul]
+    _ ≤ scale * (A + L / (1 - theta)) :=
+      mul_le_mul_of_nonneg_left henv_integral_le hscale_nonneg
+
+/-! Promoted from Staging/integral_sum_sq_le_of_abs_le_scaled_geometric_impulse.lean. -/
+
+open MeasureTheory
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: integrated finite-horizon squared-energy bound under a scaled
+--   geometric-impulse absolute-value envelope; orig was
+--   `stable_output_square_integral_sum_bound_of_geometric_impulse`
+-- generality used: arbitrary measurable sample type, probability measure,
+--   real-valued output and forcing processes, two unrestricted real scale
+--   factors, a nonnegative contraction below one, and integrable output and
+--   forcing squares; no independence, optimization, normed-space,
+--   completeness, or finite-dimensional assumptions are used
+-- portable call pattern: stochastic stable-filter, consensus, and tracking-
+--   error proofs vary the probability space, output, forcing, gain, stepsize,
+--   contraction, initial envelope, forcing budget, and horizon while retaining
+--   the same pathwise-envelope-to-integrated-energy step
+-- counterargument checked: this is not paper-local traceability or a pure
+--   wrapper; it composes the deterministic geometric-impulse energy theorem
+--   with finite-sum Bochner integration, integral monotonicity, probability
+--   normalization, and a linear forcing second-moment budget
+-- coverage search: searches for `integral finite sum squares upper bound
+--   pointwise absolute scaled geometric convolution impulse second moment
+--   budget`, `sum integrals squared output bounded geometric impulse forcing
+--   integral budget`, and `integral finite sum inequality pointwise bound
+--   integrable finite sum` found `sum_sq_le_of_abs_le_scaled_geometric_impulse`
+--   and `expectation_le_sum_expectation_of_ae_le_finset_sum` as strict partial
+--   matches; no Mathlib or SOptLib declaration has the complete contract
+-- minimal hypotheses: source assumptions `0 <= C` and `0 <= alpha` are removed,
+--   and `0 < theta` is weakened to `0 <= theta`; probability normalization is
+--   retained because the deterministic initial contribution is not multiplied
+--   by the mass of the measure
+
+/-- A scaled geometric-impulse envelope and a linear forcing second-moment
+budget control the integrated finite-horizon squared output energy.
+
+Layer: Glue | Gap: Level 1 (integrated geometric-impulse energy from a forcing moment budget)
+Proof: Apply `sum_sq_le_of_abs_le_scaled_geometric_impulse` samplewise, integrate the resulting finite-sum inequality, commute the Bochner integral through the finite sums, and substitute the linear forcing second-moment budget.
+Source: discrete Young convolution energy bounds and Mathlib Bochner integral monotonicity, finite-sum linearity, scalar linearity, and probability-measure constant integration
+Used in: stochastic stable-system and distributed tracking analyses after a pathwise geometric impulse estimate and before finite-horizon averaging
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/4
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem integral_sum_sq_le_of_abs_le_scaled_geometric_impulse
+    {Ω : Type*} [MeasurableSpace Ω] (μ : Measure Ω)
+    [IsProbabilityMeasure μ]
+    (out window : Ω → ℕ → ℝ)
+    (C alpha theta A Cwin : ℝ) (T : ℕ)
+    (htheta_nonneg : 0 ≤ theta) (htheta_lt_one : theta < 1)
+    (hA_nonneg : 0 ≤ A)
+    (hwindow_nonneg : ∀ ω k, k ∈ Finset.range (T - 1) → 0 ≤ window ω k)
+    (hout : ∀ ω t, t ∈ Finset.range T →
+      |out ω t| ≤
+        C * alpha *
+          (theta ^ t * A +
+            Finset.sum (Finset.range t) (fun j =>
+              theta ^ (t - 1 - j) * window ω j)))
+    (hout_int : ∀ t ∈ Finset.range T,
+      Integrable (fun ω => |out ω t| ^ 2) μ)
+    (hwindow_sq_int :
+      ∀ k ∈ Finset.range (T - 1),
+        Integrable (fun ω => window ω k ^ 2) μ)
+    (hwindow_sum_bound :
+      Finset.sum (Finset.range (T - 1)) (fun k =>
+        ∫ ω, window ω k ^ 2 ∂μ) ≤ (T : ℝ) * Cwin) :
+    Finset.sum (Finset.range T) (fun t =>
+        ∫ ω, |out ω t| ^ 2 ∂μ) ≤
+      (C ^ 2 * alpha ^ 2) *
+        ((2 / (1 - theta ^ 2)) * A ^ 2 +
+          (2 / (1 - theta) ^ 2) * ((T : ℝ) * Cwin)) := by
+  classical
+  rcases T.eq_zero_or_pos with rfl | hT_pos_nat
+  · simp only [Finset.range_zero, Finset.sum_empty, Nat.cast_zero, zero_mul,
+      mul_zero, add_zero]
+    have htheta_sq_lt_one : theta ^ 2 < (1 : ℝ) := by
+      simpa using (sq_lt_sq₀ htheta_nonneg (by norm_num)).2 htheta_lt_one
+    exact mul_nonneg (mul_nonneg (sq_nonneg C) (sq_nonneg alpha))
+      (mul_nonneg (div_nonneg (by norm_num) (sub_nonneg.mpr htheta_sq_lt_one.le))
+        (sq_nonneg A))
+  let N : ℕ := T - 1
+  have hT_eq : N + 1 = T := by
+    dsimp [N]
+    exact Nat.succ_pred_eq_of_pos hT_pos_nat
+  have hpoint :
+      ∀ ω : Ω,
+        Finset.sum (Finset.range T) (fun t => |out ω t| ^ 2) ≤
+          (C ^ 2 * alpha ^ 2) *
+            ((2 / (1 - theta ^ 2)) * A ^ 2 +
+              (2 / (1 - theta) ^ 2) *
+                Finset.sum (Finset.range N) (fun j => window ω j ^ 2)) := by
+    intro ω
+    have hsq :=
+      sum_sq_le_of_abs_le_scaled_geometric_impulse
+        (fun t => out ω t) (fun k => window ω k)
+        C alpha theta A N htheta_nonneg htheta_lt_one hA_nonneg
+        (fun k hk => hwindow_nonneg ω k (by simpa [N] using hk))
+        (fun t ht => hout ω t (by simpa [hT_eq] using ht))
+    simpa [hT_eq] using hsq
+  have hleft_int :
+      Integrable
+        (fun ω : Ω =>
+          Finset.sum (Finset.range T) (fun t => |out ω t| ^ 2)) μ := by
+    exact integrable_finset_sum (Finset.range T)
+      (fun t ht => hout_int t ht)
+  have hwindow_sum_int :
+      Integrable
+        (fun ω : Ω =>
+          Finset.sum (Finset.range N) (fun j => window ω j ^ 2)) μ := by
+    exact integrable_finset_sum (Finset.range N)
+      (fun j hj => hwindow_sq_int j (by simpa [N] using hj))
+  have hright_int :
+      Integrable
+        (fun ω : Ω =>
+          (C ^ 2 * alpha ^ 2) *
+            ((2 / (1 - theta ^ 2)) * A ^ 2 +
+              (2 / (1 - theta) ^ 2) *
+                Finset.sum (Finset.range N) (fun j => window ω j ^ 2))) μ := by
+    exact
+      ((integrable_const ((2 / (1 - theta ^ 2)) * A ^ 2)).add
+        (hwindow_sum_int.const_mul (2 / (1 - theta) ^ 2))).const_mul
+          (C ^ 2 * alpha ^ 2)
+  have hmono :
+      (∫ ω,
+        Finset.sum (Finset.range T) (fun t => |out ω t| ^ 2) ∂μ) ≤
+        ∫ ω,
+          (C ^ 2 * alpha ^ 2) *
+            ((2 / (1 - theta ^ 2)) * A ^ 2 +
+              (2 / (1 - theta) ^ 2) *
+                Finset.sum (Finset.range N) (fun j => window ω j ^ 2)) ∂μ := by
+    exact integral_mono_ae hleft_int hright_int
+      (Filter.Eventually.of_forall hpoint)
+  have hcoef_nonneg : 0 ≤ 2 / (1 - theta) ^ 2 := by
+    have hden_pos : 0 < (1 - theta) ^ 2 := by
+      apply sq_pos_of_ne_zero
+      linarith
+    positivity
+  have hwindow_N_le_T :
+      Finset.sum (Finset.range N) (fun k =>
+          ∫ ω, window ω k ^ 2 ∂μ) ≤ (T : ℝ) * Cwin := by
+    simpa [N] using hwindow_sum_bound
+  have hinside_le :
+      (2 / (1 - theta ^ 2)) * A ^ 2 +
+          (2 / (1 - theta) ^ 2) *
+            Finset.sum (Finset.range N) (fun k =>
+              ∫ ω, window ω k ^ 2 ∂μ) ≤
+        (2 / (1 - theta ^ 2)) * A ^ 2 +
+          (2 / (1 - theta) ^ 2) * ((T : ℝ) * Cwin) := by
+    exact add_le_add (le_refl ((2 / (1 - theta ^ 2)) * A ^ 2))
+      (mul_le_mul_of_nonneg_left hwindow_N_le_T hcoef_nonneg)
+  calc
+    Finset.sum (Finset.range T) (fun t =>
+        ∫ ω, |out ω t| ^ 2 ∂μ) =
+        ∫ ω, Finset.sum (Finset.range T) (fun t => |out ω t| ^ 2) ∂μ := by
+          rw [integral_finset_sum]
+          exact fun t ht => hout_int t ht
+    _ ≤ ∫ ω,
+          (C ^ 2 * alpha ^ 2) *
+            ((2 / (1 - theta ^ 2)) * A ^ 2 +
+              (2 / (1 - theta) ^ 2) *
+                Finset.sum (Finset.range N) (fun j => window ω j ^ 2)) ∂μ :=
+          hmono
+    _ =
+        (C ^ 2 * alpha ^ 2) *
+          ((2 / (1 - theta ^ 2)) * A ^ 2 +
+            (2 / (1 - theta) ^ 2) *
+              Finset.sum (Finset.range N) (fun j =>
+                ∫ ω, window ω j ^ 2 ∂μ)) := by
+          rw [integral_const_mul]
+          rw [integral_add]
+          · rw [integral_const]
+            rw [integral_const_mul]
+            rw [integral_finset_sum]
+            · simp
+            · exact fun j hj => hwindow_sq_int j (by simpa [N] using hj)
+          · exact integrable_const _
+          · exact hwindow_sum_int.const_mul (2 / (1 - theta) ^ 2)
+    _ ≤
+        (C ^ 2 * alpha ^ 2) *
+          ((2 / (1 - theta ^ 2)) * A ^ 2 +
+            (2 / (1 - theta) ^ 2) * ((T : ℝ) * Cwin)) := by
+          exact mul_le_mul_of_nonneg_left hinside_le
+            (mul_nonneg (sq_nonneg C) (sq_nonneg alpha))
+
+/-! Promoted from Staging/finite_average_integral_norm_sq_block_mismatch_pair_le_of_average_bound.lean. -/
+
+open MeasureTheory
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: paired normalized finite-horizon integral squared-norm bounds
+--   for floor-divided stride mismatch and same-time floor-block mismatch; orig
+--   was `stable_phase_remainder_components_average_bound`
+-- generality used: an arbitrary measure, a seminormed additive commutative
+--   group, a positive natural period, and horizon-local raw squared-norm
+--   integrability; no probability, scalar action, inner product, completeness,
+--   finite-dimensionality, convexity, smoothness, or oracle assumptions
+-- portable call pattern: periodic, epoch, and mini-batch stochastic-process
+--   proofs change the process, measure, period, horizon, and uniform raw
+--   second-moment budget while reusing the paired phase and within-block bounds
+-- counterargument checked: the result composes three independently useful
+--   aggregation steps and is not paper-local traceability; the already staged
+--   stride and floor-block theorems each return only one component, while this
+--   contract additionally floor-divides the stride-mismatch index and returns
+--   both estimates from one shared hypothesis bundle
+-- coverage search: symbol queries for `finite average integral norm squared
+--   block mismatch pair upper bound average second moment` and `floor division
+--   sampled stride mismatch and same time floor block mismatch paired bound`,
+--   plus a Mathlib semantic search for the paired contract, found the strict
+--   components `finite_average_integral_norm_sq_stride_mismatch_le`,
+--   `finite_average_integral_norm_sq_floor_block_mismatch_le_of_average_bound`,
+--   and `normalized_sum_le_period_mul_of_floor_div_majorant`, but no declaration
+--   with the complete paired conclusion
+-- minimal hypotheses: positivity of the period, raw squared-norm integrability
+--   only below `T * p`, and raw normalized bounds only at `T` and `T * p`;
+--   the source probability instance, global and mismatch integrability,
+--   threshold scale, and factorization `C * alpha ^ 2` are unused
+
+/-- Raw second-moment bounds at a horizon and its period enlargement jointly
+control the floor-divided stride mismatch and the same-time floor-block
+mismatch of a normed process.
+
+Layer: Glue | Gap: Level 1 (paired integrated periodic block-mismatch bounds)
+Proof: apply the integrated positive-stride mismatch bound, propagate it through floor division with the normalized block-majorant theorem, and pair the result with the integrated floor-block mismatch bound.
+Source: Mathlib Bochner integral nonnegativity and seminormed additive groups, together with finite-range positive-stride and floor-division aggregation
+Used in: periodic, epoch, and mini-batch stochastic-process remainder estimates that need both a sampled block-phase mismatch and a current-time within-block mismatch from one raw second-moment budget
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/6
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem finite_average_integral_norm_sq_block_mismatch_pair_le_of_average_bound
+    {Omega E : Type*} [MeasurableSpace Omega]
+    [SeminormedAddCommGroup E]
+    (mu : Measure Omega) (out : Omega -> Nat -> E)
+    (p T : Nat) (B : Real) (hp : 0 < p)
+    (hout_int : forall t, t < T * p ->
+      Integrable (fun omega => ‖out omega t‖ ^ 2) mu)
+    (havg_T :
+      (T : Real)⁻¹ *
+          Finset.sum (Finset.range T) (fun t =>
+            ∫ omega, ‖out omega t‖ ^ 2 ∂mu) <=
+        B)
+    (havg_mul :
+      ((T * p : Nat) : Real)⁻¹ *
+          Finset.sum (Finset.range (T * p)) (fun t =>
+            ∫ omega, ‖out omega t‖ ^ 2 ∂mu) <=
+        B) :
+    (T : Real)⁻¹ *
+        Finset.sum (Finset.range T) (fun t =>
+          ∫ omega,
+            ‖out omega (t / p) - out omega ((t / p) * p)‖ ^ 2 ∂mu) <=
+      (p : Real) * (2 * B + 2 * ((p : Real) * B)) ∧
+    (T : Real)⁻¹ *
+        Finset.sum (Finset.range T) (fun t =>
+          ∫ omega,
+            ‖out omega t - out omega ((t / p) * p)‖ ^ 2 ∂mu) <=
+      2 * B + 2 * ((p : Real) * ((p : Real) * B)) := by
+  classical
+  let index : Nat -> Real := fun k =>
+    ∫ omega, ‖out omega k - out omega (k * p)‖ ^ 2 ∂mu
+  have hindex_nonneg : forall k, k < T -> 0 <= index k := by
+    intro k _hk
+    dsimp [index]
+    exact integral_nonneg fun omega => sq_nonneg _
+  have hindex_avg :
+      (T : Real)⁻¹ * Finset.sum (Finset.range T) index <=
+        2 * B + 2 * ((p : Real) * B) := by
+    simpa [index] using
+      finite_average_integral_norm_sq_stride_mismatch_le
+        mu out p T B hp hout_int havg_T havg_mul
+  have hsampled_index :
+      (T : Real)⁻¹ *
+          Finset.sum (Finset.range T) (fun t => index (t / p)) <=
+        (p : Real) * (2 * B + 2 * ((p : Real) * B)) := by
+    simpa using
+      normalized_sum_le_period_mul_of_floor_div_majorant
+        p T (fun t => index (t / p)) index (1 : Real)
+        (2 * B + 2 * ((p : Real) * B)) hp (by norm_num)
+        hindex_nonneg (fun t _ht => by simp) hindex_avg
+  have hout_int_T : forall t, t < T ->
+      Integrable (fun omega => ‖out omega t‖ ^ 2) mu := by
+    intro t ht
+    exact hout_int t (lt_of_lt_of_le ht (Nat.le_mul_of_pos_right T hp))
+  exact
+    ⟨by simpa [index] using hsampled_index,
+      finite_average_integral_norm_sq_floor_block_mismatch_le_of_average_bound
+        mu out p T B hp hout_int_T havg_T havg_mul⟩
+
+/-! Promoted from Staging/sum_integral_le_mul_sum_integral_of_pointwise_sum_le.lean. -/
+
+open MeasureTheory
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: finite-sum integral inequality from an a.e. finite-sum bound;
+--   orig was the local block `sum_integral_le_mul_sum_integral_of_pointwise_sum_le`.
+-- generality used: arbitrary measurable sample space, arbitrary measure, two
+--   unrelated finite index types and sets, ordered real normed-space-valued
+--   integrable summands, and an arbitrary real coefficient; no probability,
+--   independence, convexity,
+--   smoothness, oracle, completeness, or finite-dimensional assumption is used.
+-- portable call pattern: stochastic consensus, descent, and Lyapunov proofs
+--   change the two finite horizons, summand families, measure, scalar response
+--   coefficient, and a.e. pathwise inequality while retaining the same
+--   sum-of-expectations conclusion.
+-- counterargument checked: this is a short composition of Mathlib integral
+--   monotonicity and finite-sum linearity, but it is a recurring expectation
+--   transport boundary rather than paper-local traceability. The closest
+--   SOptLib theorem requires one shared index set, scales both sides, adds a
+--   deterministic gap, and assumes a probability measure, so it does not
+--   directly cover this contract.
+-- coverage search: queries `finite sums of integrals inequality from almost
+--   everywhere inequality between finite sums`, `sum integral less than
+--   coefficient times sum integral pointwise almost everywhere`, and `integral
+--   finite sum inequality distinct index sets scalar multiplier` found Mathlib
+--   `MeasureTheory.integral_mono_ae`, `MeasureTheory.integral_finset_sum`, and
+--   SOptLib `integral_finset_sum_le_of_pointwise_finset_sum_le` and
+--   `expectation_le_sum_expectation_of_ae_le_finset_sum`; these are proof
+--   ingredients or differently shaped partial coverage, not a full duplicate.
+-- minimal hypotheses: integrability is required only for members of the two
+--   selected finsets, and the pathwise inequality is weakened to hold a.e.; all
+--   paper-level stochastic and network assumptions are removed.
+
+/-- An a.e. bound between two finite sums lifts to the corresponding inequality
+between their sums of integrals, with a scalar action on the right.
+
+Layer: Glue | Gap: Level 0 (two-index finite-sum integral monotonicity)
+Proof: build integrability of both finite sums, apply Bochner
+  `integral_mono_ae`, and commute the integral through the sums and the constant
+  multiplier.
+Source: Mathlib Bochner `integral_mono_ae`, `integral_finset_sum`, and
+  `integral_smul` APIs
+Used in: stochastic consensus convolution estimates that lift a pathwise
+  finite-horizon response-energy bound to a sum-of-expectations bound
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/algorithm_spec
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem sum_integral_le_smul_sum_integral_of_ae_sum_le_smul_sum
+    {Omega I J E : Type*} [MeasurableSpace Omega] {mu : Measure Omega}
+    [NormedAddCommGroup E] [NormedSpace ℝ E] [PartialOrder E]
+    [IsOrderedAddMonoid E] [IsOrderedModule ℝ E] [ClosedIciTopology E]
+    (s : Finset I) (t : Finset J)
+    (f : I -> Omega -> E) (g : J -> Omega -> E) (c : ℝ)
+    (hf : forall i, i ∈ s -> Integrable (f i) mu)
+    (hg : forall j, j ∈ t -> Integrable (g j) mu)
+    (hpoint :
+      ∀ᵐ omega ∂mu,
+        s.sum (fun i => f i omega) <= c • t.sum (fun j => g j omega)) :
+    s.sum (fun i => ∫ omega, f i omega ∂mu) <=
+      c • t.sum (fun j => ∫ omega, g j omega ∂mu) := by
+  have hleft_int :
+      Integrable (fun omega : Omega => s.sum fun i => f i omega) mu :=
+    integrable_finset_sum s hf
+  have hright_int :
+      Integrable (fun omega : Omega => t.sum fun j => g j omega) mu :=
+    integrable_finset_sum t hg
+  have hmono :
+      (∫ omega, s.sum (fun i => f i omega) ∂mu) <=
+        ∫ omega, c • t.sum (fun j => g j omega) ∂mu := by
+    exact integral_mono_ae hleft_int (hright_int.smul c) hpoint
+  rw [integral_finset_sum s hf, integral_smul,
+    integral_finset_sum t hg] at hmono
+  exact hmono

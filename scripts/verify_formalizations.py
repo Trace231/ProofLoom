@@ -259,6 +259,10 @@ def verify_one(item, args, packages, deps):
         ordered = inspect_source_closure(directory, item)
         for relative in ordered:
             source = directory / relative
+            lean_options = [
+                f"-D{name}={json.dumps(value)}"
+                for name, value in sorted(item["files"][relative].get("lean_options", {}).items())
+            ]
             local_dependencies = [
                 n.replace(".", "/") + ".lean"
                 for n in import_names(source)
@@ -272,7 +276,7 @@ def verify_one(item, args, packages, deps):
                         item["lean_toolchain"],
                         lock_hash,
                         [(d, fingerprints[d]) for d in local_dependencies],
-                    ],
+                    ] + ([lean_options] if lean_options else []),
                     sort_keys=True,
                 ).encode()
             )
@@ -288,7 +292,7 @@ def verify_one(item, args, packages, deps):
                     print(f'[{item["id"]}] compiling {relative}', flush=True)
                     with (cache / "compiler.log").open("w") as output:
                         proc = subprocess.run(
-                            [*lean, "-o", str(object_path), relative],
+                            [*lean, *lean_options, "-o", str(object_path), relative],
                             cwd=directory,
                             env=env,
                             stdout=output,

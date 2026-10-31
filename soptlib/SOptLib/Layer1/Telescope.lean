@@ -1,11 +1,17 @@
 import Mathlib.Analysis.Convex.Jensen
 import Mathlib.Algebra.Order.Floor.Div
 import SOptLib.Glue.Algebra
+import SOptLib.Glue.Analysis
+import SOptLib.Glue.Martingale
 import Mathlib.Analysis.InnerProductSpace.Basic
 import Mathlib.Tactic
 import SOptLib.Glue.Probability
 import SOptLib.Model.ConditionalGradient
 import SOptLib.Model.Iterates
+import SOptLib.Model.NetworkMatrix
+import SOptLib.Model.Norms
+import SOptLib.Model.Norms.FiniteMatrixQuadraticForm
+import SOptLib.Model.Tensors
 import SOptLib.Model.Saddle
 import SOptLib.Layer1.Proximal
 import SOptLib.Model.Objective
@@ -1724,6 +1730,83 @@ theorem epochCounter_succ_eq_div_of_divisibility_update
         simp [hupdate, ih, Nat.succ_div_of_not_dvd hdiv]
 
 end SOptLib
+
+/-- Bound a retained quadratic-stepsize weighted gap sum using terminal
+inner-product and oracle budgets.
+
+If nonnegative weights turn pointwise bounds `gap i - error <= inner i` into a
+weighted inner-product lower bound, a terminal estimate controls the weighted
+inner sum by an oracle sum, and that oracle sum is bounded by a linear gap term
+plus a constant, then the retained weights `gamma i - b * gamma i ^ 2` control
+the gap sum by the initial distance, accumulated error, and constant budgets.
+
+Layer: Layer1 | Gap: Level 1 (terminal and oracle budget elimination)
+Proof: sum the pointwise inner lower bounds under nonnegative weights, compose
+  the terminal and oracle inequalities, and rearrange distributed finite sums
+  by ordered real arithmetic.
+Source: Mathlib `Finset.sum_le_sum`, finite big-operator distributivity, and
+  linear ordered-field arithmetic
+Used in: stochastic gradient and derivative-free convex convergence proofs
+  after telescoping a terminal distance recursion and bounding oracle second moments
+Book citation: book/FOML/StochasticZerothOrder.json#/main_theorem/proof/17
+Origin algorithm: G. Lan, First-Order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic gradient-free method -/
+theorem weighted_gap_sum_le_of_terminal_inner_and_oracle_budget
+    {ι : Type*} (s : Finset ι)
+    (gamma gap inner oracle : ι → ℝ) (dist b error C : ℝ)
+    (hgamma_nonneg : ∀ i ∈ s, 0 ≤ gamma i)
+    (hinner : ∀ i ∈ s, gap i - error ≤ inner i)
+    (hterminal :
+      2 * Finset.sum s (fun i => gamma i * inner i) ≤
+        dist + Finset.sum s (fun i => gamma i ^ (2 : ℕ) * oracle i))
+    (horacle :
+      Finset.sum s (fun i => gamma i ^ (2 : ℕ) * oracle i) ≤
+        Finset.sum s
+          (fun i => gamma i ^ (2 : ℕ) * (2 * b * gap i + C))) :
+    2 * Finset.sum s
+        (fun i => (gamma i - b * gamma i ^ (2 : ℕ)) * gap i) ≤
+      dist + 2 * error * Finset.sum s gamma +
+        C * Finset.sum s (fun i => gamma i ^ (2 : ℕ)) := by
+  classical
+  have hinner_sum :
+      Finset.sum s (fun i => gamma i * (gap i - error)) ≤
+        Finset.sum s (fun i => gamma i * inner i) := by
+    refine Finset.sum_le_sum ?_
+    intro i hi
+    exact mul_le_mul_of_nonneg_left (hinner i hi) (hgamma_nonneg i hi)
+  have hinner_budget :
+      2 * Finset.sum s (fun i => gamma i * (gap i - error)) ≤
+        dist + Finset.sum s (fun i => gamma i ^ (2 : ℕ) * oracle i) := by
+    linarith
+  have hbudget :
+      2 * Finset.sum s (fun i => gamma i * (gap i - error)) ≤
+        dist + Finset.sum s
+          (fun i => gamma i ^ (2 : ℕ) * (2 * b * gap i + C)) := by
+    linarith
+  calc
+    2 * Finset.sum s
+        (fun i => (gamma i - b * gamma i ^ (2 : ℕ)) * gap i)
+        =
+      Finset.sum s
+        (fun i =>
+          2 * (gamma i * (gap i - error)) -
+            gamma i ^ (2 : ℕ) * (2 * b * gap i + C) +
+            (2 * error * gamma i + C * gamma i ^ (2 : ℕ))) := by
+        rw [Finset.mul_sum]
+        refine Finset.sum_congr rfl ?_
+        intro i _hi
+        ring
+    _ =
+      2 * Finset.sum s (fun i => gamma i * (gap i - error)) -
+        Finset.sum s
+          (fun i => gamma i ^ (2 : ℕ) * (2 * b * gap i + C)) +
+        (2 * error * Finset.sum s gamma +
+        C * Finset.sum s (fun i => gamma i ^ (2 : ℕ))) := by
+        simp only [Finset.sum_add_distrib, Finset.sum_sub_distrib,
+          Finset.mul_sum]
+    _ ≤ dist + 2 * error * Finset.sum s gamma +
+        C * Finset.sum s (fun i => gamma i ^ (2 : ℕ)) := by
+        linarith
 
 -- Generalization plan (G0):
 -- concept/name: selected-memory gradient-extrapolation pathwise telescope; orig
@@ -5544,3 +5627,2320 @@ theorem sum_delta_le_ratio_sum_tilde_of_active_epoch_predecessor_bound
       (fun s hs j hj => hdelta_epoch s j hs hj) htilde_active_nonneg
 
 end SOptLib
+
+-- Phase 4 merged from focused staging declarations.
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: accelerated_gamma_terminal_raw_bound_of_telescope_and_distance
+--   exposes the scalar Gamma-normalized terminal bound obtained by combining
+--   an accelerated raw telescope with a distance-telescope budget; orig was
+--   partB_pathwise_gamma_terminal_raw_coeff_bound, renamed away from Part B
+--   and paper-local setup fields.
+-- generality used: all data are real scalar streams over natural time plus a
+--   positive-time Gamma value; no measure, independence, integrability,
+--   convexity, smoothness, oracle, topology, normed-space, or finite-dimensional
+--   assumptions are used by this algebraic proof-composition step.
+-- portable call pattern: accelerated stochastic-gradient, accelerated mirror,
+--   and variance-reduced pathwise proofs can provide a raw Gamma telescope,
+--   terminal Gamma positivity, finite-window Gamma/alpha nonzeroness, the
+--   alpha-one boundary cancellation, and a weighted distance telescope while
+--   changing the concrete gradient, noise, residual, and distance streams.
+-- counterargument checked: this is not merely paper traceability because the
+--   conclusion packages the recurring transition from raw Gamma telescope to
+--   terminal raw bound after distance domination; the only full existing hit
+--   was the local private theorem, while the staged scalar division helper
+--   covers only one internal normalization substep.
+-- coverage search: searched `terminal objective gap bound from raw gamma
+--   telescope distance telescope raw gradient noise residual`, `distance
+--   telescope terminal bound raw gradient raw noise residual`, and `divide
+--   inequality positive gamma subtract multiplied sum upper bound`; closest
+--   hits were SOptLib `summed_one_step_gap_bound_of_telescope` and
+--   `accelerated_expected_gap_bound_of_pathwise_telescope`, plus staged
+--   `div_sub_le_sum_of_sub_mul_le_mul_sum`, all partial rather than full.
+-- minimal hypotheses: nonzeroness is required only on the finite window
+--   denominators used to rewrite the retained raw-gradient sum, positivity is
+--   required only to divide by terminal Gamma, the boundary cancellation is
+--   exactly `alpha 1 = 1`, and the distance budget is a single pointwise
+--   scalar inequality.
+
+/-- A raw accelerated Gamma telescope and a distance budget give a terminal raw bound.
+
+The theorem abstracts the finite-window algebra in which the raw telescope
+contains a retained gradient sum, a weighted distance-difference sum, and a
+combined noise/residual sum.  After the `alpha 1 = 1` boundary cancellation
+and a distance telescope bound, the terminal quantity divided by the terminal
+Gamma is bounded by the distance budget minus the raw gradient sum plus the
+raw noise and residual sums.
+
+Layer: Layer1 | Gap: Level 1 (Gamma-normalized accelerated terminal telescope)
+Proof: identify the raw telescope sums with the named gradient, distance,
+  noise, and residual sums by finite-sum congruence, apply positive Gamma
+  scalar normalization, and substitute the distance budget by ordered real
+  arithmetic.
+Source: Mathlib finite-sum congruence, ordered-field normalization, and
+  linear real arithmetic
+Used in: nonconvex stochastic accelerated gradient descent after the raw
+  Part B Gamma telescope and before coefficient simplification of the
+  gradient and oracle-noise budgets
+Book citation: book/FOML/NonconvexStochasticAcceleratedGD.json#/main_theorem/proof/18
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, nonconvex stochastic accelerated gradient descent -/
+theorem accelerated_gamma_terminal_raw_bound_of_telescope_and_distance
+    (A alpha beta gamma gradCoeff noiseCoeff distDiff : ℕ → ℝ)
+    (gradSq noiseSq residualTerm : (t : ℕ) → 1 ≤ t → ℝ)
+    (Gamma : (t : ℕ) → 1 ≤ t → ℝ) (N : ℕ) (hN : 1 ≤ N) (dist : ℝ)
+    (hGamma_pos : 0 < Gamma N hN)
+    (hGamma_ne : ∀ t (ht : t ∈ Finset.Icc 1 N),
+      Gamma t (Finset.mem_Icc.mp ht).1 ≠ 0)
+    (halpha_ne : ∀ t, t ∈ Finset.Icc 1 N → alpha t ≠ 0)
+    (halpha_one : alpha 1 = 1)
+    (htelescope :
+      let GammaNat : ℕ → ℝ := fun t => if ht : 1 ≤ t then Gamma t ht else 1
+      let Lterm : ℕ → ℝ := fun t =>
+        if ht : 1 ≤ t then
+          -(beta t / alpha t) * gradCoeff t * gradSq t ht
+        else 0
+      let Bterm : ℕ → ℝ := fun t => if _ht : 1 ≤ t then distDiff t else 0
+      let Dterm : ℕ → ℝ := fun t =>
+        if ht : 1 ≤ t then noiseCoeff t * noiseSq t ht + residualTerm t ht else 0
+      A N - Gamma N hN *
+          Finset.sum (Finset.Icc 1 N) (fun t => alpha t / GammaNat t * Lterm t) ≤
+        Gamma N hN * (1 - alpha 1) * A 0 +
+          Gamma N hN *
+            Finset.sum (Finset.Icc 1 N)
+              (fun t => alpha t / (gamma t * GammaNat t) * Bterm t) +
+          Gamma N hN *
+            Finset.sum (Finset.Icc 1 N) (fun t => Dterm t / GammaNat t))
+    (hdistance :
+      Finset.sum (Finset.Icc 1 N).attach (fun k =>
+        alpha k.1 / (gamma k.1 * Gamma k.1 (Finset.mem_Icc.mp k.2).1) *
+          distDiff k.1) ≤ dist) :
+    A N / Gamma N hN ≤
+      dist -
+        Finset.sum (Finset.Icc 1 N).attach (fun k =>
+          (Gamma k.1 (Finset.mem_Icc.mp k.2).1)⁻¹ *
+            beta k.1 * gradCoeff k.1 * gradSq k.1 (Finset.mem_Icc.mp k.2).1) +
+        Finset.sum (Finset.Icc 1 N).attach (fun k =>
+          (Gamma k.1 (Finset.mem_Icc.mp k.2).1)⁻¹ *
+            noiseCoeff k.1 * noiseSq k.1 (Finset.mem_Icc.mp k.2).1) +
+        Finset.sum (Finset.Icc 1 N).attach (fun k =>
+          (Gamma k.1 (Finset.mem_Icc.mp k.2).1)⁻¹ *
+            residualTerm k.1 (Finset.mem_Icc.mp k.2).1) := by
+  classical
+  let GammaNat : ℕ → ℝ := fun t => if ht : 1 ≤ t then Gamma t ht else 1
+  let Lterm : ℕ → ℝ := fun t =>
+    if ht : 1 ≤ t then
+      -(beta t / alpha t) * gradCoeff t * gradSq t ht
+    else 0
+  let Bterm : ℕ → ℝ := fun t => if _ht : 1 ≤ t then distDiff t else 0
+  let Dterm : ℕ → ℝ := fun t =>
+    if ht : 1 ≤ t then noiseCoeff t * noiseSq t ht + residualTerm t ht else 0
+  let rawGrad : ℝ :=
+    Finset.sum (Finset.Icc 1 N).attach (fun k =>
+      (Gamma k.1 (Finset.mem_Icc.mp k.2).1)⁻¹ *
+        beta k.1 * gradCoeff k.1 * gradSq k.1 (Finset.mem_Icc.mp k.2).1)
+  let distanceSum : ℝ :=
+    Finset.sum (Finset.Icc 1 N).attach (fun k =>
+      alpha k.1 / (gamma k.1 * Gamma k.1 (Finset.mem_Icc.mp k.2).1) *
+        distDiff k.1)
+  let rawNoise : ℝ :=
+    Finset.sum (Finset.Icc 1 N).attach (fun k =>
+      (Gamma k.1 (Finset.mem_Icc.mp k.2).1)⁻¹ *
+        noiseCoeff k.1 * noiseSq k.1 (Finset.mem_Icc.mp k.2).1)
+  let residual : ℝ :=
+    Finset.sum (Finset.Icc 1 N).attach (fun k =>
+      (Gamma k.1 (Finset.mem_Icc.mp k.2).1)⁻¹ *
+        residualTerm k.1 (Finset.mem_Icc.mp k.2).1)
+  have hbase :
+      A N - Gamma N hN * (-rawGrad) ≤
+        Gamma N hN * distanceSum + Gamma N hN * rawNoise + Gamma N hN * residual := by
+    have htel' :
+        A N - Gamma N hN *
+            Finset.sum (Finset.Icc 1 N) (fun t => alpha t / GammaNat t * Lterm t) ≤
+          Gamma N hN * (1 - alpha 1) * A 0 +
+            Gamma N hN *
+              Finset.sum (Finset.Icc 1 N)
+                (fun t => alpha t / (gamma t * GammaNat t) * Bterm t) +
+            Gamma N hN *
+              Finset.sum (Finset.Icc 1 N) (fun t => Dterm t / GammaNat t) := by
+      simpa [GammaNat, Lterm, Bterm, Dterm] using htelescope
+    have hLsum :
+        Finset.sum (Finset.Icc 1 N) (fun t => alpha t / GammaNat t * Lterm t) =
+          -rawGrad := by
+      calc
+        Finset.sum (Finset.Icc 1 N) (fun t => alpha t / GammaNat t * Lterm t) =
+            Finset.sum (Finset.Icc 1 N).attach
+              (fun k => alpha k.1 / GammaNat k.1 * Lterm k.1) := by
+                simpa using
+                  (Finset.sum_attach (s := Finset.Icc 1 N)
+                    (f := fun t => alpha t / GammaNat t * Lterm t)).symm
+        _ =
+            Finset.sum (Finset.Icc 1 N).attach (fun k =>
+              -((Gamma k.1 (Finset.mem_Icc.mp k.2).1)⁻¹ *
+                beta k.1 * gradCoeff k.1 *
+                  gradSq k.1 (Finset.mem_Icc.mp k.2).1)) := by
+              refine Finset.sum_congr rfl ?_
+              intro k _hk
+              have hk1 : 1 ≤ k.1 := (Finset.mem_Icc.mp k.2).1
+              have hαne : alpha k.1 ≠ 0 := halpha_ne k.1 k.2
+              have hΓne : Gamma k.1 hk1 ≠ 0 := hGamma_ne k.1 k.2
+              dsimp [GammaNat, Lterm]
+              simp [hk1]
+              field_simp [hαne, hΓne]
+        _ = -rawGrad := by
+              simp [rawGrad, Finset.sum_neg_distrib]
+    have hBsum :
+        Finset.sum (Finset.Icc 1 N)
+            (fun t => alpha t / (gamma t * GammaNat t) * Bterm t) =
+          distanceSum := by
+      calc
+        Finset.sum (Finset.Icc 1 N)
+            (fun t => alpha t / (gamma t * GammaNat t) * Bterm t) =
+            Finset.sum (Finset.Icc 1 N).attach
+              (fun k => alpha k.1 / (gamma k.1 * GammaNat k.1) * Bterm k.1) := by
+                simpa using
+                  (Finset.sum_attach (s := Finset.Icc 1 N)
+                    (f := fun t => alpha t / (gamma t * GammaNat t) * Bterm t)).symm
+        _ = distanceSum := by
+              dsimp [distanceSum]
+              refine Finset.sum_congr rfl ?_
+              intro k _hk
+              have hk1 : 1 ≤ k.1 := (Finset.mem_Icc.mp k.2).1
+              dsimp [GammaNat, Bterm]
+              simp [hk1]
+    have hDsum :
+        Finset.sum (Finset.Icc 1 N) (fun t => Dterm t / GammaNat t) =
+          rawNoise + residual := by
+      calc
+        Finset.sum (Finset.Icc 1 N) (fun t => Dterm t / GammaNat t) =
+            Finset.sum (Finset.Icc 1 N).attach (fun k => Dterm k.1 / GammaNat k.1) := by
+              simpa using
+                (Finset.sum_attach (s := Finset.Icc 1 N)
+                  (f := fun t => Dterm t / GammaNat t)).symm
+        _ =
+            Finset.sum (Finset.Icc 1 N).attach (fun k =>
+              (Gamma k.1 (Finset.mem_Icc.mp k.2).1)⁻¹ *
+                  noiseCoeff k.1 * noiseSq k.1 (Finset.mem_Icc.mp k.2).1 +
+                (Gamma k.1 (Finset.mem_Icc.mp k.2).1)⁻¹ *
+                  residualTerm k.1 (Finset.mem_Icc.mp k.2).1) := by
+              refine Finset.sum_congr rfl ?_
+              intro k _hk
+              have hk1 : 1 ≤ k.1 := (Finset.mem_Icc.mp k.2).1
+              dsimp [GammaNat, Dterm]
+              simp [hk1, div_eq_mul_inv]
+              ring
+        _ = rawNoise + residual := by
+              simp [rawNoise, residual, Finset.sum_add_distrib]
+    calc
+      A N - Gamma N hN * (-rawGrad)
+          = A N - Gamma N hN *
+              Finset.sum (Finset.Icc 1 N) (fun t => alpha t / GammaNat t * Lterm t) := by
+              rw [hLsum]
+      _ ≤ Gamma N hN * (1 - alpha 1) * A 0 +
+            Gamma N hN *
+              Finset.sum (Finset.Icc 1 N)
+                (fun t => alpha t / (gamma t * GammaNat t) * Bterm t) +
+            Gamma N hN *
+              Finset.sum (Finset.Icc 1 N) (fun t => Dterm t / GammaNat t) := htel'
+      _ = Gamma N hN * distanceSum + Gamma N hN * rawNoise + Gamma N hN * residual := by
+            rw [hBsum, hDsum, halpha_one]
+            ring
+  have hnorm :
+      A N / Gamma N hN + rawGrad ≤ distanceSum + rawNoise + residual := by
+    have hdiv :=
+      div_sub_le_sum_of_sub_mul_le_mul_sum
+        (A := A N) (L := -rawGrad) (C := distanceSum) (B := rawNoise)
+        (D := residual) (gamma := Gamma N hN) hGamma_pos hbase
+    linarith
+  have hdist' : distanceSum ≤ dist := by
+    simpa [distanceSum] using hdistance
+  change A N / Gamma N hN ≤ dist - rawGrad + rawNoise + residual
+  linarith
+
+
+-- Generalization plan (G0):
+-- concept/name: terminal_bound_with_simplified_gradient_noise_of_raw_bound
+--   exposes the scalar upper-bound simplification that replaces a retained
+--   raw gradient penalty and raw noise term by simplified gradient and noise
+--   budgets; orig was partB_pathwise_gamma_terminal_bound, renamed away from
+--   Part B and all paper-local setup fields.
+-- generality used: seven real scalars and three order hypotheses are all the
+--   proof uses; there are no measure, independence, integrability, convexity,
+--   smoothness, oracle, topology, normed-space, or finite-dimensional
+--   assumptions.
+-- portable call pattern: accelerated stochastic-gradient, accelerated mirror,
+--   and variance-reduced pathwise proofs can call this after a raw terminal
+--   telescope bound and separate coefficient comparisons, while changing the
+--   concrete terminal quantity, distance budget, gradient sum, noise sum, and
+--   residual expression.
+-- counterargument checked: this is not just paper-local traceability because
+--   it packages a recurring ordered-real transition after telescoping; it is
+--   not a pure rename of Mathlib because the needed contract combines a raw
+--   terminal bound with two monotone substitutions in opposite-signed terms.
+-- coverage search: searched `terminal bound simplified gradient noise raw
+--   bound scalar inequalities`, `real upper bound replace terms by larger
+--   bounds`, and LeanSearch `real inequality replace two terms by upper
+--   bounds in an additive upper bound`; closest hits were the local private
+--   theorem, staged `accelerated_gamma_terminal_raw_bound_of_telescope_and_distance`,
+--   and generic additive/order lemmas, all partial rather than full.
+-- minimal hypotheses: all hypotheses are pointwise scalar inequalities; no
+--   positivity or nonzeroness assumptions are needed for this final
+--   simplification once the raw and coefficient bounds are supplied.
+
+/-- A raw terminal bound with gradient and noise coefficient comparisons gives
+the corresponding simplified terminal bound.
+
+If a terminal quantity is bounded by `dist - rawGrad + rawNoise + residual`,
+then any lower bound `gradBudget ≤ rawGrad` and upper bound
+`rawNoise ≤ noiseBudget` may be substituted into the opposite-signed gradient
+and noise slots.
+
+Layer: Layer1 | Gap: Level 1 (scalar terminal-bound coefficient simplification)
+Proof: use ordered real arithmetic to combine the raw terminal bound with the
+  lower gradient-budget comparison and the upper noise-budget comparison.
+Source: Mathlib ordered real linear arithmetic
+Used in: nonconvex stochastic accelerated gradient descent after the Part B
+  raw Gamma terminal telescope and before isolating the weighted search-gradient
+  sum
+Book citation: book/FOML/NonconvexStochasticAcceleratedGD.json#/main_theorem/proof/20
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, nonconvex stochastic accelerated gradient descent -/
+theorem terminal_bound_with_simplified_gradient_noise_of_raw_bound
+    (terminal dist rawGrad gradBudget rawNoise noiseBudget residual : ℝ)
+    (hraw : terminal ≤ dist - rawGrad + rawNoise + residual)
+    (hgrad : gradBudget ≤ rawGrad)
+    (hnoise : rawNoise ≤ noiseBudget) :
+    terminal ≤ dist - gradBudget + noiseBudget + residual := by
+  linarith
+
+
+-- Generalization plan (G0):
+-- concept/name: isolate a retained weighted sum from a nonnegative terminal upper bound; orig was partB_pathwise_weighted_gradient_le_noise_residual
+-- generality used: real ordered additive arithmetic only; no carrier typeclasses, measures, convexity, smoothness, oracle, or finite-dimensional assumptions are used
+-- portable call pattern: accelerated or telescoping stochastic-optimization proofs after a pathwise terminal bound `terminal <= dist - weightedSum + noise + residual` and a minimizer or feasibility argument proving `0 <= terminal`
+-- counterargument checked: the proof is short, but it is not paper-local traceability because the same scalar isolation step recurs after terminal-gap telescopes; it is not covered by the adjacent coefficient-simplification lemma, which still concludes a terminal upper bound
+-- coverage search: queried "weighted sum less equal noise residual nonnegative terminal bound", "isolate weighted gradient sum terminal nonnegative pathwise terminal bound", and the precise terminal/nonnegative inequality shape; hits were local/private theorem, related terminal_bound_with_simplified_gradient_noise_of_raw_bound, and unrelated finite-sum telescopes, with no full duplicate
+-- minimal hypotheses: all already minimal; the caller-side minimizer and positive Gamma assumptions are compressed to the pointwise scalar hypothesis `0 <= terminal`
+
+/-- A nonnegative terminal bound isolates the retained weighted sum.
+
+If a terminal quantity is nonnegative and is bounded above by a distance budget
+minus a weighted sum plus noise and residual terms, then the weighted sum is
+bounded by the distance, noise, and residual budgets.
+
+Layer: Layer1 | Gap: Level 1 (scalar terminal-bound weighted-sum isolation)
+Proof: combine the terminal nonnegativity and terminal upper bound by ordered real arithmetic.
+Source: Mathlib ordered real linear arithmetic
+Used in: nonconvex stochastic accelerated gradient descent after the convex Part B terminal pathwise recursion and before converting the weighted search-gradient numerator into the randomized output bound
+Book citation: book/FOML/NonconvexStochasticAcceleratedGD.json#/main_theorem/proof/steps/22
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, nonconvex stochastic accelerated gradient descent -/
+theorem weighted_sum_le_noise_residual_of_nonneg_terminal_bound
+    (terminal weightedSum dist noise residual : ℝ)
+    (hterminal_nonneg : 0 ≤ terminal)
+    (hpath : terminal ≤ dist - weightedSum + noise + residual) :
+    weightedSum ≤ dist + noise + residual := by
+  linarith
+
+end SOptLib
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: finite constant-scaled sum bound from pointwise drop-plus-noise bounds; orig was theorem69_weighted_descent_telescope_bound_of_fixed_step.
+-- generality used: arbitrary finite index type with real-valued gap, drop, and noise functions; no measure, convexity, smoothness, oracle, or vector-space assumptions are used.
+-- portable call pattern: convergence proofs that have per-time weighted stationarity bounds `c * gap i <= drop i + noise i` and a finite-window aggregate drop budget call this before normalizing an output distribution; the index type, gap, drop, noise, scalar, and budget change while the conclusion shape remains fixed.
+-- counterargument checked: this is more than paper-local traceability because it packages the recurring finite-window aggregation step; it is not a pure wrapper around `Finset.sum_le_sum` because it also factors the constant and absorbs an independent aggregate budget.
+-- coverage search: searched "finset constant multiply sum less equal telescope add sum pointwise less equal aggregate budget", "weighted gap sum bound pointwise drop noise aggregate telescope budget", and LeanSearch "finite sum pointwise inequality sum drop bounded by budget implies constant times sum gap bounded by budget plus sum noise"; top hits were `Finset.sum_le_sum`, `summed_one_step_gap_bound_of_telescope`, `active_sum_objective_drop_add_scalar_budget`, and active-window budget lemmas, all partial rather than this flat constant-scaled statement.
+-- minimal hypotheses: all already minimal for the real scalar use; no nonnegativity of the scalar is needed because the scaled inequality is supplied pointwise.
+
+/-- Aggregate constant-scaled pointwise bounds with a finite drop budget.
+
+If every indexed term satisfies `c * gap i <= drop i + noise i`, and the total
+drop is bounded by `budget`, then the constant-scaled finite gap sum is bounded
+by the budget plus the finite noise sum.
+
+Layer: Layer1 | Gap: Level 1 (finite-window scaled descent aggregation)
+Proof: factor the constant through the finite sum, apply `Finset.sum_le_sum` to
+  the pointwise bounds, split the sum over addition, and absorb the aggregate
+  drop budget by monotonicity of addition.
+Source: Mathlib finite big-operator distributivity and ordered real arithmetic
+Used in: nonconvex stochastic block mirror descent finite-window projected-gradient numerator aggregation after fixed-time descent bounds and objective-drop telescoping
+Book citation: book/FOML/StochasticBlockMirrorDescent.json#/algorithm_spec
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, nonconvex stochastic block mirror descent -/
+theorem finset_const_mul_sum_le_telescope_add_sum_of_pointwise_le
+    {α : Type*} (s : Finset α) (c budget : ℝ)
+    (gap drop noise : α → ℝ)
+    (hpoint : ∀ i ∈ s, c * gap i ≤ drop i + noise i)
+    (hdrop : Finset.sum s drop ≤ budget) :
+    c * Finset.sum s gap ≤ budget + Finset.sum s noise := by
+  classical
+  calc
+    c * Finset.sum s gap = Finset.sum s (fun i => c * gap i) := by
+      rw [Finset.mul_sum]
+    _ ≤ Finset.sum s (fun i => drop i + noise i) := by
+      exact Finset.sum_le_sum hpoint
+    _ = Finset.sum s drop + Finset.sum s noise := by
+      rw [Finset.sum_add_distrib]
+    _ ≤ budget + Finset.sum s noise := by
+      simpa [add_comm, add_left_comm, add_assoc] using
+        add_le_add_right hdrop (Finset.sum s noise)
+
+end SOptLib
+
+/-- Aggregate a finite-window pointwise bound with two independently budgeted telescope sums.
+
+If a retained total is bounded by the finite sum of pointwise gaps, each gap is
+bounded by two drop terms, two retained budget terms, and a correction, and the
+two drop sums have scalar budgets, then the retained total is bounded by the
+sum of those scalar budgets plus the retained finite sums minus the correction
+sum.
+
+Layer: Layer1 | Gap: Level 1 (finite-window two-telescope budget aggregation)
+Proof: sum the pointwise inequalities, split finite sums over addition and
+  subtraction, then compose the two aggregate telescope budgets by ordered-real
+  arithmetic.
+Source: Mathlib finite big-operator distributivity and ordered real arithmetic
+Used in: stochastic saddle-point maximized-regret pathwise budget after combining the stochastic mirror step, the auxiliary residual mirror step, and the two prox telescopes
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/key_lemmas/1/proof/11
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic convex-concave saddle point mirror descent -/
+theorem two_telescope_pathwise_budget_of_pointwise_combined_bounds
+    {τ : Type*} (times : Finset τ)
+    (gap dz dv q1 q2 correction : τ → ℝ)
+    (budgetZ budgetV total : ℝ)
+    (htotal : total ≤ Finset.sum times gap)
+    (hpoint : ∀ t ∈ times,
+      gap t ≤ dz t + dv t + q1 t + q2 t - correction t)
+    (hbudgetZ : Finset.sum times dz ≤ budgetZ)
+    (hbudgetV : Finset.sum times dv ≤ budgetV) :
+    total ≤
+      budgetZ + budgetV + Finset.sum times q1 + Finset.sum times q2 -
+        Finset.sum times correction := by
+  classical
+  have hsumPoint :
+      Finset.sum times gap ≤
+        Finset.sum times (fun t => dz t + dv t + q1 t + q2 t - correction t) := by
+    exact Finset.sum_le_sum hpoint
+  have hsplit :
+      Finset.sum times (fun t => dz t + dv t + q1 t + q2 t - correction t) =
+        Finset.sum times dz + Finset.sum times dv +
+          Finset.sum times q1 + Finset.sum times q2 -
+            Finset.sum times correction := by
+    simp [Finset.sum_add_distrib, Finset.sum_sub_distrib]
+  linarith
+
+/-- A normalized weighted gap sum is bounded by a normalized max-regret certificate.
+
+If every pointwise gap is bounded by a regret summand, all finite-window weights
+are nonnegative, and the weighted regret sum is bounded by `maxRegret`, then
+the same positive normalizer bounds the weighted gap sum by `maxRegret`.
+
+Layer: Layer1 | Gap: Level 0 (normalized weighted finite-sum regret handoff)
+Proof: scale the pointwise gap inequalities by nonnegative weights, sum them
+  over the finite window, compose with the max-regret certificate, and multiply
+  by the nonnegative inverse of the positive normalizer.
+Source: Mathlib `Finset.sum_le_sum` and ordered real scalar multiplication
+Used in: stochastic convex-concave saddle-point mirror descent when converting pointwise saddle-gap subgradient bounds into the selected maximized-regret numerator before normalized output estimates
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/main_theorem/proof
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic mirror descent for stochastic convex-concave saddle point problems -/
+theorem weighted_gap_sum_le_inv_max_regret_of_pointwise_le
+    {T : Type*} (times : Finset T)
+    (gamma gap regretTerm : T → ℝ) (weightSum maxRegret : ℝ)
+    (hgamma_nonneg : ∀ t ∈ times, 0 ≤ gamma t)
+    (hweightSum_pos : 0 < weightSum)
+    (hpoint : ∀ t ∈ times, gap t ≤ regretTerm t)
+    (hmaxRegret :
+      Finset.sum times (fun t => gamma t * regretTerm t) ≤ maxRegret) :
+    weightSum⁻¹ * Finset.sum times (fun t => gamma t * gap t) ≤
+      weightSum⁻¹ * maxRegret := by
+  classical
+  have hsum :
+      Finset.sum times (fun t => gamma t * gap t) ≤
+        Finset.sum times (fun t => gamma t * regretTerm t) := by
+    refine Finset.sum_le_sum ?_
+    intro t ht
+    exact mul_le_mul_of_nonneg_left (hpoint t ht) (hgamma_nonneg t ht)
+  have hnormalizer_nonneg : 0 ≤ weightSum⁻¹ :=
+    inv_nonneg.mpr (le_of_lt hweightSum_pos)
+  exact mul_le_mul_of_nonneg_left (le_trans hsum hmaxRegret) hnormalizer_nonneg
+
+namespace SOptLib
+
+/-- A weighted-average convex-concave saddle gap is bounded by normalized
+maximized regret.
+
+If the averaged primal and dual outputs are the weighted averages of feasible
+iterates, Jensen bounds the cross gap against any selected comparison pair by
+the normalized weighted sum of pointwise cross gaps. A supplied regret bound for
+that weighted sum then gives the final normalized regret estimate.
+
+Layer: Layer1 | Gap: Level 1 (convex-concave weighted-output saddle-gap to regret)
+Proof: apply finite weighted Jensen separately to the primal payoff and the
+  negated dual payoff, add the two inequalities, distribute the finite sums,
+  and compose with the supplied normalized weighted-regret bound.
+Source: Mathlib finite Jensen inequality `ConvexOn.map_sum_le`, SOptLib
+  carrier totalization, and finite-sum ordered real algebra
+Used in: stochastic convex-concave saddle-point mirror descent when converting
+  the weighted average output saddle gap into the selected maximized regret
+  before martingale and deterministic regret estimates are combined
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/algorithm_spec
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, stochastic mirror descent for stochastic convex-concave
+  saddle point problems -/
+theorem saddleGap_weightedAverage_le_inv_max_regret_of_convex_concave
+    {T EX EY : Type*}
+    [AddCommGroup EX] [Module ℝ EX]
+    [AddCommGroup EY] [Module ℝ EY]
+    (s : Finset T) (γ : T → ℝ) (W regret : ℝ)
+    (X : Set EX) (Y : Set EY)
+    (L : {x : EX // x ∈ X} → {y : EY // y ∈ Y} → ℝ)
+    (x : T → {x : EX // x ∈ X}) (y : T → {y : EY // y ∈ Y})
+    (xbar xStar : {x : EX // x ∈ X}) (ybar yStar : {y : EY // y ∈ Y})
+    (hL_convex_x :
+      ConvexOn ℝ X (totalizeOn X (fun x' => L x' yStar)))
+    (hL_concave_y :
+      ConvexOn ℝ Y
+        (fun y' => -(totalizeOn Y (fun y'' => L xStar y'') y')))
+    (hγ_nonneg : ∀ t ∈ s, 0 ≤ γ t)
+    (hW_pos : 0 < W)
+    (hW_eq : W = ∑ t ∈ s, γ t)
+    (hxbar :
+      xbar.1 = W⁻¹ • Finset.sum s (fun t => γ t • (x t).1))
+    (hybar :
+      ybar.1 = W⁻¹ • Finset.sum s (fun t => γ t • (y t).1))
+    (hregret :
+      W⁻¹ * Finset.sum s (fun t =>
+        γ t * SOptLib.saddleGap L (x t, y t) (xStar, yStar)) ≤ W⁻¹ * regret) :
+    SOptLib.saddleGap L (xbar, ybar) (xStar, yStar) ≤ W⁻¹ * regret := by
+  classical
+  change L xbar yStar - L xStar ybar ≤ W⁻¹ * regret
+  have hregret_raw :
+      W⁻¹ * Finset.sum s (fun t =>
+        γ t * (L (x t) yStar - L xStar (y t))) ≤ W⁻¹ * regret := by
+    simpa [SOptLib.saddleGap] using hregret
+  have hJx :
+      L xbar yStar ≤
+        W⁻¹ * Finset.sum s (fun t => γ t * L (x t) yStar) := by
+    have hraw :=
+      convexOn_weighted_average_le_weighted_sum
+        (hf := hL_convex_x) (s := s) (γ := γ)
+        (p := fun t => (x t).1) (xbar := xbar.1) (W := W)
+        hγ_nonneg (fun t _ht => (x t).2) hW_pos hW_eq hxbar
+    simpa [totalizeOn_of_mem X (fun x' => L x' yStar) xbar.2] using hraw
+  have hJy :
+      -L xStar ybar ≤
+        W⁻¹ * Finset.sum s (fun t => γ t * (-L xStar (y t))) := by
+    have hraw :=
+      convexOn_weighted_average_le_weighted_sum
+        (hf := hL_concave_y) (s := s) (γ := γ)
+        (p := fun t => (y t).1) (xbar := ybar.1) (W := W)
+        hγ_nonneg (fun t _ht => (y t).2) hW_pos hW_eq hybar
+    simpa [totalizeOn_of_mem Y (fun y'' => L xStar y'') ybar.2] using hraw
+  have hadd := add_le_add hJx hJy
+  have hsum_eq :
+      W⁻¹ * Finset.sum s (fun t => γ t * L (x t) yStar) +
+          W⁻¹ * Finset.sum s (fun t => γ t * (-L xStar (y t))) =
+        W⁻¹ * Finset.sum s (fun t =>
+          γ t * (L (x t) yStar - L xStar (y t))) := by
+    rw [← mul_add, ← Finset.sum_add_distrib]
+    congr 1
+    refine Finset.sum_congr rfl ?_
+    intro t ht
+    ring
+  calc
+    L xbar yStar - L xStar ybar =
+        L xbar yStar + (-L xStar ybar) := by ring
+    _ ≤
+        W⁻¹ * Finset.sum s (fun t => γ t * L (x t) yStar) +
+          W⁻¹ * Finset.sum s (fun t => γ t * (-L xStar (y t))) := hadd
+    _ =
+        W⁻¹ * Finset.sum s (fun t =>
+          γ t * (L (x t) yStar - L xStar (y t))) := hsum_eq
+    _ ≤ W⁻¹ * regret := hregret_raw
+
+end SOptLib
+
+
+-- Merged from Staging/sum_cost_le_terminal_cost_add_potential_sub_of_prefix_minimizers.lean
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: finite be-the-leader cumulative-cost bound from regularized prefix
+--   minimizers; orig was Lemma_2_FTL_BTL_potential_generic
+-- generality used: an arbitrary state type, admissibility predicate, real-valued
+--   per-round cost, finite leader sequence, and real-valued potential; no matrix,
+--   topology, measure, convexity, smoothness, oracle, or finite-dimensional structure
+--   is used
+-- portable call pattern: follow-the-regularized-leader analyses for adaptive-gradient,
+--   online mirror-descent, and matrix/tensor preconditioner algorithms vary the state,
+--   feasible set, per-round costs, selected prefix minimizers, and regularizer while
+--   retaining the same leader-versus-terminal-leader cumulative inequality
+-- counterargument checked: the result is not paper-local traceability or a one-line
+--   wrapper; it packages the nontrivial finite be-the-leader induction independently
+--   of the matrix trace identities used by Shampoo to discharge its minimizer premise
+-- coverage search: searched `finite sum costs leader bounded by terminal leader cost
+--   potential prefix minimizer`, `follow the leader be the leader prefix minimizers
+--   cumulative inequality`, and the corresponding Mathlib semantic query; nearby
+--   SOptLib results cover finite telescopes or matrix prefix-objective conversion, while
+--   Mathlib hits cover generic finite sums, so none has this complete contract
+-- minimal hypotheses: admissibility is required only for the chosen leader competitors;
+--   prefix minimality is pointwise in the endpoint and competitor, and no existence,
+--   uniqueness, positivity, or global minimizer object is assumed
+
+/-- Regularized prefix minimizers bound their cumulative played costs by the
+terminal leader's cumulative cost plus the terminal potential change.
+
+At each prefix endpoint, `leader` minimizes the sum of all preceding costs plus
+`potential` over admissible states. Comparing consecutive leaders and inducting
+over the horizon yields the finite be-the-leader inequality.
+
+Layer: Layer1 | Gap: Level 1 (finite regularized be-the-leader induction)
+Proof: induct over strict finite prefixes, compare each prefix minimizer with the next admissible leader, expose the new endpoint cost with the masked-`Fin` prefix-sum successor identity, and rearrange the terminal inequality.
+Source: textbook follow-the-regularized-leader analysis and Mathlib finite big-operator order arithmetic
+Used in: adaptive-gradient, online mirror-descent, and matrix/tensor preconditioner regret proofs that compare cumulative costs at successive regularized leaders with the final leader objective
+Book citation: book/research/Source.json#/key_lemmas/1
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, follow-the-leader/be-the-leader potential step -/
+theorem sum_cost_le_terminal_cost_add_potential_sub_of_prefix_minimizers
+    {T : Nat} {State : Type*}
+    (cost : Fin T → State → ℝ)
+    (leader : Fin (T + 1) → State)
+    (potential : State → ℝ)
+    (admissible : State → Prop)
+    (hleader : ∀ N : Fin (T + 1), admissible (leader N))
+    (hmin : ∀ (N : Fin (T + 1)) (x : State), admissible x →
+      (∑ s : Fin T, if s.1 < N.1 then cost s (leader N) else 0) +
+          potential (leader N) ≤
+        (∑ s : Fin T, if s.1 < N.1 then cost s x else 0) + potential x) :
+    ∑ t : Fin T, cost t (leader t.succ) ≤
+      ∑ t : Fin T, cost t (leader (Fin.last T)) +
+        potential (leader (Fin.last T)) - potential (leader 0) := by
+  classical
+  have hprefix :
+      ∀ (n : Nat) (hn : n ≤ T),
+        (∑ s : Fin T, if s.1 < n then cost s (leader s.succ) else 0) +
+            potential (leader 0) ≤
+          (∑ s : Fin T, if s.1 < n then
+              cost s (leader ⟨n, Nat.lt_succ_of_le hn⟩) else 0) +
+            potential (leader ⟨n, Nat.lt_succ_of_le hn⟩) := by
+    intro n
+    induction n with
+    | zero =>
+        intro hn
+        simp
+    | succ n ih =>
+        intro hn
+        have hnT : n < T := Nat.lt_of_succ_le hn
+        let N : Fin (T + 1) := ⟨n, Nat.lt_succ_of_le (Nat.le_of_lt hnT)⟩
+        let Nnext : Fin (T + 1) := ⟨n + 1, Nat.lt_succ_of_le hn⟩
+        let idx : Fin T := ⟨n, hnT⟩
+        have ihN :
+            (∑ s : Fin T, if s.1 < n then cost s (leader s.succ) else 0) +
+                potential (leader 0) ≤
+              (∑ s : Fin T, if s.1 < n then cost s (leader N) else 0) +
+                potential (leader N) := by
+          simpa [N] using ih (Nat.le_of_lt hnT)
+        have hminN :
+            (∑ s : Fin T, if s.1 < n then cost s (leader N) else 0) +
+                potential (leader N) ≤
+              (∑ s : Fin T, if s.1 < n then cost s (leader Nnext) else 0) +
+                potential (leader Nnext) := by
+          simpa [N] using hmin N (leader Nnext) (hleader Nnext)
+        have hchain :
+            (∑ s : Fin T, if s.1 < n then cost s (leader s.succ) else 0) +
+                potential (leader 0) ≤
+              (∑ s : Fin T, if s.1 < n then cost s (leader Nnext) else 0) +
+                potential (leader Nnext) :=
+          le_trans ihN hminN
+        have hleft :=
+          sum_fin_lt_succ_eq_sum_fin_lt_add
+            (fun s : Fin T => cost s (leader s.succ)) hnT
+        have hright :=
+          sum_fin_lt_succ_eq_sum_fin_lt_add
+            (fun s : Fin T => cost s (leader Nnext)) hnT
+        have hterm : cost idx (leader idx.succ) = cost idx (leader Nnext) := by
+          congr
+        calc
+          (∑ s : Fin T, if s.1 < n + 1 then cost s (leader s.succ) else 0) +
+              potential (leader 0) =
+              ((∑ s : Fin T, if s.1 < n then cost s (leader s.succ) else 0) +
+                potential (leader 0)) + cost idx (leader Nnext) := by
+                  rw [hleft, hterm]
+                  ring
+          _ ≤ ((∑ s : Fin T, if s.1 < n then cost s (leader Nnext) else 0) +
+                potential (leader Nnext)) + cost idx (leader Nnext) := by
+                  linarith
+          _ = (∑ s : Fin T, if s.1 < n + 1 then cost s (leader Nnext) else 0) +
+                potential (leader Nnext) := by
+                  rw [hright]
+                  ring
+  have hterminal :
+      (∑ t : Fin T, cost t (leader t.succ)) + potential (leader 0) ≤
+        (∑ t : Fin T, cost t (leader (Fin.last T))) +
+          potential (leader (Fin.last T)) := by
+    simpa using hprefix T le_rfl
+  linarith
+
+-- Merged from Staging/Matrix_sum_dualQuadraticForm_regularizedPrefixGram_sqrt_le_two_trace.lean
+
+open scoped BigOperators MatrixOrder
+
+namespace Matrix
+
+-- Generalization plan (G0):
+-- concept/name: cumulative dual quadratic bound for square roots of regularized
+--   prefix Gram matrices, named
+--   `Matrix.sum_dualQuadraticForm_regularizedPrefixGram_sqrt_le_two_trace`;
+--   orig was `generic_regularized_hhat_equation6_bound`
+-- generality used: an arbitrary finite coordinate type with decidable equality,
+--   a finite real vector stream, and a strictly positive real ridge; no algorithm
+--   state, matrix dimensions encoded by `Fin`, rank, measure, convexity, smoothness,
+--   stochastic-oracle, or comparator assumptions are used
+-- portable call pattern: full-matrix AdaGrad, matrix FTRL, online Newton, and
+--   Shampoo-like adaptive methods vary the vector stream, finite coordinate type,
+--   positive ridge, and horizon while retaining the same cumulative inverse-metric
+--   charge bound by twice the terminal square-root trace
+-- counterargument checked: this is not paper-local traceability or a one-line
+--   wrapper; it composes prefix-Gram positivity, square-root trace-potential
+--   minimization, the finite be-the-leader inequality, and terminal objective
+--   evaluation into the reusable global bound consumed by adaptive-metric analyses
+-- coverage search: queried `sum dual quadratic form regularized prefix Gram square
+--   root less than twice trace terminal`, `regularized prefix Gram positive definite
+--   square root inverse quadratic sum trace bound`, and `follow the leader trace
+--   inverse potential prefix outer products cumulative bound`; SOptLib provides
+--   `Matrix.regularizedPrefixGram`,
+--   `sum_cost_le_terminal_cost_add_potential_sub_of_prefix_minimizers`, and the
+--   trace-potential/dual-quadratic component lemmas, while Mathlib semantic search
+--   found square-root positivity but no theorem with this cumulative contract
+-- minimal hypotheses: `Fintype` and `DecidableEq` support finite matrix spectral
+--   calculus and total inversion; strict positivity of the ridge is exactly what
+--   makes every prefix Gram matrix and its square root positive definite
+
+/-- The sum of inverse-metric quadratic costs in the square roots of
+ridge-regularized prefix Gram matrices is at most twice the trace of the terminal
+square root.
+
+Layer: Layer1 | Gap: Level 2 (full-matrix regularized prefix-Gram dual-cost bound)
+Proof: use the trace-plus-inverse-trace objective to make each regularized prefix square root a positive-definite prefix minimizer, apply finite be-the-leader, then evaluate the terminal square-root objective and discard the nonnegative initial potential.
+Source: textbook full-matrix AdaGrad/FTRL potential analysis, Mathlib continuous-functional-calculus square roots, and SOptLib finite prefix-minimizer and trace-inverse-potential APIs
+Used in: full-matrix AdaGrad, matrix FTRL, online Newton, and Shampoo-like regret proofs that charge cumulative gradient dual energies to the terminal adaptive preconditioner trace
+Book citation: book/research/Source.json#/key_lemmas/1
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Theorem 7 matrix regret analysis -/
+theorem sum_dualQuadraticForm_regularizedPrefixGram_sqrt_le_two_trace
+    {T : Nat} {ι : Type*} [Fintype ι] [DecidableEq ι]
+    (g : Fin T → ι → ℝ) {c : ℝ} (hc : 0 < c) :
+    (∑ t : Fin T,
+      SOptLib.finiteMatrixDualQuadraticForm
+        (cfc (R := ℝ) (p := IsSelfAdjoint) (fun x : ℝ => x ^ (1 / 2 : ℝ))
+          (regularizedPrefixGram g c t.succ))
+        (WithLp.toLp 2 (g t))) ≤
+      2 * trace
+        (cfc (R := ℝ) (p := IsSelfAdjoint) (fun x : ℝ => x ^ (1 / 2 : ℝ))
+          (regularizedPrefixGram g c (Fin.last T))) := by
+  classical
+  let M : Fin (T + 1) → Matrix ι ι ℝ := fun N =>
+    ∑ s : Fin T, if s.1 < N.1 then Matrix.vecMulVec (g s) (g s) else 0
+  let H : Fin (T + 1) → Matrix ι ι ℝ := fun N =>
+    CFC.sqrt (regularizedPrefixGram g c N)
+  let Phi : Matrix ι ι ℝ → ℝ := traceInversePotential c
+  have hHpd : ∀ N : Fin (T + 1), (H N).PosDef := by
+    intro N
+    exact isStrictlyPositive_iff_posDef.mp
+      (regularizedPrefixGram_posDef g hc N).isStrictlyPositive.sqrt
+  have hPrefixMin :
+      ∀ (N : Fin (T + 1)) (K : Matrix ι ι ℝ), K.PosDef →
+        (∑ s : Fin T, if s.1 < N.1 then
+            SOptLib.finiteMatrixDualQuadraticForm (H N)
+              (WithLp.toLp 2 (g s)) else 0) + Phi (H N) ≤
+          (∑ s : Fin T, if s.1 < N.1 then
+            SOptLib.finiteMatrixDualQuadraticForm K
+              (WithLp.toLp 2 (g s)) else 0) + Phi K := by
+    intro N K hK
+    apply SOptLib.prefix_dualQuadratic_objective_le_of_trace_inverse_minimizer
+      (g := g) (A := M N) (H := H N) (K := K) (Phi := Phi) (N := N)
+      (hA := rfl)
+    simpa [M, H, Phi, regularizedPrefixGram] using
+      cfc_sqrt_minimizes_traceInversePotential_objective (M N) c
+        (by simpa [M, regularizedPrefixGram] using
+          regularizedPrefixGram_posDef g hc N)
+        K hK
+  have hBTL :=
+    sum_cost_le_terminal_cost_add_potential_sub_of_prefix_minimizers
+      (cost := fun t K =>
+        SOptLib.finiteMatrixDualQuadraticForm K (WithLp.toLp 2 (g t)))
+      (leader := H) (potential := Phi)
+      (admissible := fun K : Matrix ι ι ℝ => K.PosDef)
+      hHpd hPrefixMin
+  let HT : Matrix ι ι ℝ := H (Fin.last T)
+  let H0 : Matrix ι ι ℝ := H 0
+  have hHTpd : HT.PosDef := by
+    simpa [HT] using hHpd (Fin.last T)
+  have hfinal_sum :
+      (∑ t : Fin T,
+        SOptLib.finiteMatrixDualQuadraticForm HT (WithLp.toLp 2 (g t))) =
+        trace (M (Fin.last T) * HT⁻¹) := by
+    symm
+    simpa [M] using
+      (SOptLib.trace_prefix_outer_sum_mul_inv_add_eq_sum_dualQuadraticForm_add
+        (g := g) (A := M (Fin.last T)) (N := Fin.last T) (hA := rfl)
+        (K := HT) (c := 0))
+  have hHT_sq : HT * HT = c • (1 : Matrix ι ι ℝ) + M (Fin.last T) := by
+    have hGramNonneg : 0 ≤ regularizedPrefixGram g c (Fin.last T) :=
+      (regularizedPrefixGram_posDef g hc (Fin.last T)).posSemidef.nonneg
+    change CFC.sqrt (regularizedPrefixGram g c (Fin.last T)) *
+        CFC.sqrt (regularizedPrefixGram g c (Fin.last T)) =
+      c • (1 : Matrix ι ι ℝ) + M (Fin.last T)
+    rw [CFC.sqrt_mul_sqrt_self _ hGramNonneg]
+    rfl
+  have hfinal_objective :
+      (∑ t : Fin T,
+        SOptLib.finiteMatrixDualQuadraticForm HT (WithLp.toLp 2 (g t))) +
+          Phi HT = 2 * trace HT := by
+    rw [hfinal_sum]
+    exact trace_mul_inv_add_traceInversePotential_eq_two_trace_of_square
+      (M (Fin.last T)) c HT hHTpd.isUnit hHT_sq
+  have hPhi0_nonneg : 0 ≤ Phi H0 := by
+    exact traceInversePotential_nonneg (le_of_lt hc) (hHpd 0).posSemidef
+  have hbound :
+      ∑ t : Fin T,
+          SOptLib.finiteMatrixDualQuadraticForm (H t.succ)
+            (WithLp.toLp 2 (g t)) ≤
+        2 * trace HT := by
+    rw [hfinal_objective] at hBTL
+    linarith
+  have hroot_eq : ∀ N : Fin (T + 1),
+      cfc (R := ℝ) (p := IsSelfAdjoint) (fun x : ℝ => x ^ (1 / 2 : ℝ))
+          (regularizedPrefixGram g c N) =
+        CFC.sqrt (regularizedPrefixGram g c N) := by
+    intro N
+    symm
+    rw [CFC.sqrt_eq_rpow,
+      CFC.rpow_eq_cfc_real (regularizedPrefixGram_posDef g hc N).posSemidef.nonneg]
+  simpa only [H, HT, hroot_eq] using hbound
+
+end Matrix
+
+/-! Phase 4 batch 19: `le_affineRecurrence_const_of_step_le_upto.lean`. -/
+
+-- Generalization plan (G0):
+-- concept/name: finite-horizon upper comparison with a constant-forcing affine
+--   recurrence; orig was `finiteWindowLinearBudget_bound_upto`
+-- generality used: an arbitrary partially ordered semiring whose addition and
+--   multiplication by nonnegative elements are monotone, a nonnegative recurrence
+--   coefficient, an arbitrary constant forcing and scale, and a finite horizon; no
+--   measure, probability, topology, norm, convexity, oracle, or optimization assumptions
+-- portable call pattern: stochastic-moment, consensus-error, gradient-tracking, and
+--   forced-filter proofs change the ordered scalar carrier, coefficient, forcing constant,
+--   scale, compared sequence, and horizon while retaining the same one-step comparison
+-- counterargument checked: Mathlib's general sequence-comparison theorem supplies the
+--   induction engine, but it does not expose the canonical affine-recurrence conclusion;
+--   this specialization is not paper traceability and avoids re-deriving the exact
+--   majorant sequence at each stochastic-optimization call site
+-- coverage search: symbol searches for "finite horizon affine recurrence upper bound exact
+--   recurrence nonnegative coefficient", "sequence bounded by constant forcing affine
+--   recurrence up to horizon", and "order comparison affine recurrence step inequality
+--   initial upper bound" found `SOptLib.affineRecurrence`, the directionally different
+--   `geometric_lower_bound_of_affine_recurrence`, and integral or matrix recurrences;
+--   Mathlib LeanSearch found `Monotone.seq_le_seq` and the homogeneous `le_geom`, which
+--   provide the engine and a forcing-free special case rather than the stated conclusion
+-- minimal hypotheses: only nonnegativity of the multiplicative coefficient is used;
+--   the source assumptions `0 <= C` and `0 <= E` are omitted because the comparison
+--   requires no sign condition on the constant forcing or its scale
+
+/-- A finite-horizon affine step inequality is bounded by the corresponding exact
+constant-forcing affine recurrence, with an optional right-hand scale.
+
+Layer: Layer1 | Gap: Level 1 (finite-horizon constant-forcing affine recurrence comparison)
+Proof: specialize Mathlib's `Monotone.seq_le_seq` to the monotone affine map `x ↦ M * x + C * E`; the exact comparison sequence follows the same map by the successor equation for `SOptLib.affineRecurrence` and semiring distributivity.
+Source: Mathlib ordered-semiring monotonicity and `Monotone.seq_le_seq`, together with the SOptLib canonical constant-coefficient affine recurrence
+Used in: within-period stochastic push-pull propagation bounds, and analogous consensus-error, gradient-tracking, stochastic-moment, and forced-filter estimates that compare a local one-step inequality with an exact scalar budget
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/6
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem le_affineRecurrence_const_of_step_le_upto
+    {R : Type*} [Semiring R] [PartialOrder R] [IsOrderedRing R]
+    (Y : ℕ → R) (M C E : R) (m : ℕ)
+    (hM : 0 ≤ M)
+    (hY0 : Y 0 ≤ 0)
+    (hstep : ∀ n : ℕ, n < m → Y (n + 1) ≤ M * Y n + C * E) :
+    ∀ n : ℕ, n ≤ m →
+      Y n ≤ SOptLib.affineRecurrence 0 M (fun _ => C) n * E := by
+  intro n hn
+  have hmono : Monotone (fun x : R => M * x + C * E) := by
+    intro a b hab
+    exact add_le_add (mul_le_mul_of_nonneg_left hab hM) le_rfl
+  apply hmono.seq_le_seq n
+  · simpa using hY0
+  · intro k hk
+    exact hstep k (lt_of_lt_of_le hk hn)
+  · intro k _hk
+    simp [SOptLib.affineRecurrence_succ, add_mul, mul_assoc]
+
+/-! Phase 4 batch 19: `sub_smul_sum_range_eq_of_succ_recurrence.lean`. -/
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: shifted finite-prefix closed form of a subtractive successor
+--   recurrence; orig was the local block `liftedCenter_block_telescope_hprefix`
+-- generality used: an arbitrary scalar semiring, additive commutative group and
+--   module, two natural-number sequences, one scalar, a start index, and a prefix
+--   length; no norm, topology, measure, finite-dimensionality, optimization, or
+--   stochastic assumptions are used
+-- portable call pattern: gradient descent, mirror-coordinate, consensus-center,
+--   and gradient-tracking proofs change the state space, start index, step scalar,
+--   and driving sequence while unrolling the same subtractive update over a finite
+--   shifted range
+-- counterargument checked: this is not paper-local traceability or a caller-side
+--   expression; it packages recurrence consumption, index shifting, scalar
+--   distribution, and finite-prefix telescoping in one reusable call
+-- coverage search: queries for "successor recurrence subtraction scalar multiple
+--   telescopes arbitrary start finite range sum" and the exact shifted endpoint
+--   shape found Mathlib `Finset.sum_range_induction`, `Finset.sum_range_sub'`, and
+--   SOptLib `fin_state_eq_base_add_sum_lt_of_succ_eq_add`; the Mathlib results are
+--   proof ingredients, while the SOptLib theorem uses fixed-horizon `Fin` states
+--   and a masked `Fin` sum rather than a natural sequence and shifted range
+-- minimal hypotheses: `Semiring R`, `AddCommGroup E`, and `Module R E` are exactly
+--   what subtraction and distribution of the constant scalar over the sum require
+
+/-- A subtractive successor recurrence unrolls to a shifted finite-prefix sum.
+
+For a module-valued sequence satisfying `x (n + 1) = x n - a • u n`, the state
+after `m` steps from any `start` is the starting state minus `a` times the sum of
+the `m` driving terms beginning at `start`.
+
+Layer: Layer1 | Gap: Level 1 (shifted finite-prefix recurrence telescope)
+Proof: Induct on the prefix length, apply the successor recurrence at the exposed endpoint, append the new driving term with `Finset.sum_range_succ`, and distribute the scalar action over the sum.
+Source: Mathlib finite sums over natural ranges, module scalar-distribution, and additive-commutative-group algebra
+Used in: iterative optimization and distributed gradient-tracking arguments that telescope a constant-step subtractive state update from an arbitrary block or epoch boundary
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/3/proof/4
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem sub_smul_sum_range_eq_of_succ_recurrence
+    {R E : Type*} [Semiring R] [AddCommGroup E] [Module R E]
+    (x u : Nat → E) (a : R) (start m : Nat)
+    (hstep : ∀ n, x (n + 1) = x n - a • u n) :
+    x (start + m) =
+      x start - a • ∑ r ∈ Finset.range m, u (start + r) := by
+  induction m with
+  | zero => simp
+  | succ m ih =>
+      calc
+        x (start + (m + 1)) = x ((start + m) + 1) := by
+          rw [Nat.add_assoc]
+        _ = x (start + m) - a • u (start + m) := hstep (start + m)
+        _ = (x start - a • ∑ r ∈ Finset.range m, u (start + r)) -
+              a • u (start + m) := by rw [ih]
+        _ = x start - a • ∑ r ∈ Finset.range (m + 1), u (start + r) := by
+          rw [Finset.sum_range_succ, smul_add]
+          abel
+
+/-! Phase 4 batch 19: `affineRecurrence_window_unroll.lean`. -/
+
+-- Generalization plan (G0):
+-- concept/name: finite-window unrolling of a time-varying affine recurrence;
+--   orig was `quadraticRestrictedConsecutiveProduct_affine_process_action`
+-- generality used: an arbitrary finite coordinate type, scalar semiring,
+--   time-varying square matrices, state and forcing sequences, and a recursively
+--   propagated forcing accumulator; no order, topology, norm, measure,
+--   probability, optimization, or finite-dimensional vector-space assumptions
+-- portable call pattern: linear stochastic approximation, switched control,
+--   consensus, gradient-tracking, and momentum proofs change the coordinate
+--   type, scalar semiring, transition schedule, state, forcing, window start,
+--   and horizon while retaining the same product-plus-forcing conclusion
+-- counterargument checked: the closest staged result is the zero-initial
+--   explicit Duhamel sum for continuous linear maps; this theorem instead keeps
+--   a nonzero boundary state and a recursive forcing accumulator, supports an
+--   arbitrary window start, and requires only semiring-valued finite matrices
+-- coverage search: symbol queries for "affine recurrence window unroll matrix
+--   consecutive product boundary state recursively propagated forcing equality"
+--   found `linearRecurrence_eq_consecutiveProduct_response` and
+--   `FiniteNetwork.consecutiveProduct_mulVec_eq_of_step`; Mathlib LeanSearch
+--   found only homogeneous `LinearRecurrence.mkSol`, so coverage is partial
+-- minimal hypotheses: `[Semiring R]`, finite decidable coordinates, and the
+--   pointwise state and accumulator update rules on the selected window are all
+--   that the induction and matrix-action laws use
+
+/-- A time-varying affine recurrence unrolls over a finite window into the
+consecutive homogeneous product applied to its boundary state plus the forcing
+accumulated by the same transitions.
+
+Layer: Layer1 | Gap: Level 1 (finite-window variation-of-constants with recursive forcing)
+Proof: Induct on the window length, substitute the state and forcing-accumulator successor rules, distribute the newest matrix action over addition, and compose it with the preceding consecutive product.
+Source: discrete variation-of-constants for nonautonomous linear systems, Mathlib finite-matrix `mulVec` action laws, and `FiniteNetwork.consecutiveProduct`
+Used in: unrolling the restricted noisy quadratic push-pull state before period-map spectral decomposition, and in analogous switched consensus, gradient-tracking, control, and stochastic-approximation recurrences
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/0
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem affineRecurrence_window_unroll
+    {ι R : Type*} [Fintype ι] [DecidableEq ι] [Semiring R]
+    (A : Nat → Matrix ι ι R) (z b : Nat → ι → R)
+    (acc : Nat → ι → R) (start n : Nat)
+    (hz : ∀ k < n,
+      z (start + k + 1) = (A (start + k)).mulVec (z (start + k)) + b (start + k))
+    (hacc_zero : acc 0 = 0)
+    (hacc_succ : ∀ k < n,
+      acc (k + 1) = (A (start + k)).mulVec (acc k) + b (start + k)) :
+    z (start + n) =
+      (FiniteNetwork.consecutiveProduct A start n).mulVec (z start) + acc n := by
+  induction n with
+  | zero =>
+      simp [hacc_zero]
+  | succ n ih =>
+      have hz' := hz n (Nat.lt_succ_self n)
+      have hacc' := hacc_succ n (Nat.lt_succ_self n)
+      have ih' := ih
+        (fun k hk => hz k (Nat.lt_succ_of_lt hk))
+        (fun k hk => hacc_succ k (Nat.lt_succ_of_lt hk))
+      rw [show start + (n + 1) = start + n + 1 by omega, hz', ih',
+        hacc', FiniteNetwork.consecutiveProduct_succ, Matrix.mulVec_add,
+        Matrix.mulVec_mulVec]
+      simp only [add_assoc]
+
+/-! Phase 4 batch 19: `linearDuhamelResponse_eq_projectionComplementAction_of_split_recurrence.lean`. -/
+
+-- Generalization plan (G0):
+-- concept/name: identification of a finite discrete Duhamel response with the
+--   complementary component of a split affine recurrence; orig was
+--   quadraticRestrictedStableBoundaryResponse_eq_boundary_stableComplement
+-- generality used: an arbitrary real normed additive commutative group and real
+--   normed space, three continuous linear endomorphisms, and only the pointwise
+--   affine recurrence and complementary-step equations
+-- portable call pattern: spectral slow/stable decompositions and
+--   consensus/disagreement recurrences call the same result while changing the state
+--   space, affine state sequence, transition, projection, stable remainder, the
+--   algebraic conditions establishing the complementary step, and forcing sequence
+-- counterargument checked: the successor API for `linearDuhamelResponse` and the
+--   one-step complementary-projection identity each cover only one edge; their
+--   induction-level composition identifying the closed response with the true state
+--   component is absent from Mathlib/SOptLib and is not paper-local traceability
+-- coverage search: symbol queries "linear Duhamel response equals projection complement
+--   affine recurrence split idempotent annihilation" and "projection complement of
+--   affine recurrence equals forced linear recurrence" found
+--   `SOptLib.linearDuhamelResponse_succ` and
+--   `Module.End.projectionComplementAction_split_step`, but no theorem with this full
+--   equality contract
+-- minimal hypotheses: finite coordinates, matrices, spectral bounds, completeness,
+--   finite dimensionality, probability, and measurability are eliminated; the split
+--   algebra is reduced to the pointwise complementary-step fact actually used, while
+--   real normed-space structure remains only because the canonical
+--   `linearDuhamelResponse` is built from continuous real-linear endomorphisms
+
+namespace SOptLib
+
+/-- The Duhamel response of the stable projected initial state and forcing equals
+the complementary component of every state in a split affine recurrence.
+
+Layer: Layer1 | Gap: Level 1 (Duhamel identification for a split affine recurrence)
+Proof: induct on time, using `linearDuhamelResponse_succ`, the affine recurrence, and the supplied complementary-step identity at the successor.
+Source: discrete variation of constants and uniqueness of solutions to forced linear recurrences
+Used in: identifying stable block-boundary responses with the complementary state component in spectral distributed recurrences before finite-phase propagation
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/2
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem linearDuhamelResponse_eq_projectionComplementAction_of_split_recurrence
+    {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (P F A : E →L[ℝ] E)
+    (y xi : ℕ → E)
+    (hrec : ∀ k : ℕ, y (k + 1) = A (y k) + xi k)
+    (hsplit : ∀ z eta : E,
+      (1 - P) (A z + eta) = F ((1 - P) z) + (1 - P) eta) :
+    ∀ k : ℕ,
+      linearDuhamelResponse F ((1 - P) (y 0))
+          (fun j => (1 - P) (xi j)) k =
+        (1 - P) (y k) := by
+  intro k
+  induction k with
+  | zero => simp
+  | succ k ih =>
+      rw [linearDuhamelResponse_succ, ih, hrec]
+      exact (hsplit (y k) (xi k)).symm
+
+end SOptLib
+
+/-! Phase 4 batch 19: `second_moment_affine_recurrence_eq_of_cross_zero.lean`. -/
+
+open MeasureTheory
+open scoped InnerProductSpace
+
+-- Generalization plan (G0):
+-- concept/name: exact Hilbert-space second-moment recurrence for an affine
+--   stochastic update with orthogonal innovation; orig was
+--   `quadraticScalarBlockBoundarySecondMoment_recursion`
+-- generality used: arbitrary measurable sample space, arbitrary measure, real
+--   normed inner-product-space state, deterministic scalar multiplier, and L2
+--   state and innovation processes; no probability or finite-dimensionality
+-- portable call pattern: stochastic approximation, recursive estimation, and
+--   tracking proofs can change the state process, innovation process, and scalar
+--   contraction while reusing the same exact next-second-moment recurrence
+-- counterargument checked: the fixed-combination Glue diagonalization is close
+--   but does not encode an affine process update or expose a sequence recurrence;
+--   the existing Layer1 additive theorem has unit multiplier and only an upper bound
+-- coverage search: queries `second moment affine update equality zero cross inner
+--   product` and `integral norm squared scalar multiple add exact decomposition
+--   cross zero` found `integral_norm_sq_smul_add_smul_eq_of_integral_inner_eq_zero`
+--   (the algebraic step reused below) and
+--   `second_moment_add_recurrence_le_of_cross_zero` (partial, inequality only)
+-- minimal hypotheses: L2 membership supplies diagonal and cross integrability;
+--   the update holds almost everywhere under the integration measure, and the
+--   only stochastic cancellation is the zero integrated cross inner product
+
+/-- An affine stochastic update with orthogonal innovation satisfies an exact
+second-moment recurrence.
+
+Layer: Layer1 | Gap: Level 1 (exact affine-update second-moment recurrence)
+Proof: derive diagonal and cross integrability from the two `MemLp` hypotheses, rewrite the next state by the pointwise affine update, and apply the two-term Hilbert second-moment diagonalization theorem.
+Source: Mathlib `MemLp` squared-norm integrability and real Hilbert polarization, together with SOptLib's integral cross-moment diagonalization API
+Used in: block-boundary stochastic tracking recurrences after a fresh block innovation is proved orthogonal to the preceding block state
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/15/proof/1
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem second_moment_affine_recurrence_eq_of_cross_zero
+    {Omega E : Type*} [MeasurableSpace Omega]
+    [NormedAddCommGroup E] [InnerProductSpace Real E]
+    (mu : Measure Omega) (X innovation : Nat -> Omega -> E) (gamma : Real)
+    (hX : forall k, MemLp (X k) 2 mu)
+    (hinnovation : forall k, MemLp (innovation k) 2 mu)
+    (hupdate : forall k,
+      X (k + 1) =ᵐ[mu] fun omega => gamma • X k omega + innovation k omega)
+    (hcross_zero : forall k,
+      (∫ omega, inner Real (X k omega) (innovation k omega) ∂mu) = 0) :
+    forall k,
+      (∫ omega, ‖X (k + 1) omega‖ ^ 2 ∂mu) =
+        gamma ^ 2 * (∫ omega, ‖X k omega‖ ^ 2 ∂mu) +
+          ∫ omega, ‖innovation k omega‖ ^ 2 ∂mu := by
+  intro k
+  have hX_sq : Integrable (fun omega => ‖X k omega‖ ^ 2) mu :=
+    (memLp_two_iff_integrable_sq_norm (hX k).aestronglyMeasurable).1 (hX k)
+  have hinnovation_sq :
+      Integrable (fun omega => ‖innovation k omega‖ ^ 2) mu :=
+    (memLp_two_iff_integrable_sq_norm
+      (hinnovation k).aestronglyMeasurable).1 (hinnovation k)
+  have hcross_int :
+      Integrable (fun omega => inner Real (X k omega) (innovation k omega)) mu :=
+    integrable_inner_of_integrable_sq_norm
+      (hX k).aestronglyMeasurable (hinnovation k).aestronglyMeasurable
+      hX_sq hinnovation_sq
+  have hdiag :=
+    integral_norm_sq_smul_add_smul_eq_of_integral_inner_eq_zero
+      mu (X k) (innovation k) gamma 1 hX_sq hinnovation_sq hcross_int
+      (hcross_zero k)
+  calc
+    (∫ omega, ‖X (k + 1) omega‖ ^ 2 ∂mu) =
+        ∫ omega, ‖gamma • X k omega + (1 : Real) • innovation k omega‖ ^ 2 ∂mu := by
+      apply integral_congr_ae
+      filter_upwards [hupdate k] with omega hupdate_omega
+      rw [hupdate_omega, one_smul]
+    _ = gamma ^ 2 * (∫ omega, ‖X k omega‖ ^ 2 ∂mu) +
+          ∫ omega, ‖innovation k omega‖ ^ 2 ∂mu := by
+      simpa using hdiag
+
+/-! Phase 4 batch 19: `integral_affine_recurrence_eq_initial_mul_pow_of_innovation_zero.lean`. -/
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: expected value of a constant-coefficient affine recurrence with
+--   centered innovations; orig was
+--   `quadraticScalarComparisonProcess_block_boundary_integral_eq_x0_mul_gamma_pow`
+-- generality used: an arbitrary measurable sample space and probability measure,
+--   real-valued state and innovation processes, and only first-moment integrability;
+--   no independence, second moments, convexity, or optimization assumptions
+-- portable call pattern: stochastic approximation, autoregressive estimation, and
+--   distributed block-recursion proofs can change the state, coefficient, initial
+--   value, and innovation process while retaining the geometric expected-state formula
+-- counterargument checked: deterministic affine-recurrence uniqueness applies only
+--   after deriving the expectation recurrence, while the staged second-moment result
+--   concerns squared norms and cross moments; neither covers this first-moment bridge
+-- coverage search: queries `integral affine recurrence equals initial times coefficient
+--   power zero mean innovation` and `expectation affine recursion mean zero forcing
+--   equals initial coefficient power` found `SOptLib.eq_affineRecurrence_of_zero_of_succ`
+--   and `second_moment_affine_recurrence_eq_of_cross_zero` as partial hits; Mathlib
+--   semantic search found only general linear-recurrence infrastructure
+-- minimal hypotheses: probability normalization is used only for the initial constant;
+--   integrability is pointwise in time, the update is pointwise, and innovation
+--   centering is assumed directly at the integral level
+
+/-- The expectation of a constant-coefficient affine recurrence with centered
+innovations is the initial value times the corresponding geometric power.
+
+Layer: Layer1 | Gap: Level 1 (first-moment affine-recurrence expectation formula)
+Proof: induct on time, integrate the pointwise affine update using first-moment integrability, cancel the innovation integral, and normalize the constant base case with the probability measure.
+Source: Mathlib Bochner integral linearity, constant integration under a probability measure, and natural-power recursion
+Used in: block-boundary stochastic comparison recurrences where each fresh block innovation has zero mean and the deterministic block multiplier is constant
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/15/proof/1
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem integral_affine_recurrence_eq_initial_mul_pow_of_innovation_zero
+    {Omega : Type*} [MeasurableSpace Omega]
+    (mu : Measure Omega) [IsProbabilityMeasure mu]
+    (X innovation : Nat -> Omega -> Real) (x0 gamma : Real)
+    (hX_integrable : forall k, Integrable (X k) mu)
+    (hinnovation_integrable : forall k, Integrable (innovation k) mu)
+    (hzero : forall omega, X 0 omega = x0)
+    (hupdate : forall k omega,
+      X (k + 1) omega = gamma * X k omega + innovation k omega)
+    (hinnovation_zero : forall k, (∫ omega, innovation k omega ∂mu) = 0) :
+    forall k, (∫ omega, X k omega ∂mu) = x0 * gamma ^ k := by
+  intro k
+  induction k with
+  | zero =>
+      have hpoint : X 0 = fun _ : Omega => x0 := by
+        funext omega
+        exact hzero omega
+      rw [hpoint, integral_const]
+      simp
+  | succ k ih =>
+      have hpoint : X (k + 1) =
+          fun omega => gamma * X k omega + innovation k omega := by
+        funext omega
+        exact hupdate k omega
+      calc
+        (∫ omega, X (k + 1) omega ∂mu) =
+            ∫ omega, gamma * X k omega + innovation k omega ∂mu := by
+              rw [hpoint]
+        _ = gamma * (∫ omega, X k omega ∂mu) +
+              ∫ omega, innovation k omega ∂mu := by
+              rw [integral_add]
+              · rw [integral_const_mul]
+              · exact (hX_integrable k).const_mul gamma
+              · exact hinnovation_integrable k
+        _ = gamma * (x0 * gamma ^ k) + 0 := by
+              rw [ih, hinnovation_zero k]
+        _ = x0 * gamma ^ (k + 1) := by
+              rw [pow_succ]
+              ring
+
+/-! Phase 4 batch 19: `affine_recurrence_cross_integral_eq_zero_of_future_orthogonal.lean`. -/
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: propagation of future cross-moment orthogonality through an
+--   affine recurrence; orig was
+--   `quadraticScalarComparisonProcess_weightedNoise_cross_integral_eq_zero`
+-- generality used: arbitrary measurable sample space and measure, real-valued
+--   state, innovation, and future-test processes, time-varying real coefficient
+--   schedules, and L2 hypotheses only to justify cross-product integrability;
+--   no probability normalization, independence, convexity, or optimization data
+-- portable call pattern: stochastic approximation, autoregressive estimation,
+--   and distributed tracking proofs can change the state and innovation
+--   processes and both coefficient schedules while reusing the same induction
+--   from initial/fresh-to-future orthogonality to state-to-future orthogonality
+-- counterargument checked: this is not paper-local traceability or a caller-side
+--   expression because it packages the nontrivial invariant induction and the
+--   L2-to-L1 product bridge; the existing first-moment and second-moment affine
+--   recurrence lemmas have different conclusions and do not propagate future
+--   cross moments
+-- coverage search: queries `affine recurrence future innovation cross integral
+--   zero orthogonal` and `integral product recurrence zero initial fresh future
+--   orthogonal` found only the partial hits
+--   `integral_affine_recurrence_eq_initial_mul_pow_of_innovation_zero`,
+--   `second_moment_affine_recurrence_eq_of_cross_zero`, and Mathlib's algebraic
+--   `LinearRecurrence` API; none proves this future cross-moment invariant
+-- minimal hypotheses: the measure is arbitrary; L2 is required separately for
+--   the state, innovation, and test processes, the affine update is pointwise,
+--   and orthogonality is assumed only for the initial state and strictly future
+--   innovation/test pairs
+
+/-- An affine state built from past innovations has zero cross integral with
+every future test process when the initial state and each earlier innovation do.
+
+Layer: Layer1 | Gap: Level 1 (future cross-moment invariant for affine recurrences)
+Proof: induct on the state time, rewrite the pointwise affine update, use L2 Holder integrability to split the cross integral, and cancel the inherited and fresh cross moments.
+Source: Mathlib `MeasureTheory.MemLp.integrable_mul` and Bochner integral linearity, together with the standard adapted-state/future-innovation orthogonality induction
+Used in: block stochastic comparison recurrences where a boundary state is assembled from earlier centered oracle noises and paired with a later weighted noise
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/assumptions/6
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem affine_recurrence_cross_integral_eq_zero_of_future_orthogonal
+    {Omega : Type*} [MeasurableSpace Omega]
+    (mu : Measure Omega)
+    (X xi Z : Nat -> Omega -> Real) (a b : Nat -> Real)
+    (hX_memLp : forall t, MemLp (X t) 2 mu)
+    (hxi_memLp : forall t, MemLp (xi t) 2 mu)
+    (hZ_memLp : forall u, MemLp (Z u) 2 mu)
+    (hupdate : forall t omega,
+      X (t + 1) omega = a t * X t omega + b t * xi t omega)
+    (hinitial : forall u, (∫ omega, X 0 omega * Z u omega ∂mu) = 0)
+    (hfuture : forall {t u}, t < u ->
+      (∫ omega, xi t omega * Z u omega ∂mu) = 0) :
+    forall {t u}, t <= u ->
+      (∫ omega, X t omega * Z u omega ∂mu) = 0 := by
+  have mul_integrable {f g : Omega -> Real}
+      (hf : MemLp f 2 mu) (hg : MemLp g 2 mu) :
+      Integrable (fun omega => f omega * g omega) mu := by
+    have hprod : Integrable (fun omega => ‖f omega‖ * ‖g omega‖) mu := by
+      simpa [Pi.mul_apply] using
+        (MemLp.integrable_mul hf.norm hg.norm :
+          Integrable ((fun omega => ‖f omega‖) *
+            (fun omega => ‖g omega‖)) mu)
+    exact hprod.mono'
+      (hf.aestronglyMeasurable.mul hg.aestronglyMeasurable)
+      (Filter.Eventually.of_forall fun omega => by simp [norm_mul])
+  intro t
+  induction t with
+  | zero =>
+      intro u _htu
+      exact hinitial u
+  | succ t ih =>
+      intro u htu
+      have ht_le_u : t <= u := Nat.le_trans (Nat.le_succ t) htu
+      have ht_lt_u : t < u := Nat.succ_le_iff.mp htu
+      have hstate_zero : (∫ omega, X t omega * Z u omega ∂mu) = 0 :=
+        ih ht_le_u
+      have hinnovation_zero :
+          (∫ omega, xi t omega * Z u omega ∂mu) = 0 :=
+        hfuture ht_lt_u
+      have hstate_integrable :
+          Integrable (fun omega => X t omega * Z u omega) mu :=
+        mul_integrable (hX_memLp t) (hZ_memLp u)
+      have hinnovation_integrable :
+          Integrable (fun omega => xi t omega * Z u omega) mu :=
+        mul_integrable (hxi_memLp t) (hZ_memLp u)
+      calc
+        (∫ omega, X (t + 1) omega * Z u omega ∂mu) =
+            ∫ omega,
+              (a t * X t omega + b t * xi t omega) * Z u omega ∂mu := by
+          apply integral_congr_ae
+          filter_upwards [] with omega
+          rw [hupdate]
+        _ = ∫ omega,
+              a t * (X t omega * Z u omega) +
+                b t * (xi t omega * Z u omega) ∂mu := by
+          apply integral_congr_ae
+          filter_upwards [] with omega
+          ring
+        _ = a t * (∫ omega, X t omega * Z u omega ∂mu) +
+              b t * (∫ omega, xi t omega * Z u omega ∂mu) := by
+          rw [integral_add]
+          · rw [integral_const_mul, integral_const_mul]
+          · exact hstate_integrable.const_mul (a t)
+          · exact hinnovation_integrable.const_mul (b t)
+        _ = 0 := by rw [hstate_zero, hinnovation_zero]; ring
+
+/-! Phase 4 batch 19: `abs_le_geometric_convolution_of_affine_recurrence.lean`. -/
+
+-- Generalization plan (G0):
+-- concept/name: absolute geometric-convolution envelope for a scalar affine
+--   recurrence; orig was `scalar_ar_abs_convolution_bound`
+-- generality used: real-valued state and forcing sequences with a constant real
+--   multiplier whose absolute value is bounded by the geometric coefficient; no
+--   measure, probability, convexity, smoothness, or optimization assumptions
+-- portable call pattern: scalar stochastic-approximation errors, stable filter
+--   coordinates, and distributed-optimization comparison recurrences change the
+--   state, forcing, and coefficients while retaining the same pathwise convolution
+--   envelope
+-- counterargument checked: this is not paper-local traceability or a caller-side
+--   expression because it packages the nontrivial induction from an exact forced
+--   affine recurrence to its finite Duhamel majorant; existing response theorems
+--   require an unrolled formula and Mathlib's `le_geom` has no forcing term
+-- coverage search: symbol queries for an affine-recurrence absolute geometric
+--   convolution bound found only fixed-response, matrix-consensus, and homogeneous
+--   recurrence results; Mathlib semantic search found `le_geom` as partial coverage
+-- minimal hypotheses: `|gamma| <= r` replaces source assumptions `0 <= gamma`,
+--   `gamma <= r`, and `0 <= r`, since it is exactly the multiplier domination used
+--   by the proof and implies nonnegativity of `r`
+
+open scoped BigOperators
+
+/-- The absolute value of a scalar affine recurrence is bounded by its initial
+value propagated geometrically plus the geometric convolution of its forcing.
+
+Layer: Layer1 | Gap: Level 1 (forced scalar affine-recurrence convolution envelope)
+Proof: induct on time, apply the absolute-value triangle inequality at each affine update, replace the multiplier by its geometric majorant, and split the successor convolution into its prefix and newest forcing term.
+Source: discrete variation of constants, Mathlib real absolute-value inequalities, finite sums over `Finset.range`, and the homogeneous comparison theorem `le_geom`
+Used in: pathwise slow-coordinate error estimates for stochastic approximation and distributed gradient tracking before convolution-energy or expectation bounds are applied
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/5
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem abs_le_geometric_convolution_of_affine_recurrence
+    {gamma r : Real} (err eta : Nat -> Real)
+    (hgamma_le_r : |gamma| <= r)
+    (hrec : forall k : Nat, err (k + 1) = gamma * err k + eta k) :
+    forall t : Nat,
+      |err t| <=
+        r ^ t * |err 0| +
+          Finset.sum (Finset.range t) (fun j =>
+            r ^ (t - 1 - j) * |eta j|) := by
+  classical
+  have hr_nonneg : 0 <= r := (abs_nonneg gamma).trans hgamma_le_r
+  intro t
+  induction t with
+  | zero =>
+      simp
+  | succ t ih =>
+      have hstep_abs :
+          |err (t + 1)| <= |gamma| * |err t| + |eta t| := by
+        rw [hrec t]
+        calc
+          |gamma * err t + eta t| <= |gamma * err t| + |eta t| :=
+            abs_add_le _ _
+          _ = |gamma| * |err t| + |eta t| := by rw [abs_mul]
+      have hgamma_to_r :
+          |gamma| * |err t| <= r * |err t| :=
+        mul_le_mul_of_nonneg_right hgamma_le_r (abs_nonneg _)
+      have hsum_succ :
+          (Finset.range (t + 1)).sum (fun j =>
+              r ^ (t + 1 - 1 - j) * |eta j|) =
+            r * (Finset.range t).sum (fun j =>
+                r ^ (t - 1 - j) * |eta j|) + |eta t| := by
+        have hprefix :
+            (Finset.range t).sum (fun j =>
+                r ^ (t + 1 - 1 - j) * |eta j|) =
+              r * (Finset.range t).sum (fun j =>
+                  r ^ (t - 1 - j) * |eta j|) := by
+          rw [Finset.mul_sum]
+          apply Finset.sum_congr rfl
+          intro j hj
+          have hj_lt : j < t := Finset.mem_range.mp hj
+          have hexp : t + 1 - 1 - j = (t - 1 - j) + 1 := by omega
+          rw [hexp, pow_succ]
+          ring
+        rw [Finset.sum_range_succ, hprefix]
+        simp
+      calc
+        |err (t + 1)| <= |gamma| * |err t| + |eta t| := hstep_abs
+        _ <= r * |err t| + |eta t| := add_le_add hgamma_to_r le_rfl
+        _ <=
+            r * (r ^ t * |err 0| +
+              (Finset.range t).sum (fun j =>
+                r ^ (t - 1 - j) * |eta j|)) + |eta t| := by
+              exact add_le_add
+                (mul_le_mul_of_nonneg_left ih hr_nonneg) le_rfl
+        _ =
+            r ^ (t + 1) * |err 0| +
+              (Finset.range (t + 1)).sum (fun j =>
+                r ^ (t + 1 - 1 - j) * |eta j|) := by
+              rw [hsum_succ]
+              ring
+
+-- Merged from Staging/Matrix_sum_dualQuadraticForm_prefixGram_sqrt_le_two_trace.lean
+
+open Topology
+open scoped BigOperators MatrixOrder
+
+namespace Matrix
+
+-- Generalization plan (G0):
+-- concept/name: singular-endpoint cumulative dual quadratic bound for square
+--   roots of prefix Gram matrices, named
+--   `Matrix.sum_dualQuadraticForm_prefixGram_sqrt_le_two_trace`; orig was
+--   `generic_hhat_positive_delta_range_limit_bound`
+-- generality used: an arbitrary finite coordinate type with decidable equality,
+--   a finite real vector stream, and a nonnegative real ridge; no algorithm
+--   state, rank bound, measure, convexity, smoothness, stochastic-oracle, or
+--   comparator assumptions are used
+-- portable call pattern: full-matrix AdaGrad, matrix FTRL, online Newton, and
+--   Shampoo-like methods vary the gradient stream, horizon, coordinate type,
+--   and nonnegative base ridge while using supported positive-regularization
+--   limits whose sum is controlled by the terminal prefix-Gram square-root trace
+-- counterargument checked: the positive-ridge theorem
+--   `Matrix.sum_dualQuadraticForm_regularizedPrefixGram_sqrt_le_two_trace` does
+--   not cover a singular base ridge; this result adds the nontrivial spectral
+--   support construction, convergence at zero, and passage of its sum bound to
+--   the endpoint, so it is neither a duplicate nor a paper-local wrapper
+-- coverage search: queried `sum dual quadratic form prefix Gram square root
+--   singular regularization limit support twice terminal trace`, `regularized
+--   prefix Gram inverse square root dual quadratic limits nonnegative ridge`,
+--   and the full contract with Mathlib LeanSearch; the closest project hits were
+--   the strictly-positive-ridge bound, the shifted spectral-support certificate,
+--   the square-root trace limit, and the generic finite-sum limit inequality,
+--   while Mathlib returned only PSD square-root component declarations
+-- minimal hypotheses: `Fintype` and `DecidableEq` support finite Hermitian
+--   spectral calculus and matrices; nonnegativity of the ridge is exact because
+--   positive perturbations supply the strict positivity used before taking the
+--   possibly singular endpoint limit
+
+/-- Each inclusive prefix-Gram inverse-square-root dual cost has a finite
+positive-regularization limit when the base ridge is nonnegative.
+
+Layer: Layer1 | Gap: Level 2 (supported singular prefix-Gram dual-cost limits)
+Proof: dominate the current vector outer product by its inclusive prefix Gram matrix, obtain a zero-eigenspace spectral-support certificate, and pass the shifted inverse-square-root spectral sum to zero.
+Source: Mathlib finite Hermitian spectral calculus and real-power convergence, together with SOptLib regularized prefix-Gram positivity, inclusive-prefix domination, and shifted dual-quadratic spectral-support APIs
+Used in: singular full-matrix adaptive-gradient analyses that define each inverse-square-root gradient charge by a positive-ridge limit
+Book citation: book/research/Source.json#/key_lemmas/8/proof/15
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 1 matrix regret proof -/
+private theorem exists_dualQuadraticForm_prefixGram_sqrt_limit_at
+    {T : Nat} {ι : Type*} [Fintype ι] [DecidableEq ι]
+    (g : Fin T → ι → ℝ) (epsilon : ℝ) (heps : 0 ≤ epsilon) (t : Fin T) :
+    ∃ supportDual : ℝ,
+      Filter.Tendsto
+        (fun delta : ℝ ↦
+          if 0 < delta then
+            SOptLib.finiteMatrixDualQuadraticForm
+              (cfc (R := ℝ) (p := IsSelfAdjoint)
+                (fun x : ℝ ↦ x ^ (1 / 2 : ℝ))
+                (regularizedPrefixGram g (epsilon + delta) t.succ))
+              (WithLp.toLp 2 (g t))
+          else
+            0)
+        (nhdsWithin (0 : ℝ) (Set.Ioi 0))
+        (nhds supportDual) := by
+  classical
+  have hprefix : ∀ N : Fin (T + 1),
+      (regularizedPrefixGram g epsilon N).PosSemidef :=
+    fun N ↦ regularizedPrefixGram_posSemidef g heps N
+  have houter :
+      Matrix.vecMulVec (g t) (g t) ≤ regularizedPrefixGram g epsilon t.succ := by
+    simpa [regularizedPrefixGram] using
+      (term_le_base_add_sum_fin_lt_next_of_nonneg
+        (A := fun s : Fin T ↦ Matrix.vecMulVec (g s) (g s))
+        (base := epsilon • (1 : Matrix ι ι ℝ))
+        (hbase := (Matrix.PosSemidef.one.smul heps).nonneg)
+        (t := t)
+        (hA := fun s _ ↦
+          (Matrix.posSemidef_vecMulVec_self_star (g s)).nonneg))
+  obtain ⟨coeff, hcoeff_spec, hcoeff_zero, _hcoeff_def⟩ :=
+    dualQuadraticForm_cfc_sqrt_add_smul_one_spectral_support
+      (regularizedPrefixGram g epsilon t.succ) (g t) (hprefix t.succ) houter
+  let supportDual : ℝ :=
+    ∑ i : ι,
+      coeff i ^ 2 *
+        ((hprefix t.succ).1.eigenvalues i) ^ (-(1 / 2 : ℝ))
+  refine ⟨supportDual, ?_⟩
+  let lam : ι → ℝ := fun i ↦ (hprefix t.succ).1.eigenvalues i
+  have hlim :=
+    tendsto_sum_sq_mul_add_rpow_neg_half_of_support
+      lam coeff
+      (fun i ↦ by
+        simpa [lam] using (hprefix t.succ).eigenvalues_nonneg i)
+      (fun i hi ↦ hcoeff_zero i (by simpa [lam] using hi))
+  have heventual :
+      (fun delta : ℝ ↦
+        if 0 < delta then
+          SOptLib.finiteMatrixDualQuadraticForm
+            (cfc (R := ℝ) (p := IsSelfAdjoint)
+              (fun x : ℝ ↦ x ^ (1 / 2 : ℝ))
+              (regularizedPrefixGram g (epsilon + delta) t.succ))
+            (WithLp.toLp 2 (g t))
+        else
+          0) =ᶠ[nhdsWithin (0 : ℝ) (Set.Ioi 0)]
+      (fun delta : ℝ ↦
+        ∑ i : ι, coeff i ^ 2 * (lam i + delta) ^ (-(1 / 2 : ℝ))) := by
+    filter_upwards
+      [show Set.Ioi (0 : ℝ) ∈ nhdsWithin (0 : ℝ) (Set.Ioi 0) by
+        exact self_mem_nhdsWithin]
+      with delta hdelta
+    have hdelta_pos : 0 < delta := hdelta
+    rw [if_pos hdelta_pos]
+    have hshift :
+        regularizedPrefixGram g (epsilon + delta) t.succ =
+          regularizedPrefixGram g epsilon t.succ +
+            delta • (1 : Matrix ι ι ℝ) := by
+      simp only [regularizedPrefixGram_def, add_smul]
+      abel
+    rw [hshift]
+    simpa only [lam] using hcoeff_spec hdelta_pos
+  change Filter.Tendsto _ _
+    (nhds
+      (∑ i : ι,
+        coeff i ^ 2 * (lam i) ^ (-(1 / 2 : ℝ))))
+  exact hlim.congr' heventual.symm
+
+/-- A finite stream of inclusive prefix-Gram inverse-square-root dual costs has
+a family of positive-regularization limits when the base ridge is nonnegative.
+
+Layer: Layer1 | Gap: Level 1 (finite family of singular prefix-Gram dual-cost limits)
+Proof: choose the supported scalar limit supplied by the pointwise spectral-limit theorem at each finite time index.
+Source: Mathlib finite dependent choice together with the supported pointwise prefix-Gram dual-quadratic limit
+Used in: singular full-matrix adaptive-gradient arguments that aggregate the limiting inverse-square-root charge at every update time
+Book citation: book/research/Source.json#/key_lemmas/8/proof/15
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 1 matrix regret proof -/
+private theorem exists_dualQuadraticForm_prefixGram_sqrt_limits
+    {T : Nat} {ι : Type*} [Fintype ι] [DecidableEq ι]
+    (g : Fin T → ι → ℝ) (epsilon : ℝ) (heps : 0 ≤ epsilon) :
+    ∃ supportDual : Fin T → ℝ,
+      ∀ t : Fin T,
+        Filter.Tendsto
+          (fun delta : ℝ ↦
+            if 0 < delta then
+              SOptLib.finiteMatrixDualQuadraticForm
+                (cfc (R := ℝ) (p := IsSelfAdjoint)
+                  (fun x : ℝ ↦ x ^ (1 / 2 : ℝ))
+                  (regularizedPrefixGram g (epsilon + delta) t.succ))
+                (WithLp.toLp 2 (g t))
+            else
+              0)
+          (nhdsWithin (0 : ℝ) (Set.Ioi 0))
+          (nhds (supportDual t)) := by
+  classical
+  choose supportDual hsupport using
+    fun t ↦ exists_dualQuadraticForm_prefixGram_sqrt_limit_at g epsilon heps t
+  exact ⟨supportDual, hsupport⟩
+
+/-- Positive scalar regularizations of prefix-Gram inverse-square-root dual
+quadratic costs admit supported limits whose sum is at most twice the trace of
+the terminal unregularized square root.
+
+Layer: Layer1 | Gap: Level 2 (singular full-matrix prefix-Gram dual-cost endpoint bound)
+Proof: construct each limit from the shifted spectral formula and zero-eigenspace support, use continuity of the terminal square-root trace, apply the positive-ridge cumulative bound for every positive perturbation, and pass the finite-sum inequality to the limit.
+Source: textbook full-matrix AdaGrad/FTRL potential analysis, Mathlib finite Hermitian continuous functional calculus and filter convergence, and SOptLib regularized prefix-Gram spectral-support and finite-sum limit APIs
+Used in: full-matrix AdaGrad, matrix FTRL, online Newton, and Shampoo-like regret proofs that remove a vanishing ridge from cumulative inverse-square-root gradient charges while retaining the terminal trace bound
+Book citation: book/research/Source.json#/key_lemmas/8/proof/15
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 1 matrix regret proof -/
+theorem sum_dualQuadraticForm_prefixGram_sqrt_le_two_trace
+    {T : Nat} {ι : Type*} [Fintype ι] [DecidableEq ι]
+    (g : Fin T → ι → ℝ) (epsilon : ℝ) (heps : 0 ≤ epsilon) :
+    ∃ supportDual : Fin T → ℝ,
+      (∀ t : Fin T,
+        Filter.Tendsto
+          (fun delta : ℝ ↦
+            if 0 < delta then
+              SOptLib.finiteMatrixDualQuadraticForm
+                (cfc (R := ℝ) (p := IsSelfAdjoint)
+                  (fun x : ℝ ↦ x ^ (1 / 2 : ℝ))
+                  (regularizedPrefixGram g (epsilon + delta) t.succ))
+                (WithLp.toLp 2 (g t))
+            else
+              0)
+          (nhdsWithin (0 : ℝ) (Set.Ioi 0))
+          (nhds (supportDual t))) ∧
+      Filter.Tendsto
+        (fun delta : ℝ ↦
+          if 0 < delta then
+            trace
+              (cfc (R := ℝ) (p := IsSelfAdjoint)
+                (fun x : ℝ ↦ x ^ (1 / 2 : ℝ))
+                (regularizedPrefixGram g (epsilon + delta) (Fin.last T)))
+          else
+            0)
+        (nhdsWithin (0 : ℝ) (Set.Ioi 0))
+        (nhds
+          (trace
+            (cfc (R := ℝ) (p := IsSelfAdjoint)
+              (fun x : ℝ ↦ x ^ (1 / 2 : ℝ))
+              (regularizedPrefixGram g epsilon (Fin.last T))))) ∧
+      (∑ t : Fin T, supportDual t) ≤
+        2 * trace
+          (cfc (R := ℝ) (p := IsSelfAdjoint)
+            (fun x : ℝ ↦ x ^ (1 / 2 : ℝ))
+            (regularizedPrefixGram g epsilon (Fin.last T))) := by
+  classical
+  obtain ⟨supportDual, hDualLimit⟩ :=
+    exists_dualQuadraticForm_prefixGram_sqrt_limits g epsilon heps
+  have hprefixFinal :
+      (regularizedPrefixGram g epsilon (Fin.last T)).PosSemidef :=
+    regularizedPrefixGram_posSemidef g heps (Fin.last T)
+  have hTraceLimit :
+      Filter.Tendsto
+        (fun delta : ℝ ↦
+          if 0 < delta then
+            trace
+              (cfc (R := ℝ) (p := IsSelfAdjoint)
+                (fun x : ℝ ↦ x ^ (1 / 2 : ℝ))
+                (regularizedPrefixGram g (epsilon + delta) (Fin.last T)))
+          else
+            0)
+        (nhdsWithin (0 : ℝ) (Set.Ioi 0))
+        (nhds
+          (trace
+            (cfc (R := ℝ) (p := IsSelfAdjoint)
+              (fun x : ℝ ↦ x ^ (1 / 2 : ℝ))
+              (regularizedPrefixGram g epsilon (Fin.last T))))) := by
+    simpa [regularizedPrefixGram, add_smul, add_assoc, add_left_comm, add_comm]
+      using
+        (tendsto_trace_cfc_sqrt_add_smul_one_nhdsWithin_zero
+          (regularizedPrefixGram g epsilon (Fin.last T))
+          hprefixFinal.1)
+  refine ⟨supportDual, hDualLimit, hTraceLimit, ?_⟩
+  letI : Filter.NeBot (nhdsWithin (0 : ℝ) (Set.Ioi 0)) := by
+    simpa using
+      (nhdsWithin_Ioi_neBot (a := (0 : ℝ)) (b := 0) (le_refl 0))
+  exact Filter.sum_le_mul_of_tendsto_of_eventually
+    (s := Finset.univ)
+    (l := nhdsWithin (0 : ℝ) (Set.Ioi 0))
+    (f := fun t delta ↦
+      if 0 < delta then
+        SOptLib.finiteMatrixDualQuadraticForm
+          (cfc (R := ℝ) (p := IsSelfAdjoint)
+            (fun x : ℝ ↦ x ^ (1 / 2 : ℝ))
+            (regularizedPrefixGram g (epsilon + delta) t.succ))
+          (WithLp.toLp 2 (g t))
+      else
+        0)
+    (g := fun delta ↦
+      if 0 < delta then
+        trace
+          (cfc (R := ℝ) (p := IsSelfAdjoint)
+            (fun x : ℝ ↦ x ^ (1 / 2 : ℝ))
+            (regularizedPrefixGram g (epsilon + delta) (Fin.last T)))
+      else
+        0)
+    (a := supportDual) (b := 2)
+    (c := trace
+      (cfc (R := ℝ) (p := IsSelfAdjoint)
+        (fun x : ℝ ↦ x ^ (1 / 2 : ℝ))
+        (regularizedPrefixGram g epsilon (Fin.last T))))
+    (fun t _ht ↦ hDualLimit t) hTraceLimit
+    (by
+      filter_upwards
+        [show Set.Ioi (0 : ℝ) ∈ nhdsWithin (0 : ℝ) (Set.Ioi 0) by
+          exact self_mem_nhdsWithin]
+        with delta hdelta
+      have hdelta_pos : 0 < delta := hdelta
+      simp_rw [if_pos hdelta_pos]
+      exact
+        sum_dualQuadraticForm_regularizedPrefixGram_sqrt_le_two_trace
+          g (add_pos_of_nonneg_of_pos heps hdelta_pos))
+
+end Matrix
+
+-- Merged from Staging/Matrix_diagonalPrefixGram_spectralSupport_sum_le_two_trace.lean
+
+open scoped BigOperators
+
+namespace Matrix
+
+-- Generalization plan (G0):
+-- concept/name: spectral support and cumulative inverse-square-root charge for
+--   diagonal prefix Gram matrices; orig was
+--   `theorem13_diagonal_hhat_spectral_support_bound`
+-- generality used: an arbitrary finite coordinate type, a finite stream of
+--   real coordinate vectors, and a nonnegative real ridge; no matrix shape,
+--   rank bound, algorithm state, measure, convexity, or oracle assumptions
+-- portable call pattern: diagonal AdaGrad, diagonal Shampoo variants, and
+--   singular coordinate preconditioners vary the coordinate type, vector
+--   stream, and ridge while retaining the same zero-spectrum certificate and
+--   twice-terminal-trace cumulative bound
+-- counterargument checked: this is not paper-local traceability or a one-line
+--   wrapper; it packages a spectral support certificate and a global trace
+--   bound that downstream singular inverse-power comparisons consume together
+-- coverage search: queries `diagonal prefix Gram inverse square root spectral
+--   coefficients zero eigenvalue sum bounded terminal square root trace`,
+--   `spectral support inverse square root diagonal cumulative quadratic form
+--   trace`, and the full Mathlib semantic contract found the separate staged
+--   lemmas `Matrix.spectral_coeff_eq_zero_of_sq_le_diagonal_of_eigenvalue_eq_zero`
+--   and `sum_sq_mul_prefix_add_rpow_neg_half_le_two_mul_terminal_rpow_half`,
+--   plus Mathlib spectral-basis and Cauchy--Schwarz facts, but no declaration
+--   combining the spectral certificate with the terminal trace estimate
+-- minimal hypotheses: `Fintype` and `DecidableEq` support finite spectral
+--   matrix calculus; `0 ≤ a` is the only data hypothesis, since every Gram
+--   increment is a coordinate square
+
+/-- Diagonal prefix Gram inverse-square-root charges have spectral coefficients
+supported away from the zero spectrum, and their total is at most twice the
+trace of the terminal square root.
+
+Layer: Layer1 | Gap: Level 2 (singular diagonal prefix-Gram spectral support and trace telescope)
+Proof: identify each coordinate charge with the spectral quadratic form of its diagonal prefix matrix, use coordinate-square domination to eliminate zero-eigenvalue coefficients, then apply the scalar inclusive-prefix square-root telescope coordinatewise and sum the bounds into the terminal CFC trace.
+Source: Mathlib finite Hermitian matrix spectral decomposition and continuous functional calculus, together with SOptLib's diagonal spectral-support and inclusive-prefix inverse-square-root telescope lemmas
+Used in: diagonal AdaGrad, diagonal Shampoo, and singular coordinate-preconditioner analyses that transfer inverse-square-root dual charges through a semidefinite preconditioner comparison
+Book citation: book/research/Source.json#/key_lemmas/16/proof/12
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 3 diagonal matrix regret proof -/
+theorem diagonalPrefixGram_spectralSupport_sum_le_two_trace
+    {T : Nat} {iota : Type*} [Fintype iota] [DecidableEq iota]
+    (g : Fin T → iota → ℝ) (a : ℝ) (ha : 0 ≤ a) :
+    let d : Fin (T + 1) → iota → ℝ := fun N i =>
+      (a • (1 : Matrix iota iota ℝ) +
+        ∑ s : Fin T, if s.1 < N.1 then Matrix.vecMulVec (g s) (g s) else 0) i i
+    ∃ supportDual : Fin T → ℝ,
+      (∀ t : Fin T,
+        ∃ coeff : iota → ℝ,
+          supportDual t =
+            ∑ i : iota,
+              coeff i ^ 2 *
+                ((Matrix.isHermitian_diagonal
+                  (d ⟨t.1 + 1, Nat.succ_lt_succ t.2⟩)).eigenvalues i) ^
+                    (-(1 / 2 : ℝ)) ∧
+          (∀ i : iota,
+            coeff i =
+              ∑ j : iota,
+                g t j *
+                  ((Matrix.isHermitian_diagonal
+                    (d ⟨t.1 + 1, Nat.succ_lt_succ t.2⟩)).eigenvectorUnitary :
+                      Matrix iota iota ℝ) j i) ∧
+          (∀ i : iota,
+            (Matrix.isHermitian_diagonal
+              (d ⟨t.1 + 1, Nat.succ_lt_succ t.2⟩)).eigenvalues i = 0 →
+              coeff i = 0)) ∧
+      (∑ t : Fin T, supportDual t) ≤
+        2 * Matrix.trace
+          (cfc (R := ℝ) (p := IsSelfAdjoint) (fun x : ℝ => x ^ (1 / 2 : ℝ))
+            (Matrix.diagonal (d ⟨T, Nat.lt_succ_self T⟩) :
+              Matrix iota iota ℝ)) := by
+  classical
+  dsimp only
+  let d : Fin (T + 1) → iota → ℝ := fun N i =>
+    (a • (1 : Matrix iota iota ℝ) +
+      ∑ s : Fin T, if s.1 < N.1 then Matrix.vecMulVec (g s) (g s) else 0) i i
+  have hd_eq : ∀ (N : Fin (T + 1)) (i : iota),
+      d N i = a + ∑ s : Fin T, if s.1 < N.1 then g s i ^ 2 else 0 := by
+    intro N i
+    simp [d, Matrix.sum_apply, pow_two]
+    apply Finset.sum_congr rfl
+    intro s _hs
+    by_cases hsN : s.1 < N.1
+    · simp [hsN, Matrix.vecMulVec]
+    · simp [hsN]
+  have hd_nonneg : ∀ (N : Fin (T + 1)) (i : iota), 0 ≤ d N i := by
+    intro N i
+    rw [hd_eq]
+    exact add_nonneg ha (Finset.sum_nonneg (fun s _ => by
+        split_ifs
+        · exact sq_nonneg (g s i)
+        · exact le_rfl))
+  have hcurrent : ∀ (t : Fin T) (i : iota),
+      g t i ^ 2 ≤ d ⟨t.1 + 1, Nat.succ_lt_succ t.2⟩ i := by
+    intro t i
+    have hsum := sum_fin_lt_succ_eq_sum_fin_lt_add
+      (fun s : Fin T => g s i ^ 2) t.2
+    have hprefix_nonneg :
+        0 ≤ ∑ s : Fin T, if s.1 < t.1 then g s i ^ 2 else 0 :=
+      Finset.sum_nonneg (fun s _ => by
+        split_ifs
+        · exact sq_nonneg (g s i)
+        · exact le_rfl)
+    rw [hd_eq]
+    rw [hsum]
+    linarith
+  let supportDual : Fin T → ℝ := fun t =>
+    ∑ i : iota,
+      g t i ^ 2 *
+        (d ⟨t.1 + 1, Nat.succ_lt_succ t.2⟩ i) ^ (-(1 / 2 : ℝ))
+  refine ⟨supportDual, ?_, ?_⟩
+  · intro t
+    let D : Matrix iota iota ℝ :=
+      Matrix.diagonal (d ⟨t.1 + 1, Nat.succ_lt_succ t.2⟩)
+    let hD : D.IsHermitian :=
+      Matrix.isHermitian_diagonal (d ⟨t.1 + 1, Nat.succ_lt_succ t.2⟩)
+    let U : unitary (Matrix iota iota ℝ) := hD.eigenvectorUnitary
+    let lam : iota → ℝ := hD.eigenvalues
+    let coeff : iota → ℝ := fun i =>
+      ∑ j : iota, g t j * (U : Matrix iota iota ℝ) j i
+    have hcfc_spectral :
+        cfc (R := ℝ) (p := IsSelfAdjoint) (fun x : ℝ => x ^ (-(1 / 2 : ℝ))) D =
+          (U : Matrix iota iota ℝ) *
+            Matrix.diagonal (fun i : iota => (lam i) ^ (-(1 / 2 : ℝ))) *
+              star (U : Matrix iota iota ℝ) := by
+      simpa [U, lam] using hD.cfc_eq (fun x : ℝ => x ^ (-(1 / 2 : ℝ)))
+    have hcfc_diagonal :
+        cfc (R := ℝ) (p := IsSelfAdjoint) (fun x : ℝ => x ^ (-(1 / 2 : ℝ))) D =
+          Matrix.diagonal (fun i : iota =>
+            (d ⟨t.1 + 1, Nat.succ_lt_succ t.2⟩ i) ^ (-(1 / 2 : ℝ))) := by
+      simpa [D] using TensorsProofSupport.Matrix.cfc_rpow_diagonal
+        (d ⟨t.1 + 1, Nat.succ_lt_succ t.2⟩) (-(1 / 2 : ℝ))
+    have hspectral_q :
+        Matrix.toBilin'
+            ((U : Matrix iota iota ℝ) *
+              Matrix.diagonal (fun i : iota => (lam i) ^ (-(1 / 2 : ℝ))) *
+                star (U : Matrix iota iota ℝ))
+            (g t) (g t) =
+          ∑ i : iota, coeff i ^ 2 * (lam i) ^ (-(1 / 2 : ℝ)) := by
+      simpa [coeff] using
+        Matrix.toBilin_mul_diagonal_mul_transpose_self_eq_sum_sq_mul
+          (g t) (fun i : iota => (lam i) ^ (-(1 / 2 : ℝ)))
+            (U : Matrix iota iota ℝ)
+    have hdiagonal_q :
+        Matrix.toBilin'
+            (Matrix.diagonal (fun i : iota =>
+              (d ⟨t.1 + 1, Nat.succ_lt_succ t.2⟩ i) ^ (-(1 / 2 : ℝ))))
+            (g t) (g t) =
+          ∑ i : iota,
+            g t i ^ 2 *
+              (d ⟨t.1 + 1, Nat.succ_lt_succ t.2⟩ i) ^ (-(1 / 2 : ℝ)) := by
+      simp [Matrix.toBilin'_apply, Matrix.diagonal_apply, pow_two]
+      ring
+    refine ⟨coeff, ?_, ?_, ?_⟩
+    · calc
+        supportDual t =
+            ∑ i : iota,
+              g t i ^ 2 *
+                (d ⟨t.1 + 1, Nat.succ_lt_succ t.2⟩ i) ^ (-(1 / 2 : ℝ)) := by
+              rfl
+        _ = Matrix.toBilin'
+              (Matrix.diagonal (fun i : iota =>
+                (d ⟨t.1 + 1, Nat.succ_lt_succ t.2⟩ i) ^ (-(1 / 2 : ℝ))))
+              (g t) (g t) := hdiagonal_q.symm
+        _ = Matrix.toBilin'
+              (cfc (R := ℝ) (p := IsSelfAdjoint)
+                (fun x : ℝ => x ^ (-(1 / 2 : ℝ))) D) (g t) (g t) := by
+              rw [hcfc_diagonal]
+        _ = Matrix.toBilin'
+              ((U : Matrix iota iota ℝ) *
+                Matrix.diagonal (fun i : iota => (lam i) ^ (-(1 / 2 : ℝ))) *
+                  star (U : Matrix iota iota ℝ)) (g t) (g t) := by
+              rw [hcfc_spectral]
+        _ = ∑ i : iota, coeff i ^ 2 * (lam i) ^ (-(1 / 2 : ℝ)) :=
+              hspectral_q
+        _ = ∑ i : iota,
+              coeff i ^ 2 *
+                ((Matrix.isHermitian_diagonal
+                  (d ⟨t.1 + 1, Nat.succ_lt_succ t.2⟩)).eigenvalues i) ^
+                    (-(1 / 2 : ℝ)) := by
+              rfl
+    · intro i
+      rfl
+    · intro i hi
+      simpa [coeff, U, hD, D] using
+        Matrix.spectral_coeff_eq_zero_of_sq_le_diagonal_of_eigenvalue_eq_zero
+          (d ⟨t.1 + 1, Nat.succ_lt_succ t.2⟩) (g t) (hcurrent t) i hi
+  · have hcoord : ∀ i : iota,
+        (∑ t : Fin T,
+          g t i ^ 2 *
+            (d ⟨t.1 + 1, Nat.succ_lt_succ t.2⟩ i) ^ (-(1 / 2 : ℝ))) ≤
+          2 * (d ⟨T, Nat.lt_succ_self T⟩ i) ^ (1 / 2 : ℝ) := by
+      intro i
+      simpa [hd_eq] using
+        sum_sq_mul_prefix_add_rpow_neg_half_le_two_mul_terminal_rpow_half
+          (fun t : Fin T => g t i) a ha
+    have htrace :
+        Matrix.trace
+            (cfc (R := ℝ) (p := IsSelfAdjoint) (fun x : ℝ => x ^ (1 / 2 : ℝ))
+              (Matrix.diagonal (d ⟨T, Nat.lt_succ_self T⟩) :
+                Matrix iota iota ℝ)) =
+          ∑ i : iota, (d ⟨T, Nat.lt_succ_self T⟩ i) ^ (1 / 2 : ℝ) := by
+      rw [TensorsProofSupport.Matrix.cfc_rpow_diagonal]
+      simp [Matrix.trace_diagonal]
+    calc
+      (∑ t : Fin T, supportDual t) =
+          ∑ i : iota, ∑ t : Fin T,
+            g t i ^ 2 *
+              (d ⟨t.1 + 1, Nat.succ_lt_succ t.2⟩ i) ^ (-(1 / 2 : ℝ)) := by
+            simp only [supportDual]
+            rw [Finset.sum_comm]
+      _ ≤ ∑ i : iota,
+            2 * (d ⟨T, Nat.lt_succ_self T⟩ i) ^ (1 / 2 : ℝ) := by
+            exact Finset.sum_le_sum (fun i _ => hcoord i)
+      _ = 2 * ∑ i : iota,
+            (d ⟨T, Nat.lt_succ_self T⟩ i) ^ (1 / 2 : ℝ) := by
+            rw [Finset.mul_sum]
+      _ = 2 * Matrix.trace
+            (cfc (R := ℝ) (p := IsSelfAdjoint) (fun x : ℝ => x ^ (1 / 2 : ℝ))
+              (Matrix.diagonal (d ⟨T, Nat.lt_succ_self T⟩) :
+                Matrix iota iota ℝ)) := by
+            rw [htrace]
+
+end Matrix
+/-! Phase 4 batch 20: scalar affine-recurrence telescope bounds. -/
+
+open MeasureTheory
+open scoped BigOperators
+
+/-- A scalar affine recurrence whose multiplier is dominated by a contraction
+rate has finite-horizon squared energy controlled by its initial and forcing
+energies.
+
+Layer: Layer1 | Gap: Level 1 (contracting scalar affine recurrence energy bound)
+Proof: derive the pathwise geometric-convolution envelope from the affine update,
+then apply the finite initial-plus-convolution squared-energy estimate with unit
+kernel scale.
+Source: discrete variation of constants, discrete Young convolution inequality,
+Mathlib real absolute-value inequalities, and finite sums over `Finset.range`
+Used in: slow-coordinate comparison errors, stable scalar filters, momentum
+coordinates, and stochastic-approximation recurrences before expectation or
+time-averaging bounds are applied
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/5
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem sum_sq_le_of_contracting_scalar_affine_recurrence
+    {gamma r : Real} (err eta : Nat -> Real) (N : Nat)
+    (hgamma_le_r : |gamma| <= r) (hr_lt_one : r < 1)
+    (hrec : forall k : Nat, err (k + 1) = gamma * err k + eta k) :
+    Finset.sum (Finset.range (N + 1)) (fun t => |err t| ^ 2) <=
+      (2 / (1 - r ^ 2)) * |err 0| ^ 2 +
+        (2 / (1 - r) ^ 2) *
+          Finset.sum (Finset.range N) (fun j => |eta j| ^ 2) := by
+  have hr_nonneg : 0 <= r := (abs_nonneg gamma).trans hgamma_le_r
+  have hconv :
+      forall t : Nat,
+        |err t| <=
+          1 * r ^ t * |err 0| +
+            Finset.sum (Finset.range t) (fun j =>
+              1 * r ^ (t - 1 - j) * |eta j|) := by
+    intro t
+    simpa [mul_assoc] using
+      abs_le_geometric_convolution_of_affine_recurrence
+        err eta hgamma_le_r hrec t
+  have hsquare :=
+    finite_sq_sum_le_of_le_geometric_initial_add_convolution
+      (u := fun t : Nat => |err t|) (z := fun t : Nat => |eta t|)
+      (M := (1 : Real)) (r := r) N
+      (fun t _ht => abs_nonneg (err t)) hr_nonneg hr_lt_one
+      (fun t _ht => hconv t)
+  simpa using hsquare
+
+/-- A pathwise contracting scalar affine recurrence has integrated
+finite-horizon squared energy controlled by its initial and forcing energies.
+
+Layer: Layer1 | Gap: Level 1 (integrated contracting scalar affine-recurrence energy bound)
+Proof: Apply the deterministic recurrence-to-energy estimate samplewise, integrate its pointwise inequality, and commute the Bochner integral through the finite sums and constant scalar multiples.
+Source: discrete variation of constants and Young convolution energy bounds, together with Mathlib `integral_mono_ae`, `integral_finset_sum`, and Bochner-integral linearity
+Used in: stochastic slow-coordinate comparison, stable random-filter, momentum-error, and distributed-optimization recurrence analyses before finite-horizon averaging
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/5
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem integral_sum_sq_le_of_contracting_scalar_affine_recurrence
+    {Omega : Type*} [MeasurableSpace Omega] (mu : Measure Omega)
+    {gamma r : Real} (err eta : Omega -> Nat -> Real) (N : Nat)
+    (hgamma_le_r : |gamma| <= r) (hr_lt_one : r < 1)
+    (hrec : forall omega : Omega, forall k : Nat,
+      err omega (k + 1) = gamma * err omega k + eta omega k)
+    (herr_int : forall t : Nat, t ∈ Finset.range (N + 1) ->
+      Integrable (fun omega : Omega => |err omega t| ^ 2) mu)
+    (heta_int : forall k : Nat, k ∈ Finset.range N ->
+      Integrable (fun omega : Omega => |eta omega k| ^ 2) mu) :
+    Finset.sum (Finset.range (N + 1)) (fun t =>
+        ∫ omega, |err omega t| ^ 2 ∂mu) <=
+      (2 / (1 - r ^ 2)) * (∫ omega, |err omega 0| ^ 2 ∂mu) +
+        (2 / (1 - r) ^ 2) *
+          Finset.sum (Finset.range N) (fun j =>
+            ∫ omega, |eta omega j| ^ 2 ∂mu) := by
+  classical
+  let A : Real := 2 / (1 - r ^ 2)
+  let B : Real := 2 / (1 - r) ^ 2
+  have hpoint :
+      forall omega : Omega,
+        Finset.sum (Finset.range (N + 1)) (fun t => |err omega t| ^ 2) <=
+          A * |err omega 0| ^ 2 +
+            B * Finset.sum (Finset.range N) (fun j => |eta omega j| ^ 2) := by
+    intro omega
+    simpa [A, B] using
+      sum_sq_le_of_contracting_scalar_affine_recurrence
+        (fun t => err omega t) (fun k => eta omega k) N
+        hgamma_le_r hr_lt_one (hrec omega)
+  have hleft_int :
+      Integrable
+        (fun omega : Omega =>
+          Finset.sum (Finset.range (N + 1))
+            (fun t => |err omega t| ^ 2)) mu := by
+    exact integrable_finset_sum (Finset.range (N + 1))
+      (fun t ht => herr_int t ht)
+  have heta_sum_int :
+      Integrable
+        (fun omega : Omega =>
+          Finset.sum (Finset.range N) (fun j => |eta omega j| ^ 2)) mu := by
+    exact integrable_finset_sum (Finset.range N)
+      (fun j hj => heta_int j hj)
+  have hright_int :
+      Integrable
+        (fun omega : Omega =>
+          A * |err omega 0| ^ 2 +
+            B * Finset.sum (Finset.range N)
+              (fun j => |eta omega j| ^ 2)) mu := by
+    exact (herr_int 0 (by simp)).const_mul A |>.add
+      (heta_sum_int.const_mul B)
+  have hmono :
+      (∫ omega : Omega,
+        Finset.sum (Finset.range (N + 1))
+          (fun t => |err omega t| ^ 2) ∂mu) <=
+        ∫ omega : Omega,
+          A * |err omega 0| ^ 2 +
+            B * Finset.sum (Finset.range N)
+              (fun j => |eta omega j| ^ 2) ∂mu := by
+    exact integral_mono_ae hleft_int hright_int
+      (Filter.Eventually.of_forall hpoint)
+  calc
+    Finset.sum (Finset.range (N + 1)) (fun t =>
+        ∫ omega, |err omega t| ^ 2 ∂mu) =
+        ∫ omega : Omega,
+          Finset.sum (Finset.range (N + 1))
+            (fun t => |err omega t| ^ 2) ∂mu := by
+          rw [integral_finset_sum]
+          exact fun t ht => herr_int t ht
+    _ <= ∫ omega : Omega,
+          A * |err omega 0| ^ 2 +
+            B * Finset.sum (Finset.range N)
+              (fun j => |eta omega j| ^ 2) ∂mu := hmono
+    _ =
+        A * (∫ omega, |err omega 0| ^ 2 ∂mu) +
+          B * Finset.sum (Finset.range N) (fun j =>
+            ∫ omega, |eta omega j| ^ 2 ∂mu) := by
+          rw [integral_add]
+          · rw [integral_const_mul]
+            rw [integral_const_mul]
+            rw [integral_finset_sum]
+            · exact fun j hj => by
+                simpa [sq_abs] using heta_int j hj
+          · exact (herr_int 0 (by simp)).const_mul A
+          · exact heta_sum_int.const_mul B
+    _ =
+      (2 / (1 - r ^ 2)) * (∫ omega, |err omega 0| ^ 2 ∂mu) +
+        (2 / (1 - r) ^ 2) *
+          Finset.sum (Finset.range N) (fun j =>
+            ∫ omega, |eta omega j| ^ 2 ∂mu) := by
+        simp [A, B]
+
+/-- The mean error in an affine comparison obeys a deterministic recurrence when
+the innovation is centered and the reference process has geometric mean.
+
+Layer: Layer1 | Gap: Level 1 (first-moment affine-error recurrence with reference forcing)
+Proof: rewrite by the pointwise affine error update, split the Bochner integral using first-moment integrability, then substitute the centered innovation and geometric reference-mean identities.
+Source: Mathlib Bochner integral addition and constant-scalar linearity
+Used in: stochastic linear-comparison proofs after subtracting a reference block recursion and isolating a centered block innovation
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/5
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem integral_affine_error_recurrence_of_reference_mean_and_innovation_zero
+    {Omega : Type*} [MeasurableSpace Omega]
+    (mu : Measure Omega) (a b x0 : Real)
+    (err reference innovation : Omega -> Nat -> Real)
+    (hupdate : forall k, ∀ᵐ omega ∂mu,
+      err omega (k + 1) =
+        a * err omega k + ((a - b) * reference omega k + innovation omega k))
+    (herr_integrable : forall k, Integrable (fun omega => err omega k) mu)
+    (hreference_integrable : forall k,
+      Integrable (fun omega => reference omega k) mu)
+    (hinnovation_integrable : forall k,
+      Integrable (fun omega => innovation omega k) mu)
+    (hinnovation_zero : forall k, (∫ omega, innovation omega k ∂mu) = 0)
+    (hreference_mean : forall k,
+      (∫ omega, reference omega k ∂mu) = x0 * b ^ k) :
+    forall k,
+      (∫ omega, err omega (k + 1) ∂mu) =
+        a * (∫ omega, err omega k ∂mu) + (a - b) * (x0 * b ^ k) := by
+  intro k
+  have herr_k_integrable : Integrable (fun omega => err omega k) mu :=
+    herr_integrable k
+  have hreference_k_integrable :
+      Integrable (fun omega => reference omega k) mu :=
+    hreference_integrable k
+  have hinnovation_k_integrable :
+      Integrable (fun omega => innovation omega k) mu :=
+    hinnovation_integrable k
+  have hforcing_integrable :
+      Integrable
+        (fun omega => (a - b) * reference omega k + innovation omega k) mu :=
+    (hreference_k_integrable.const_mul (a - b)).add hinnovation_k_integrable
+  calc
+    (∫ omega, err omega (k + 1) ∂mu) =
+        ∫ omega,
+          a * err omega k +
+            ((a - b) * reference omega k + innovation omega k) ∂mu := by
+          exact integral_congr_ae (hupdate k)
+    _ =
+        (∫ omega, a * err omega k ∂mu) +
+          ∫ omega, (a - b) * reference omega k + innovation omega k ∂mu := by
+          rw [integral_add]
+          · exact herr_k_integrable.const_mul a
+          · exact hforcing_integrable
+    _ =
+        a * (∫ omega, err omega k ∂mu) +
+          ((a - b) * (∫ omega, reference omega k ∂mu) +
+            ∫ omega, innovation omega k ∂mu) := by
+          rw [integral_const_mul]
+          rw [integral_add]
+          · rw [integral_const_mul]
+          · exact hreference_k_integrable.const_mul (a - b)
+          · exact hinnovation_k_integrable
+    _ = a * (∫ omega, err omega k ∂mu) + (a - b) * (x0 * b ^ k) := by
+          rw [hreference_mean k, hinnovation_zero k]
+          ring
+
+/-- A scalar affine recurrence with a coefficient in `[0, 1]` and uniformly
+bounded forcing stays below its initial absolute value plus the elapsed forcing
+budget.
+
+Layer: Layer1 | Gap: Level 1 (finite-horizon contractive affine-recurrence budget)
+Proof: induct on time, use the absolute-value triangle inequality and the forcing bound at each successor, then discard contraction using the coefficient upper bound.
+Source: Mathlib real absolute-value inequalities and natural-number induction, extending the homogeneous recurrence comparison `le_geom`
+Used in: stochastic-approximation mean-error and distributed-tracking recurrences after random innovations have been reduced to a uniformly bounded deterministic forcing
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/16/proof/3
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem abs_le_initial_add_nat_mul_of_contracting_affine_recurrence
+    (gamma B : Real) (e u : Nat -> Real)
+    (hgamma_nonneg : 0 <= gamma) (hgamma_le_one : gamma <= 1)
+    (hforcing : forall k : Nat, |u k| <= B)
+    (hrec : forall k : Nat, e (k + 1) = gamma * e k + u k) :
+    forall k : Nat, |e k| <= |e 0| + (k : Real) * B := by
+  intro k
+  induction k with
+  | zero => simp
+  | succ k ih =>
+      have hstep : |e (k + 1)| <= gamma * |e k| + B := by
+        calc
+          |e (k + 1)| = |gamma * e k + u k| := by rw [hrec k]
+          _ <= |gamma * e k| + |u k| := abs_add_le _ _
+          _ = gamma * |e k| + |u k| := by
+            rw [abs_mul, abs_of_nonneg hgamma_nonneg]
+          _ <= gamma * |e k| + B := by
+            gcongr
+            exact hforcing k
+      have hcontract : gamma * |e k| <= |e k| := by
+        simpa using
+          (mul_le_mul_of_nonneg_right hgamma_le_one (abs_nonneg (e k)))
+      calc
+        |e (k + 1)| <= gamma * |e k| + B := hstep
+        _ <= |e k| + B := by gcongr
+        _ <= (|e 0| + (k : Real) * B) + B := by gcongr
+        _ = |e 0| + ((k + 1 : Nat) : Real) * B := by
+          norm_num
+          ring
+
+/-- A slowly contracting scalar affine recurrence with an `alpha^2` initial
+energy budget and an `alpha^4` linear forcing budget has `alpha^2` average
+integrated squared energy once the horizon satisfies `alpha * T >= 1`.
+
+Layer: Layer1 | Gap: Level 1 (slow-contraction finite-horizon average energy bound)
+Proof: apply the integrated contracting affine-recurrence energy estimate, bound the two geometric denominators using `r = 1 - cGamma * alpha`, and normalize the initial and forcing budgets by the horizon condition.
+Source: discrete variation of constants and Young convolution energy estimates, together with ordered-field denominator bounds and finite-horizon averaging
+Used in: stochastic approximation, stable-filter, momentum-error, and distributed slow-mode analyses after second-moment initial and forcing budgets have been established
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/5
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem average_integral_sq_le_of_slow_contracting_affine_recurrence
+    {Omega : Type*} [MeasurableSpace Omega] (mu : Measure Omega)
+    {alpha cGamma Cinit Ceta gamma : Real}
+    (err eta : Omega -> Nat -> Real)
+    (halpha_pos : 0 < alpha) (hcGamma_pos : 0 < cGamma)
+    (hgamma_le_rate : |gamma| <= 1 - cGamma * alpha)
+    (hCinit_nonneg : 0 <= Cinit) (hCeta_nonneg : 0 <= Ceta)
+    (hrec : forall omega : Omega, forall k : Nat,
+      err omega (k + 1) = gamma * err omega k + eta omega k)
+    (herr_int : forall t : Nat,
+      Integrable (fun omega : Omega => |err omega t| ^ 2) mu)
+    (heta_int : forall k : Nat,
+      Integrable (fun omega : Omega => |eta omega k| ^ 2) mu)
+    (hinit_bound :
+      integral mu (fun omega => |err omega 0| ^ 2) <= Cinit * alpha ^ 2)
+    (heta_sum_bound : forall N : Nat,
+      Finset.sum (Finset.range N) (fun k =>
+        integral mu (fun omega => |eta omega k| ^ 2)) <=
+        Ceta * alpha ^ 4 * (N : Real)) :
+    let C : Real := 2 * Cinit / cGamma + 2 * Ceta / cGamma ^ 2 + 1
+    0 < C /\
+      forall T : Nat, 1 <= alpha * (T : Real) ->
+        ((T : Real)⁻¹) *
+          Finset.sum (Finset.range T) (fun t =>
+            integral mu (fun omega => |err omega t| ^ 2)) <=
+          C * alpha ^ 2 := by
+  classical
+  let r : Real := 1 - cGamma * alpha
+  let C : Real := 2 * Cinit / cGamma + 2 * Ceta / cGamma ^ 2 + 1
+  have hcAlpha_pos : 0 < cGamma * alpha := mul_pos hcGamma_pos halpha_pos
+  have hr_nonneg : 0 <= r := by
+    exact (abs_nonneg gamma).trans hgamma_le_rate
+  have hr_lt_one : r < 1 := by
+    dsimp [r]
+    nlinarith
+  have hden1_pos : 0 < 1 - r ^ 2 := by
+    nlinarith [sq_nonneg r, mul_self_lt_mul_self (show 0 <= r from hr_nonneg) hr_lt_one]
+  have hden1_ge : cGamma * alpha <= 1 - r ^ 2 := by
+    have hprod_nonneg : 0 <= cGamma * alpha * r :=
+      mul_nonneg hcAlpha_pos.le hr_nonneg
+    dsimp [r] at hprod_nonneg ⊢
+    nlinarith
+  have hA_le : 2 / (1 - r ^ 2) <= 2 / (cGamma * alpha) :=
+    div_le_div_of_nonneg_left (by norm_num) hcAlpha_pos hden1_ge
+  have hB_eq : 2 / (1 - r) ^ 2 = 2 / (cGamma * alpha) ^ 2 := by
+    dsimp [r]
+    ring
+  have hC_pos : 0 < C := by
+    have hterm1_nonneg : 0 <= 2 * Cinit / cGamma := by positivity
+    have hterm2_nonneg : 0 <= 2 * Ceta / cGamma ^ 2 := by positivity
+    dsimp [C]
+    nlinarith
+  refine And.intro hC_pos ?_
+  intro T halphaT
+  have hprod_pos : 0 < alpha * (T : Real) :=
+    lt_of_lt_of_le zero_lt_one halphaT
+  have hT_pos : 0 < (T : Real) :=
+    pos_of_mul_pos_right hprod_pos (le_of_lt halpha_pos)
+  have hT_nat_pos : 0 < T := by exact_mod_cast hT_pos
+  have hT_ne : (T : Real) ≠ 0 := ne_of_gt hT_pos
+  have hTinv_nonneg : 0 <= (T : Real)⁻¹ := inv_nonneg.mpr hT_pos.le
+  have hTinv_le_alpha : (T : Real)⁻¹ <= alpha := by
+    have hdiv : (1 : Real) / (T : Real) <= alpha :=
+      (div_le_iff₀ hT_pos).mpr (by simpa [one_mul] using halphaT)
+    simpa [one_div] using hdiv
+  have hsum_contract :
+      Finset.sum (Finset.range T) (fun t =>
+          integral mu (fun omega => |err omega t| ^ 2)) <=
+        (2 / (1 - r ^ 2)) *
+            integral mu (fun omega => |err omega 0| ^ 2) +
+          (2 / (1 - r) ^ 2) *
+            Finset.sum (Finset.range (T - 1)) (fun j =>
+              integral mu (fun omega => |eta omega j| ^ 2)) := by
+    have hbase :=
+      integral_sum_sq_le_of_contracting_scalar_affine_recurrence
+        mu err eta (T - 1) hgamma_le_rate hr_lt_one hrec
+        (fun t _ht => herr_int t) (fun k _hk => heta_int k)
+    have hT_pred : T - 1 + 1 = T :=
+      Nat.sub_add_cancel (Nat.succ_le_of_lt hT_nat_pos)
+    rw [hT_pred] at hbase
+    exact hbase
+  have hI0_nonneg :
+      0 <= integral mu (fun omega => |err omega 0| ^ 2) :=
+    integral_nonneg fun omega => sq_nonneg |err omega 0|
+  have hinit_term :
+      ((T : Real)⁻¹) *
+          ((2 / (1 - r ^ 2)) *
+            integral mu (fun omega => |err omega 0| ^ 2)) <=
+        (2 * Cinit / cGamma) * alpha ^ 2 := by
+    have hmul_bound :
+        (2 / (1 - r ^ 2)) *
+            integral mu (fun omega => |err omega 0| ^ 2) <=
+          (2 / (cGamma * alpha)) * (Cinit * alpha ^ 2) := by
+      exact mul_le_mul hA_le hinit_bound hI0_nonneg
+        (div_nonneg (by norm_num) hcAlpha_pos.le)
+    calc
+      ((T : Real)⁻¹) *
+          ((2 / (1 - r ^ 2)) *
+            integral mu (fun omega => |err omega 0| ^ 2)) <=
+          ((T : Real)⁻¹) *
+            ((2 / (cGamma * alpha)) * (Cinit * alpha ^ 2)) :=
+            mul_le_mul_of_nonneg_left hmul_bound hTinv_nonneg
+      _ = (2 * Cinit / cGamma) * alpha * (T : Real)⁻¹ := by
+            field_simp [ne_of_gt hcGamma_pos, ne_of_gt halpha_pos]
+      _ <= (2 * Cinit / cGamma) * alpha * alpha := by
+            exact mul_le_mul_of_nonneg_left hTinv_le_alpha
+              (mul_nonneg
+                (div_nonneg (mul_nonneg (by norm_num) hCinit_nonneg)
+                  hcGamma_pos.le)
+                halpha_pos.le)
+      _ = (2 * Cinit / cGamma) * alpha ^ 2 := by ring
+  have hpred_le_T : ((T - 1 : Nat) : Real) <= (T : Real) := by
+    exact_mod_cast Nat.sub_le T 1
+  have heta_sum_le_T :
+      Finset.sum (Finset.range (T - 1)) (fun j =>
+          integral mu (fun omega => |eta omega j| ^ 2)) <=
+        Ceta * alpha ^ 4 * (T : Real) := by
+    calc
+      Finset.sum (Finset.range (T - 1)) (fun j =>
+          integral mu (fun omega => |eta omega j| ^ 2)) <=
+          Ceta * alpha ^ 4 * ((T - 1 : Nat) : Real) :=
+          heta_sum_bound (T - 1)
+      _ <= Ceta * alpha ^ 4 * (T : Real) := by
+          exact mul_le_mul_of_nonneg_left hpred_le_T
+            (mul_nonneg hCeta_nonneg (pow_nonneg halpha_pos.le 4))
+  have heta_term :
+      ((T : Real)⁻¹) *
+          ((2 / (1 - r) ^ 2) *
+            Finset.sum (Finset.range (T - 1)) (fun j =>
+              integral mu (fun omega => |eta omega j| ^ 2))) <=
+        (2 * Ceta / cGamma ^ 2) * alpha ^ 2 := by
+    calc
+      ((T : Real)⁻¹) *
+          ((2 / (1 - r) ^ 2) *
+            Finset.sum (Finset.range (T - 1)) (fun j =>
+              integral mu (fun omega => |eta omega j| ^ 2))) =
+          ((T : Real)⁻¹) *
+            ((2 / (cGamma * alpha) ^ 2) *
+              Finset.sum (Finset.range (T - 1)) (fun j =>
+                integral mu (fun omega => |eta omega j| ^ 2))) := by
+            rw [hB_eq]
+      _ <= ((T : Real)⁻¹) *
+            ((2 / (cGamma * alpha) ^ 2) *
+              (Ceta * alpha ^ 4 * (T : Real))) := by
+            exact mul_le_mul_of_nonneg_left
+              (mul_le_mul_of_nonneg_left heta_sum_le_T (by positivity))
+              hTinv_nonneg
+      _ = (2 * Ceta / cGamma ^ 2) * alpha ^ 2 := by
+            field_simp [hT_ne, ne_of_gt hcGamma_pos, ne_of_gt halpha_pos]
+  calc
+    ((T : Real)⁻¹) *
+        Finset.sum (Finset.range T) (fun t =>
+          integral mu (fun omega => |err omega t| ^ 2)) <=
+        ((T : Real)⁻¹) *
+          ((2 / (1 - r ^ 2)) *
+              integral mu (fun omega => |err omega 0| ^ 2) +
+            (2 / (1 - r) ^ 2) *
+              Finset.sum (Finset.range (T - 1)) (fun j =>
+                integral mu (fun omega => |eta omega j| ^ 2))) :=
+          mul_le_mul_of_nonneg_left hsum_contract hTinv_nonneg
+    _ =
+        ((T : Real)⁻¹) *
+          ((2 / (1 - r ^ 2)) *
+            integral mu (fun omega => |err omega 0| ^ 2)) +
+        ((T : Real)⁻¹) *
+          ((2 / (1 - r) ^ 2) *
+            Finset.sum (Finset.range (T - 1)) (fun j =>
+              integral mu (fun omega => |eta omega j| ^ 2))) := by ring
+    _ <=
+        (2 * Cinit / cGamma) * alpha ^ 2 +
+          (2 * Ceta / cGamma ^ 2) * alpha ^ 2 :=
+        add_le_add hinit_term heta_term
+    _ <= C * alpha ^ 2 := by
+        have hsq_nonneg : 0 <= alpha ^ 2 := sq_nonneg alpha
+        dsimp [C]
+        nlinarith

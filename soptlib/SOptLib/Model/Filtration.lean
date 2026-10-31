@@ -522,4 +522,18 @@ theorem sampleWindowMeasurableSpace_eq_comap
     exact hK_past.comap_le
   exact le_antisymm hleft hright
 
+/-- A function has a representative measurable for a chosen sigma-algebra, up to
+almost-everywhere equality under an ambient measure.
+
+Layer: Model | Concept: law-scoped measurable representative for a sub-sigma-algebra
+Proof: (definitional construction; existentially package a source-measurable representative and ambient-measure almost-everywhere equality)
+Source: Mathlib `Measurable` with an explicit source sigma-algebra and `Filter.EventuallyEq` under a measure's almost-everywhere filter
+Used in: adapted stochastic-process arguments whose law supplies measurable versions without global off-stream kernel measurability
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/key_lemmas/1
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum (STORM) -/
+def HasAEMeasurableRepresentative
+    {Ω β : Type*} [mΩ : MeasurableSpace Ω] [MeasurableSpace β]
+    (m : MeasurableSpace Ω) (f : Ω → β) (μ : @Measure Ω mΩ) : Prop :=
+  ∃ f' : Ω → β, Measurable[m] f' ∧ f =ᵐ[μ] f'
+
 end SOptLib

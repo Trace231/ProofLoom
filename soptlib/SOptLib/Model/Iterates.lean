@@ -1,9 +1,14 @@
 import Mathlib.Algebra.BigOperators.Intervals
 import Mathlib.Algebra.BigOperators.Field
+import Mathlib.Algebra.Order.Field.GeomSum
 import Mathlib.Algebra.Order.BigOperators.Group.Finset
 import Mathlib.Algebra.Order.Floor.Div
 import Mathlib.Analysis.Convex.Combination
+import Mathlib.Analysis.CStarAlgebra.CStarMatrix
+import Mathlib.Analysis.Matrix.Order
 import Mathlib.Analysis.Normed.Group.Basic
+import Mathlib.Analysis.Normed.Operator.Basic
+import Mathlib.Analysis.SpecialFunctions.Pow.Real
 import Mathlib.Data.Fintype.Lattice
 import Mathlib.Data.Fintype.Pi
 import Mathlib.Data.Finset.Max
@@ -11,13 +16,16 @@ import Mathlib.Data.Real.Sqrt
 import Mathlib.MeasureTheory.Constructions.BorelSpace.Real
 import Mathlib.MeasureTheory.Group.Arithmetic
 import Mathlib.MeasureTheory.MeasurableSpace.Prod
+import Mathlib.MeasureTheory.Function.LpSpace.Basic
+import Mathlib.Data.Matrix.Mul
 import Mathlib.Order.Filter.Extr
 import Mathlib.Probability.ProbabilityMassFunction.Constructions
 import Mathlib.Tactic
+import SOptLib.Model.Iterates.gradientStep
 import Mathlib.Analysis.Convex.Function
 import SOptLib.Model.BlockSampling
 
-open scoped BigOperators
+open scoped BigOperators MatrixOrder
 open scoped MeasureTheory
 
 namespace SOptLib
@@ -1538,6 +1546,1130 @@ theorem randomizedOutput_measurable_wrt_sampleBlock
   simpa [h_output t] using h_process (time t) le_rfl
 
 end SOptLib
+
+
+/-! Promoted from Staging/SOptLib_PushPullState.lean. -/
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: push-pull gradient-tracking state; orig was AlgorithmState
+-- generality used: arbitrary node and table-entry types; no finiteness, algebraic,
+--   measure, convexity, smoothness, or oracle assumptions
+-- portable call pattern: push-pull and gradient-tracking recurrences reuse the same
+--   primal/tracker table state while changing the node type, entry type, mixing
+--   operators, oracle, and transition rule
+-- counterargument checked: although the carrier is equivalent to a product, this is
+--   not paper-local traceability or a caller-side expression because the named primal
+--   and tracker projections are the stable interface shared by initialization,
+--   transitions, generated trajectories, and coordinate recurrence theorems
+-- coverage search: queries for two-table primal/tracker and two-coordinate algorithm
+--   states found Mathlib Prod and the SOptLib AcceleratedGradientState,
+--   ConditionalGradientState, and BlockIterateState; none exposes a node-indexed
+--   primal table paired with its gradient-tracking table
+-- minimal hypotheses: all already minimal; the two function-valued fields require no
+--   typeclasses on either parameter
+
+/-- State of a push-pull gradient-tracking iteration, carrying its primal and tracker tables.
+
+Each table has one entry per node. The entry type is independent of any vector-space,
+topological, measurable, or finite-dimensional structure needed by a particular update rule.
+
+Layer: Model | Concept: push-pull gradient-tracking state
+Proof: (definitional construction; bundles node-indexed primal and gradient-tracker tables)
+Source: distributed optimization push-pull and gradient-tracking state-space notation
+Used in: initialization, one-step transitions, and generated trajectories for distributed push-pull and gradient-tracking methods
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/algorithm_spec
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks -/
+@[ext]
+structure PushPullState (Node E : Type*) where
+  primal : Node → E
+  tracker : Node → E
+
+end SOptLib
+
+/-! Promoted from Staging/SOptLib_pushPullStep.lean. -/
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: push-pull gradient-tracking transition; orig was `oneStep`
+-- generality used: arbitrary node and entry types, an additive group with a real
+--   scalar action, an abstract left matrix action, two real matrix schedules, a
+--   real stepsize, and a state-dependent oracle table; no finiteness, norm,
+--   inner product, measure, convexity, smoothness, or oracle assumptions
+-- portable call pattern: time-varying push-pull and gradient-tracking algorithms
+--   reuse the coupled primal/tracker transition while changing their matrix
+--   schedules, stepsize, state-dependent oracle table, and current state
+-- counterargument checked: this is not merely a paper-local rename or a single
+--   caller-side affine expression because the next oracle must be evaluated at
+--   the newly mixed primal table and its difference drives the second coordinate;
+--   the definition also supplies the canonical transition paired with PushPullState
+-- coverage search: searched "two coordinate push pull state transition primal row
+--   mixing tracker column mixing oracle difference", "state update tracker oracle
+--   difference next primal", and `pushPullStep`; Mathlib semantic search returned
+--   only calculus gradients, while SOptLib returned PushPullState and unrelated
+--   two-coordinate/adaptedness APIs, so no existing declaration covers this step
+-- minimal hypotheses: reduced the source finite-dimensional Hilbert-space frame to
+--   `[AddGroup E] [SMul ℝ E]`, exactly supporting subtraction and scalar action
+
+/-- Perform one push-pull gradient-tracking transition on a two-table state.
+
+The primal table is first updated by the left row-mixing action minus the scaled
+tracker. The tracker is then column-mixed and corrected by the difference between
+the oracle table at the new primal state and the oracle table at the old state.
+
+Layer: Model | Concept: push-pull gradient-tracking state transition
+Proof: (definitional construction; sequential primal mixing and state-dependent oracle-difference tracker update)
+Source: distributed optimization push-pull and gradient-tracking recurrences with Mathlib pointwise additive-group and scalar-action APIs
+Used in: pathwise state transitions of time-varying and fixed-network push-pull gradient-tracking algorithms before recursive trajectory generation
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/algorithm_spec/steps
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+def pushPullStep
+    {Node E : Type*} [AddGroup E] [SMul ℝ E]
+    (leftAct : (Node → Node → ℝ) → (Node → E) → Node → E)
+    (R C : ℕ → Node → Node → ℝ) (alpha : ℝ)
+    (oracleTable : ℕ → (Node → E) → Node → E)
+    (t : ℕ) (state : PushPullState Node E) : PushPullState Node E :=
+  let Xnext := leftAct (R t) state.primal - alpha • state.tracker
+  let Gcur := oracleTable t state.primal
+  let Gnext := oracleTable (t + 1) Xnext
+  { primal := Xnext
+    tracker := leftAct (C t) state.tracker + Gnext - Gcur }
+
+/-- The push-pull step unfolds to its sequential primal and tracker update equations.
+
+Layer: Model | Gap: Level 0 (push-pull state-transition unfolding)
+Proof: by rfl after unfolding `pushPullStep`.
+Source: Lean let reduction and structure literals together with Mathlib pointwise additive-group and scalar-action instances
+Used in: exposing the primal push equation and gradient-tracking pull equation from a generated push-pull trajectory
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/algorithm_spec/steps
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+@[simp]
+theorem pushPullStep_def
+    {Node E : Type*} [AddGroup E] [SMul ℝ E]
+    (leftAct : (Node → Node → ℝ) → (Node → E) → Node → E)
+    (R C : ℕ → Node → Node → ℝ) (alpha : ℝ)
+    (oracleTable : ℕ → (Node → E) → Node → E)
+    (t : ℕ) (state : PushPullState Node E) :
+    pushPullStep leftAct R C alpha oracleTable t state =
+      let Xnext := leftAct (R t) state.primal - alpha • state.tracker
+      let Gcur := oracleTable t state.primal
+      let Gnext := oracleTable (t + 1) Xnext
+      { primal := Xnext
+        tracker := leftAct (C t) state.tracker + Gnext - Gcur } := by
+  rfl
+
+/-- A push-pull step preserves equality between tracker and oracle aggregates.
+
+If an additive aggregate map is invariant under the pull action at the current
+tracker and the current tracker aggregate equals the current oracle aggregate,
+then the next tracker aggregate equals the oracle aggregate evaluated at the new
+primal table. This packages the cancellation at the heart of gradient tracking
+without committing to a particular finite-sum aggregate or matrix action.
+
+Layer: Model | Gap: Level 0 (push-pull tracker aggregate invariant)
+Proof: map the tracker update through the additive homomorphism, use pull-mass preservation and the current aggregate invariant, then cancel the old oracle aggregate.
+Source: additive aggregation of the push-pull gradient-tracking recurrence under a mass-preserving pull action
+Used in: finite-sum and weighted-aggregate invariants for distributed gradient-tracking trajectories -/
+theorem pushPullStep_tracker_aggregate_eq_oracle_aggregate_of_preserves_aggregate
+    {Node E : Type*} [AddCommGroup E] [SMul ℝ E]
+    (leftAct : (Node → Node → ℝ) → (Node → E) → Node → E)
+    (R C : ℕ → Node → Node → ℝ) (alpha : ℝ)
+    (oracleTable : ℕ → (Node → E) → Node → E)
+    (aggregate : (Node → E) →+ E) (t : ℕ) (state : PushPullState Node E)
+    (hpull : aggregate (leftAct (C t) state.tracker) = aggregate state.tracker)
+    (htracker : aggregate state.tracker = aggregate (oracleTable t state.primal)) :
+    aggregate
+        (pushPullStep leftAct R C alpha oracleTable t state).tracker =
+      aggregate
+        (oracleTable (t + 1)
+          (pushPullStep leftAct R C alpha oracleTable t state).primal) := by
+  simp [pushPullStep, hpull, htracker]
+
+end SOptLib
+
+/-! Promoted from Staging/linearOutputPropagatedInputCoeff.lean. -/
+
+open scoped BigOperators
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: linear-system output coefficient of a projected, propagated
+--   input channel; orig was `quadraticRestrictedProjectedPeriodInputCoeff`
+-- generality used: arbitrary state and input index types over a non-unital
+--   non-associative semiring, with finiteness only of the contracted state index;
+--   the action theorem strengthens the scalar structure to a non-unital semiring
+--   and additionally assumes the input index finite
+-- portable call pattern: finite-dimensional linear stochastic systems, periodic
+--   distributed recursions, and state-space impulse-response proofs change the
+--   output functional, projection, within-window propagator, input channel, and
+--   index types while reusing the same deterministic input-coordinate row
+-- counterargument checked: Mathlib already supplies each `Matrix.vecMul`, but not
+--   the named four-stage transfer coefficient or its bridge from pairing against
+--   a raw input to evaluating the projected propagated system output
+-- coverage search: symbol queries for "linear output propagated input coefficient"
+--   and "row vector matrix multiplication coefficient sum" found only paper-local
+--   coefficient rows; Mathlib semantic search found `Matrix.vecMul`,
+--   `Matrix.dotProduct_mulVec`, and `Matrix.mul_apply_eq_vecMul`, which cover the
+--   component contractions but not this composed modeling object and action law
+-- minimal hypotheses: the definition needs `[Fintype StateIdx]` only; no
+--   `Fintype InputIdx`, decidable equality, topology, norm, finite-dimensionality,
+--   measure, convexity, smoothness, or oracle assumptions are used
+
+/-- The input-coordinate row obtained by applying an output row after a
+projection and a state propagator to an input coefficient matrix.
+
+Layer: Model | Concept: projected propagated linear-system input-to-output coefficient
+Proof: (definitional construction; three successive `Matrix.vecMul` contractions compose the output row, projection, propagator, and input channel)
+Source: Mathlib finite matrix `Matrix.vecMul` and state-space input-to-output transfer coefficients
+Used in: periodic linear stochastic recursions, where a projected propagated output is rewritten as a deterministic coefficient row acting on the raw innovation
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/3
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+noncomputable def linearOutputPropagatedInputCoeff
+    {R StateIdx InputIdx : Type*}
+    [NonUnitalNonAssocSemiring R] [Fintype StateIdx]
+    (output : StateIdx → R)
+    (projection propagator : Matrix StateIdx StateIdx R)
+    (inputCoeff : Matrix StateIdx InputIdx R) : InputIdx → R :=
+  Matrix.vecMul
+    (Matrix.vecMul (Matrix.vecMul output projection) propagator) inputCoeff
+
+/-- A coordinate of the propagated input coefficient is the nested finite sum
+over the projection, propagator, and input-channel state coordinates.
+
+Layer: Model | Gap: Level 0 (projected propagated input coefficient coordinate formula)
+Proof: by rfl after unfolding `linearOutputPropagatedInputCoeff` and Mathlib's `Matrix.vecMul` coordinate contraction.
+Source: Mathlib finite matrix `Matrix.vecMul`, `Matrix.dotProduct`, and finite-sum APIs
+Used in: coordinatewise periodicity, analyticity, and perturbation arguments for deterministic innovation coefficient rows
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/3
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+@[simp]
+theorem linearOutputPropagatedInputCoeff_apply
+    {R StateIdx InputIdx : Type*}
+    [NonUnitalNonAssocSemiring R] [Fintype StateIdx]
+    (output : StateIdx → R)
+    (projection propagator : Matrix StateIdx StateIdx R)
+    (inputCoeff : Matrix StateIdx InputIdx R) (j : InputIdx) :
+    linearOutputPropagatedInputCoeff output projection propagator inputCoeff j =
+      ∑ a : StateIdx,
+        (∑ b : StateIdx,
+          (∑ c : StateIdx, output c * projection c b) * propagator b a) *
+            inputCoeff a j := by
+  rfl
+
+/-- Pairing the propagated input coefficient row with a raw input equals
+evaluating the output row on the projected and propagated input response.
+
+Layer: Model | Gap: Level 1 (input-coordinate coefficient to propagated output action)
+Proof: reassociate three row/matrix contractions with `Matrix.dotProduct_mulVec`, moving each matrix from the coefficient row to the raw input response.
+Source: Mathlib finite matrix `Matrix.vecMul`, `Matrix.mulVec`, and `Matrix.dotProduct_mulVec`
+Used in: finite-Duhamel and impulse-response proofs that replace a projected propagated system output by a deterministic row paired with stochastic innovations
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/3
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem linearOutputPropagatedInputCoeff_dotProduct
+    {R StateIdx InputIdx : Type*}
+    [NonUnitalSemiring R] [Fintype StateIdx] [Fintype InputIdx]
+    (output : StateIdx → R)
+    (projection propagator : Matrix StateIdx StateIdx R)
+    (inputCoeff : Matrix StateIdx InputIdx R) (input : InputIdx → R) :
+    dotProduct
+        (linearOutputPropagatedInputCoeff
+          output projection propagator inputCoeff) input =
+      dotProduct output
+        (Matrix.mulVec projection
+          (Matrix.mulVec propagator (Matrix.mulVec inputCoeff input))) := by
+  unfold linearOutputPropagatedInputCoeff
+  rw [← Matrix.dotProduct_mulVec]
+  rw [← Matrix.dotProduct_mulVec]
+  rw [← Matrix.dotProduct_mulVec]
+
+end SOptLib
+
+/-! Promoted from Staging/affineRecurrence.lean. -/
+
+-- Generalization plan (G0):
+-- concept/name: affineRecurrence names the sequence generated by a constant
+--   multiplicative coefficient and a time-varying additive forcing; orig was
+--   quadraticScalarBlockBoundarySecondMomentARFormula
+-- generality used: an arbitrary carrier with only multiplication and addition, an initial
+--   value, a constant coefficient, and a natural-time forcing sequence; no semiring laws,
+--   order, topology, measure, probability, or optimization assumptions are used
+-- portable call pattern: stochastic second-moment recursions, forced scalar dynamics, and
+--   blockwise distributed recursions use the same carrier while changing the initial value,
+--   contraction coefficient, innovation-moment sequence, and time horizon
+-- counterargument checked: this is not paper-local traceability or a caller-side expression;
+--   unlike Mathlib's constant-forcing arithmetic-geometric sequence, it is the canonical
+--   varying-forcing carrier with reusable initialization, transition, and uniqueness API
+-- coverage search: searches for "sequence defined by initial value constant coefficient
+--   affine recurrence forcing" and "affine recurrence solution initial value forcing
+--   sequence equality" found Mathlib `arithGeom`, whose forcing is constant,
+--   `LinearRecurrence.mkSol`, which is homogeneous, and SOptLib `linearDuhamelResponse`,
+--   which is a normed linear-operator closed form; all are partial rather than full coverage
+-- minimal hypotheses: `[Mul R]` and `[Add R]` are exactly the operations used by the
+--   recursion, strengthening the planner's semiring generalization by dropping unused laws
+
+namespace SOptLib
+
+/-- The sequence generated from an initial value by a constant-coefficient affine
+recurrence with a time-varying forcing term.
+
+Layer: Model | Concept: constant-coefficient affine recurrence with varying forcing
+Proof: (definitional construction; natural-number recursion from the supplied initial value using multiplication, addition, and the forcing at the preceding time)
+Source: Mathlib arithmetic-geometric sequences and natural-number primitive recursion
+Used in: block-boundary stochastic second-moment recursions whose contraction coefficient is fixed while innovation moments vary with the block
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/15/proof/4/math
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, Appendix C.2 scalar moment expansion -/
+def affineRecurrence
+    {R : Type*} [Mul R] [Add R]
+    (init q : R) (forcing : ℕ → R) : ℕ → R
+  | 0 => init
+  | k + 1 => q * affineRecurrence init q forcing k + forcing k
+
+/-- The affine recurrence starts at its supplied initial value.
+
+Layer: Model | Gap: Level 0 (affine recurrence initialization)
+Proof: by rfl after unfolding `affineRecurrence` at zero.
+Source: Mathlib natural-number recursive-equation simplification
+Used in: base cases that identify a stochastic moment or forced-dynamics carrier with its prescribed initial state
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/15/proof/4/math
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, Appendix C.2 scalar moment expansion -/
+@[simp]
+theorem affineRecurrence_zero
+    {R : Type*} [Mul R] [Add R]
+    (init q : R) (forcing : ℕ → R) :
+    affineRecurrence init q forcing 0 = init := by
+  rfl
+
+/-- Each successor value of the affine recurrence is the coefficient times the
+preceding value plus the forcing at that time.
+
+Layer: Model | Gap: Level 0 (affine recurrence successor equation)
+Proof: by rfl after unfolding `affineRecurrence` at a successor.
+Source: Mathlib natural-number recursive-equation simplification
+Used in: one-step stochastic moment and forced-dynamics calculations before induction or finite-horizon summation
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/15/proof/4/math
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, Appendix C.2 scalar moment expansion -/
+theorem affineRecurrence_succ
+    {R : Type*} [Mul R] [Add R]
+    (init q : R) (forcing : ℕ → R) (k : ℕ) :
+    affineRecurrence init q forcing (k + 1) =
+      q * affineRecurrence init q forcing k + forcing k := by
+  rfl
+
+/-- A sequence with the prescribed initial value and successor equation is the
+corresponding affine recurrence.
+
+Layer: Model | Gap: Level 1 (uniqueness of a forced affine recurrence)
+Proof: use function extensionality and induction on time; the base hypothesis handles zero and the successor hypothesis reduces the next value to the induction hypothesis.
+Source: Mathlib function extensionality and natural-number induction for recursively specified sequences
+Used in: identifying stochastic second-moment and forced-dynamics sequences with their canonical affine-recursion carriers
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/15/proof/4/math
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, Appendix C.2 scalar moment expansion -/
+theorem eq_affineRecurrence_of_zero_of_succ
+    {R : Type*} [Mul R] [Add R]
+    (x : ℕ → R) (init q : R) (forcing : ℕ → R)
+    (hzero : x 0 = init)
+    (hsucc : ∀ k : ℕ, x (k + 1) = q * x k + forcing k) :
+    x = affineRecurrence init q forcing := by
+  funext k
+  induction k with
+  | zero => exact hzero
+  | succ k ih =>
+      rw [hsucc k, affineRecurrence_succ, ih]
+
+end SOptLib
+
+/-! Promoted from Staging/linearDuhamelResponse.lean. -/
+
+-- Generalization plan (G0):
+-- concept/name: finite discrete variation-of-constants response; orig was
+--   stablePowerDuhamelClosedResponse
+-- generality used: an arbitrary real normed additive commutative group and real normed
+--   space, one continuous linear endomorphism, an initial state, and an innovation sequence
+-- portable call pattern: linear stochastic recursions and distributed block recursions call
+--   the same closed response while changing the state space, transition, initial state,
+--   innovations, and horizon
+-- counterargument checked: although the body is one formula, it recurs as the shared object
+--   for recurrence, norm, integrability, and energy estimates, so it is not merely a
+--   paper-local notation wrapper
+-- coverage search: symbol searches for "linear operator response initial state finite
+--   propagated input sum" and "variation constants discrete linear recurrence closed form"
+--   found only scalar homogeneous LinearRecurrence APIs and additive telescope lemmas; none
+--   defines this forced operator-valued response
+-- minimal hypotheses: no stability, finite-dimensionality, completeness, measurability, or
+--   probability assumptions are used; all displayed typeclasses are needed by the continuous
+--   linear endomorphism and finite sum
+
+open scoped BigOperators
+
+namespace SOptLib
+
+/-- The finite discrete Duhamel response of a linear endomorphism to an initial
+state and a sequence of innovations.
+
+Layer: Model | Concept: finite discrete Duhamel response
+Proof: (definitional construction; homogeneous operator power plus the finite causal sum of propagated innovations)
+Source: discrete variation-of-constants formula, using Mathlib continuous-linear-map powers and finite sums
+Used in: stable components of linear stochastic recursions and blockwise distributed-optimization dynamics before norm, moment, and energy estimates
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/algorithm_spec
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks -/
+noncomputable def linearDuhamelResponse
+    {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (F : E →L[ℝ] E) (z0 : E) (xi : ℕ → E) (t : ℕ) : E :=
+  (F ^ t) z0 +
+    ∑ j ∈ Finset.range t, (F ^ (t - 1 - j)) (xi j)
+
+/-- The discrete Duhamel response unfolds to its homogeneous term and finite
+causal innovation sum.
+
+Layer: Model | Gap: Level 0 (finite discrete Duhamel response unfolding)
+Proof: by rfl after unfolding `linearDuhamelResponse`.
+Source: Mathlib continuous-linear-map powers and finite sums in the discrete variation-of-constants formula
+Used in: rewriting linear stochastic and distributed block responses before applying operator bounds or integrability closure
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/algorithm_spec
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks -/
+@[simp]
+theorem linearDuhamelResponse_def
+    {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (F : E →L[ℝ] E) (z0 : E) (xi : ℕ → E) (t : ℕ) :
+    linearDuhamelResponse F z0 xi t =
+      (F ^ t) z0 +
+        ∑ j ∈ Finset.range t, (F ^ (t - 1 - j)) (xi j) := by
+  rfl
+
+/-- At time zero, the finite discrete Duhamel response is the initial state.
+
+Layer: Model | Gap: Level 0 (finite discrete Duhamel response initialization)
+Proof: unfold `linearDuhamelResponse`; the zeroth operator power is the identity and the innovation range is empty.
+Source: Mathlib identity continuous-linear-map action and the empty finite sum over `Finset.range 0`
+Used in: base cases for linear stochastic recursions and stable distributed block-state energy estimates
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/algorithm_spec
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks -/
+@[simp]
+theorem linearDuhamelResponse_zero
+    {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (F : E →L[ℝ] E) (z0 : E) (xi : ℕ → E) :
+    linearDuhamelResponse F z0 xi 0 = z0 := by
+  simp [linearDuhamelResponse]
+
+end SOptLib
+
+/-! Promoted from Staging/linearDuhamelResponse_apply_abs_le_of_component_bounds.lean. -/
+
+-- Generalization plan (G0):
+-- concept/name: absolute output-envelope assembly for a finite discrete Duhamel
+--   response; orig was quadraticRestrictedPrimalAverageOutput_stableDuhamel_le_of_source_envelope
+-- generality used: an arbitrary real normed additive commutative group and real normed
+--   space, a continuous linear endomorphism and scalar functional, an initial state,
+--   innovations, and scalar component envelopes; no stability or sign assumptions
+-- portable call pattern: linear stochastic recursions, distributed block recursions, and
+--   state-space perturbation proofs call the same finite convolution bound while changing
+--   the state space, transition, output functional, inputs, and supplied envelopes
+-- counterargument checked: this is not a paper-local wrapper because it packages the
+--   reusable linearity, finite-sum triangle, component-bound aggregation, and coefficient
+--   factorization step for the canonical linearDuhamelResponse object
+-- coverage search: searches for "linear Duhamel response functional absolute value bound
+--   component bounds finite sum", "continuous linear map finite sum norm absolute value
+--   bound", and the corresponding Mathlib semantic query found only generic finite-sum
+--   maps and triangle inequalities, not this response-level envelope theorem
+-- minimal hypotheses: the original nonnegativity assumptions on C and alpha are unused;
+--   finite-dimensionality, completeness, stability, measurability, and probability are absent
+
+open scoped BigOperators
+
+namespace SOptLib
+
+/-- A scalar linear functional of a finite Duhamel response is bounded by the
+corresponding convolution of supplied component envelopes.
+
+Layer: Model | Gap: Level 1 (finite Duhamel output-envelope assembly)
+Proof: unfold the response, commute the continuous linear functional with addition and finite sums, apply the scalar triangle inequality and component bounds, then factor the common coefficient from the finite sum.
+Source: discrete variation-of-constants formula together with Mathlib continuous-linear-map finite-sum preservation and real absolute-value triangle inequalities
+Used in: stable-output estimates for linear stochastic recursions and distributed block dynamics after homogeneous and innovation impulse bounds have been established separately
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/3
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks -/
+theorem linearDuhamelResponse_apply_abs_le_of_component_bounds
+    {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (F : E →L[ℝ] E) (ell : E →L[ℝ] ℝ)
+    (z0 : E) (xi : ℕ → E) (t : ℕ)
+    (c theta E0 : ℝ) (Exi : ℕ → ℝ)
+    (hinit :
+      |ell ((F ^ t) z0)| ≤ c * (theta ^ t * E0))
+    (hxi :
+      ∀ j : ℕ, j ∈ Finset.range t →
+        |ell ((F ^ (t - 1 - j)) (xi j))| ≤
+          c * (theta ^ (t - 1 - j) * Exi j)) :
+    |ell (linearDuhamelResponse F z0 xi t)| ≤
+      c *
+        (theta ^ t * E0 +
+          Finset.sum (Finset.range t) (fun j ↦
+            theta ^ (t - 1 - j) * Exi j)) := by
+  calc
+    |ell (linearDuhamelResponse F z0 xi t)| =
+        |ell ((F ^ t) z0) +
+          ∑ j ∈ Finset.range t, ell ((F ^ (t - 1 - j)) (xi j))| := by
+            simp [linearDuhamelResponse]
+    _ ≤
+        |ell ((F ^ t) z0)| +
+          |∑ j ∈ Finset.range t, ell ((F ^ (t - 1 - j)) (xi j))| :=
+      abs_add_le _ _
+    _ ≤
+        |ell ((F ^ t) z0)| +
+          ∑ j ∈ Finset.range t, |ell ((F ^ (t - 1 - j)) (xi j))| := by
+      gcongr
+      simpa using
+        (Finset.abs_sum_le_sum_abs
+          (s := Finset.range t)
+          (f := fun j ↦ ell ((F ^ (t - 1 - j)) (xi j))))
+    _ ≤
+        c * (theta ^ t * E0) +
+          ∑ j ∈ Finset.range t,
+            c * (theta ^ (t - 1 - j) * Exi j) := by
+      exact add_le_add hinit (Finset.sum_le_sum fun j hj ↦ hxi j hj)
+    _ =
+        c *
+          (theta ^ t * E0 +
+            Finset.sum (Finset.range t) (fun j ↦
+              theta ^ (t - 1 - j) * Exi j)) := by
+      rw [← Finset.mul_sum]
+      ring
+
+end SOptLib
+
+/-! Promoted from Staging/linearDuhamelResponse_apply_eq_zero_of_invariant.lean. -/
+
+-- Generalization plan (G0):
+-- concept/name: annihilation of a finite discrete Duhamel response on an invariant
+--   submodule; orig was quadraticRestrictedPrimalAverageOutput_stableResponse_alpha_zero
+-- generality used: an arbitrary real normed additive commutative group and real normed
+--   space, a continuous linear endomorphism and scalar functional, an invariant submodule,
+--   an initial state, innovations, and a finite horizon
+-- portable call pattern: stable/slow decompositions, linear stochastic recursions, and
+--   state-space perturbation proofs use the same zero-output step while changing the state
+--   space, transition, invariant submodule, output functional, initial state, and forcing
+-- counterargument checked: this is not paper-local traceability or a one-line wrapper;
+--   it packages induction of submodule membership through every operator power together
+--   with closure of the complete finite Duhamel sum and annihilation by the output map
+-- coverage search: symbol searches for "linear Duhamel response equals zero invariant
+--   submodule contained in kernel linear functional", "submodule invariant under continuous
+--   linear endomorphism powers", and "continuous linear map vanishes submodule finite sum"
+--   found the existing response definition and component-bound theorem only; Mathlib semantic
+--   search found Submodule.mem_dualAnnihilator, which supplies only the terminal kernel fact
+-- minimal hypotheses: forcing membership is required only on Finset.range t; no stability,
+--   finite-dimensionality, completeness, measurability, probability, or closedness is used
+
+open scoped BigOperators
+
+namespace SOptLib
+
+/-- A scalar linear functional annihilates a finite Duhamel response when the
+transition preserves a submodule containing the initial state and every
+relevant innovation, and the functional vanishes on that submodule.
+
+Layer: Model | Gap: Level 1 (invariant-submodule annihilation of a finite Duhamel response)
+Proof: induct on operator powers to keep every propagated input in the invariant submodule, close the finite causal sum under submodule addition, and apply containment in the functional kernel.
+Source: discrete variation-of-constants together with Mathlib submodule closure, continuous-linear-map powers, kernels, and finite sums
+Used in: stable-output cancellation for linear stochastic recursions and distributed state-space splittings at a parameter value where the stable state and all forcing terms lie in an output-null invariant subspace
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/3
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem linearDuhamelResponse_apply_eq_zero_of_invariant
+    {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (F : E →L[ℝ] E) (ell : E →L[ℝ] ℝ)
+    (S : Submodule ℝ E) (z0 : E) (xi : ℕ → E) (t : ℕ)
+    (hF : Set.MapsTo F S S)
+    (hell : S ≤ LinearMap.ker ell.toLinearMap)
+    (hz0 : z0 ∈ S)
+    (hxi : ∀ j : ℕ, j ∈ Finset.range t → xi j ∈ S) :
+    ell (linearDuhamelResponse F z0 xi t) = 0 := by
+  have hpow : ∀ (m : ℕ) {z : E}, z ∈ S → (F ^ m) z ∈ S := by
+    intro m
+    induction m with
+    | zero =>
+        intro z hz
+        simpa using hz
+    | succ m ih =>
+        intro z hz
+        rw [pow_succ, ContinuousLinearMap.mul_apply]
+        exact ih (hF hz)
+  have hresponse : linearDuhamelResponse F z0 xi t ∈ S := by
+    rw [linearDuhamelResponse_def]
+    exact S.add_mem (hpow t hz0) <|
+      S.sum_mem fun j hj ↦ hpow (t - 1 - j) (hxi j hj)
+  exact LinearMap.mem_ker.mp (hell hresponse)
+
+end SOptLib
+
+/-! Promoted from Staging/linearDuhamelResponse_memLp.lean. -/
+
+-- Generalization plan (G0):
+-- concept/name: Lp closure of the finite discrete Duhamel response; orig was
+--   stablePowerDuhamelClosedResponse_coordinate_memLp
+-- generality used: an arbitrary measurable sample space, real normed additive
+--   commutative group, real normed space, measure, continuous linear endomorphism,
+--   Lp exponent, initial random state, innovation process, and finite horizon
+-- portable call pattern: random linear recursions and distributed block-state
+--   recursions call the same Lp-closure step while changing the state space,
+--   transition operator, initial state, innovations, exponent, measure, and horizon
+-- counterargument checked: this is not paper-local traceability or a pure wrapper;
+--   it packages linear transport, a causally indexed finite innovation sum, and
+--   addition into the closure theorem for the canonical linearDuhamelResponse object
+-- coverage search: queries for "linear Duhamel response MemLp initial state
+--   innovations finite sum continuous linear map" and "MemLp continuous linear map
+--   finite sum add" found Mathlib's MemLp.continuousLinearMap_comp,
+--   memLp_finset_sum, and MemLp.add as component facts, but no theorem with this
+--   complete response-level contract; the staged response definition is the only
+--   direct Duhamel hit
+-- minimal hypotheses: all displayed hypotheses are minimal; p is arbitrary, and no
+--   finite measure, probability, independence, completeness, finite-dimensionality,
+--   inner-product, stability, or coordinate-finiteness assumption is used
+
+open scoped BigOperators
+open MeasureTheory
+
+namespace SOptLib
+
+/-- A finite discrete Duhamel response is in `Lᵖ` when its initial random state
+and every innovation in the response horizon are in `Lᵖ`.
+
+Layer: Model | Gap: Level 1 (Lp closure of a finite discrete Duhamel response)
+Proof: transport the initial state and each innovation through the appropriate continuous-linear-map power, close the causal innovation range under a finite sum, and add the homogeneous and forced responses.
+Source: Mathlib `MemLp.continuousLinearMap_comp`, `memLp_finset_sum`, and `MemLp.add`, organized by the discrete variation-of-constants formula
+Used in: moment well-posedness for finite-horizon random linear recursions and stable distributed block-state responses before expectation and energy estimates
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks -/
+theorem linearDuhamelResponse_memLp
+    {Ω E : Type*} [MeasurableSpace Ω]
+    [NormedAddCommGroup E] [NormedSpace ℝ E]
+    {μ : Measure Ω} {p : ENNReal}
+    (F : E →L[ℝ] E) (z0 : Ω → E) (xi : ℕ → Ω → E)
+    (hz0 : MemLp z0 p μ) (t : ℕ)
+    (hxi : ∀ k ∈ Finset.range t, MemLp (xi k) p μ) :
+    MemLp
+      (fun ω => linearDuhamelResponse F (z0 ω) (fun k => xi k ω) t)
+      p μ := by
+  have hinit : MemLp (fun ω => (F ^ t) (z0 ω)) p μ :=
+    hz0.continuousLinearMap_comp (F ^ t)
+  have hforced :
+      MemLp
+        (fun ω => ∑ j ∈ Finset.range t, (F ^ (t - 1 - j)) (xi j ω))
+        p μ := by
+    apply memLp_finset_sum (Finset.range t)
+    intro j _hj
+    exact (hxi j _hj).continuousLinearMap_comp (F ^ (t - 1 - j))
+  simpa only [linearDuhamelResponse, Pi.add_apply] using hinit.add hforced
+
+end SOptLib
+
+/-! Promoted from Staging/linearDuhamelResponse_norm_le_geometric_convolution.lean. -/
+
+-- Generalization plan (G0):
+-- concept/name: norm bound for a finite discrete Duhamel response under a geometric
+--   operator-power estimate; orig was stablePowerDuhamelClosedResponse_norm_bound
+-- generality used: an arbitrary real normed additive commutative group and real normed
+--   space, one continuous linear endomorphism, an initial state, an innovation sequence,
+--   and a pointwise geometric bound on the norms of all operator powers
+-- portable call pattern: stable linear stochastic recursions and distributed block
+--   recursions use the same convolution estimate while changing the normed state space,
+--   transition operator, initial state, innovations, geometric constants, and horizon
+-- counterargument checked: this is not paper-local traceability or a pure wrapper because
+--   it composes the operator-power estimate, action bound, finite-sum triangle inequality,
+--   and causal Duhamel indexing into the reusable estimate needed by later energy bounds
+-- coverage search: searches for "linear Duhamel response norm upper bound geometric power
+--   estimate causal convolution" and "continuous linear map powers norm bound finite sum
+--   propagated inputs" found the staged response definition and Mathlib's
+--   ContinuousLinearMap.le_of_opNorm_le and norm_sum_le, but no theorem with this complete
+--   convolution contract
+-- minimal hypotheses: the power-norm estimate is pointwise in the exponent; no positivity
+--   or strict-contraction hypothesis on the constants, finite-dimensionality, completeness,
+--   measurability, probability measure, independence, or integrability is used
+
+open scoped BigOperators
+
+namespace SOptLib
+
+/-- A geometric bound on every power of a linear operator bounds its finite Duhamel
+response by the homogeneous term plus the causal geometric convolution of innovation norms.
+
+Layer: Model | Gap: Level 1 (geometric norm estimate for a finite discrete Duhamel response)
+Proof: unfold the response, apply the triangle inequality and `norm_sum_le`, then use `ContinuousLinearMap.le_of_opNorm_le` with the supplied bound on each operator power.
+Source: Mathlib continuous-linear-map operator norms and finite-sum norm inequalities, combined through the discrete variation-of-constants formula
+Used in: stable-state estimates for linear stochastic recursions and period-block distributed dynamics before square-sum or moment aggregation
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks -/
+theorem linearDuhamelResponse_norm_le_geometric_convolution
+    {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (F : E →L[ℝ] E) (z0 : E) (xi : ℕ → E) {K theta : ℝ}
+    (hpower : ∀ j : ℕ, ‖F ^ j‖ ≤ K * theta ^ j)
+    (t : ℕ) :
+    ‖linearDuhamelResponse F z0 xi t‖ ≤
+      K * theta ^ t * ‖z0‖ +
+        Finset.sum (Finset.range t) fun j =>
+          K * theta ^ (t - 1 - j) * ‖xi j‖ := by
+  rw [linearDuhamelResponse_def]
+  calc
+    ‖(F ^ t) z0 + ∑ j ∈ Finset.range t, (F ^ (t - 1 - j)) (xi j)‖ ≤
+        ‖(F ^ t) z0‖ + ‖∑ j ∈ Finset.range t, (F ^ (t - 1 - j)) (xi j)‖ :=
+      norm_add_le _ _
+    _ ≤ K * theta ^ t * ‖z0‖ +
+          ∑ j ∈ Finset.range t, ‖(F ^ (t - 1 - j)) (xi j)‖ := by
+      exact add_le_add ((F ^ t).le_of_opNorm_le (hpower t) z0) (norm_sum_le _ _)
+    _ ≤ K * theta ^ t * ‖z0‖ +
+          Finset.sum (Finset.range t) fun j =>
+            K * theta ^ (t - 1 - j) * ‖xi j‖ := by
+      gcongr with j hj
+      exact (F ^ (t - 1 - j)).le_of_opNorm_le (hpower (t - 1 - j)) (xi j)
+
+end SOptLib
+
+/-! Promoted from Staging/linearDuhamelResponse_succ.lean. -/
+
+-- Generalization plan (G0):
+-- concept/name: successor recurrence for the finite discrete Duhamel response; orig was
+--   stablePowerDuhamelClosedResponse_succ
+-- generality used: the arbitrary real normed additive commutative group and real normed
+--   space used by the canonical response, with one continuous linear endomorphism, an
+--   initial state, an innovation sequence, and a natural time
+-- portable call pattern: linear stochastic recursions, forced dynamical systems, and
+--   distributed block recursions expose the same one-step affine equation while changing
+--   the state space, transition operator, initial state, innovations, and time
+-- counterargument checked: this is not paper-local traceability or a pure rename; it is the
+--   central recurrence specification of the already-staged canonical Duhamel response and
+--   packages power reindexing with distribution of a linear map over a finite causal sum
+-- coverage search: symbol searches for "finite discrete Duhamel response successor affine
+--   recurrence", "linear recursion closed form successor equality operator power finite
+--   sum", and "continuous linear map finite propagated input sum recurrence" found the
+--   response's zero/spec lemmas but no successor theorem; Mathlib semantic search returned
+--   Birkhoff-sum and homogeneous LinearRecurrence APIs, neither of which covers varying inputs
+-- minimal hypotheses: no stability, finite-dimensionality, completeness, measurability, or
+--   probability assumptions are used; the normed-space assumptions come only from the
+--   established `linearDuhamelResponse` continuous-linear-map API
+
+open scoped BigOperators
+
+namespace SOptLib
+
+/-- The finite discrete Duhamel response satisfies its one-step affine recurrence.
+
+Layer: Model | Gap: Level 1 (successor recurrence for a finite discrete Duhamel response)
+Proof: split the causal sum at its final index, reindex the earlier operator powers, and distribute the continuous linear endomorphism over addition and the finite sum.
+Source: discrete variation-of-constants formula, Mathlib continuous-linear-map powers, and `Finset.sum_range_succ`
+Used in: converting closed stable responses for forced stochastic and distributed block dynamics into one-step state recurrences
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/algorithm_spec
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks -/
+theorem linearDuhamelResponse_succ
+    {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (F : E →L[ℝ] E) (z0 : E) (xi : ℕ → E) (t : ℕ) :
+    linearDuhamelResponse F z0 xi (t + 1) =
+      F (linearDuhamelResponse F z0 xi t) + xi t := by
+  rw [linearDuhamelResponse_def, linearDuhamelResponse_def,
+    Finset.sum_range_succ]
+  have hpow : (F ^ (t + 1)) z0 = F ((F ^ t) z0) := by
+    rw [pow_succ']
+    rfl
+  have hsum :
+      (∑ j ∈ Finset.range t, (F ^ (t + 1 - 1 - j)) (xi j)) =
+        F (∑ j ∈ Finset.range t, (F ^ (t - 1 - j)) (xi j)) := by
+    rw [map_sum]
+    refine Finset.sum_congr rfl ?_
+    intro j hj
+    have hjlt : j < t := Finset.mem_range.mp hj
+    have hexp : t + 1 - 1 - j = (t - 1 - j) + 1 := by omega
+    rw [hexp, pow_succ']
+    rfl
+  have hlast : (F ^ (t + 1 - 1 - t)) (xi t) = xi t := by
+    simp
+  rw [hpow, hsum, hlast, map_add]
+  abel
+
+end SOptLib
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: two-sided matrix preconditioner state; orig was MatrixState
+-- generality used: arbitrary row, column, and entry types; no algebraic, measure,
+--   convexity, smoothness, oracle, finiteness, or decidability assumptions
+-- portable call pattern: full-matrix and diagonal adaptive methods reuse the same
+--   iterate/left-accumulator/right-accumulator state while changing index and entry types
+-- counterargument checked: not paper-local bookkeeping or a pure wrapper because the
+--   row/column coupling of the three matrix shapes is the reusable state invariant
+-- coverage search: symbol and semantic searches found Mathlib.Matrix and the partial
+--   SOptLib.BlockIterateState; neither bundles this two-sided matrix state shape
+-- minimal hypotheses: all already minimal; Matrix requires only its three carrier types
+
+/-- A rectangular matrix iterate together with square left and right preconditioner states.
+
+The shared row and column index types record that the left accumulator acts on rows and
+the right accumulator acts on columns of the iterate.
+
+Layer: Model | Concept: two-sided matrix preconditioner state
+Proof: (definitional construction; bundles a rectangular iterate with row- and column-indexed square accumulator matrices)
+Source: Mathlib matrix types and the standard state-space model for two-sided adaptive matrix preconditioning
+Used in: initialization and transition recurrences for full-matrix and diagonal two-sided adaptive optimization methods
+Book citation: book/research/Source.json#/additional_algorithm_specs/0
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 1 (matrix case) -/
+structure TwoSidedMatrixPreconditionerState (ι κ 𝕜 : Type*) where
+  W : Matrix ι κ 𝕜
+  L : Matrix ι ι 𝕜
+  R : Matrix κ κ 𝕜
+
+end SOptLib
+
+namespace SOptLib
+
+universe u v w
+
+-- Generalization plan (G0):
+-- concept/name: modewise tensor preconditioner state; orig was TensorState
+-- generality used: an arbitrary mode type, a dependent coordinate type for each mode,
+--   and an arbitrary coefficient type; no finiteness, algebraic, measure, convexity,
+--   smoothness, oracle, or decidable-equality assumptions
+-- portable call pattern: tensor adaptive-gradient and multilinear preconditioned methods
+--   reuse the iterate/modewise-accumulator carrier while changing modes, coordinates,
+--   coefficients, iterate values, and accumulator values
+-- counterargument checked: this is not paper-local traceability or a caller-side expression;
+--   the dependent coordinate family enforces that each mode accumulator is square on the
+--   corresponding tensor coordinate type, a reusable state invariant
+-- coverage search: symbol searches for modewise tensor preconditioner states and dependent
+--   square-matrix accumulator families found the two-mode `TwoSidedMatrixPreconditionerState`
+--   and counter-bearing `BlockIterateState`; Mathlib semantic search found only `DMatrix`,
+--   so none covers this iterate plus mode-indexed square-operator state
+-- minimal hypotheses: all already minimal; dependent functions and `Matrix` need no typeclasses
+
+/-- A dependent tensor iterate together with one square preconditioner state for every mode.
+
+The coordinate family ties each accumulator's row and column indices to the corresponding
+mode while allowing both the set of modes and their coordinate types to vary.
+
+Layer: Model | Concept: modewise tensor preconditioner state
+Proof: (definitional construction; bundles a dependent-function tensor iterate with a mode-indexed family of square matrices)
+Source: Mathlib matrix types and dependent Pi types for heterogeneous tensor coordinates
+Used in: initialization and transition recurrences for tensor adaptive-gradient and multilinear modewise-preconditioning methods
+Book citation: book/research/Source.json#/algorithm_spec
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 2 (tensor case) -/
+structure ModewiseTensorPreconditionerState
+    (Mode : Type u) (Coord : Mode → Type v) (R : Type w) where
+  W : ((i : Mode) → Coord i) → R
+  H : (i : Mode) → Matrix (Coord i) (Coord i) R
+
+end SOptLib
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: two-sided matrix preconditioner initial state; orig was `initialState`
+-- generality used: arbitrary row and column index types with decidable equality and a
+--   real regularization scalar; no finiteness, measure, convexity, smoothness, oracle,
+--   or sign assumptions are needed for the construction
+-- portable call pattern: full-matrix and diagonal adaptive methods initialize a zero
+--   rectangular iterate and identity-scaled row/column accumulators while changing the
+--   index types and regularization scalar
+-- counterargument checked: although definitionally small, this is not a paper-local
+--   caller expression because it is the canonical constructor paired with the reusable
+--   two-sided state carrier and exposes the shared base state of several matrix methods
+-- coverage search: searched "two sided matrix preconditioner initial state zero iterate
+--   scaled identity accumulators" and "matrix state initialization zero matrix epsilon
+--   scalar identity left right"; the closest hit was `TwoSidedMatrixPreconditionerState`,
+--   which supplies the carrier but no initialization constructor
+-- minimal hypotheses: decidable equality is used only to form the two identity matrices;
+--   finiteness and nonnegativity from the algorithm are unnecessary here
+
+/-- Initialize a two-sided matrix preconditioner with a zero iterate and scaled identities.
+
+The row accumulator and column accumulator use the same regularization scalar but
+their identity matrices are indexed independently.
+
+Layer: Model | Concept: two-sided matrix preconditioner initialization
+Proof: (definitional construction; stores the zero rectangular matrix and the regularization scalar times each index type's identity matrix)
+Source: Mathlib zero, identity, and scalar multiplication operations for matrices, together with the standard initialization of two-sided adaptive preconditioners
+Used in: base states for full-matrix and diagonal adaptive-gradient recurrences before row and column Gram accumulators receive their first update
+Book citation: book/research/Source.json#/additional_algorithm_specs/0/initialization
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 1 (matrix case) -/
+def twoSidedMatrixPreconditionerInitialState
+    {ι κ : Type*} [DecidableEq ι] [DecidableEq κ] (ε : ℝ) :
+    TwoSidedMatrixPreconditionerState ι κ ℝ where
+  W := 0
+  L := ε • 1
+  R := ε • 1
+
+/-- The two-sided preconditioner initialization unfolds to its zero iterate and
+identity-scaled row and column accumulators.
+
+Layer: Model | Gap: Level 0 (two-sided matrix preconditioner initialization unfolding)
+Proof: by rfl after unfolding `twoSidedMatrixPreconditionerInitialState`.
+Source: Mathlib matrix structure literals and definitional reduction of structure-valued functions
+Used in: base-case proofs that identify the initial iterate and both accumulator matrices in full-matrix and diagonal adaptive-gradient recurrences
+Book citation: book/research/Source.json#/additional_algorithm_specs/0/initialization
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 1 (matrix case) -/
+@[simp]
+theorem twoSidedMatrixPreconditionerInitialState_def
+    {ι κ : Type*} [DecidableEq ι] [DecidableEq κ] (ε : ℝ) :
+    twoSidedMatrixPreconditionerInitialState (ι := ι) (κ := κ) ε =
+      { W := 0
+        L := ε • 1
+        R := ε • 1 } := by
+  rfl
+
+/-- Both accumulators of the two-sided initial state are positive semidefinite
+when the regularization scalar is nonnegative.
+
+Layer: Model | Gap: Level 0 (positive semidefiniteness of initialized accumulators)
+Proof: unfold the initialization and use positive semidefiniteness of the identity,
+preserved by multiplication by a nonnegative scalar.
+Source: Mathlib positive-semidefinite matrix API for identity matrices and nonnegative
+scalar multiplication
+Used in: establishing the base invariant for full-matrix and diagonal two-sided adaptive
+preconditioner recurrences
+Book citation: book/research/Source.json#/additional_algorithm_specs/0/initialization
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 1 (matrix case) -/
+theorem twoSidedMatrixPreconditionerInitialState_accumulators_posSemidef
+    {ι κ : Type*} [DecidableEq ι] [DecidableEq κ]
+    {ε : ℝ} (hε : 0 ≤ ε) :
+    (twoSidedMatrixPreconditionerInitialState (ι := ι) (κ := κ) ε).L.PosSemidef ∧
+      (twoSidedMatrixPreconditionerInitialState (ι := ι) (κ := κ) ε).R.PosSemidef := by
+  constructor
+  · simpa [twoSidedMatrixPreconditionerInitialState] using
+      (Matrix.PosSemidef.one.smul hε : Matrix.PosSemidef (ε • (1 : Matrix ι ι ℝ)))
+  · simpa [twoSidedMatrixPreconditionerInitialState] using
+      (Matrix.PosSemidef.one.smul hε : Matrix.PosSemidef (ε • (1 : Matrix κ κ ℝ)))
+
+end SOptLib
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: two-sided matrix-preconditioned state transition; orig was stepState
+-- generality used: arbitrary finite decidable row and column index types, real matrix
+--   entries, a real learning rate, and positive-definite updated accumulators
+-- portable call pattern: full-matrix adaptive-gradient and Shampoo-family methods call
+--   the same transition while changing row/column types, learning rate, state, and gradient
+-- counterargument checked: not a caller-side expression or paper-local wrapper because it
+--   canonically couples both Gram updates with the two-sided inverse-fourth-power direction
+-- coverage search: symbol searches for two-sided matrix preconditioned steps and Gram
+--   accumulator updates found no SOptLib match; Mathlib semantic search found Matrix.gram
+--   and matrix inverse identities, but no state transition with fractional preconditioning
+-- minimal hypotheses: Fintype and DecidableEq support spectral matrix powers and matrix
+--   multiplication; PosDef certificates are exactly the domain required by negative powers
+
+/-- Update both Gram accumulators and take a two-sided inverse-fourth-power matrix step.
+
+The positive-definite certificates make the negative spectral powers explicit in the
+transition's domain instead of assigning inverse powers to possibly singular accumulators.
+
+Layer: Model | Concept: two-sided matrix-preconditioned state transition
+Proof: (definitional construction; adds row and column Gram matrices and applies their certified spectral inverse fourth powers on the two sides of the direction)
+Source: Mathlib Hermitian eigendecomposition through `Matrix.IsHermitian.eigenvectorUnitary` and `Matrix.IsHermitian.eigenvalues`, with finite real matrix multiplication
+Used in: full-matrix adaptive-gradient and Shampoo-family iteration recurrences that update row and column accumulators before preconditioning the current matrix gradient
+Book citation: book/research/Source.json#/additional_algorithm_specs/0/steps
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 1 (matrix case) -/
+noncomputable def twoSidedMatrixPreconditionedStep
+    {ι κ : Type*} [Fintype ι] [DecidableEq ι] [Fintype κ] [DecidableEq κ]
+    (η : ℝ) (st : TwoSidedMatrixPreconditionerState ι κ ℝ) (G : Matrix ι κ ℝ)
+    (hLpd : (st.L + G * G.transpose).PosDef)
+    (hRpd : (st.R + G.transpose * G).PosDef) :
+    TwoSidedMatrixPreconditionerState ι κ ℝ :=
+  let Lnew := st.L + G * G.transpose
+  let Rnew := st.R + G.transpose * G
+  { W := st.W -
+      η • (((hLpd.posSemidef.1.eigenvectorUnitary : Matrix ι ι ℝ) *
+          Matrix.diagonal (fun i : ι =>
+            (hLpd.posSemidef.1.eigenvalues i) ^ (-(1 / 4 : ℝ))) *
+          star (hLpd.posSemidef.1.eigenvectorUnitary : Matrix ι ι ℝ)) * G *
+        ((hRpd.posSemidef.1.eigenvectorUnitary : Matrix κ κ ℝ) *
+          Matrix.diagonal (fun i : κ =>
+            (hRpd.posSemidef.1.eigenvalues i) ^ (-(1 / 4 : ℝ))) *
+          star (hRpd.posSemidef.1.eigenvectorUnitary : Matrix κ κ ℝ)))
+    L := Lnew
+    R := Rnew }
+
+/-- Unfold a two-sided matrix-preconditioned step into its updated iterate and Gram
+accumulators. -/
+@[simp]
+theorem twoSidedMatrixPreconditionedStep_def
+    {ι κ : Type*} [Fintype ι] [DecidableEq ι] [Fintype κ] [DecidableEq κ]
+    (η : ℝ) (st : TwoSidedMatrixPreconditionerState ι κ ℝ) (G : Matrix ι κ ℝ)
+    (hLpd : (st.L + G * G.transpose).PosDef)
+    (hRpd : (st.R + G.transpose * G).PosDef) :
+    twoSidedMatrixPreconditionedStep η st G hLpd hRpd =
+      { W := st.W -
+          η • (((hLpd.posSemidef.1.eigenvectorUnitary : Matrix ι ι ℝ) *
+              Matrix.diagonal (fun i : ι =>
+                (hLpd.posSemidef.1.eigenvalues i) ^ (-(1 / 4 : ℝ))) *
+              star (hLpd.posSemidef.1.eigenvectorUnitary : Matrix ι ι ℝ)) * G *
+            ((hRpd.posSemidef.1.eigenvectorUnitary : Matrix κ κ ℝ) *
+              Matrix.diagonal (fun i : κ =>
+                (hRpd.posSemidef.1.eigenvalues i) ^ (-(1 / 4 : ℝ))) *
+              star (hRpd.posSemidef.1.eigenvectorUnitary : Matrix κ κ ℝ)))
+        L := st.L + G * G.transpose
+        R := st.R + G.transpose * G } := by
+  rfl
+
+/-- The left component of a two-sided matrix-preconditioned step is the updated row Gram
+accumulator.
+
+Layer: Model | Gap: Level 0 (left accumulator projection)
+Proof: by rfl after unfolding `twoSidedMatrixPreconditionedStep`.
+Source: Mathlib structure projection reduction and finite real matrix multiplication
+Used in: accumulator recurrences for full-matrix adaptive-gradient and Shampoo-family methods
+Book citation: book/research/Source.json#/additional_algorithm_specs/0/steps/2
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 1 (matrix case) -/
+@[simp]
+theorem twoSidedMatrixPreconditionedStep_left
+    {ι κ : Type*} [Fintype ι] [DecidableEq ι] [Fintype κ] [DecidableEq κ]
+    (η : ℝ) (st : TwoSidedMatrixPreconditionerState ι κ ℝ) (G : Matrix ι κ ℝ)
+    (hLpd : (st.L + G * G.transpose).PosDef)
+    (hRpd : (st.R + G.transpose * G).PosDef) :
+    (twoSidedMatrixPreconditionedStep η st G hLpd hRpd).L =
+      st.L + G * G.transpose := by
+  rfl
+
+/-- The right component of a two-sided matrix-preconditioned step is the updated column
+Gram accumulator.
+
+Layer: Model | Gap: Level 0 (right accumulator projection)
+Proof: by rfl after unfolding `twoSidedMatrixPreconditionedStep`.
+Source: Mathlib structure projection reduction and finite real matrix multiplication
+Used in: accumulator recurrences for full-matrix adaptive-gradient and Shampoo-family methods
+Book citation: book/research/Source.json#/additional_algorithm_specs/0/steps/3
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 1 (matrix case) -/
+@[simp]
+theorem twoSidedMatrixPreconditionedStep_right
+    {ι κ : Type*} [Fintype ι] [DecidableEq ι] [Fintype κ] [DecidableEq κ]
+    (η : ℝ) (st : TwoSidedMatrixPreconditionerState ι κ ℝ) (G : Matrix ι κ ℝ)
+    (hLpd : (st.L + G * G.transpose).PosDef)
+    (hRpd : (st.R + G.transpose * G).PosDef) :
+    (twoSidedMatrixPreconditionedStep η st G hLpd hRpd).R =
+      st.R + G.transpose * G := by
+  rfl
+
+/-- Both accumulators returned by a two-sided matrix-preconditioned step retain the
+positive-definiteness certificates required to form its negative spectral powers. -/
+theorem twoSidedMatrixPreconditionedStep_accumulators_posDef
+    {ι κ : Type*} [Fintype ι] [DecidableEq ι] [Fintype κ] [DecidableEq κ]
+    (η : ℝ) (st : TwoSidedMatrixPreconditionerState ι κ ℝ) (G : Matrix ι κ ℝ)
+    (hLpd : (st.L + G * G.transpose).PosDef)
+    (hRpd : (st.R + G.transpose * G).PosDef) :
+    (twoSidedMatrixPreconditionedStep η st G hLpd hRpd).L.PosDef ∧
+      (twoSidedMatrixPreconditionedStep η st G hLpd hRpd).R.PosDef := by
+  constructor
+  · simpa only [twoSidedMatrixPreconditionedStep_left] using hLpd
+  · simpa only [twoSidedMatrixPreconditionedStep_right] using hRpd
+
+/-- The iterate component takes the certified two-sided spectral inverse-fourth-power
+preconditioned matrix direction.
+
+Layer: Model | Gap: Level 0 (preconditioned iterate projection)
+Proof: by rfl after unfolding `twoSidedMatrixPreconditionedStep`.
+Source: Mathlib Hermitian eigendecomposition through `Matrix.IsHermitian.eigenvectorUnitary` and `Matrix.IsHermitian.eigenvalues`
+Used in: matrix-iterate recurrences for full-matrix adaptive-gradient and Shampoo-family methods
+Book citation: book/research/Source.json#/additional_algorithm_specs/0/steps/4
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 1 (matrix case) -/
+@[simp]
+theorem twoSidedMatrixPreconditionedStep_iterate
+    {ι κ : Type*} [Fintype ι] [DecidableEq ι] [Fintype κ] [DecidableEq κ]
+    (η : ℝ) (st : TwoSidedMatrixPreconditionerState ι κ ℝ) (G : Matrix ι κ ℝ)
+    (hLpd : (st.L + G * G.transpose).PosDef)
+    (hRpd : (st.R + G.transpose * G).PosDef) :
+    (twoSidedMatrixPreconditionedStep η st G hLpd hRpd).W =
+      st.W - η •
+        (((hLpd.posSemidef.1.eigenvectorUnitary : Matrix ι ι ℝ) *
+            Matrix.diagonal (fun i : ι =>
+              (hLpd.posSemidef.1.eigenvalues i) ^ (-(1 / 4 : ℝ))) *
+            star (hLpd.posSemidef.1.eigenvectorUnitary : Matrix ι ι ℝ)) * G *
+          ((hRpd.posSemidef.1.eigenvectorUnitary : Matrix κ κ ℝ) *
+            Matrix.diagonal (fun i : κ =>
+              (hRpd.posSemidef.1.eigenvalues i) ^ (-(1 / 4 : ℝ))) *
+            star (hRpd.posSemidef.1.eigenvectorUnitary : Matrix κ κ ℝ))) := by
+  rfl
+
+end SOptLib
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: finite-horizon inverse-metric preconditioned gradient trajectory;
+--   orig was `IsOMDTrajectory`, with the algorithm acronym removed
+-- generality used: an arbitrary horizon and finite decidable coordinate type, with real
+--   step size, iterates, directions, and square preconditioners; no measure, convexity,
+--   positivity, invertibility, smoothness, or oracle assumptions are used
+-- portable call pattern: online mirror-descent and adaptive-gradient regret proofs use the
+--   same pointwise trajectory equation while changing the horizon, coordinates, step size,
+--   iterate path, supplied gradients, and time-varying preconditioners
+-- counterargument checked: this is a one-equation predicate, but it names the reusable
+--   horizon-wide contract consumed by regret arguments, rather than merely renaming the
+--   one-step expression; the existing step object does not package trajectory evidence
+-- coverage search: project searches for "preconditioned gradient trajectory successor
+--   iterate update" and "finite horizon trajectory current next index recurrence" found
+--   `preconditionedGradientStep` and generic iterate bridge lemmas only as partial matches;
+--   Mathlib semantic search found `Stream'.iterate` but no time-varying finite trajectory
+-- minimal hypotheses: `Fintype` is required by matrix-vector multiplication and
+--   `DecidableEq` by Mathlib's total matrix inverse; all source assumptions are omitted
+
+/-- A finite iterate path follows the inverse-metric preconditioned gradient update at every
+step of its horizon.
+
+The current point is selected by `Fin.castSucc`, while `Fin.succ` selects its successor in
+the path of length `T + 1`.
+
+Layer: Model | Concept: finite-horizon preconditioned gradient trajectory
+Proof: (definitional construction; universally quantify the `preconditionedGradientStep` recurrence over the finite horizon)
+Source: Mathlib finite-index embeddings and finite matrix-vector multiplication, together with SOptLib's inverse-metric preconditioned gradient step
+Used in: adaptive-gradient and online mirror-descent regret proofs that consume every time-local inverse-metric update from a finite iterate path
+Book citation: book/research/Source.json#/main_theorem/proof/1/math
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, adaptive online mirror descent -/
+def IsPreconditionedGradientTrajectory
+    {T : Nat} {ι : Type*} [Fintype ι] [DecidableEq ι]
+    (η : ℝ) (w : Fin (T + 1) → ι → ℝ) (g : Fin T → ι → ℝ)
+    (H : Fin T → Matrix ι ι ℝ) : Prop :=
+  ∀ t : Fin T,
+    w (Fin.succ t) = preconditionedGradientStep η (H t) (g t) (w (Fin.castSucc t))
+
+/-- The preconditioned-gradient trajectory predicate is exactly its pointwise finite-horizon
+successor recurrence.
+
+Layer: Model | Gap: Level 0 (preconditioned-gradient trajectory unfolding)
+Proof: by rfl after unfolding `IsPreconditionedGradientTrajectory`.
+Source: Mathlib finite-index successor and cast embeddings, together with SOptLib's inverse-metric preconditioned gradient step
+Used in: adaptive-gradient regret proofs that specialize a trajectory contract to one time index before applying one-step metric algebra
+Book citation: book/research/Source.json#/main_theorem/proof/1/math
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, adaptive online mirror descent -/
+@[simp] theorem IsPreconditionedGradientTrajectory_def
+    {T : Nat} {ι : Type*} [Fintype ι] [DecidableEq ι]
+    (η : ℝ) (w : Fin (T + 1) → ι → ℝ) (g : Fin T → ι → ℝ)
+    (H : Fin T → Matrix ι ι ℝ) :
+    IsPreconditionedGradientTrajectory η w g H ↔
+      ∀ t : Fin T,
+        w (Fin.succ t) = preconditionedGradientStep η (H t) (g t) (w (Fin.castSucc t)) := by
+  rfl
+
+/-- Two preconditioned-gradient trajectories driven by the same directions and
+preconditioners are equal when their initial iterates are equal.
+
+Layer: Model | Gap: Level 0 (finite preconditioned-gradient trajectory uniqueness)
+Proof: induct over the finite time index and use the common one-step recurrence at each
+successor.
+Source: Mathlib finite-index induction and SOptLib's preconditioned-gradient trajectory
+predicate
+Used in: identifying an abstract adaptive-gradient trajectory with a recursively constructed
+iterate path -/
+theorem IsPreconditionedGradientTrajectory.eq_of_initial_eq
+    {T : Nat} {ι : Type*} [Fintype ι] [DecidableEq ι]
+    (η : ℝ) {w₁ w₂ : Fin (T + 1) → ι → ℝ} (g : Fin T → ι → ℝ)
+    (H : Fin T → Matrix ι ι ℝ)
+    (hw₁ : IsPreconditionedGradientTrajectory η w₁ g H)
+    (hw₂ : IsPreconditionedGradientTrajectory η w₂ g H)
+    (hzero : w₁ 0 = w₂ 0) :
+    w₁ = w₂ := by
+  funext t
+  induction t using Fin.induction with
+  | zero => exact hzero
+  | succ t ih =>
+      rw [hw₁ t, hw₂ t, ih]
+
+end SOptLib
+
 
 namespace SOptLib
 
@@ -7633,5 +8765,1563 @@ theorem relaxedMemoryRefreshPoint_solve
   rw [relaxedMemoryRefreshPoint_def]
   rw [smul_smul, mul_inv_cancel₀ hden]
   simp [sub_eq_add_neg, add_assoc]
+
+-- Generalization plan (G0):
+-- concept/name: recursive-momentum iterate state; orig was `State`
+-- generality used: arbitrary iterate/direction carrier `E` and accumulator carrier `R`;
+--   no algebraic, measurable, measure, convexity, smoothness, or oracle assumptions
+-- portable call pattern: recursive-momentum and adaptive-gradient transitions that update
+--   an iterate, a same-carrier direction estimate, and an accumulated statistic; both the
+--   vector carrier and accumulator representation may change
+-- counterargument checked: this is not paper-only bookkeeping or a product rename because
+--   the named coordinates form the public interface used by initialization, transitions,
+--   generated processes, and measurability proofs; nearby SOptLib records have different
+--   invariants or fixed counter shapes
+-- coverage search: queries "recursive momentum state iterate direction accumulated statistic
+--   structure" and "state with iterate direction accumulator"; closest SOptLib hits were
+--   `ConditionalGradientState`, `FeasibleAcceleratedState`, and `BlockIterateState`, all partial;
+--   Mathlib semantic search returned only unrelated estimator and map-accumulator APIs
+-- minimal hypotheses: all already minimal after removing the unused normed-group and
+--   normed-space typeclasses from the original declaration
+
+/-- State of a recursive-momentum iteration, carrying its iterate, direction estimate,
+and accumulated statistic.
+
+Layer: Model | Concept: recursive-momentum iterate state
+Proof: (definitional construction; bundled iterate, same-carrier recursive direction estimate,
+  and independently typed accumulated statistic)
+Source: recursive-momentum and adaptive-gradient algorithm-state notation
+Used in: recursive-momentum initialization and sample-driven transitions that jointly update
+  the iterate, direction estimate, and cumulative gradient statistic
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD,
+  STOchastic Recursive Momentum (STORM) -/
+@[ext]
+structure RecursiveMomentumState (E R : Type*) where
+  x : E
+  direction : E
+  gradNormSqSum : R
+
+namespace RecursiveMomentumState
+
+/-- The iterate projection of a state built from coordinates is the supplied iterate. -/
+@[simp]
+theorem mk_x {E R : Type*} (x direction : E) (gradNormSqSum : R) :
+    (RecursiveMomentumState.mk x direction gradNormSqSum).x = x := by
+  rfl
+
+/-- The direction projection of a state built from coordinates is the supplied direction. -/
+@[simp]
+theorem mk_direction {E R : Type*} (x direction : E) (gradNormSqSum : R) :
+    (RecursiveMomentumState.mk x direction gradNormSqSum).direction = direction := by
+  rfl
+
+/-- The accumulator projection of a state built from coordinates is the supplied accumulator. -/
+@[simp]
+theorem mk_gradNormSqSum {E R : Type*} (x direction : E) (gradNormSqSum : R) :
+    (RecursiveMomentumState.mk x direction gradNormSqSum).gradNormSqSum = gradNormSqSum := by
+  rfl
+
+end RecursiveMomentumState
+
+/-- The measurable space on a recursive-momentum state generated by its three coordinates.
+
+Layer: Model | Concept: recursive-momentum iterate state
+Proof: (definitional construction; supremum of the three coordinate-comap
+  measurable spaces)
+Source: Mathlib measure-theory measurable-space comap APIs
+Used in: measurability of recursive-momentum and adaptive-gradient state processes -/
+@[reducible]
+def recursiveMomentumStateMeasurableSpace
+    {E R : Type*} [MeasurableSpace E] [MeasurableSpace R] :
+    MeasurableSpace (RecursiveMomentumState E R) :=
+  MeasurableSpace.comap (fun s : RecursiveMomentumState E R => s.x) inferInstance ⊔
+    MeasurableSpace.comap (fun s : RecursiveMomentumState E R => s.direction) inferInstance ⊔
+      MeasurableSpace.comap
+        (fun s : RecursiveMomentumState E R => s.gradNormSqSum) inferInstance
+
+/-- The recursive-momentum state measurable space unfolds to the supremum of its
+three coordinate-comap measurable spaces. -/
+@[simp]
+theorem recursiveMomentumStateMeasurableSpace_def
+    {E R : Type*} [MeasurableSpace E] [MeasurableSpace R] :
+    (recursiveMomentumStateMeasurableSpace :
+      MeasurableSpace (RecursiveMomentumState E R)) =
+      MeasurableSpace.comap (fun s : RecursiveMomentumState E R => s.x) inferInstance ⊔
+        MeasurableSpace.comap
+            (fun s : RecursiveMomentumState E R => s.direction) inferInstance ⊔
+          MeasurableSpace.comap
+            (fun s : RecursiveMomentumState E R => s.gradNormSqSum) inferInstance := by
+  rfl
+
+/-- The iterate coordinate is measurable for the coordinate-generated state
+measurable space. -/
+theorem recursiveMomentumState_x_measurable
+    {E R : Type*} [MeasurableSpace E] [MeasurableSpace R] :
+    @Measurable (RecursiveMomentumState E R) E
+      recursiveMomentumStateMeasurableSpace inferInstance
+      (fun s => s.x) := by
+  exact Measurable.of_comap_le (le_sup_left.trans le_sup_left)
+
+/-- The recursive direction coordinate is measurable for the coordinate-generated
+state measurable space. -/
+theorem recursiveMomentumState_direction_measurable
+    {E R : Type*} [MeasurableSpace E] [MeasurableSpace R] :
+    @Measurable (RecursiveMomentumState E R) E
+      recursiveMomentumStateMeasurableSpace inferInstance
+      (fun s => s.direction) := by
+  exact Measurable.of_comap_le (le_sup_right.trans le_sup_left)
+
+/-- The accumulated-statistic coordinate is measurable for the coordinate-generated
+state measurable space. -/
+theorem recursiveMomentumState_gradNormSqSum_measurable
+    {E R : Type*} [MeasurableSpace E] [MeasurableSpace R] :
+    @Measurable (RecursiveMomentumState E R) R
+      recursiveMomentumStateMeasurableSpace inferInstance
+      (fun s => s.gradNormSqSum) := by
+  exact Measurable.of_comap_le le_sup_right
+
+/-- Measurable coordinate processes assemble into a measurable recursive-momentum
+state process for the coordinate-generated state measurable space. -/
+theorem recursiveMomentumState_mk_measurable
+    {Ω E R : Type*} [MeasurableSpace Ω] [MeasurableSpace E] [MeasurableSpace R]
+    {x direction : Ω → E} {gradNormSqSum : Ω → R}
+    (hx : Measurable x) (hdirection : Measurable direction)
+    (hgradNormSqSum : Measurable gradNormSqSum) :
+    @Measurable Ω (RecursiveMomentumState E R) inferInstance
+      recursiveMomentumStateMeasurableSpace
+      (fun ω => RecursiveMomentumState.mk (x ω) (direction ω) (gradNormSqSum ω)) := by
+  apply Measurable.of_comap_le
+  simp only [recursiveMomentumStateMeasurableSpace_def, MeasurableSpace.comap_sup,
+    MeasurableSpace.comap_comp]
+  exact sup_le (sup_le hx.comap_le hdirection.comap_le) hgradNormSqSum.comap_le
+
+-- Generalization plan (G0):
+-- concept/name: sample-path recursive process with a random initial slice;
+--   orig was stateProcess
+-- generality used: arbitrary sample-path type Ω and state type State; no
+--   topology, algebra, measurable space, measure, or probability assumptions
+-- portable call pattern: stochastic-gradient, recursive-momentum, and
+--   variance-reduced algorithms whose first oracle sample initializes the state;
+--   the state type, initial random variable, and pathwise transition may vary
+-- counterargument checked: this is not only a paper wrapper: unlike
+--   SOptLib.recursiveIterateProcess, its initial slice may depend on ω, and the
+--   zero/successor API avoids encoding that difference through a lifted state
+--   space and a dummy outer sample type
+-- coverage search: queries “recursive stochastic process random initial state
+--   omega dependent transition zero successor equations” and “natural number
+--   recursive process from initial function and transition”; the closest hit is
+--   SOptLib.recursiveIterateProcess in SOptLib/Model/Iterates.lean, whose full
+--   signature requires a constant initial state, so coverage is partial
+-- minimal hypotheses: all already minimal; primitive recursion needs only the
+--   two carrier types, an Ω-indexed initial value, and a time-indexed transition
+
+/-- The canonical natural-number process generated from a path-dependent initial
+state and a path-dependent transition.
+
+Layer: Model | Concept: recursive stochastic process with random initialization
+Proof: (definitional construction; primitive recursion over natural time with an Ω-indexed base case)
+Source: Mathlib natural-number primitive recursion and Pi-function APIs
+Used in: pathwise stochastic algorithms whose first oracle sample initializes the state before recursive updates
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STORM -/
+def recursive_process_from_random_initial
+    {Ω State : Type*}
+    (initial : Ω → State)
+    (step : ℕ → State → Ω → State) :
+    ℕ → Ω → State
+  | 0 => initial
+  | n + 1 => fun ω =>
+      step n (recursive_process_from_random_initial initial step n ω) ω
+
+/-- A process from a random initial slice unfolds to its initial slice at zero.
+
+Layer: Model | Gap: Level 0 (random-initial recursive process definition)
+Proof: by rfl after unfolding recursive_process_from_random_initial.
+Source: Mathlib natural-number primitive recursion and Pi-function APIs
+Used in: controlled simplification of pathwise stochastic recursive processes
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STORM -/
+@[simp]
+theorem recursive_process_from_random_initial_def
+    {Ω State : Type*}
+    (initial : Ω → State)
+    (step : ℕ → State → Ω → State) :
+    recursive_process_from_random_initial initial step 0 = initial := by
+  rfl
+
+/-- A process generated from a random initial slice equals that slice at time zero.
+
+Layer: Model | Gap: Level 0 (random-initial recursive process base equation)
+Proof: by rfl after unfolding recursive_process_from_random_initial.
+Source: Mathlib natural-number primitive recursion and Pi-function extensionality APIs
+Used in: identifying the first-sample initialization of a pathwise stochastic algorithm
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/initialization
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STORM -/
+@[simp]
+theorem recursive_process_from_random_initial_zero
+    {Ω State : Type*}
+    (initial : Ω → State)
+    (step : ℕ → State → Ω → State) :
+    recursive_process_from_random_initial initial step 0 = initial := by
+  rfl
+
+/-- A process generated from a random initial slice applies its transition
+pointwise at successor time.
+
+Layer: Model | Gap: Level 0 (random-initial recursive process successor equation)
+Proof: by rfl after unfolding recursive_process_from_random_initial.
+Source: Mathlib natural-number primitive recursion and Pi-function APIs
+Used in: unfolding one recursive update of a sample-path stochastic state process
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/steps
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STORM -/
+@[simp]
+theorem recursive_process_from_random_initial_succ
+    {Ω State : Type*}
+    (initial : Ω → State)
+    (step : ℕ → State → Ω → State)
+    (n : ℕ) :
+    recursive_process_from_random_initial initial step (n + 1) =
+      fun ω => step n (recursive_process_from_random_initial initial step n ω) ω := by
+  rfl
+
+/-- A set invariant that contains every random initial state and is preserved by
+the transition contains every state of the generated process.
+
+Layer: Model | Gap: Level 1 (random-initial recursive process invariant propagation)
+Proof: by induction on time, using initial membership at zero and transition preservation at successors.
+Source: Mathlib natural-number induction and set-membership APIs
+Used in: feasibility and state-validity proofs for pathwise stochastic algorithms with random initialization
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STORM -/
+theorem recursive_process_from_random_initial_invariant_mem
+    {Ω State : Type*}
+    {s : Set State}
+    (initial : Ω → State)
+    (step : ℕ → State → Ω → State)
+    (h_initial : ∀ ω, initial ω ∈ s)
+    (h_step : ∀ n state ω, state ∈ s → step n state ω ∈ s) :
+    ∀ n ω, recursive_process_from_random_initial initial step n ω ∈ s := by
+  intro n
+  induction n with
+  | zero =>
+      exact h_initial
+  | succ n ih =>
+      intro ω
+      exact h_step n _ ω (ih ω)
+
+-- Generalization plan (G0):
+-- concept/name: recursive-momentum initial state; orig was `initialState`
+-- generality used: arbitrary sample-path type `Ω`, sample type `Sample`, and
+--   carrier `E` equipped only with a norm; no additive, measure, probability, inner-product,
+--   completeness, convexity, smoothness, or oracle-regularity assumptions
+-- portable call pattern: recursive-momentum and adaptive-gradient methods initialize
+--   an iterate at `x0`, set the direction to a first sampled oracle value, and seed
+--   a cumulative second-moment statistic with its squared norm; the point, oracle,
+--   and first-sample map may all change while the state contract remains unchanged
+-- counterargument checked: although the construction is definitional, it is not a
+--   caller-side composition or record-constructor rename: it names the coupled
+--   first-oracle initialization invariant used by later direction and accumulator
+--   proofs, and ships a characterizing simplification theorem
+-- coverage search: searched "recursive momentum initial state first oracle direction
+--   squared norm accumulator" and "state initialization direction equals oracle value
+--   accumulator squared norm"; the closest project hit was `RecursiveMomentumState`,
+--   which provides the result record but no initialization, while Mathlib semantic
+--   search returned norm-square identities and no state constructor
+-- minimal hypotheses: `Norm E` supplies exactly the real-valued norm used in the
+--   squared-norm accumulator; all additive, Hilbert, and completeness assumptions
+--   from the source are unnecessary
+
+/-- Initialize a recursive-momentum state from the first sampled oracle value.
+
+The iterate is `x0`, the initial direction is the oracle value at `x0` and the
+first sample, and the accumulated gradient statistic is that value's squared norm.
+
+Layer: Model | Concept: recursive-momentum first-oracle state initialization
+Proof: (definitional construction; evaluate the first sampled oracle once and store
+  the point, oracle value, and its squared norm in `RecursiveMomentumState`)
+Source: stochastic recursive-momentum and adaptive-gradient initialization notation
+Used in: recursive-momentum and adaptive-gradient base states before pathwise sampled
+  transitions update the iterate, direction estimate, and cumulative second moment
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/initialization
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex
+  SGD, STOchastic Recursive Momentum (STORM) -/
+def recursiveMomentumInitialState
+    {Ω Sample E : Type*} [Norm E]
+    (x0 : E) (oracle : E → Sample → E) (sample0 : Ω → Sample) :
+    Ω → RecursiveMomentumState E ℝ :=
+  fun ω =>
+    let g := oracle x0 (sample0 ω)
+    { x := x0
+      direction := g
+      gradNormSqSum := ‖g‖ ^ 2 }
+
+/-- A recursive-momentum initial state has the initial point, first sampled oracle
+value, and squared norm of that same value as its three coordinates.
+
+Layer: Model | Gap: Level 0 (recursive-momentum initialization unfolding)
+Proof: by rfl after unfolding `recursiveMomentumInitialState` and reducing its local
+  first-oracle binding
+Source: Mathlib norm notation and `RecursiveMomentumState` constructor projections
+Used in: base-case proofs identifying the initial iterate, direction estimate, and
+  cumulative gradient-square statistic of recursive-momentum state processes
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/initialization
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex
+  SGD, STOchastic Recursive Momentum (STORM) -/
+@[simp]
+theorem recursiveMomentumInitialState_def
+    {Ω Sample E : Type*} [Norm E]
+    (x0 : E) (oracle : E → Sample → E) (sample0 : Ω → Sample) (ω : Ω) :
+    recursiveMomentumInitialState x0 oracle sample0 ω =
+      { x := x0
+        direction := oracle x0 (sample0 ω)
+        gradNormSqSum := ‖oracle x0 (sample0 ω)‖ ^ 2 } := by
+  rfl
+
+/-- The cumulative squared-norm statistic of an initialized recursive-momentum
+state is nonnegative.
+
+Layer: Model | Gap: Level 0 (recursive-momentum initial accumulator nonnegativity)
+Proof: unfold the initialized accumulator and apply nonnegativity of a real square
+Source: Mathlib `sq_nonneg` for the squared norm stored by the initializer
+Used in: base cases for nonnegative cumulative second-moment statistics in
+  recursive-momentum and adaptive-gradient state processes -/
+theorem recursiveMomentumInitialState_gradNormSqSum_nonneg
+    {Ω Sample E : Type*} [Norm E]
+    (x0 : E) (oracle : E → Sample → E) (sample0 : Ω → Sample) (ω : Ω) :
+    0 ≤ (recursiveMomentumInitialState x0 oracle sample0 ω).gradNormSqSum := by
+  rw [recursiveMomentumInitialState_def]
+  exact sq_nonneg _
+
+-- Generalization plan (G0):
+-- concept/name: sample-driven recursive-momentum state transition; orig was
+--   `stateStepFromSample`
+-- generality used: arbitrary sample type and carrier with an additive group, real scalar
+--   action, and norm; the oracle,
+--   accumulator-to-step schedule, and step-to-momentum-weight schedule are explicit;
+--   no measure, probability, finite-dimensionality, inner-product, completeness,
+--   convexity, smoothness, or oracle-regularity assumptions are used
+-- portable call pattern: recursive-momentum, STORM-family, and same-sample
+--   variance-reduced methods update an iterate, correct a direction estimator using
+--   one sample at the old and new points, and extend a cumulative squared-norm
+--   statistic; the oracle and both scalar schedules may change while the state
+--   transition contract remains the same
+-- counterargument checked: although definitional, this is not a caller-side record
+--   constructor or paper traceability wrapper: it names a coupled four-stage update
+--   used as a sample kernel by recursive processes and ships both a characterizing
+--   equation and preservation of accumulator nonnegativity
+-- coverage search: queries "recursive momentum state transition same sample correction
+--   accumulated squared oracle norm" and "state update direction estimator accumulator
+--   oracle sample step size momentum weight" found only `RecursiveMomentumState`,
+--   its initializer, generic recursive-process APIs, and a structurally different
+--   accelerated-state sample bridge; Mathlib semantic search returned no matching
+--   stochastic recursive-momentum transition
+-- minimal hypotheses: weakened the source's Hilbert and complete-space assumptions to
+--   `AddGroup E`, `SMul ℝ E`, and `Norm E`, exactly supporting subtraction, real scalar
+--   multiplication, and the squared norm
+
+/-- Advance a recursive-momentum state using one newly supplied oracle sample.
+
+The step schedule is evaluated on the stored accumulator. The same sample is
+then used for oracle values at the updated and previous iterates, producing the
+recursive direction correction and the next cumulative squared-norm statistic.
+
+Layer: Model | Concept: sample-driven recursive-momentum state transition
+Proof: (definitional construction; compute the adaptive primal step, two same-sample oracle values, recursive direction correction, and squared-norm accumulator update)
+Source: stochastic recursive-momentum and same-sample variance-reduction update equations over Mathlib real normed spaces
+Used in: recursive-momentum and STORM-family sample kernels that generate pathwise states from an oracle and adaptive scalar schedules
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/steps
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum (STORM) -/
+def recursive_momentum_step_from_sample
+    {Sample E : Type*} [AddGroup E] [SMul ℝ E] [Norm E]
+    (oracle : E → Sample → E)
+    (stepSize : ℝ → ℝ)
+    (momentumWeight : ℝ → ℝ)
+    (state : RecursiveMomentumState E ℝ)
+    (sampleNext : Sample) : RecursiveMomentumState E ℝ :=
+  let η := stepSize state.gradNormSqSum
+  let xNext := state.x - η • state.direction
+  let gNext := oracle xNext sampleNext
+  let correction := oracle state.x sampleNext
+  let aNext := momentumWeight η
+  { x := xNext
+    direction := gNext + (1 - aNext) • (state.direction - correction)
+    gradNormSqSum := state.gradNormSqSum + ‖gNext‖ ^ 2 }
+
+/-- The sample-driven recursive-momentum transition unfolds to its primal,
+same-sample direction-correction, and cumulative squared-norm coordinates.
+
+Layer: Model | Gap: Level 0 (recursive-momentum sample-step unfolding)
+Proof: by rfl after unfolding `recursive_momentum_step_from_sample` and reducing its local bindings
+Source: Mathlib normed-space subtraction, real scalar multiplication, and norm notation together with `RecursiveMomentumState` constructor projections
+Used in: coordinate proofs for generated recursive-momentum iterates, direction estimators, and accumulated sampled-gradient squares
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/steps
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum (STORM) -/
+@[simp]
+theorem recursive_momentum_step_from_sample_def
+    {Sample E : Type*} [AddGroup E] [SMul ℝ E] [Norm E]
+    (oracle : E → Sample → E)
+    (stepSize momentumWeight : ℝ → ℝ)
+    (state : RecursiveMomentumState E ℝ)
+    (sampleNext : Sample) :
+    recursive_momentum_step_from_sample oracle stepSize momentumWeight state sampleNext =
+      let η := stepSize state.gradNormSqSum
+      let xNext := state.x - η • state.direction
+      let gNext := oracle xNext sampleNext
+      let correction := oracle state.x sampleNext
+      let aNext := momentumWeight η
+      { x := xNext
+        direction := gNext + (1 - aNext) • (state.direction - correction)
+        gradNormSqSum := state.gradNormSqSum + ‖gNext‖ ^ 2 } := by
+  rfl
+
+/-- A sample-driven recursive-momentum step preserves nonnegativity of the
+cumulative squared-norm statistic.
+
+Layer: Model | Gap: Level 1 (recursive-momentum accumulator nonnegativity preservation)
+Proof: unfold the transition and add the assumed nonnegative accumulator to the nonnegative square of the new oracle norm
+Source: Mathlib ordered-ring lemmas `add_nonneg` and `sq_nonneg` for real-valued squared norms
+Used in: inductive invariants for adaptive step schedules driven by cumulative sampled-gradient squares
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/steps
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum (STORM) -/
+theorem recursive_momentum_step_from_sample_grad_norm_sq_sum_nonneg
+    {Sample E : Type*} [AddGroup E] [SMul ℝ E] [Norm E]
+    (oracle : E → Sample → E)
+    (stepSize momentumWeight : ℝ → ℝ)
+    (state : RecursiveMomentumState E ℝ)
+    (sampleNext : Sample)
+    (hstate : 0 ≤ state.gradNormSqSum) :
+    0 ≤ (recursive_momentum_step_from_sample oracle stepSize momentumWeight state sampleNext).gradNormSqSum := by
+  rw [recursive_momentum_step_from_sample_def]
+  exact add_nonneg hstate (sq_nonneg _)
+
+/-- The iterate coordinate of a generated recursive-momentum process advances
+by subtracting the scheduled multiple of its current direction.
+
+Layer: Model | Gap: Level 1 (generated recursive-momentum iterate-coordinate successor equation)
+Proof: unfold the random-initial process at successor time, reduce the sample-driven recursive-momentum transition, and project its iterate coordinate
+Source: Mathlib natural-number primitive recursion, additive-group subtraction, and real scalar-action APIs together with `recursive_process_from_random_initial_succ` and `recursive_momentum_step_from_sample_def`
+Used in: STORM-family recursive-momentum proofs that expose the primal update before descent, adaptedness, or integrability arguments
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/steps/2/math
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum (STORM) -/
+theorem recursive_momentum_iterate_succ
+    {Ω Sample E : Type*} [AddGroup E] [SMul ℝ E] [Norm E]
+    (oracle : E → Sample → E)
+    (sample : ℕ → Ω → Sample)
+    (step_size weight : ℝ → ℝ)
+    (initial : Ω → RecursiveMomentumState E ℝ)
+    (n : ℕ) (ω : Ω) :
+    let process :=
+      recursive_process_from_random_initial initial
+        (fun n state ω =>
+          recursive_momentum_step_from_sample oracle step_size weight state
+            (sample (n + 1) ω))
+    (process (n + 1) ω).x =
+      (process n ω).x - step_size (process n ω).gradNormSqSum •
+        (process n ω).direction := by
+  rfl
+
+-- Generalization plan (G0):
+-- concept/name: totality of an Option-valued recursive process from successful
+--   step simulation; orig was sourceStateProcess_eq_some_stateProcess_of_generated_boundary
+-- generality used: arbitrary sample-path and state types with no topology,
+--   algebra, measurable-space, measure, probability, or finiteness assumptions
+-- portable call pattern: checked stochastic-gradient, adaptive-momentum, and
+--   variance-reduced recursions prove that their partial source process shadows
+--   a total process; the initial state, transitions, and success proof vary
+--   while the pointwise `partial = some total` conclusion stays unchanged
+-- counterargument checked: the result is not paper-local traceability or a
+--   one-line wrapper; it packages the reusable induction that propagates
+--   successful checked transitions through an Option-valued recursion
+-- coverage search: searched “partial recursive process equals some total
+--   recursive process when every step succeeds”, “Option recursion equality
+--   some successor step”, and Mathlib semantic search for the same contract;
+--   SOptLib recursive-process hits provide successor or determinism lemmas,
+--   while Mathlib Stream'.Seq corec lemmas concern a different coinductive API,
+--   so coverage is partial and no existing theorem has this signature
+-- minimal hypotheses: all already minimal; only the two base equations, two
+--   successor equations, and pointwise successful-step simulation are used
+
+/-- An Option-valued recursive process equals `some` of a total recursive process
+when every checked transition along the total process succeeds with the same step.
+
+Layer: Model | Gap: Level 1 (partial recursive-process totality by step simulation)
+Proof: induction on natural time; the base equations identify the initial slice, and the successor equations reduce the claim to the successful-step hypothesis.
+Source: Mathlib natural-number induction and Option bind reduction APIs
+Used in: proving checked adaptive stochastic-optimization state recursions agree pointwise with their total arithmetic realizations
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STORM -/
+theorem partialRecursiveProcess_eq_some_of_step_eq_some
+    {Ω State : Type*}
+    (partialProcess : ℕ → Ω → Option State)
+    (total : ℕ → Ω → State)
+    (partialStep : ℕ → State → Ω → Option State)
+    (totalStep : ℕ → State → Ω → State)
+    (initial : Ω → State)
+    (h_partial_zero : ∀ ω, partialProcess 0 ω = some (initial ω))
+    (h_total_zero : ∀ ω, total 0 ω = initial ω)
+    (h_partial_succ : ∀ n ω,
+      partialProcess (n + 1) ω =
+        (partialProcess n ω).bind (fun state => partialStep n state ω))
+    (h_total_succ : ∀ n ω, total (n + 1) ω = totalStep n (total n ω) ω)
+    (h_step : ∀ n ω,
+      partialStep n (total n ω) ω = some (totalStep n (total n ω) ω)) :
+    ∀ n ω, partialProcess n ω = some (total n ω) := by
+  intro n
+  induction n with
+  | zero =>
+      intro ω
+      rw [h_partial_zero ω, h_total_zero ω]
+  | succ n ih =>
+      intro ω
+      rw [h_partial_succ n ω, ih ω, h_total_succ n ω]
+      exact h_step n ω
+
+end SOptLib
+
+/- Compatibility syntax for algorithm proofs staged before the snake_case API
+rename. This does not introduce a second declaration. -/
+macro "SOptLib.recursiveProcessFromRandomInitial" : term =>
+  `(SOptLib.recursive_process_from_random_initial)
+
+-- Phase 4 merged from focused staging declarations.
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: accelerated stochastic-gradient two-coordinate state process;
+--   orig was the paper-local `State`/`stateAfter`/`x`/`xBar`/`xUnder` block,
+--   exposed here as `AcceleratedGradientState` and `acceleratedGradientState`.
+-- generality used: arbitrary additive real module state space, arbitrary sample
+--   type, scalar schedules `alpha`, `beta`, and `lam`, sampled oracle kernel,
+--   initial point, and a sample-coordinate reader from streams; no objective,
+--   measure, filtration, convexity, smoothness, probability, independence,
+--   integrability, or finite-dimensional assumption is needed by the process
+--   construction itself.
+-- portable call pattern: accelerated stochastic-gradient, accelerated
+--   stochastic approximation, and two-sequence stochastic methods can supply
+--   their schedules, oracle kernel, sample stream, and initial point while
+--   reusing the same state recursion and `x`, `xBar`, `xUnder` projections.
+-- counterargument checked: this is not merely paper traceability because the
+--   generated process and projections are the stable modeling boundary used
+--   before adaptedness, martingale-noise, update-identity, and telescope
+--   arguments; it is not the feasible-subtype accelerated-state API already in
+--   SOptLib because this statement is unconstrained and stores the two raw
+--   oracle-step coordinates without carrier membership proofs.
+-- coverage search: searched `accelerated stochastic gradient state process
+--   coordinate projections`, `two sequence accelerated gradient state search
+--   point sampled oracle step`, `raw accelerated gradient process state x xBar
+--   xUnder coordinate projections`, and `recursive iterate process sample
+--   update initial state projections`; relevant hits were
+--   `recursiveIterateProcess`, `acceleratedSearchPoint`,
+--   `FeasibleAcceleratedState`, `accelerated_step_from_state`, and
+--   `accelerated_step_from_sample`, which cover generic recursion and feasible
+--   constrained variants but not this raw unconstrained two-coordinate sampled
+--   gradient process with public projections.
+-- minimal hypotheses: all already minimal at the construction level except
+--   using `[AddCommGroup E] [Module ℝ E]` as the Mathlib-grade module interface
+--   for subtraction and real scalar multiplication in the two update formulas.
+
+/-- Raw two-coordinate state for an accelerated stochastic-gradient recursion.
+
+The state stores the current update iterate `x` and the averaged/output iterate
+`xBar`, without imposing a feasible-carrier invariant.
+
+Layer: Model | Concept: accelerated stochastic-gradient state
+Proof: (definitional construction; bundled raw update and averaged-output
+  coordinates for a two-sequence accelerated process)
+Source: accelerated stochastic approximation state recurrences and Mathlib
+  structure-field APIs
+Used in: randomized stochastic accelerated-gradient generated process before
+  search-point projection, sampled oracle updates, and telescope identities
+Book citation: book/book/FOML/NonconvexStochasticAcceleratedGD.json#/algorithm_spec/steps
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic accelerated gradient descent
+  (Algorithm 6.4 and Theorem 6.12) -/
+structure AcceleratedGradientState (E : Type*) where
+  x : E
+  xBar : E
+
+/-- Initial raw accelerated state with both coordinates equal to the initial point.
+
+Layer: Model | Concept: accelerated stochastic-gradient initial state
+Proof: (definitional construction; duplicate the initial point into the update
+  and averaged-output coordinates)
+Source: accelerated stochastic approximation initialization notation and
+  Mathlib structure constructor APIs
+Used in: randomized stochastic accelerated-gradient base state before the first
+  sampled oracle update
+Book citation: book/book/FOML/NonconvexStochasticAcceleratedGD.json#/algorithm_spec/initialization
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic accelerated gradient descent
+  (Algorithm 6.4 and Theorem 6.12) -/
+def acceleratedGradientInitialState {E : Type*} (x0 : E) : AcceleratedGradientState E :=
+  { x := x0, xBar := x0 }
+
+@[simp]
+theorem acceleratedGradientInitialState_x {E : Type*} (x0 : E) :
+    (acceleratedGradientInitialState x0).x = x0 := by
+  rfl
+
+@[simp]
+theorem acceleratedGradientInitialState_xBar {E : Type*} (x0 : E) :
+    (acceleratedGradientInitialState x0).xBar = x0 := by
+  rfl
+
+/-- One sampled accelerated stochastic-gradient step from a raw two-coordinate state.
+
+The step forms the accelerated search point from the previous `xBar` and `x`,
+evaluates the oracle at the provided sample, and updates both stored coordinates
+with the `lam` and `beta` schedules.
+
+Layer: Model | Concept: accelerated stochastic-gradient sampled state step
+Proof: (definitional construction; accelerated search-point evaluation followed
+  by the two sampled oracle update formulas)
+Source: accelerated stochastic approximation state recurrences, sampled oracle
+  notation, and Mathlib module subtraction/scalar multiplication APIs
+Used in: randomized stochastic accelerated-gradient pathwise state transition
+  at a positive paper time before deriving coordinate update identities
+Book citation: book/book/FOML/NonconvexStochasticAcceleratedGD.json#/algorithm_spec/steps
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic accelerated gradient descent
+  (Algorithm 6.4 and Theorem 6.12) -/
+def acceleratedGradientStepState
+    {E Sample : Type*} [AddCommGroup E] [Module ℝ E]
+    (alpha beta lam : ℕ → ℝ) (oracle : E → Sample → E)
+    (k : {n : ℕ // 1 ≤ n}) (st : AcceleratedGradientState E) (sample : Sample) :
+    AcceleratedGradientState E :=
+  let xUnder := acceleratedSearchPoint alpha k st.xBar st.x
+  let gk := oracle xUnder sample
+  { x := st.x - lam k.1 • gk
+    xBar := xUnder - beta k.1 • gk }
+
+@[simp]
+theorem acceleratedGradientStepState_def
+    {E Sample : Type*} [AddCommGroup E] [Module ℝ E]
+    (alpha beta lam : ℕ → ℝ) (oracle : E → Sample → E)
+    (k : {n : ℕ // 1 ≤ n}) (st : AcceleratedGradientState E) (sample : Sample) :
+    acceleratedGradientStepState alpha beta lam oracle k st sample =
+      let xUnder := acceleratedSearchPoint alpha k st.xBar st.x
+      let gk := oracle xUnder sample
+      { x := st.x - lam k.1 • gk
+        xBar := xUnder - beta k.1 • gk } := by
+  rfl
+
+@[simp]
+theorem acceleratedGradientStepState_x
+    {E Sample : Type*} [AddCommGroup E] [Module ℝ E]
+    (alpha beta lam : ℕ → ℝ) (oracle : E → Sample → E)
+    (k : {n : ℕ // 1 ≤ n}) (st : AcceleratedGradientState E) (sample : Sample) :
+    (acceleratedGradientStepState alpha beta lam oracle k st sample).x =
+      st.x - lam k.1 •
+        oracle (acceleratedSearchPoint alpha k st.xBar st.x) sample := by
+  rfl
+
+@[simp]
+theorem acceleratedGradientStepState_xBar
+    {E Sample : Type*} [AddCommGroup E] [Module ℝ E]
+    (alpha beta lam : ℕ → ℝ) (oracle : E → Sample → E)
+    (k : {n : ℕ // 1 ≤ n}) (st : AcceleratedGradientState E) (sample : Sample) :
+    (acceleratedGradientStepState alpha beta lam oracle k st sample).xBar =
+      acceleratedSearchPoint alpha k st.xBar st.x -
+        beta k.1 • oracle (acceleratedSearchPoint alpha k st.xBar st.x) sample := by
+  rfl
+
+/-- One sampled accelerated stochastic-gradient step reading its sample from a stream.
+
+Layer: Model | Concept: accelerated stochastic-gradient stream state step
+Proof: (definitional construction; read the positive-time sample coordinate
+  and apply `acceleratedGradientStepState`)
+Source: accelerated stochastic approximation sampled-process notation and
+  Mathlib function application APIs
+Used in: randomized stochastic accelerated-gradient sample-stream recursion
+  before exposing generated `x`, `xBar`, and `xUnder` processes
+Book citation: book/book/FOML/NonconvexStochasticAcceleratedGD.json#/algorithm_spec/steps
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic accelerated gradient descent
+  (Algorithm 6.4 and Theorem 6.12) -/
+def acceleratedGradientStepStateAt
+    {E Sample : Type*} [AddCommGroup E] [Module ℝ E]
+    (alpha beta lam : ℕ → ℝ) (oracle : E → Sample → E)
+    (sampleAt : {n : ℕ // 1 ≤ n} → (ℕ → Sample) → Sample)
+    (k : {n : ℕ // 1 ≤ n}) (st : AcceleratedGradientState E) (ξ : ℕ → Sample) :
+    AcceleratedGradientState E :=
+  acceleratedGradientStepState alpha beta lam oracle k st (sampleAt k ξ)
+
+@[simp]
+theorem acceleratedGradientStepStateAt_def
+    {E Sample : Type*} [AddCommGroup E] [Module ℝ E]
+    (alpha beta lam : ℕ → ℝ) (oracle : E → Sample → E)
+    (sampleAt : {n : ℕ // 1 ≤ n} → (ℕ → Sample) → Sample)
+    (k : {n : ℕ // 1 ≤ n}) (st : AcceleratedGradientState E) (ξ : ℕ → Sample) :
+    acceleratedGradientStepStateAt alpha beta lam oracle sampleAt k st ξ =
+      acceleratedGradientStepState alpha beta lam oracle k st (sampleAt k ξ) := by
+  rfl
+
+/-- Sample-stream accelerated stochastic-gradient state process.
+
+Starting from `x0`, the zero-based process performs at successor time `t + 1`
+the positive-time sampled accelerated step indexed by `t + 1`.
+
+Layer: Model | Concept: accelerated stochastic-gradient state process
+Proof: (definitional construction; primitive recursion over natural time with
+  positive-time sample-coordinate updates)
+Source: accelerated stochastic approximation recursive process notation and
+  Mathlib natural-number primitive recursion APIs
+Used in: randomized stochastic accelerated-gradient generated process that
+  supplies the raw iterate, averaged iterate, and search point for later
+  martingale and telescope estimates
+Book citation: book/book/FOML/NonconvexStochasticAcceleratedGD.json#/algorithm_spec/steps
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic accelerated gradient descent
+  (Algorithm 6.4 and Theorem 6.12) -/
+def acceleratedGradientState
+    {E Sample : Type*} [AddCommGroup E] [Module ℝ E]
+    (alpha beta lam : ℕ → ℝ) (oracle : E → Sample → E) (x0 : E)
+    (sampleAt : {n : ℕ // 1 ≤ n} → (ℕ → Sample) → Sample :=
+      fun k ξ => ξ k.1) :
+    ℕ → (ℕ → Sample) → AcceleratedGradientState E
+  | 0 => fun _ => acceleratedGradientInitialState x0
+  | t + 1 => fun ξ =>
+      acceleratedGradientStepStateAt alpha beta lam oracle sampleAt
+        ⟨t + 1, Nat.succ_le_succ (Nat.zero_le t)⟩
+        (acceleratedGradientState alpha beta lam oracle x0 sampleAt t ξ)
+        ξ
+
+@[simp]
+theorem acceleratedGradientState_zero
+    {E Sample : Type*} [AddCommGroup E] [Module ℝ E]
+    (alpha beta lam : ℕ → ℝ) (oracle : E → Sample → E) (x0 : E)
+    (sampleAt : {n : ℕ // 1 ≤ n} → (ℕ → Sample) → Sample :=
+      fun k ξ => ξ k.1)
+    (ξ : ℕ → Sample) :
+    acceleratedGradientState alpha beta lam oracle x0 sampleAt 0 ξ =
+      acceleratedGradientInitialState x0 := by
+  rfl
+
+@[simp]
+theorem acceleratedGradientState_succ
+    {E Sample : Type*} [AddCommGroup E] [Module ℝ E]
+    (alpha beta lam : ℕ → ℝ) (oracle : E → Sample → E) (x0 : E)
+    (sampleAt : {n : ℕ // 1 ≤ n} → (ℕ → Sample) → Sample :=
+      fun k ξ => ξ k.1)
+    (t : ℕ) (ξ : ℕ → Sample) :
+    acceleratedGradientState alpha beta lam oracle x0 sampleAt (t + 1) ξ =
+      acceleratedGradientStepStateAt alpha beta lam oracle sampleAt
+        ⟨t + 1, Nat.succ_le_succ (Nat.zero_le t)⟩
+        (acceleratedGradientState alpha beta lam oracle x0 sampleAt t ξ)
+        ξ := by
+  rfl
+
+/-- Raw iterate projection of a sample-stream accelerated stochastic-gradient process.
+
+Layer: Model | Concept: accelerated stochastic-gradient raw iterate projection
+Proof: (definitional construction; project the `x` field from
+  `acceleratedGradientState`)
+Source: accelerated stochastic approximation iterate notation and Mathlib
+  structure-field projection APIs
+Used in: randomized stochastic accelerated-gradient coordinate update identity
+  and smoothness descent estimates for the generated raw iterate
+Book citation: book/book/FOML/NonconvexStochasticAcceleratedGD.json#/algorithm_spec/steps
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic accelerated gradient descent
+  (Algorithm 6.4 and Theorem 6.12) -/
+def acceleratedGradientX
+    {E Sample : Type*} [AddCommGroup E] [Module ℝ E]
+    (alpha beta lam : ℕ → ℝ) (oracle : E → Sample → E) (x0 : E)
+    (sampleAt : {n : ℕ // 1 ≤ n} → (ℕ → Sample) → Sample :=
+      fun k ξ => ξ k.1)
+    (ξ : ℕ → Sample) (t : ℕ) : E :=
+  (acceleratedGradientState alpha beta lam oracle x0 sampleAt t ξ).x
+
+@[simp]
+theorem acceleratedGradientX_def
+    {E Sample : Type*} [AddCommGroup E] [Module ℝ E]
+    (alpha beta lam : ℕ → ℝ) (oracle : E → Sample → E) (x0 : E)
+    (sampleAt : {n : ℕ // 1 ≤ n} → (ℕ → Sample) → Sample :=
+      fun k ξ => ξ k.1)
+    (ξ : ℕ → Sample) (t : ℕ) :
+    acceleratedGradientX alpha beta lam oracle x0 sampleAt ξ t =
+      (acceleratedGradientState alpha beta lam oracle x0 sampleAt t ξ).x := by
+  rfl
+
+/-- Averaged iterate projection of a sample-stream accelerated stochastic-gradient process.
+
+Layer: Model | Concept: accelerated stochastic-gradient averaged iterate projection
+Proof: (definitional construction; project the `xBar` field from
+  `acceleratedGradientState`)
+Source: accelerated stochastic approximation averaged-iterate notation and
+  Mathlib structure-field projection APIs
+Used in: randomized stochastic accelerated-gradient coordinate update identity,
+  output randomization, and function-gap estimates for the generated averaged
+  iterate
+Book citation: book/book/FOML/NonconvexStochasticAcceleratedGD.json#/algorithm_spec/steps
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic accelerated gradient descent
+  (Algorithm 6.4 and Theorem 6.12) -/
+def acceleratedGradientXBar
+    {E Sample : Type*} [AddCommGroup E] [Module ℝ E]
+    (alpha beta lam : ℕ → ℝ) (oracle : E → Sample → E) (x0 : E)
+    (sampleAt : {n : ℕ // 1 ≤ n} → (ℕ → Sample) → Sample :=
+      fun k ξ => ξ k.1)
+    (ξ : ℕ → Sample) (t : ℕ) : E :=
+  (acceleratedGradientState alpha beta lam oracle x0 sampleAt t ξ).xBar
+
+@[simp]
+theorem acceleratedGradientXBar_def
+    {E Sample : Type*} [AddCommGroup E] [Module ℝ E]
+    (alpha beta lam : ℕ → ℝ) (oracle : E → Sample → E) (x0 : E)
+    (sampleAt : {n : ℕ // 1 ≤ n} → (ℕ → Sample) → Sample :=
+      fun k ξ => ξ k.1)
+    (ξ : ℕ → Sample) (t : ℕ) :
+    acceleratedGradientXBar alpha beta lam oracle x0 sampleAt ξ t =
+      (acceleratedGradientState alpha beta lam oracle x0 sampleAt t ξ).xBar := by
+  rfl
+
+/-- Accelerated search-point projection of a sample-stream accelerated process.
+
+At positive time `k`, the query is the affine search point formed from the
+previous averaged iterate and previous raw iterate.
+
+Layer: Model | Concept: accelerated stochastic-gradient search-point projection
+Proof: (definitional construction; apply `acceleratedSearchPoint` to the
+  previous `xBar` and `x` projections)
+Source: accelerated stochastic approximation search-point notation and Mathlib
+  natural-number predecessor APIs
+Used in: randomized stochastic accelerated-gradient sampled oracle query before
+  generated oracle-noise and descent estimates
+Book citation: book/book/FOML/NonconvexStochasticAcceleratedGD.json#/algorithm_spec/steps/0/math
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic accelerated gradient descent
+  (Algorithm 6.4 and Theorem 6.12) -/
+def acceleratedGradientXUnder
+    {E Sample : Type*} [AddCommGroup E] [Module ℝ E]
+    (alpha beta lam : ℕ → ℝ) (oracle : E → Sample → E) (x0 : E)
+    (sampleAt : {n : ℕ // 1 ≤ n} → (ℕ → Sample) → Sample :=
+      fun k ξ => ξ k.1)
+    (ξ : ℕ → Sample) (k : {n : ℕ // 1 ≤ n}) : E :=
+  acceleratedSearchPoint alpha k
+    (acceleratedGradientXBar alpha beta lam oracle x0 sampleAt ξ (k.1 - 1))
+    (acceleratedGradientX alpha beta lam oracle x0 sampleAt ξ (k.1 - 1))
+
+@[simp]
+theorem acceleratedGradientXUnder_def
+    {E Sample : Type*} [AddCommGroup E] [Module ℝ E]
+    (alpha beta lam : ℕ → ℝ) (oracle : E → Sample → E) (x0 : E)
+    (sampleAt : {n : ℕ // 1 ≤ n} → (ℕ → Sample) → Sample :=
+      fun k ξ => ξ k.1)
+    (ξ : ℕ → Sample) (k : {n : ℕ // 1 ≤ n}) :
+    acceleratedGradientXUnder alpha beta lam oracle x0 sampleAt ξ k =
+      acceleratedSearchPoint alpha k
+        (acceleratedGradientXBar alpha beta lam oracle x0 sampleAt ξ (k.1 - 1))
+        (acceleratedGradientX alpha beta lam oracle x0 sampleAt ξ (k.1 - 1)) := by
+  rfl
+
+end SOptLib
+
+-- Phase 4 batch 1 merge from Staging/minBlockDescentFactor.lean
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: finite block descent factor minimum
+-- generality used: arbitrary nonempty finite block index type, real sampling weights,
+--   real block smoothness constants, and a scalar stepsize; no measure,
+--   convexity, oracle, normed-space, or finite-dimensional assumptions are used.
+-- portable call pattern: randomized block methods use the same factor when normalizing
+--   output probabilities and when lower-bounding sampled block descent by a full block
+--   norm; only the block index type, probabilities, smoothness constants, and stepsize vary.
+-- counterargument checked: the body is one finite minimum, but the named quantity is reused
+--   across output-law and descent-factor bounds; it is not merely paper traceability because
+--   future block-coordinate proofs can instantiate the same formula without setup fields.
+-- coverage search: queried "minimum finite block descent factor probability smoothness
+--   stepsize" and "Finset univ image nonempty min block factor"; hits covered generic
+--   finite-image extrema (`finset_univ_image_nonempty`, `finiteRunMinValue_le`) but no
+--   probability-smoothness block descent factor definition, so this specializes a real
+--   stochastic-optimization model concept rather than duplicating an existing name.
+-- minimal hypotheses: all already minimal for this formula; `[Fintype I] [Nonempty I]`
+--   are exactly needed to take a nonempty finite minimum.
+
+/-- The finite minimum of probability-weighted block descent factors.
+
+For a finite block family, this is `min_i p_i * (1 - (L_i / 2) * gamma)`,
+the descent factor that appears in randomized block output weights.
+
+Layer: Model | Concept: finite block descent factor
+Proof: (definitional construction; nonempty finite real-image minimum of the probability-weighted descent factor)
+Source: Mathlib finite-set image minima and SOptLib finite-image nonemptiness
+Used in: stochastic randomized block methods, output normalization, and block-factor lower bounds -/
+noncomputable def min_block_descent_factor
+    {I : Type*} [Fintype I] [Nonempty I]
+    (p L : I → ℝ) (gamma : ℝ) : ℝ :=
+  (Finset.univ.image (fun i => p i * (1 - (L i / 2) * gamma))).min'
+    (finset_univ_image_nonempty
+      (fun i => p i * (1 - (L i / 2) * gamma)))
+
+/-- The finite block descent factor unfolds to the corresponding finite image minimum.
+
+Layer: Model | Gap: Level 0 (finite block descent factor unfolding)
+Proof: by rfl after unfolding `min_block_descent_factor`.
+Source: Mathlib finite-set image minima and SOptLib finite-image nonemptiness
+Used in: stochastic randomized block methods, output normalization, and block-factor lower bounds -/
+@[simp]
+theorem min_block_descent_factor_def
+    {I : Type*} [Fintype I] [Nonempty I]
+    (p L : I → ℝ) (gamma : ℝ) :
+    min_block_descent_factor p L gamma =
+      (Finset.univ.image (fun i => p i * (1 - (L i / 2) * gamma))).min'
+        (finset_univ_image_nonempty
+          (fun i => p i * (1 - (L i / 2) * gamma))) := by
+  rfl
+
+/-- The minimum block descent factor is bounded above by every block factor. -/
+theorem min_block_descent_factor_le
+    {I : Type*} [Fintype I] [Nonempty I]
+    (p L : I → ℝ) (gamma : ℝ) (i : I) :
+    min_block_descent_factor p L gamma ≤ p i * (1 - (L i / 2) * gamma) := by
+  classical
+  rw [min_block_descent_factor_def]
+  exact Finset.min'_le _ _ (by simp)
+
+/-- The minimum block descent factor is nonnegative under nonnegative sampling
+weights and a stepsize no larger than each block smoothness reciprocal scale. -/
+theorem min_block_descent_factor_nonneg
+    {I : Type*} [Fintype I] [Nonempty I]
+    (p L : I → ℝ) (gamma : ℝ)
+    (hp_nonneg : ∀ i, 0 ≤ p i)
+    (hL_pos : ∀ i, 0 < L i)
+    (hgamma_le : ∀ i, gamma ≤ 2 / L i) :
+    0 ≤ min_block_descent_factor p L gamma := by
+  classical
+  rw [min_block_descent_factor_def]
+  refine Finset.le_min' (x := (0 : ℝ))
+    (s := Finset.univ.image (fun i : I => p i * (1 - (L i / 2) * gamma)))
+    (H := finset_univ_image_nonempty
+      (fun i : I => p i * (1 - (L i / 2) * gamma))) ?_
+  intro y hy
+  rcases Finset.mem_image.mp hy with ⟨i, _hi, rfl⟩
+  have hhalf_nonneg : 0 ≤ L i / 2 :=
+    div_nonneg (le_of_lt (hL_pos i)) (by norm_num)
+  have hscaled_le : (L i / 2) * gamma ≤ (L i / 2) * (2 / L i) :=
+    mul_le_mul_of_nonneg_left (hgamma_le i) hhalf_nonneg
+  have hscale : (L i / 2) * (2 / L i) = 1 := by
+    field_simp [(hL_pos i).ne']
+  have hfactor_nonneg : 0 ≤ 1 - (L i / 2) * gamma := by
+    linarith
+  exact mul_nonneg (hp_nonneg i) hfactor_nonneg
+
+/-- The minimum block descent factor lower-bounds the corresponding weighted
+sum for arbitrary nonnegative real weights. -/
+theorem min_block_descent_factor_mul_sum_le_weighted_sum
+    {I : Type*} [Fintype I] [Nonempty I]
+    (p L : I → ℝ) (gamma : ℝ) (w : I → ℝ)
+    (hw_nonneg : ∀ i, 0 ≤ w i) :
+    min_block_descent_factor p L gamma * (∑ i, w i) ≤
+      ∑ i, p i * (1 - (L i / 2) * gamma) * w i := by
+  classical
+  rw [Finset.mul_sum]
+  refine Finset.sum_le_sum ?_
+  intro i _hi
+  exact mul_le_mul_of_nonneg_right
+    (min_block_descent_factor_le p L gamma i) (hw_nonneg i)
+
+end SOptLib
+
+-- Phase 4 batch 1 merge from Staging/minBlockDescentFactor_nonneg_of_lt_two_div.lean
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: strict-bound nonnegativity for the finite block descent factor;
+--   orig was outputBlockFactor_nonneg.
+-- generality used: arbitrary finite nonempty block index type, real sampling
+--   weights, real block smoothness constants, and one real stepsize; no measure,
+--   convexity, oracle, normed-space, or finite-dimensional assumptions are used.
+-- portable call pattern: randomized block-coordinate and block mirror-descent
+--   proofs use a positive stepsize with the blockwise restriction gamma < 2/L_i
+--   to certify nonnegative minimum block factors before constructing an output
+--   law; the probabilities, smoothness constants, and stepsize vary.
+-- counterargument checked: an existing theorem handles the weaker API once
+--   positivity of every L_i and gamma <= 2/L_i are supplied, but future callers
+--   should not rederive those facts from the strict source stepsize restriction.
+-- coverage search: queried "minimum block descent factor nonnegative step size
+--   less than two divided Lipschitz", "min block descent factor nonneg", and
+--   "positive gamma less than two divided L implies L positive"; hits included
+--   SOptLib.min_block_descent_factor_nonneg as a partial theorem requiring
+--   explicit L-positivity, with no complete strict-bound wrapper.
+-- minimal hypotheses: the pointwise hypotheses `0 <= p i`, `0 < gamma`, and
+--   `gamma < 2 / L i` are exactly what the proof consumes.
+
+/-- The finite minimum block descent factor is nonnegative under strict
+stepsize bounds `gamma < 2 / L_i`.
+
+Layer: Model | Gap: Level 1 (strict block stepsize descent-factor nonnegativity)
+Proof: derive `0 < L_i` from `0 < gamma < 2 / L_i`, weaken the strict stepsize
+  bound to `gamma <= 2 / L_i`, and apply the finite minimum block factor API.
+Source: Mathlib ordered real division and SOptLib finite minimum block descent factors
+Used in: randomized block mirror descent output-law admissibility, where positive
+  source stepsizes satisfy a strict blockwise reciprocal smoothness bound
+Book citation: book/FOML/NonconvexStochasticBlockMirrorDescent.json#/algorithm_spec/output
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, nonconvex stochastic block mirror descent -/
+theorem min_block_descent_factor_nonneg_of_pos_of_lt_two_div
+    {I : Type*} [Fintype I] [Nonempty I]
+    (p L : I → ℝ) (gamma : ℝ)
+    (hp_nonneg : ∀ i, 0 ≤ p i)
+    (hgamma_pos : 0 < gamma)
+    (hgamma_lt : ∀ i, gamma < 2 / L i) :
+    0 ≤ min_block_descent_factor p L gamma := by
+  classical
+  refine min_block_descent_factor_nonneg p L gamma hp_nonneg ?_ ?_
+  · intro i
+    have hdivpos : 0 < 2 / L i := lt_trans hgamma_pos (hgamma_lt i)
+    have htwo : ¬ ((2 : ℝ) < 0) := by norm_num
+    rw [div_pos_iff] at hdivpos
+    rcases hdivpos with hsame | hsame
+    · exact hsame.2
+    · exact (htwo hsame.1).elim
+  · intro i
+    exact le_of_lt (hgamma_lt i)
+
+end SOptLib
+
+-- Phase 4 batch 1 merge from Staging/minBlockDescentOutputWeight.lean
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: finite block descent output weight; orig was outputWeight.
+-- generality used: arbitrary finite nonempty block index type, arbitrary output
+--   index type, real sampling weights, real block smoothness constants, and a
+--   real stepsize schedule; no measure, convexity, oracle, normed-space, or
+--   finite-dimensional assumptions are used.
+-- portable call pattern: randomized block algorithms normalize output laws and
+--   aggregate descent estimates with the same weight gamma_k times the minimum
+--   block descent factor; the block probabilities, smoothness constants,
+--   stepsize schedule, and output index type vary while the formula stays fixed.
+-- counterargument checked: the body is a product, but it names the canonical
+--   stopping weight that travels with denominator, nonnegativity, and weighted
+--   descent APIs; it is not merely paper traceability because future randomized
+--   block-coordinate proofs can instantiate it without setup fields.
+-- coverage search: queried "minimum block descent factor output weight gamma
+--   product equality", "min block descent factor gamma output weight", the
+--   catalog for output-weight/min-block terms, and Mathlib LeanSearch for
+--   "define output weight as step size times minimum finite block descent
+--   factor"; hits covered min_block_descent_factor, generic finite output
+--   denominators, and unrelated Mathlib weight APIs, but no definition or API
+--   for this block-descent output weight.
+-- minimal hypotheses: all already minimal for this formula and its API; the
+--   finite nonempty block assumptions come from the minimum factor, and the
+--   output index type is unconstrained.
+
+/-- The randomized-output weight formed from a stepsize and the minimum block descent factor.
+
+For a finite block family, this is
+`gamma k * min_i p_i * (1 - (L_i / 2) * gamma k)`, the numerator weight used
+in randomized block-method output laws.
+
+Layer: Model | Concept: finite block descent output weight
+Proof: (definitional construction; pointwise product of a stepsize and the finite minimum block descent factor)
+Source: Mathlib real multiplication and SOptLib finite-image minimum block descent factors
+Used in: randomized block mirror descent output normalization and descent aggregation
+Book citation: book/FOML/NonconvexStochasticBlockMirrorDescent.json#/algorithm_spec/output
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, nonconvex stochastic block mirror descent -/
+noncomputable def min_block_descent_output_weight
+    {I T : Type*} [Fintype I] [Nonempty I]
+    (p L : I → ℝ) (gamma : T → ℝ) (k : T) : ℝ :=
+  gamma k * min_block_descent_factor p L (gamma k)
+
+/-- The finite block descent output weight unfolds to stepsize times minimum block factor.
+
+Layer: Model | Gap: Level 0 (finite block descent output-weight unfolding)
+Proof: by rfl after unfolding `min_block_descent_output_weight`.
+Source: Mathlib real multiplication and SOptLib finite-image minimum block descent factors
+Used in: randomized block mirror descent output normalization and descent aggregation
+Book citation: book/FOML/NonconvexStochasticBlockMirrorDescent.json#/algorithm_spec/output
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, nonconvex stochastic block mirror descent -/
+@[simp]
+theorem min_block_descent_output_weight_def
+    {I T : Type*} [Fintype I] [Nonempty I]
+    (p L : I → ℝ) (gamma : T → ℝ) (k : T) :
+    min_block_descent_output_weight p L gamma k =
+      gamma k * min_block_descent_factor p L (gamma k) := by
+  rfl
+
+/-- The finite block descent output weight is nonnegative under the standard
+block-probability and stepsize upper-bound conditions.
+
+Layer: Model | Gap: Level 1 (finite block descent output-weight nonnegativity)
+Proof: combine nonnegativity of the stepsize with nonnegativity of the minimum
+  block descent factor under nonnegative probabilities and the blockwise
+  stepsize upper bound.
+Source: Mathlib ordered real multiplication and SOptLib minimum block descent factor nonnegativity
+Used in: randomized block mirror descent output-law admissibility on positive output windows
+Book citation: book/FOML/NonconvexStochasticBlockMirrorDescent.json#/algorithm_spec/output
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, nonconvex stochastic block mirror descent -/
+theorem min_block_descent_output_weight_nonneg
+    {I T : Type*} [Fintype I] [Nonempty I]
+    (p L : I → ℝ) (gamma : T → ℝ) (k : T)
+    (hgamma_nonneg : 0 ≤ gamma k)
+    (hp_nonneg : ∀ i, 0 ≤ p i)
+    (hL_pos : ∀ i, 0 < L i)
+    (hgamma_le : ∀ i, gamma k ≤ 2 / L i) :
+    0 ≤ min_block_descent_output_weight p L gamma k := by
+  exact mul_nonneg hgamma_nonneg
+    (min_block_descent_factor_nonneg p L (gamma k) hp_nonneg hL_pos hgamma_le)
+
+/-- The finite block descent output weight transports the minimum-factor
+weighted-sum bound through multiplication by the current stepsize.
+
+Layer: Model | Gap: Level 1 (finite block descent output-weight weighted-sum bound)
+Proof: unfold the output weight and multiply the minimum block descent factor
+  weighted-sum bound by the nonnegative stepsize.
+Source: Mathlib ordered real multiplication and SOptLib minimum block descent factor weighted-sum bound
+Used in: randomized block mirror descent conversion from full block norm to sampled-block expected descent
+Book citation: book/FOML/NonconvexStochasticBlockMirrorDescent.json#/algorithm_spec/output
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, nonconvex stochastic block mirror descent -/
+theorem min_block_descent_output_weight_mul_sum_le_gamma_weighted_sum
+    {I T : Type*} [Fintype I] [Nonempty I]
+    (p L : I → ℝ) (gamma : T → ℝ) (k : T) (w : I → ℝ)
+    (hgamma_nonneg : 0 ≤ gamma k)
+    (hw_nonneg : ∀ i, 0 ≤ w i) :
+    min_block_descent_output_weight p L gamma k * (∑ i, w i) ≤
+      gamma k * ∑ i, p i * (1 - (L i / 2) * gamma k) * w i := by
+  rw [min_block_descent_output_weight_def]
+  rw [mul_assoc]
+  exact mul_le_mul_of_nonneg_left
+    (min_block_descent_factor_mul_sum_le_weighted_sum
+      p L (gamma k) w hw_nonneg)
+    hgamma_nonneg
+
+end SOptLib
+
+
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: checked inverse-scale additive update relation; orig was `IsDualUpdate`.
+-- generality used: an arbitrary preordered division semiring and additive commutative module; no norm, topology, measure, finite-dimensionality, convexity, smoothness, oracle, or algorithm setup is used.
+-- portable call pattern: primal-dual, dual-averaging, and penalty methods certify a positive update scale and an inverse-scaled additive transition while changing the scalar field, state module, previous state, direction, and next state.
+-- counterargument checked: although the defining conjunction is short, it is not paper-local shorthand: the positivity guard records the source domain omitted by totalized field inversion and is kept with the affine transition as one reusable well-definedness contract.
+-- coverage search: searched `positive scale additive update inverse direction next state equality`, `checked inverse scale update relation positivity`, `relational affine update with positive denominator`, and Mathlib semantic variants; no exact result was found. `IsCheckedAdaptiveProjectedUpdate` is only a structurally different projected update with square-root and quotient witnesses.
+-- minimal hypotheses: `[DivisionSemiring K] [Preorder K] [AddCommMonoid E] [Module K E]` are exactly the structures used by positivity, inversion, addition, and scalar multiplication.
+
+/-- An inverse-scale additive update is checked by positivity of its scale and the
+exact affine transition from the previous state in the supplied direction.
+
+Layer: Model | Concept: checked inverse-scale additive update relation
+Proof: (definitional construction; conjunction of a positive scale certificate and an inverse-scaled additive update equality)
+Source: Mathlib preordered division semirings, additive commutative monoids, modules, and inverse scalar multiplication
+Used in: primal-dual, dual-averaging, and penalty updates that retain the positive-denominator obligation alongside the inverse-scaled state recurrence
+Book citation: book/research/Source.json#/algorithm_spec/steps/2
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, Stochastic Decentralized Communication Sliding Algorithm 8.8 -/
+def IsCheckedInverseScaleAddUpdate
+    {K E : Type*} [DivisionSemiring K] [Preorder K] [AddCommMonoid E] [Module K E]
+    (scale : K) (prev direction next : E) : Prop :=
+  0 < scale ∧ next = prev + scale⁻¹ • direction
+
+/-- The checked inverse-scale additive update relation unfolds to its positivity
+certificate and affine transition equation.
+
+Layer: Model | Gap: Level 0 (checked inverse-scale additive update unfolding)
+Proof: by rfl after unfolding `IsCheckedInverseScaleAddUpdate`.
+Source: Mathlib proposition equivalence and definitional reduction for preordered division-semiring module expressions
+Used in: exposing the positive scale and exact inverse-scaled recurrence from guarded primal-dual, dual-averaging, and penalty update contracts
+Book citation: book/research/Source.json#/algorithm_spec/steps/2
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, Stochastic Decentralized Communication Sliding Algorithm 8.8 -/
+@[simp]
+theorem IsCheckedInverseScaleAddUpdate_def
+    {K E : Type*} [DivisionSemiring K] [Preorder K] [AddCommMonoid E] [Module K E]
+    (scale : K) (prev direction next : E) :
+    IsCheckedInverseScaleAddUpdate scale prev direction next ↔
+      0 < scale ∧ next = prev + scale⁻¹ • direction := Iff.rfl
+
+/-- A checked inverse-scale additive update determines its next state uniquely
+when the scale, previous state, and direction are fixed.
+
+Layer: Model | Gap: Level 0 (checked inverse-scale additive update uniqueness)
+Proof: both checked updates identify their next state with the same inverse-scaled affine expression.
+Source: equality transitivity for the defining affine transition
+Used in: identifying independently certified primal-dual, dual-averaging, and penalty update outputs -/
+theorem IsCheckedInverseScaleAddUpdate.next_unique
+    {K E : Type*} [DivisionSemiring K] [Preorder K] [AddCommMonoid E] [Module K E]
+    {scale : K} {prev direction next₁ next₂ : E}
+    (h₁ : IsCheckedInverseScaleAddUpdate scale prev direction next₁)
+    (h₂ : IsCheckedInverseScaleAddUpdate scale prev direction next₂) :
+    next₁ = next₂ :=
+  h₁.2.trans h₂.2.symm
+
+end SOptLib
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: finite squared mass bound for a scaled geometric response;
+--   the original name already exposes this paper-free mathematical contract
+-- generality used: an arbitrary linearly ordered field, scalar scale and initial
+--   magnitude, a ratio whose square is below one, and a natural horizon;
+--   no measure, convexity, smoothness, oracle, or finite-dimensional assumptions
+-- portable call pattern: stability, linear-filter, and recurrence proofs bound the
+--   finite energy of a homogeneous geometric response while the scale, contraction
+--   ratio, initial magnitude, and horizon vary
+-- counterargument checked: Mathlib already bounds the underlying geometric prefix,
+--   but does not package extraction of both squared response scales or the resulting
+--   finite-energy contract, so this is more than a pure rename or caller-side formula
+-- coverage search: `finite geometric square sum bounded by infinite geometric mass`
+--   and `sum range squared scaled geometric powers`; the closest full signature was
+--   Mathlib `geom_sum_Ico_le_of_lt_one`, which supplies only the unscaled prefix bound,
+--   while SOptLib geometric-history results have different weighted-sum conclusions
+-- minimal hypotheses: the ratio assumptions are reduced to the exact condition
+--   `r ^ 2 < 1`; all other parameters are unrestricted
+
+/-- The finite squared mass of a scaled scalar geometric response is bounded by
+its infinite geometric mass.
+
+Layer: Glue | Gap: Level 0 (scaled squared geometric-response prefix bound)
+Proof: Factor the squared scale and initial magnitude out of the finite sum, then
+apply `geom_sum_Ico_le_of_lt_one` to the nonnegative ratio `r ^ 2`.
+Source: Mathlib ordered-field finite geometric sums, especially
+`geom_sum_Ico_le_of_lt_one`, and commutative-ring power algebra
+Used in: stability and convolution estimates that bound the homogeneous initial
+response before combining it with a forced recurrence response
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/5/proof/1
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+private theorem iterates_finite_geometric_sq_response_sum_le
+    {K : Type*} [Field K] [LinearOrder K] [IsStrictOrderedRing K]
+    {M r x : K} (hr2_lt : r ^ 2 < 1) (N : ℕ) :
+    Finset.sum (Finset.range (N + 1)) (fun t => (M * r ^ t * x) ^ 2) ≤
+      (M ^ 2 / (1 - r ^ 2)) * x ^ 2 := by
+  have hgeom_le :
+      Finset.sum (Finset.range (N + 1)) (fun t => (r ^ 2) ^ t) ≤
+        1 / (1 - r ^ 2) := by
+    have h := geom_sum_Ico_le_of_lt_one
+      (x := r ^ 2) (m := 0) (n := N + 1) (sq_nonneg r) hr2_lt
+    rw [← Finset.range_eq_Ico] at h
+    simpa only [pow_zero] using h
+  calc
+    Finset.sum (Finset.range (N + 1)) (fun t => (M * r ^ t * x) ^ 2) =
+        M ^ 2 * x ^ 2 *
+          Finset.sum (Finset.range (N + 1)) (fun t => (r ^ 2) ^ t) := by
+      rw [Finset.mul_sum]
+      apply Finset.sum_congr rfl
+      intro t _
+      have hrpow : (r ^ t) ^ 2 = (r ^ 2) ^ t := by
+        rw [← pow_mul, ← pow_mul]
+        congr 1
+        omega
+      rw [← hrpow]
+      ring
+    _ ≤ M ^ 2 * x ^ 2 * (1 / (1 - r ^ 2)) :=
+      mul_le_mul_of_nonneg_left hgeom_le
+        (mul_nonneg (sq_nonneg M) (sq_nonneg x))
+    _ = (M ^ 2 / (1 - r ^ 2)) * x ^ 2 := by ring
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: finite-horizon squared gain of a stable scalar recurrence; the original name `finite_stable_recurrence_sq_sum_le` is already paper-free and concept-derived.
+-- generality used: scalar sequences over an arbitrary linear ordered field, a contraction coefficient in the half-open unit interval, zero initial state, and a pointwise affine recurrence; no measure, filtration, optimization, norm, convexity, smoothness, oracle, or finite-dimensional assumptions are used.
+-- portable call pattern: stability, momentum, filtering, and optimization proofs instantiate the state and forcing sequences and vary the contraction coefficient and horizon while reusing the same finite-horizon squared-output gain bound.
+-- counterargument checked: this is not paper-local traceability or a caller-side expression because it packages the nontrivial energy estimate and finite-horizon isolation for a stable forced recurrence; it is not a pure wrapper around a geometric-series lemma.
+-- coverage search: searched `zero initialized stable scalar recurrence finite horizon square sum bounded forcing square sum`, `finite l2 gain recurrence contraction forcing`, and the exact natural-language recurrence contract; Mathlib hits were geometric-series bounds, while SOptLib hits covered pointwise recurrence nonnegativity and unrelated telescoping energies, not this recurrence-to-square-sum conclusion.
+-- minimal hypotheses: the proof uses exactly zero initialization, the pointwise recurrence, and `0 ≤ r < 1`; the source's real scalars are generalized to a linear ordered field.
+
+/-- A zero-initialized stable scalar recurrence has finite-horizon squared output
+bounded by the forcing energy times the square of its geometric `ℓ¹` gain.
+
+Layer: Glue | Gap: Level 1 (finite-horizon squared gain for a stable recurrence)
+Proof: derive a one-step weighted square-energy inequality by completing a square,
+  sum it over the horizon, and isolate the output energy using `0 < 1 - r`.
+Source: Mathlib finite range sums, linear ordered field arithmetic, and square
+  nonnegativity
+Used in: geometric-convolution estimates for consensus, momentum, and stable
+  filter responses before accumulated forcing energies are bounded
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/algorithm_spec
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+private theorem iterates_finite_stable_recurrence_sq_sum_le
+    {R : Type*} [Field R] [LinearOrder R] [IsStrictOrderedRing R]
+    {b w : ℕ → R} {r : R}
+    (hr0 : 0 ≤ r) (hr1 : r < 1)
+    (hb0 : b 0 = 0)
+    (hstep : ∀ t : ℕ, b (t + 1) = r * b t + w t)
+    (N : ℕ) :
+    Finset.sum (Finset.range (N + 1)) (fun t => (b t) ^ 2) ≤
+      (1 / (1 - r) ^ 2) *
+        Finset.sum (Finset.range N) (fun t => (w t) ^ 2) := by
+  have hgap : 0 < 1 - r := sub_pos.mpr hr1
+  have hr_nonneg : 0 ≤ r := hr0
+  have henergy : ∀ t : ℕ,
+      (b (t + 1)) ^ 2 ≤ r * (b t) ^ 2 + (w t) ^ 2 / (1 - r) := by
+    intro t
+    rw [hstep]
+    have hid :
+        r * (b t) ^ 2 + (w t) ^ 2 / (1 - r) -
+            (r * b t + w t) ^ 2 =
+          (r / (1 - r)) * ((1 - r) * b t - w t) ^ 2 := by
+      field_simp [ne_of_gt hgap]
+      ring
+    have hnonneg :
+        0 ≤ (r / (1 - r)) * ((1 - r) * b t - w t) ^ 2 :=
+      mul_nonneg (div_nonneg hr_nonneg hgap.le) (sq_nonneg _)
+    nlinarith
+  have hsum := Finset.sum_le_sum fun t (_ : t ∈ Finset.range N) => henergy t
+  have hshift :
+      Finset.sum (Finset.range N) (fun t => (b (t + 1)) ^ 2) =
+        Finset.sum (Finset.range (N + 1)) (fun t => (b t) ^ 2) := by
+    rw [Finset.sum_range_succ']
+    simp [hb0]
+  have hprev :
+      Finset.sum (Finset.range N) (fun t => (b t) ^ 2) ≤
+        Finset.sum (Finset.range (N + 1)) (fun t => (b t) ^ 2) := by
+    rw [Finset.sum_range_succ]
+    exact le_add_of_nonneg_right (sq_nonneg (b N))
+  have hsum' :
+      Finset.sum (Finset.range (N + 1)) (fun t => (b t) ^ 2) ≤
+        r * Finset.sum (Finset.range N) (fun t => (b t) ^ 2) +
+          Finset.sum (Finset.range N) (fun t => (w t) ^ 2) / (1 - r) := by
+    rw [Finset.sum_add_distrib, ← Finset.mul_sum, ← Finset.sum_div] at hsum
+    simpa [hshift] using hsum
+  have hprev_scaled := mul_le_mul_of_nonneg_left hprev hr_nonneg
+  have hisolate :
+      (1 - r) * Finset.sum (Finset.range (N + 1)) (fun t => (b t) ^ 2) ≤
+        Finset.sum (Finset.range N) (fun t => (w t) ^ 2) / (1 - r) := by
+    nlinarith
+  have hisolate_scaled := mul_le_mul_of_nonneg_right hisolate hgap.le
+  have hgap_ne : 1 - r ≠ 0 := ne_of_gt hgap
+  rw [show
+    1 / (1 - r) ^ 2 * Finset.sum (Finset.range N) (fun t => (w t) ^ 2) =
+      Finset.sum (Finset.range N) (fun t => (w t) ^ 2) / (1 - r) ^ 2 by ring]
+  apply (le_div_iff₀ (sq_pos_of_pos hgap)).2
+  rw [div_mul_cancel₀ _ hgap_ne] at hisolate_scaled
+  simpa [pow_two, mul_assoc, mul_left_comm, mul_comm] using hisolate_scaled
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: finite squared-energy bound for a response dominated by a
+--   homogeneous geometric term plus a causal geometric convolution; orig was
+--   `SquareSummableGeometricConvolution`, renamed to the Mathlib-style theorem
+--   name `finite_sq_sum_le_of_le_geometric_initial_add_convolution`
+-- generality used: sequences over an arbitrary linear ordered field, an arbitrary
+--   kernel scale, a contraction rate in the half-open unit interval, and
+--   finite-horizon response nonnegativity and domination; no measure, convexity,
+--   smoothness, oracle, normed-space, or finite-dimensional assumptions are used
+-- portable call pattern: consensus, stable linear-system, scalar AR, momentum,
+--   control, and filtering proofs vary the response, input, kernel scale,
+--   contraction rate, and horizon while reusing the same initial-plus-forcing
+--   finite-energy estimate
+-- counterargument checked: the homogeneous-response and zero-initial convolution
+--   bounds are existing reusable ingredients, but neither covers their nonzero-
+--   initial combination or the pointwise domination transfer; the combined result
+--   is therefore not a duplicate, paper-local wrapper, or caller-side expression
+-- coverage search: queries for `nonnegative response upper bounded homogeneous
+--   geometric term plus causal geometric convolution finite sum squares`,
+--   `geometric convolution initial response finite horizon squared energy upper
+--   bound`, and the corresponding Mathlib semantic contract found only
+--   `iterates_finite_geometric_sq_response_sum_le`,
+--   `finite_sq_sum_le_of_le_geometric_convolution`, geometric-series lemmas, and
+--   weighted Cauchy--Schwarz bounds; all are partial rather than full matches
+-- minimal hypotheses: nonnegativity and domination are required only on the
+--   summed horizon; `0 < r` is weakened to `0 ≤ r`, and the unused source
+--   assumptions `0 ≤ M` and `0 ≤ z t` are removed
+
+/-- A nonnegative response dominated by a homogeneous geometric term plus a
+causal geometric convolution has bounded finite-horizon squared energy.
+
+Layer: Glue | Gap: Level 1 (initial-plus-forcing geometric response energy bound)
+Proof: Realize the forced convolution as a zero-initial stable recurrence, apply
+the finite recurrence gain and homogeneous geometric-response bounds, and sum the
+pointwise square splitting inequality `(a + b)^2 ≤ 2*a^2 + 2*b^2`.
+Source: discrete Young convolution inequality, Mathlib finite range sums and
+ordered-field square algebra, and `iterates_finite_geometric_sq_response_sum_le`
+Used in: consensus and gradient-tracking energy estimates, stable Duhamel-response
+bounds, and contractive scalar AR recurrences with nonzero initial state
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/5
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+private theorem iterates_finite_sq_sum_le_of_le_geometric_initial_add_convolution
+    {R : Type*} [Field R] [LinearOrder R] [IsStrictOrderedRing R]
+    {u z : ℕ → R} {M r : R}
+    (N : ℕ)
+    (hu_nonneg : ∀ t ∈ Finset.range (N + 1), 0 ≤ u t)
+    (hr0 : 0 ≤ r) (hr1 : r < 1)
+    (hrec : ∀ t ∈ Finset.range (N + 1),
+      u t ≤ M * r ^ t * u 0 +
+        Finset.sum (Finset.range t) fun j =>
+          M * r ^ (t - 1 - j) * z j) :
+    Finset.sum (Finset.range (N + 1)) (fun t => (u t) ^ 2) ≤
+      (2 * M ^ 2 / (1 - r ^ 2)) * (u 0) ^ 2 +
+        (2 * M ^ 2 / (1 - r) ^ 2) *
+          Finset.sum (Finset.range N) (fun j => (z j) ^ 2) := by
+  let forced : ℕ → R := fun t =>
+    Finset.sum (Finset.range t) fun j =>
+      M * r ^ (t - 1 - j) * z j
+  have hforced_zero : forced 0 = 0 := by
+    simp [forced]
+  have hforced_succ : ∀ t : ℕ,
+      forced (t + 1) = r * forced t + M * z t := by
+    intro t
+    have hprefix :
+        Finset.sum (Finset.range t) (fun j =>
+            M * r ^ ((t + 1) - 1 - j) * z j) =
+          r * Finset.sum (Finset.range t) (fun j =>
+            M * r ^ (t - 1 - j) * z j) := by
+      rw [Finset.mul_sum]
+      apply Finset.sum_congr rfl
+      intro j hj
+      have hj_lt : j < t := Finset.mem_range.mp hj
+      have hexp : (t + 1) - 1 - j = (t - 1 - j) + 1 := by omega
+      rw [hexp, pow_succ]
+      ring
+    simp only [forced]
+    rw [Finset.sum_range_succ, hprefix]
+    simp
+  have hforced_raw :=
+    iterates_finite_stable_recurrence_sq_sum_le
+      (b := forced) (w := fun t => M * z t)
+      hr0 hr1 hforced_zero hforced_succ N
+  have hinput_scale :
+      Finset.sum (Finset.range N) (fun t => (M * z t) ^ 2) =
+        M ^ 2 * Finset.sum (Finset.range N) (fun t => (z t) ^ 2) := by
+    rw [Finset.mul_sum]
+    apply Finset.sum_congr rfl
+    intro t _
+    ring
+  have hforced_bound :
+      Finset.sum (Finset.range (N + 1)) (fun t => (forced t) ^ 2) ≤
+        (M ^ 2 / (1 - r) ^ 2) *
+          Finset.sum (Finset.range N) (fun t => (z t) ^ 2) := by
+    rw [hinput_scale] at hforced_raw
+    calc
+      Finset.sum (Finset.range (N + 1)) (fun t => (forced t) ^ 2) ≤
+          1 / (1 - r) ^ 2 *
+            (M ^ 2 * Finset.sum (Finset.range N) (fun t => (z t) ^ 2)) :=
+        hforced_raw
+      _ = (M ^ 2 / (1 - r) ^ 2) *
+            Finset.sum (Finset.range N) (fun t => (z t) ^ 2) := by ring
+  have hr2_lt : r ^ 2 < 1 := by
+    have hfactor : 0 < (1 - r) * (1 + r) :=
+      mul_pos (sub_pos.mpr hr1) (by linarith)
+    nlinarith
+  have hinitial_bound :=
+    iterates_finite_geometric_sq_response_sum_le
+      (M := M) (r := r) (x := u 0) hr2_lt N
+  have hpoint : ∀ t ∈ Finset.range (N + 1),
+      (u t) ^ 2 ≤
+        2 * (M * r ^ t * u 0) ^ 2 + 2 * (forced t) ^ 2 := by
+    intro t ht
+    have hupper : u t ≤ M * r ^ t * u 0 + forced t := by
+      simpa [forced] using hrec t ht
+    have htotal_nonneg : 0 ≤ M * r ^ t * u 0 + forced t :=
+      (hu_nonneg t ht).trans hupper
+    have hsquare :
+        (u t) ^ 2 ≤ (M * r ^ t * u 0 + forced t) ^ 2 := by
+      nlinarith [hu_nonneg t ht]
+    have hsplit :
+        (M * r ^ t * u 0 + forced t) ^ 2 ≤
+          2 * (M * r ^ t * u 0) ^ 2 + 2 * (forced t) ^ 2 := by
+      nlinarith [sq_nonneg (M * r ^ t * u 0 - forced t)]
+    exact hsquare.trans hsplit
+  have hsum_point :=
+    Finset.sum_le_sum fun t ht => hpoint t ht
+  have hsum_split :
+      Finset.sum (Finset.range (N + 1)) (fun t => (u t) ^ 2) ≤
+        2 * Finset.sum (Finset.range (N + 1))
+              (fun t => (M * r ^ t * u 0) ^ 2) +
+          2 * Finset.sum (Finset.range (N + 1))
+              (fun t => (forced t) ^ 2) := by
+    rw [Finset.sum_add_distrib, ← Finset.mul_sum, ← Finset.mul_sum] at hsum_point
+    exact hsum_point
+  calc
+    Finset.sum (Finset.range (N + 1)) (fun t => (u t) ^ 2) ≤
+        2 * Finset.sum (Finset.range (N + 1))
+              (fun t => (M * r ^ t * u 0) ^ 2) +
+          2 * Finset.sum (Finset.range (N + 1))
+              (fun t => (forced t) ^ 2) := hsum_split
+    _ ≤ 2 * ((M ^ 2 / (1 - r ^ 2)) * (u 0) ^ 2) +
+          2 * ((M ^ 2 / (1 - r) ^ 2) *
+            Finset.sum (Finset.range N) (fun j => (z j) ^ 2)) :=
+      add_le_add
+        (mul_le_mul_of_nonneg_left hinitial_bound (by norm_num))
+        (mul_le_mul_of_nonneg_left hforced_bound (by norm_num))
+    _ = (2 * M ^ 2 / (1 - r ^ 2)) * (u 0) ^ 2 +
+          (2 * M ^ 2 / (1 - r) ^ 2) *
+            Finset.sum (Finset.range N) (fun j => (z j) ^ 2) := by ring
+
+-- Generalization plan (G0):
+-- concept/name: finite squared-energy bound for a stable discrete Duhamel response;
+--   orig was `stablePowerDuhamelClosedResponse_square_sum_le`
+-- generality used: an arbitrary real normed additive commutative group and real normed
+--   space, a continuous linear endomorphism, initial state, innovation sequence, and a
+--   finite-horizon geometric operator-power norm estimate; no inner product, completeness, measure,
+--   probability, convexity, smoothness, oracle, or finite-dimensional assumptions are used
+-- portable call pattern: stable linear stochastic systems, distributed block recursions,
+--   momentum states, and linear filters vary the state space, transition operator, initial
+--   state, forcing sequence, contraction constants, and horizon while reusing the same
+--   finite response-energy estimate
+-- counterargument checked: the scalar geometric-convolution energy theorem and the
+--   pointwise Duhamel norm theorem each cover only one edge of the proof; this theorem
+--   packages their nontrivial operator-response composition and is neither a pure rename,
+--   a caller-side expression, nor paper-local traceability
+-- coverage search: searches for `linear Duhamel response finite sum squared norm energy
+--   upper bound stable operator powers forcing`, `geometric convolution initial forcing
+--   finite horizon squared energy bound`, and the corresponding Mathlib semantic contract
+--   found `linearDuhamelResponse_norm_le_geometric_convolution` and
+--   `iterates_finite_sq_sum_le_of_le_geometric_initial_add_convolution` as complementary partial
+--   hits, but no declaration with this complete operator-valued response contract
+-- minimal hypotheses: the operator-power estimate is needed only through the finite horizon;
+--   `0 ≤ theta` and `theta < 1` are sufficient, while the source's separate assumptions
+--   `0 ≤ K`, `0 < theta`, and nonnegativity of innovation norms are unused
+
+open scoped BigOperators
+
+namespace SOptLib
+
+/-- A geometric bound on the powers of a linear endomorphism bounds the finite
+squared energy of its discrete Duhamel response by the initial and forcing energies.
+
+Layer: Model | Gap: Level 1 (stable discrete Duhamel response finite-energy estimate)
+Proof: Establish the geometric pointwise norm bound for `linearDuhamelResponse`
+on the requested horizon, then transfer it through the finite initial-plus-convolution
+squared-energy inequality.
+Source: discrete variation-of-constants and Young convolution estimates, using Mathlib continuous-linear-map operator norms and finite sums
+Used in: accumulated stable-state estimates for period-lifted distributed dynamics, stochastic linear recursions, momentum states, and contractive linear filters
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/5
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem linearDuhamelResponse_sum_norm_sq_le
+    {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (F : E →L[ℝ] E) (z0 : E) (xi : ℕ → E) {K theta : ℝ}
+    (htheta_nonneg : 0 ≤ theta) (htheta_lt_one : theta < 1)
+    (N : ℕ) (hpower : ∀ j ≤ N, ‖F ^ j‖ ≤ K * theta ^ j) :
+    Finset.sum (Finset.range (N + 1)) (fun t =>
+      ‖linearDuhamelResponse F z0 xi t‖ ^ 2) ≤
+      (2 * K ^ 2 / (1 - theta ^ 2)) * ‖z0‖ ^ 2 +
+        (2 * K ^ 2 / (1 - theta) ^ 2) *
+          Finset.sum (Finset.range N) (fun j => ‖xi j‖ ^ 2) := by
+  simpa using
+    (iterates_finite_sq_sum_le_of_le_geometric_initial_add_convolution
+      (u := fun t => ‖linearDuhamelResponse F z0 xi t‖)
+      (z := fun j => ‖xi j‖) (M := K) (r := theta) N
+      (fun _ _ => norm_nonneg _) htheta_nonneg htheta_lt_one
+      (fun t ht => by
+        have ht_le : t ≤ N := by
+          simpa only [Finset.mem_range, Nat.lt_add_one_iff] using ht
+        simp only [linearDuhamelResponse_zero]
+        rw [linearDuhamelResponse_def]
+        calc
+          ‖(F ^ t) z0 + ∑ j ∈ Finset.range t, (F ^ (t - 1 - j)) (xi j)‖ ≤
+              ‖(F ^ t) z0‖ + ‖∑ j ∈ Finset.range t, (F ^ (t - 1 - j)) (xi j)‖ :=
+            norm_add_le _ _
+          _ ≤ K * theta ^ t * ‖z0‖ +
+                ∑ j ∈ Finset.range t, ‖(F ^ (t - 1 - j)) (xi j)‖ := by
+            exact add_le_add ((F ^ t).le_of_opNorm_le (hpower t ht_le) z0)
+              (norm_sum_le _ _)
+          _ ≤ K * theta ^ t * ‖z0‖ +
+                Finset.sum (Finset.range t) (fun j =>
+                  K * theta ^ (t - 1 - j) * ‖xi j‖) := by
+            gcongr with j hj
+            apply (F ^ (t - 1 - j)).le_of_opNorm_le
+            apply hpower
+            omega))
 
 end SOptLib

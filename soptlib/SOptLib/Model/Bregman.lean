@@ -11,6 +11,8 @@ import Mathlib.Analysis.Seminorm
 import Mathlib.Topology.Order.Basic
 import Mathlib.MeasureTheory.Function.StronglyMeasurable.Inner
 import SOptLib.Model.Subdifferential
+import SOptLib.Model.Carrier
+import SOptLib.Model.Norms
 
 
 open scoped Gradient InnerProductSpace
@@ -2656,5 +2658,394 @@ theorem bregmanFormula_segment_difference_hasDerivWithinAt_zero
         ⟪grad z - grad a, d⟫_ℝ := by
     rw [inner_sub_left]
   simpa [d, s, β, hval] using hβ
+
+end SOptLib
+
+namespace SOptLib
+
+private theorem continuous_subtype_of_continuousOn_ambient_for_bregman
+    {E R : Type*} [TopologicalSpace E] [TopologicalSpace R]
+    {X : Set E} (f : {x : E // x ∈ X} → R) (F : E → R)
+    (hF : ContinuousOn F X)
+    (h_eq : ∀ x : {x : E // x ∈ X}, F x.1 = f x) :
+    Continuous f := by
+  have hmaps :
+      Set.MapsTo (fun x : {x : E // x ∈ X} => x.1) Set.univ X := by
+    intro x _hx
+    exact x.2
+  have hcomp :
+      ContinuousOn (fun x : {x : E // x ∈ X} => F x.1) Set.univ :=
+    hF.comp continuous_subtype_val.continuousOn hmaps
+  have hcomp' : Continuous (fun x : {x : E // x ∈ X} => F x.1) :=
+    continuousOn_univ.mp hcomp
+  rw [show f = fun x : {x : E // x ∈ X} => F x.1 by
+    funext x
+    exact (h_eq x).symm]
+  exact hcomp'
+
+private theorem ConvexOn.first_order_linear_model_le_of_hasGradientWithinAt_for_bregman
+    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
+    {X : Set E} {f : E → ℝ} {g z x : E}
+    (hf : ConvexOn ℝ X f) (hz : z ∈ X) (hx : x ∈ X)
+    (hgrad : HasGradientWithinAt f g X z) :
+    f z + ⟪g, x - z⟫_ℝ ≤ f x := by
+  let I : Set ℝ := Set.Icc (0 : ℝ) 1
+  let line : ℝ → E := fun t => AffineMap.lineMap z x t
+  have hline_mem : I ⊆ line ⁻¹' X := by
+    intro t ht
+    change line t ∈ X
+    simpa [line] using hf.1.lineMap_mem hz hx ht
+  have hconv_line : ConvexOn ℝ I (fun t => f (line t)) := by
+    simpa [line, I] using
+      (hf.comp_affineMap (AffineMap.lineMap z x)).subset hline_mem
+        (convex_Icc 0 1)
+  have hmaps : Set.MapsTo line I X := by
+    intro t ht
+    exact hline_mem ht
+  have hline_deriv : HasDerivWithinAt line (x - z) I 0 := by
+    simpa [line, I] using
+      (AffineMap.hasDerivWithinAt_lineMap (a := z) (b := x)
+        (s := I) (x := (0 : ℝ)))
+  have hfline :
+      HasDerivWithinAt (fun t => f (line t)) (⟪g, x - z⟫_ℝ) I 0 := by
+    have hcomp :=
+      hgrad.hasFDerivWithinAt.comp_hasDerivWithinAt_of_eq 0 hline_deriv hmaps
+        (by simp [line])
+    simpa [line] using hcomp
+  have hslope :
+      ⟪g, x - z⟫_ℝ ≤ slope (fun t => f (line t)) 0 1 := by
+    exact hconv_line.le_slope_of_hasDerivWithinAt
+      (x := (0 : ℝ)) (y := (1 : ℝ))
+      (by norm_num [I]) (by norm_num [I]) (by norm_num) hfline
+  have hslope_eval :
+      slope (fun t => f (line t)) 0 1 = f x - f z := by
+    simp [slope, line]
+  rw [hslope_eval] at hslope
+  linarith
+
+
+-- Generalization plan (G0):
+-- concept/name: source-DGF core minimizer existence; orig was initialPoint_exists, renamed away from the saddle-point setup field and toward the reusable compact DGF initialization step
+-- generality used: arbitrary real inner-product ambient carrier E, feasible set X, and carrier-subtype potential nu; no measure, filtration, convexity, smoothness, oracle, completeness, or finite-dimensional hypothesis is used
+-- portable call pattern: mirror descent, mirror prox, accelerated prox, and saddle-product algorithms instantiate a compact carrier and continuous distance-generating potential to select the first source-core Bregman base point; the carrier, DGF, compactness proof, and continuity proof vary while the source-core IsMinOn conclusion stays the same
+-- counterargument checked: not paper-local traceability because compact-continuous DGF initialization recurs across mirror/prox algorithms; not a pure wrapper around Mathlib because the theorem additionally repackages the minimizer as a source-core point using the zero linear perturbation; SOptLib compact objective-minimum lemmas do not provide the source-core certificate
+-- coverage search: queried `exists minimizer compact continuous source DGF core IsMinOn`, `compact continuous objective minimizer exists subtype IsMinOn`, and LeanSearch `compact continuous function on nonempty compact set attains minimum IsMinOn`; hits included Mathlib `IsCompact.exists_isMinOn`, SOptLib `objectiveMinimum_exists_of_isCompact_continuousOn`, SOptLib `proxObjective_exists_isMinOn_compact`, and SOptLib `proxCoreSet`, but none covered the compact-continuity-to-source-core subtype certificate for a carrier potential
+-- minimal hypotheses: compactness is required directly on the feasible subtype, nonemptiness is required to apply the extreme-value theorem, and ambient `ContinuousOn (totalizeOn X nu) X` is the caller-facing continuity hypothesis used to recover continuity of the carrier-subtype potential
+
+/-- A compact continuous carrier distance generator has a source-core minimizer.
+
+If the feasible carrier subtype is compact and nonempty, and the carrier
+potential is continuous through its ambient totalization, then the potential
+attains a minimum at a feasible point. Taking the zero linear perturbation
+shows that minimizer belongs to the source-DGF core.
+
+Layer: Model | Gap: Level 1 (compact source-DGF core minimizer existence)
+Proof: convert ambient carrier continuity to subtype continuity, apply
+  Mathlib's compact extreme-value theorem, and use the zero linear perturbation
+  to build the source-core certificate.
+Source: Mathlib `IsCompact.exists_isMinOn`, subtype topology, and SOptLib
+  carrier totalization APIs
+Used in: stochastic saddle-point mirror descent initialization, where the
+  product distance generator is minimized over the compact product carrier to
+  select the initial prox-core point
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/algorithm_spec/initialization
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, stochastic mirror descent for stochastic convex-concave
+  saddle point problems -/
+theorem sourceDGFCorePoint_exists_isMinOn_of_compact
+    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+    (X : Set E) (nu : {x : E // x ∈ X} → ℝ)
+    (hcompact : IsCompact (Set.univ : Set {x : E // x ∈ X}))
+    (hX_nonempty : X.Nonempty)
+    (hcont : ContinuousOn (SOptLib.totalizeOn X nu) X) :
+    ∃ z : {x : E // ∃ hx : x ∈ X, ∃ p : E, ∀ u : {u : E // u ∈ X},
+        ⟪p, x⟫_ℝ + nu ⟨x, hx⟩ ≤ ⟪p, u.1⟫_ℝ + nu u},
+      IsMinOn nu Set.univ ⟨z.1, Classical.choose z.2⟩ := by
+  classical
+  have hcontPoint : Continuous (fun p : {x : E // x ∈ X} => nu p) := by
+    refine continuous_subtype_of_continuousOn_ambient_for_bregman
+      (X := X) nu (SOptLib.totalizeOn X nu) hcont ?_
+    intro x
+    exact SOptLib.totalizeOn_of_mem X nu x.2
+  have hne : (Set.univ : Set {x : E // x ∈ X}).Nonempty := by
+    rcases hX_nonempty with ⟨x, hx⟩
+    exact ⟨⟨x, hx⟩, by simp⟩
+  rcases hcompact.exists_isMinOn hne hcontPoint.continuousOn with ⟨p, _hp_univ, hpmin⟩
+  have hcore : ∃ hx : p.1 ∈ X, ∃ q : E, ∀ u : {u : E // u ∈ X},
+      ⟪q, p.1⟫_ℝ + nu ⟨p.1, hx⟩ ≤ ⟪q, u.1⟫_ℝ + nu u := by
+    refine ⟨p.2, 0, ?_⟩
+    intro u
+    have hminu : nu p ≤ nu u :=
+      hpmin (by simp : u ∈ (Set.univ : Set {x : E // x ∈ X}))
+    simpa using hminu
+  refine ⟨⟨p.1, hcore⟩, ?_⟩
+  have hp_eq : (⟨p.1, Classical.choose hcore⟩ : {x : E // x ∈ X}) = p := by
+    ext
+    rfl
+  simpa [hp_eq] using hpmin
+
+-- Generalization plan (G0):
+-- concept/name: scaled product Bregman prox equality iff gradient displacement split; orig was productDGF_prox_eq_scaled_sum_iff_gradient_displacement_split, renamed to expose the product-prox algebraic contract rather than a setup-local theorem.
+-- generality used: arbitrary real component potential values at the feasible endpoint and core base point, arbitrary selected component-gradient and product-gradient displacement pairings, and arbitrary real scale denominators; no measure, filtration, oracle, convexity, smoothness, inner-product-space, or finite-dimensional hypotheses are used by the proof.
+-- portable call pattern: product mirror descent, saddle mirror-prox, and block-coordinate Bregman proofs can either prove a scaled product prox split from the selected-gradient displacement split, or recover that exact displacement-pairing contract from a known prox split, while changing carriers, potentials, selected gradients, endpoints, and scales.
+-- counterargument checked: not paper-local traceability because it isolates the reusable algebraic equivalence between product Bregman/prox splitting and the selected-gradient scalar contract; not a duplicate of `SOptLib.two_block_scaled_product_bregman_prox_eq_scaled_sum`, which proves only the forward product-inner-product split for a particular scaled product gradient; not covered by Mathlib, whose product inner-product lemmas do not state this Bregman/prox iff.
+-- coverage search: queried `product prox equality iff gradient displacement split scaled sum Bregman`, `Bregman prox split iff gradient pairing displacement scaled component sum`, `two block scaled Bregman prox equality iff gradient displacement split`, and LeanSearch `real algebra equality scaled sum Bregman prox iff gradient pairing split`; top hits were `SOptLib.two_block_scaled_product_bregman_prox_eq_scaled_sum`, `SOptLib.sourceProductDGF_gradient_displacement_split`, `SOptLib.carrierBregmanDivergence_eq_of_gradient_pairing`, and unrelated Mathlib gradient/product lemmas, with no full duplicate of this iff.
+-- minimal hypotheses: all already minimal; the equivalence is pure real-field algebra and does not need positivity or nonzero assumptions on the scale denominators.
+
+/-- A scaled two-block Bregman prox split is equivalent to its gradient-displacement split.
+
+After expanding product and component Bregman/prox values into potential
+increments and selected-gradient displacement pairings, equality of the product
+prox value with the scaled sum of component prox values holds exactly when the
+product selected-gradient pairing equals the corresponding scaled component
+pairing sum.
+
+Layer: Model | Gap: Level 1 (scaled product Bregman prox split equivalence)
+Proof: expand the two scalar Bregman/prox expressions, normalize divisions in
+  the reverse direction, and use linear arithmetic to recover the product
+  gradient pairing in the forward direction.
+Source: real field algebra for Bregman divergence three-term formulas and
+  scaled component sums
+Used in: stochastic saddle-point mirror descent product DGF normalization, where
+  the scaled product prox equality is interchanged with the selected product
+  gradient displacement contract
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/algorithm_spec/parameters/5/math
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, stochastic convex-concave saddle point mirror descent -/
+theorem sourceProductDGF_prox_eq_scaled_sum_iff_gradient_displacement_split
+    (nuXu nuXz nuYu nuYz gx gy gp sx sy : ℝ) :
+    (nuXu / sx + nuYu / sy - (nuXz / sx + nuYz / sy) - gp =
+        (nuXu - nuXz - gx) / sx + (nuYu - nuYz - gy) / sy) ↔
+      gp = gx / sx + gy / sy := by
+  constructor
+  · intro h
+    ring_nf at h ⊢
+    linarith
+  · intro h
+    rw [h]
+    ring
+
+-- Generalization plan (G0):
+-- concept/name: scaled two-block product DGF prox lower bound between core
+--   points; orig was `product_prox_lower_bound_between_core_points`.
+-- generality used: two arbitrary additive commutative real module blocks
+--   represented by component `Seminorm ℝ` gauges, two real diameter scales, component prox
+--   values, a product prox value, and two product points in `WithLp 2`. No
+--   measure, filtration, oracle, finite-dimensionality, convexity, smoothness,
+--   carrier, or source-DGF structure is used after the component lower bounds
+--   and product prox split are supplied.
+-- portable call pattern: two-block mirror descent, mirror-prox, and
+--   primal-dual saddle-point proofs can call this after deriving component DGF
+--   movement lower bounds and a scaled product-prox decomposition; the
+--   component spaces, gauges, diameter scales, prox values, and endpoint pair
+--   change while the conclusion stays the same.
+-- counterargument checked: this is not the already staged component
+--   `sourceDGFProx_lower_bound_between_core_points_of_seminorm`, because it
+--   performs the product assembly and scaled norm normalization; it is not
+--   covered by `two_block_scaled_product_bregman_prox_eq_scaled_sum`, which
+--   only proves the prox split equality and has no lower-bound conclusion.
+-- coverage search: searched `scaled product prox lower bound half squared
+--   product norm component prox lower bounds` and `twoBlockScaledProductNorm
+--   square equals component seminorm squares nonnegative denominators`; top
+--   hits were the local paper theorem, component source-DGF lower bound,
+--   product Bregman prox split, scaled product norm definition, and product
+--   norm zero certificate, all partial rather than this assembled inequality.
+-- minimal hypotheses: all assumptions are pointwise scalar inequalities or
+--   definitional product data; component DGF and product-prox equality proofs
+--   are caller-side hypotheses, and no positivity assumption on the scales is
+--   needed since division by nonnegative squared denominators is monotone.
+
+/-- Component prox lower bounds assemble into a scaled two-block product prox lower bound.
+
+If each component prox value lower-bounds one half of the corresponding
+component seminorm displacement squared, and the product prox dominates the
+diameter-scaled sum of those component prox values, then the named scaled
+two-block product norm displacement is lower-bounded by the product prox.
+
+Layer: Model | Gap: Level 1 (scaled two-block product prox lower-bound assembly)
+Proof: divide the component lower bounds by the nonnegative squared diameter
+  denominators, add them, and rewrite the square of the named scaled product
+  seminorm by `Real.sq_sqrt`.
+Source: Mathlib seminorm algebra, ordered-field division monotonicity,
+  `WithLp` product-coordinate API, and scaled product seminorm formula
+Used in: stochastic convex-concave saddle-point mirror-descent one-step proof
+  when replacing the product movement prox term by the scaled product primal
+  norm induced by the two component DGFs
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/algorithm_spec/parameters/5/math
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, stochastic mirror descent for stochastic convex-concave
+  saddle point problems -/
+theorem twoBlockScaledProductDGF_prox_lower_bound_between_core_points
+    {EX EY : Type*}
+    [AddCommGroup EX] [Module ℝ EX]
+    [AddCommGroup EY] [Module ℝ EY]
+    (pX : Seminorm ℝ EX) (pY : Seminorm ℝ EY)
+    (DX DY : ℝ) (proxX proxY prox : ℝ)
+    (z y : WithLp 2 (EX × EY))
+    (hXlower :
+      (1 / 2 : ℝ) * pX ((WithLp.ofLp y).fst - (WithLp.ofLp z).fst) ^ 2 ≤ proxX)
+    (hYlower :
+      (1 / 2 : ℝ) * pY ((WithLp.ofLp y).snd - (WithLp.ofLp z).snd) ^ 2 ≤ proxY)
+    (hprox :
+      proxX / (2 * DX ^ 2) + proxY / (2 * DY ^ 2) ≤ prox) :
+    (1 / 2 : ℝ) *
+        SOptLib.twoBlockScaledProductNorm pX pY DX DY (z - y) ^ 2 ≤ prox := by
+  have hDXden_nonneg : 0 ≤ 2 * DX ^ 2 := by positivity
+  have hDYden_nonneg : 0 ≤ 2 * DY ^ 2 := by positivity
+  have hscaled :
+      ((1 / 2 : ℝ) * pX ((WithLp.ofLp y).fst - (WithLp.ofLp z).fst) ^ 2) /
+            (2 * DX ^ 2) +
+          ((1 / 2 : ℝ) * pY ((WithLp.ofLp y).snd - (WithLp.ofLp z).snd) ^ 2) /
+            (2 * DY ^ 2) ≤ prox := by
+    exact (add_le_add
+      (div_le_div_of_nonneg_right hXlower hDXden_nonneg)
+      (div_le_div_of_nonneg_right hYlower hDYden_nonneg)).trans hprox
+  have hXnorm :
+      pX (WithLp.ofLp (z - y)).fst =
+        pX ((WithLp.ofLp y).fst - (WithLp.ofLp z).fst) := by
+    have hsub :
+        (WithLp.ofLp (z - y)).fst =
+          -((WithLp.ofLp y).fst - (WithLp.ofLp z).fst) := by
+      simp
+    rw [hsub, map_neg_eq_map]
+  have hYnorm :
+      pY (WithLp.ofLp (z - y)).snd =
+        pY ((WithLp.ofLp y).snd - (WithLp.ofLp z).snd) := by
+    have hsub :
+        (WithLp.ofLp (z - y)).snd =
+          -((WithLp.ofLp y).snd - (WithLp.ofLp z).snd) := by
+      simp
+    rw [hsub, map_neg_eq_map]
+  rw [SOptLib.twoBlockScaledProductNorm_def, Real.sq_sqrt]
+  · calc
+      (1 / 2 : ℝ) *
+          (pX (WithLp.ofLp (z - y)).fst ^ 2 / (2 * DX ^ 2) +
+            pY (WithLp.ofLp (z - y)).snd ^ 2 / (2 * DY ^ 2)) =
+        ((1 / 2 : ℝ) * pX ((WithLp.ofLp y).fst - (WithLp.ofLp z).fst) ^ 2) /
+            (2 * DX ^ 2) +
+          ((1 / 2 : ℝ) * pY ((WithLp.ofLp y).snd - (WithLp.ofLp z).snd) ^ 2) /
+            (2 * DY ^ 2) := by
+          rw [hXnorm, hYnorm]
+          simp
+          ring
+      _ ≤ prox := hscaled
+  · positivity
+
+-- Generalization plan (G0):
+-- concept/name: source-DGF prox/Bregman nonnegativity from convex first-order
+--   support; orig was `proxFunction_nonneg`, renamed away from the saddle setup
+--   field and toward the source-core prox contract.
+-- generality used: arbitrary complete real inner-product normed additive group,
+--   feasible carrier `X`, source core subset `Xcore`, carrier potential `nu`,
+--   and selected ambient gradient `grad`; no measure, filtration, oracle,
+--   stochastic process, compactness, product structure, or finite-dimensional
+--   hypothesis is used.
+-- portable call pattern: source-DGF mirror descent, mirror-prox, and
+--   saddle-point product-DGF proofs can call this after proving convexity of the
+--   carrier totalization and a pointwise selected within-gradient certificate at
+--   the current core base point; the carrier, core, potential, selected
+--   gradient, and endpoint vary while the nonnegative prox conclusion remains.
+-- counterargument checked: this is not paper-local traceability because it
+--   packages the recurring asymmetric core-base-to-carrier-endpoint Bregman
+--   nonnegativity step. It is not a pure wrapper around
+--   `ConvexOn.first_order_linear_model_le_of_hasGradientWithinAt_for_bregman` or
+--   `carrierBregmanDivergence_nonneg_of_subgradient`, since it additionally
+--   transports the support inequality through `totalizeOn` and the source-core
+--   subtype inclusion.
+-- coverage search: queried `Bregman prox nonnegative convex first order
+--   support`, `source DGF prox nonnegative convexOn HasGradientWithinAt
+--   totalizeOn carrier`, and `carrier Bregman nonnegative convexOn
+--   hasGradientWithinAt totalizeOn sourceDGFProx`; relevant hits were
+--   `ConvexOn.first_order_linear_model_le_of_hasGradientWithinAt_for_bregman`,
+--   `bregmanDivergence_nonneg_of_convexOn`,
+--   `carrierBregmanDivergence_nonneg_of_subgradient`, and source-DGF lower-bound
+--   staging lemmas, but none covered this source-core totalization shape.
+--   LeanSearch for convex first-order Bregman nonnegativity found only generic
+--   Mathlib convexity and slope facts.
+-- minimal hypotheses: global source-DGF assumptions are reduced to carrier
+--   totalization convexity, core inclusion in the carrier, and one pointwise
+--   `HasGradientWithinAt` certificate for the selected gradient at the base
+--   point.
+
+/-- A source-core prox/Bregman value is nonnegative by convex first-order support.
+
+If the carrier totalization of a source potential is convex on the feasible
+carrier and the selected gradient differentiates it within the carrier at a core
+base point, then the source-core Bregman/prox expression from that base point to
+any feasible endpoint is nonnegative.
+
+Layer: Model | Gap: Level 1 (source-core Bregman prox nonnegativity)
+Proof: apply the convex first-order support inequality to the totalized carrier
+  potential, rewrite both totalized endpoint values back to the carrier subtype,
+  and finish by ordered-ring arithmetic.
+Source: SOptLib carrier totalization and convex first-order support inequalities,
+  built on Mathlib convex segment and within-gradient calculus APIs
+Used in: stochastic convex-concave saddle-point mirror descent when the product
+  source-DGF prox value must be nonnegative for every core base point and
+  feasible comparison point
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/assumptions/5
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, stochastic mirror descent for stochastic convex-concave
+  saddle point problems -/
+theorem sourceDGFProx_nonneg
+    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
+    {X Xcore : Set E} {nu : {x : E // x ∈ X} → ℝ} {grad : E → E}
+    (hcore_subset : Xcore ⊆ X)
+    (hnu_convex : ConvexOn ℝ X (SOptLib.totalizeOn X nu))
+    {z : {x : E // x ∈ Xcore}} {u : {x : E // x ∈ X}}
+    (hgrad_z : HasGradientWithinAt (SOptLib.totalizeOn X nu) (grad z.1) X z.1) :
+    0 ≤
+      nu u - nu ⟨z.1, hcore_subset z.2⟩ -
+        ⟪grad z.1, u.1 - z.1⟫_ℝ := by
+  have hzX : z.1 ∈ X := hcore_subset z.2
+  have hsupport :
+      SOptLib.totalizeOn X nu z.1 +
+          ⟪grad z.1, u.1 - z.1⟫_ℝ ≤
+        SOptLib.totalizeOn X nu u.1 := by
+    exact ConvexOn.first_order_linear_model_le_of_hasGradientWithinAt_for_bregman
+      hnu_convex hzX u.2 hgrad_z
+  have hz_total :
+      SOptLib.totalizeOn X nu z.1 = nu ⟨z.1, hcore_subset z.2⟩ := by
+    exact SOptLib.totalizeOn_of_mem X nu (hcore_subset z.2)
+  have hu_total :
+      SOptLib.totalizeOn X nu u.1 = nu u := by
+    exact SOptLib.totalizeOn_of_mem X nu u.2
+  rw [hz_total, hu_total] at hsupport
+  linarith
+
+end SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: finite block Bregman aggregate coercivity from pointwise half-squared-distance bounds; orig was `stackedProx_lower_bound`
+-- generality used: a finite index type and dependent coordinate seminormed additive groups, an arbitrary block kernel, and a pointwise lower bound; no inner product, completeness, finite-dimensionality, measure, convexity, smoothness, oracle, or feasibility assumptions
+-- portable call pattern: block mirror-descent, decentralized, and coordinate algorithms can vary the finite block family, divergence kernels, and compared points while lifting the same blockwise coercivity bounds to a dependent-product energy bound
+-- counterargument checked: the proof is short finite-sum assembly, but it connects the named block Bregman aggregate and dependent-product energy at a recurring coercivity boundary; it is neither paper-local traceability nor a pure rename of a single existing theorem
+-- coverage search: queried `block Bregman sum lower bound half dependent product norm squared pointwise lower bound`, `finite sum pointwise lower bound half squared norm`, and `blockBregmanSum dependentProductNormSq`; top partial hits were `IsDistanceGeneratingFunctionOn.half_sq_norm_le_bregman`, `blockBregmanSum_def`, `dependentProductNormSq_def`, and `Finset.sum_le_sum`, with no declaration covering the aggregate contract
+-- minimal hypotheses: `Fintype` and coordinate `SeminormedAddGroup` instances are sufficient for the finite sum, norms, and pointwise subtraction; all stronger SDCS setup, Hilbert-space, feasibility, and distance-generator assumptions are discharged before this theorem is called
+
+
+open scoped BigOperators
+
+namespace SOptLib
+
+/-- A finite block Bregman aggregate dominates one half of the dependent-product
+squared displacement when every block kernel has the corresponding lower bound.
+
+Layer: Model | Gap: Level 1 (finite block Bregman coercivity aggregation)
+Proof: unfold the named block aggregate and dependent-product energy, distribute the factor one half across the finite sum, and apply `Finset.sum_le_sum` to the pointwise bounds.
+Source: Mathlib finite-sum order and scalar-distribution APIs, together with SOptLib block Bregman aggregate and dependent-product squared-energy definitions
+Used in: block mirror-descent, decentralized prox, and coordinate-method analyses that assemble local distance-generator coercivity into a product-space movement bound
+Book citation: book/research/Source.json#/assumptions/5
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic decentralized communication sliding -/
+theorem half_dependentProductNormSq_le_blockBregmanSum_of_pointwise
+    {ι : Type*} [Fintype ι]
+    {Block : ι → Type*} [∀ i, SeminormedAddGroup (Block i)]
+    (V : ∀ i, Block i → Block i → ℝ) (x u : ∀ i, Block i)
+    (hV : ∀ i, (1 / 2 : ℝ) * ‖x i - u i‖ ^ 2 ≤ V i (x i) (u i)) :
+    (1 / 2 : ℝ) * dependentProductNormSq (x - u) ≤
+      blockBregmanSum Block V x u := by
+  rw [dependentProductNormSq_def, blockBregmanSum_def, Finset.mul_sum]
+  exact Finset.sum_le_sum fun i _ => by
+    simpa only [Pi.sub_apply] using hV i
 
 end SOptLib

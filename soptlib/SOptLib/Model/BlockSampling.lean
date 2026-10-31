@@ -890,3 +890,293 @@ theorem finitePrefixExpectation_mono_of_forall_extend
   exact MeasureTheory.integral_mono hF hG h
 
 end SOptLib
+
+-- Phase 4 merged from focused staging declarations.
+
+open MeasureTheory
+
+namespace SOptLib
+
+/-- Extend values on a subtype to the ambient index type by using a chosen
+subtype coordinate as the default outside the predicate. -/
+def subtypeExtendWithDefault {ι A : Type*} {p : ι → Prop} [DecidablePred p]
+    (r : Subtype p) (pref : Subtype p → A) : ι → A :=
+  fun i =>
+    if hi : p i then
+      pref ⟨i, hi⟩
+    else
+      pref r
+
+@[simp]
+theorem subtypeExtendWithDefault_def
+    {ι A : Type*} {p : ι → Prop} [DecidablePred p]
+    (r : Subtype p) (pref : Subtype p → A) :
+    subtypeExtendWithDefault r pref =
+      fun i =>
+        if hi : p i then
+          pref ⟨i, hi⟩
+        else
+          pref r := rfl
+
+@[simp]
+theorem subtypeExtendWithDefault_apply
+    {ι A : Type*} {p : ι → Prop} [DecidablePred p]
+    (r : Subtype p) (pref : Subtype p → A) (i : ι) :
+    subtypeExtendWithDefault r pref i =
+      if hi : p i then
+        pref ⟨i, hi⟩
+      else
+        pref r := rfl
+
+/-- The subtype/default extension is measurable for product measurable spaces. -/
+theorem measurable_subtype_extend_with_default
+    {ι A : Type*} [MeasurableSpace A] {p : ι → Prop} [DecidablePred p]
+    (r : Subtype p) :
+    Measurable (subtypeExtendWithDefault (A := A) r) := by
+  rw [measurable_pi_iff]
+  intro i
+  by_cases hi : p i
+  · simpa [subtypeExtendWithDefault, hi] using
+      (measurable_pi_apply (⟨i, hi⟩ : Subtype p))
+  · simpa [subtypeExtendWithDefault, hi] using
+      (measurable_pi_apply r)
+
+@[simp]
+theorem subtype_extend_with_default_apply_subtype
+    {ι A : Type*} {p : ι → Prop} [DecidablePred p]
+    (r : Subtype p) (pref : Subtype p → A) (i : Subtype p) :
+    subtypeExtendWithDefault r pref i.1 = pref i := by
+  rw [subtypeExtendWithDefault_apply, dif_pos i.2]
+
+/-- Restricting the subtype/default extension back to the subtype recovers the
+original prefix. -/
+theorem subtype_extend_with_default_restrict
+    {ι A : Type*} {p : ι → Prop} [DecidablePred p]
+    (r : Subtype p) (pref : Subtype p → A) :
+    (fun i : Subtype p => subtypeExtendWithDefault r pref i.1) = pref := by
+  funext i
+  exact subtype_extend_with_default_apply_subtype r pref i
+
+
+end SOptLib
+
+namespace Finset
+
+
+-- Generalization plan (G1):
+-- concept/name: weighted finite-sum transport from prefix-law integrals to a
+--   stream-law integral; orig was
+--   `prefix_weighted_integral_sum_eq_integral_weighted_stream_sum`, renamed to
+--   expose the Mathlib-style finite-sum and measure-map contract.
+-- generality used: arbitrary measurable stream and prefix spaces, arbitrary
+--   finite index type, an arbitrary stream measure, deterministic real scalar
+--   weights, prefix observables in a real normed additive group, stream
+--   observables in the same target, a.e. measurable prefix map, prefix-law
+--   integrability, and per-index a.e. compatibility; no sigma-finiteness,
+--   objective, oracle, convexity, smoothness, filtration, probability, Hilbert,
+--   or finite-dimensional assumptions are used.
+-- portable call pattern: stochastic algorithm proofs with a generated stream
+--   law and a finite prefix projection can transport a finite weighted window of
+--   prefix-observable expectations into one stream expectation by changing only
+--   the index set, weights, observables, prefix map, and compatibility proof.
+-- counterargument checked: not merely paper traceability because the same
+--   measure-map plus finite-window expectation aggregation occurs whenever a
+--   randomized output law is first defined on finite prefixes and then compared
+--   with generated stream iterates; not a pure wrapper because Mathlib supplies
+--   only the separate `integral_map`, `integral_const_mul`, and
+--   `integral_finset_sum` steps.
+-- coverage search: searched `finite sum scalar integral map equals integral sum
+--   compatibility ae`, `sum mul integral map integral finset sum mul of ae
+--   equal`, `integral map composed random variable pushforward law ae equal`,
+--   and `prefix law integral stream integral measurable prefix compatibility`;
+--   relevant hits were Mathlib `MeasureTheory.integral_finset_sum`,
+--   SOptLib `integral_comp_eq_integral_of_map_eq`, and SOptLib
+--   `finitePrefixExpectation_prefixObservable_eq_integral_comp`, but none
+--   combine finite weighted aggregation with a.e. stream compatibility.
+-- minimal hypotheses: prefix integrability is the only integrability
+--   assumption; stream-side integrability is derived by map-measure
+--   integrability transport and a.e. congruence.
+
+/-- A weighted finite sum of prefix-law integrals equals the corresponding
+stream-law integral after composing with a prefix map.
+
+For each finite index, the prefix observable is integrable under the pushforward
+law and agrees almost everywhere with the stream observable after the prefix map.
+The finite weighted expectation can then be moved to the stream space and
+aggregated under one integral.
+
+Layer: Glue | Gap: Level 1 (finite weighted prefix-law integral transport)
+Proof: apply Bochner `integral_map` and `integral_smul` per index, use
+  a.e. congruence for stream compatibility, then commute the finite sum with the
+  Bochner integral.
+Source: Mathlib measure-map Bochner integration, scalar-linearity, a.e.
+  congruence, and finite-sum integral APIs
+Used in: randomized stochastic accelerated-gradient output selection where
+  finite-prefix expected gradient energies are rewritten as one generated
+  stream weighted-gradient expectation
+Book citation: book/FOML/NonconvexStochasticAcceleratedGD.json#/main_theorem/proof/17
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic accelerated gradient descent
+  (Algorithm 6.4 and Theorem 6.12) -/
+theorem sum_smul_integral_map_eq_integral_sum_smul_of_ae
+    {Ω Pref ι E : Type*} [MeasurableSpace Ω] [MeasurableSpace Pref]
+    [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (P : Measure Ω)
+    (prefixMap : Ω → Pref) (s : Finset ι) (w : ι → ℝ)
+    (Fpref : ι → Pref → E) (Fstream : ι → Ω → E)
+    (hprefix : AEMeasurable prefixMap P)
+    (hFpref_int :
+      ∀ i ∈ s, Integrable (Fpref i) (Measure.map prefixMap P))
+    (hcompat :
+      ∀ i ∈ s, (fun ω => Fpref i (prefixMap ω)) =ᵐ[P] Fstream i) :
+    Finset.sum s (fun i =>
+        w i • ∫ pref, Fpref i pref ∂Measure.map prefixMap P) =
+      ∫ ω, Finset.sum s (fun i => w i • Fstream i ω) ∂P := by
+  have hterm_int :
+      ∀ i ∈ s, Integrable (fun ω => w i • Fstream i ω) P := by
+    intro i hi
+    have hcomp_int : Integrable (fun ω => Fpref i (prefixMap ω)) P :=
+      (integrable_map_measure (hFpref_int i hi).aestronglyMeasurable hprefix).mp
+        (hFpref_int i hi)
+    have hstream_int : Integrable (Fstream i) P :=
+      hcomp_int.congr (hcompat i hi)
+    exact hstream_int.smul (w i)
+  calc
+    Finset.sum s (fun i =>
+        w i • ∫ pref, Fpref i pref ∂Measure.map prefixMap P)
+        = Finset.sum s (fun i => ∫ ω, w i • Fstream i ω ∂P) := by
+            refine Finset.sum_congr rfl ?_
+            intro i hi
+            calc
+              w i • ∫ pref, Fpref i pref ∂Measure.map prefixMap P
+                  = ∫ ω, w i • Fpref i (prefixMap ω) ∂P := by
+                      rw [MeasureTheory.integral_map hprefix
+                        (hFpref_int i hi).aestronglyMeasurable]
+                      rw [MeasureTheory.integral_smul]
+              _ = ∫ ω, w i • Fstream i ω ∂P := by
+                    apply MeasureTheory.integral_congr_ae
+                    filter_upwards [hcompat i hi] with ω hω
+                    rw [hω]
+    _ = ∫ ω, Finset.sum s (fun i => w i • Fstream i ω) ∂P := by
+          exact (MeasureTheory.integral_finset_sum s hterm_int).symm
+
+end Finset
+
+-- Phase 4 batch 1 merge from Staging/splitBlockOracleRunSample.lean (carrier)
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: split natural-time block/oracle run sample space; orig was
+--   RunSample.
+-- generality used: arbitrary block-index type and oracle-sample type; no
+--   measure, convexity, smoothness, oracle, normed-space, or finite-dimensional
+--   assumptions are used.
+-- portable call pattern: stochastic block algorithms whose probability law is
+--   built as a product of an iid block-index stream and an iid oracle-sample
+--   stream can share this carrier while changing only the block-index and
+--   oracle-sample types.
+-- counterargument checked: this is a type alias, not a value-formula wrapper;
+--   it differs from the existing paired-per-time `blockSamplePath`, because the
+--   caller's run law is a product of two stream laws on `(Nat -> I) x
+--   (Nat -> S)` rather than an iid law on `Nat -> S x I`.
+-- coverage search: queried "product streams sample space coordinate
+--   projections block oracle sample", "split natural time run sample space
+--   block index stream oracle sample stream projections", "split stream sample
+--   path product of Nat indexed streams", and "blockSamplePath Nat indexed
+--   stream pair product"; hits were `blockSamplePath`, `miniBatchSamplePath`,
+--   `twoIndexSamplePath`, and iid stream laws, but no split product-of-streams
+--   carrier.
+-- minimal hypotheses: all already minimal; the carrier needs only two types.
+
+/-- Split natural-time stochastic run sample space with a block stream and an oracle stream.
+
+For block-index type `I` and oracle-sample type `S`,
+`split_block_oracle_run_sample I S` is the product of the `Nat`-indexed block-index
+stream and the `Nat`-indexed oracle-sample stream.  This is the carrier used
+when the run law is the product of two iid stream laws rather than one iid law
+on paired samples.
+
+Layer: Model | Concept: split block/oracle run sample space
+Proof: (definitional construction; product of two Nat-indexed Pi-function stream carriers)
+Source: Mathlib natural-number index, Pi-function, and product type APIs
+Used in: stochastic block mirror descent construction of a run law from independent block-index and oracle-sample streams
+Book citation: book/book/FOML/NonconvexStochasticBlockMirrorDescent.json#/algorithm_spec/steps/1
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, nonconvex stochastic block mirror descent -/
+abbrev split_block_oracle_run_sample (I S : Type*) : Type _ :=
+  (Nat -> I) × (Nat -> S)
+
+end SOptLib
+
+
+
+-- Generalization plan (G0):
+-- concept/name: common-marginal sample run; orig was OracleRun
+-- generality used: arbitrary measurable run and sample spaces, three arbitrary coordinate
+--   types, a prescribed marginal measure, and no independence or sample measurability assumptions
+-- portable call pattern: stochastic mirror, proximal, variance-reduced, and distributed
+--   methods can change the run space, coordinate types, sample type, and marginal law while
+--   retaining the same probability-law and coordinate-pushforward interface
+-- counterargument checked: this is not paper-local traceability or a one-line wrapper because
+--   it bundles a repeatedly consumed sample process with its source probability law and all
+--   common marginal equations; canonical iid product-law APIs impose a specific path space
+--   and stronger independence assumptions
+-- coverage search: searched `common marginal sample run probability law` and `Measure.map
+--   coordinate law equals marginal probability structure`; `iidStreamLaw_map_eval`,
+--   `iidTwoIndexSampleLaw_map_eval`, and `miniBatchIidLawSpec` cover canonical iid product
+--   laws only, while Mathlib semantic search was unavailable, so coverage is partial
+-- minimal hypotheses: all already minimal; coordinate measurability and independence remain
+--   separate because the source run contract does not assume them
+
+namespace SOptLib
+
+/-- A sample process on an arbitrary run space with one common coordinate marginal law.
+
+The run bundles its probability measure with a three-index sample process and states that
+every coordinate pushforward equals the prescribed marginal. It intentionally does not
+assert coordinate independence or measurability, which can be supplied by a process-specific
+regularity contract.
+
+Layer: Model | Concept: common-marginal sample run
+Proof: (definitional construction; bundled sample process, probability law, and coordinate pushforward equations)
+Source: Mathlib measure pushforwards and probability-measure typeclasses
+Used in: stochastic mirror, proximal, variance-reduced, and distributed methods transporting each indexed oracle draw to a common sample law
+Book citation: book/research/Source.json#/assumptions/8
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic decentralized communication sliding -/
+structure CommonMarginalSampleRun
+    (Omega I J K Sample : Type*) [MeasurableSpace Omega] [MeasurableSpace Sample]
+    (marginal : MeasureTheory.Measure Sample) where
+  samples : Omega -> I -> J -> K -> Sample
+  law : MeasureTheory.Measure Omega
+  law_isProbability : MeasureTheory.IsProbabilityMeasure law
+  sampleLaw : forall i j k,
+    MeasureTheory.Measure.map (fun omega => samples omega i j k) law = marginal
+
+/-- Two common-marginal sample runs are equal when their sample processes and
+source laws are equal. -/
+@[ext]
+theorem CommonMarginalSampleRun.ext
+    {Omega I J K Sample : Type*} [MeasurableSpace Omega] [MeasurableSpace Sample]
+    {marginal : MeasureTheory.Measure Sample}
+    {run run' : CommonMarginalSampleRun Omega I J K Sample marginal}
+    (hsamples : run.samples = run'.samples) (hlaw : run.law = run'.law) :
+    run = run' := by
+  cases run
+  cases run'
+  simp_all
+
+/-- Any two coordinates of a common-marginal sample run have the same
+pushforward law. -/
+theorem CommonMarginalSampleRun.map_samples_eq_map_samples
+    {Omega I J K Sample : Type*} [MeasurableSpace Omega] [MeasurableSpace Sample]
+    {marginal : MeasureTheory.Measure Sample}
+    (run : CommonMarginalSampleRun Omega I J K Sample marginal)
+    (i i' : I) (j j' : J) (k k' : K) :
+    MeasureTheory.Measure.map (fun omega => run.samples omega i j k) run.law =
+      MeasureTheory.Measure.map (fun omega => run.samples omega i' j' k') run.law := by
+  calc
+    MeasureTheory.Measure.map (fun omega => run.samples omega i j k) run.law = marginal :=
+      run.sampleLaw i j k
+    _ = MeasureTheory.Measure.map (fun omega => run.samples omega i' j' k') run.law :=
+      (run.sampleLaw i' j' k').symm
+
+end SOptLib

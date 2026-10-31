@@ -4,6 +4,7 @@ import Mathlib.Analysis.InnerProductSpace.PiL2
 import Mathlib.MeasureTheory.Function.L2Space
 import Mathlib.MeasureTheory.Integral.Bochner.Basic
 import Mathlib.Probability.ConditionalExpectation
+import Mathlib.Tactic
 import SOptLib.Glue.Algebra
 import SOptLib.Glue.Analysis
 import SOptLib.Glue.Martingale
@@ -13,6 +14,7 @@ import SOptLib.Model.ConditionalGradient
 import SOptLib.Model.Filtration
 import SOptLib.Model.Norms
 import SOptLib.Model.StochasticOracle
+import SOptLib.Layer0.Objective
 
 
 open MeasureTheory ProbabilityTheory
@@ -6463,3 +6465,1958 @@ theorem finitePrefixExpectation_inner_sum_coordinate_residual_eq_zero
               (f := fun i : ι => resid i ω) (x := payload ω))
     _ = ∑ i : ι, ∫ ω : Ω, ⟪payload ω, resid i ω⟫_ℝ ∂μ := hsumIntegral
     _ = 0 := hsumZero
+
+
+-- Promoted from Staging/randomQuery_inner_oracleResidual_integrable_and_integral_eq_zero_of_l2.lean
+open MeasureTheory ProbabilityTheory
+open scoped InnerProductSpace
+
+-- Generalization plan (G0):
+-- concept/name: integrability and zero integral of a fresh centered oracle
+--   residual scalarized by an independent random-query L2 direction; orig was
+--   lemma2_adapted_fresh_residual_inner_integral_eq_zero_of_query_l2
+-- generality used: arbitrary measurable source, query, and sample spaces; an
+--   abstract finite base measure and mapped sample law; a complete real Hilbert
+--   target with its Borel measurable structure; no probability, convexity,
+--   smoothness, finite-dimensionality, time index, or algorithm setup
+-- portable call pattern: recursive momentum, stochastic gradient, and
+--   variance-reduction proofs change the adapted query-direction pair, oracle
+--   kernel, target map, fresh sample, variance budget, and time index while
+--   retaining scalar integrability and fresh-residual cancellation
+-- counterargument checked: not paper-local and not a thin wrapper; the nearest
+--   Layer0 theorem proves only cancellation under globally measurable query and
+--   residual maps, whereas this theorem also derives L2 scalar integrability
+--   using only regularity under the generated product law
+-- coverage search: searches for “independent random query residual inner product
+--   integrable and integral zero fixed variance” and “L2 inner product
+--   integrable squared norms” found the partial matches
+--   randomQuery_inner_oracleResidual_integral_eq_zero_of_fixed_zero,
+--   integrable_oracle_residual_inner_of_l2_multiplier, and Mathlib's
+--   IndepFun.covariance_eq_zero; none has the combined law-scoped contract
+-- minimal hypotheses: the source probability assumption was weakened to a
+--   finite measure; product-law residual regularity, a.e. measurability,
+--   independence, the sample-law identity, fixed-fiber centering and variance,
+--   and direction L2 integrability are each consumed directly
+
+/-- An independent fresh centered oracle residual has an integrable
+inner product with an L2 random-query direction, and that integral is zero.
+
+The residual kernel need only be a.e. strongly measurable under the product
+of the generated query law and the fresh-sample law. Fixed-fiber second-moment
+control supplies residual L2 integrability, while fixed-fiber centering and
+independence cancel the scalarized residual.
+
+Layer: Layer0 | Gap: Level 1 (law-scoped random-query residual L2 orthogonality)
+Proof: transfer the fixed-fiber variance bound through the independent product law, apply the L2 inner-product integrability bridge, scalarize fixed-fiber centering, and use product-law Fubini cancellation.
+Source: Mathlib product-measure independence and Bochner integration APIs, together with SOptLib L2 inner-product and oracle-residual scalarization lemmas
+Used in: recursive-momentum centered-square replacements and variance-reduced estimator recurrences pairing an adapted query-direction with a fresh oracle sample
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/key_lemmas/1
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem randomQuery_inner_oracleResidual_integrable_and_integral_eq_zero_of_l2
+    {Ω X I E : Type*} [MeasurableSpace Ω] [MeasurableSpace X]
+    [MeasurableSpace I] [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+    [CompleteSpace E] [MeasurableSpace E] [BorelSpace E]
+    [SecondCountableTopology E]
+    (P : Measure Ω) (ν : Measure I) [IsFiniteMeasure P]
+    (query : Ω → X × E) (sample : Ω → I)
+    (G : X → I → E) (target : X → E) (varianceBudget : ℝ)
+    (hres_prod :
+      AEStronglyMeasurable
+        (fun p : (X × E) × I => G p.1.1 p.2 - target p.1.1)
+        ((Measure.map query P).prod ν))
+    (hquery : AEMeasurable query P) (hsample : AEMeasurable sample P)
+    (hindep : IndepFun query sample P)
+    (hdist : Measure.map sample P = ν)
+    (hfixed_int : ∀ x, Integrable (fun i => G x i - target x) ν)
+    (hfixed_zero : ∀ x, ∫ i, G x i - target x ∂ν = 0)
+    (hfixed_sq_int :
+      ∀ x, Integrable (fun i => ‖G x i - target x‖ ^ 2) ν)
+    (hfixed_sq_bound :
+      ∀ x, ∫ i, ‖G x i - target x‖ ^ 2 ∂ν ≤ varianceBudget)
+    (hdir_sq : Integrable (fun ω => ‖(query ω).2‖ ^ 2) P) :
+    Integrable
+        (fun ω =>
+          ⟪G (query ω).1 (sample ω) - target (query ω).1,
+            (query ω).2⟫_ℝ) P ∧
+      ∫ ω,
+          ⟪G (query ω).1 (sample ω) - target (query ω).1,
+            (query ω).2⟫_ℝ ∂P = 0 := by
+  classical
+  have hres_prod_map :
+      AEStronglyMeasurable
+        (fun p : (X × E) × I => G p.1.1 p.2 - target p.1.1)
+        ((Measure.map query P).prod (Measure.map sample P)) := by
+    rw [hdist]
+    exact hres_prod
+  have hres_aesm :
+      AEStronglyMeasurable
+        (fun ω => G (query ω).1 (sample ω) - target (query ω).1) P :=
+    aestronglyMeasurable_comp_of_indep_product_law
+      hquery hsample inferInstance inferInstance hindep hres_prod_map
+  have hdir_aesm :
+      AEStronglyMeasurable (fun ω => (query ω).2) P :=
+    (measurable_snd.aestronglyMeasurable).comp_aemeasurable hquery
+  let sq : (X × E) → I → ℝ := fun q i => ‖G q.1 i - target q.1‖ ^ 2
+  have hsq_prod :
+      AEStronglyMeasurable
+        (fun p : (X × E) × I => sq p.1 p.2)
+        ((Measure.map query P).prod ν) := by
+    convert hres_prod.norm.mul hres_prod.norm using 1
+    ext p
+    simp [sq, pow_two]
+  have hres_sq :
+      Integrable
+        (fun ω => ‖G (query ω).1 (sample ω) - target (query ω).1‖ ^ 2) P := by
+    simpa [sq] using
+      integrable_comp_of_indep_fixed_integral_bound_aestronglyMeasurable
+        (P := P) (ν := ν) (φ := sq) (X := query) (Y := sample)
+        (C := varianceBudget) hsq_prod hquery hsample hindep hdist
+        (fun q i => sq_nonneg (‖G q.1 i - target q.1‖))
+        (fun q => hfixed_sq_int q.1) (fun q => hfixed_sq_bound q.1)
+  have hinner_int :
+      Integrable
+        (fun ω =>
+          ⟪G (query ω).1 (sample ω) - target (query ω).1,
+            (query ω).2⟫_ℝ) P :=
+    integrable_inner_of_integrable_sq_norm
+      hres_aesm hdir_aesm hres_sq hdir_sq
+  let scalar : (X × E) → I → ℝ := fun q i =>
+    ⟪q.2, G q.1 i - target q.1⟫_ℝ
+  have hscalar_prod :
+      AEStronglyMeasurable
+        (fun p : (X × E) × I => scalar p.1 p.2)
+        ((Measure.map query P).prod ν) := by
+    have hdir_prod :
+        AEStronglyMeasurable
+          (fun p : (X × E) × I => p.1.2)
+          ((Measure.map query P).prod ν) :=
+      (measurable_snd.comp measurable_fst).aestronglyMeasurable
+    exact hdir_prod.inner hres_prod
+  have hfixed_scalar_zero : ∀ q, ∫ i, scalar q i ∂ν = 0 := by
+    intro q
+    simpa [scalar] using
+      inner_integral_oracle_residual_eq_zero_of_integral_eq_zero
+        ν G target q.1 q.2 (hfixed_int q.1) (hfixed_zero q.1)
+  have hzero : ∫ ω, scalar (query ω) (sample ω) ∂P = 0 :=
+    integral_comp_eq_zero_of_indep_fixed_integral_zero_aestronglyMeasurable
+      (P := P) (ν := ν) (φ := scalar) (X := query) (Y := sample)
+      hscalar_prod hquery hsample hindep hdist
+      (by simpa [scalar, real_inner_comm] using hinner_int)
+      hfixed_scalar_zero
+  exact ⟨hinner_int, by simpa [scalar, real_inner_comm] using hzero⟩
+
+
+-- Promoted from Staging/randomQuery_oracleResidual_sq_integrable_and_integral_le_of_indep_fixed.lean
+open MeasureTheory ProbabilityTheory
+
+-- Generalization plan (G0):
+-- concept/name: independent random-query oracle residual square-integrability and
+--   variance-bound transfer; orig was
+--   `theorem1_random_iterate_noise_second_moment_integrable_and_le`
+-- generality used: arbitrary measurable source, query, and sample spaces; an abstract
+--   probability measure; a normed additive output group; product-law a.e. strong
+--   measurability, with no inner-product, finite-dimensional, smoothness, or convexity assumptions
+-- portable call pattern: fresh-sample stochastic-gradient, recursive-momentum, and
+--   variance-reduction proofs vary the random query, sample, oracle, target, and variance
+--   budget while retaining the paired residual integrability and second-moment conclusion
+-- counterargument checked: existing SOptLib oracle residual transfers require globally
+--   measurable kernels and maps, so they do not cover the law-scoped regularity supplied by
+--   the source; composing the two Glue transfers exposes a reusable Layer0 oracle contract
+-- coverage search: symbol queries for “independent random query oracle residual squared
+--   integrable and integral bound” found `integrable_sq_oracleResidual_of_indep_fixed_variance_bound`,
+--   `integral_sq_oracleResidual_le_of_indep_fixed_variance`, and
+--   `random_iterate_uncentered_oracle_moment_bound_of_fixed`, all requiring global
+--   measurability; Mathlib semantic search found product-integral components but no full theorem
+-- minimal hypotheses: the sample law is the pushforward `Measure.map sample P`, so no separate
+--   law equality or sample-law probability instance is assumed; nonnegativity follows from
+--   the squared norm, and all remaining hypotheses are used by the two transfer lemmas
+
+/-- A squared oracle residual at an independent random query is integrable and retains a
+uniform fixed-query integral bound under product-law a.e. strong measurability.
+
+Layer: Layer0 | Gap: Level 1 (law-scoped independent random-query oracle variance transfer)
+Proof: apply the product-law a.e.-measurable fixed-fiber integrability transfer to the squared residual, then feed the result to the matching independent-composition integral-bound transfer.
+Source: Mathlib product-measure Bochner integration and probability independence joint-law APIs
+Used in: recursive-momentum and variance-reduction noise control at an adapted random iterate queried with a fresh independent sample
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/key_lemmas/1
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem randomQuery_oracleResidual_sq_integrable_and_integral_le_of_indep_fixed
+    {Ω X S E : Type*} [MeasurableSpace Ω] [MeasurableSpace X] [MeasurableSpace S]
+    [NormedAddCommGroup E]
+    (P : Measure Ω) [IsProbabilityMeasure P]
+    (query : Ω → X) (sample : Ω → S)
+    (G : X → S → E) (target : X → E) (σ2 : ℝ)
+    (hres_sq_prod :
+      AEStronglyMeasurable
+        (fun p : X × S => ‖G p.1 p.2 - target p.1‖ ^ 2)
+        ((Measure.map query P).prod (Measure.map sample P)))
+    (hquery : AEMeasurable query P) (hsample : AEMeasurable sample P)
+    (hindep : IndepFun query sample P)
+    (hfixed : ∀ x,
+      Integrable (fun s => ‖G x s - target x‖ ^ 2) (Measure.map sample P) ∧
+        ∫ s, ‖G x s - target x‖ ^ 2 ∂Measure.map sample P ≤ σ2) :
+    Integrable
+        (fun ω => ‖G (query ω) (sample ω) - target (query ω)‖ ^ 2) P ∧
+      ∫ ω, ‖G (query ω) (sample ω) - target (query ω)‖ ^ 2 ∂P ≤ σ2 := by
+  let φ : X → S → ℝ := fun x s => ‖G x s - target x‖ ^ 2
+  have hφ_int : Integrable (fun ω => φ (query ω) (sample ω)) P :=
+    integrable_comp_of_indep_fixed_integral_bound_aestronglyMeasurable
+      (P := P) (ν := Measure.map sample P) (φ := φ)
+      (X := query) (Y := sample) (C := σ2)
+      (by simpa [φ] using hres_sq_prod) hquery hsample hindep rfl
+      (by intro x s; exact sq_nonneg _)
+      (fun x => (hfixed x).1) (fun x => (hfixed x).2)
+  have hφ_le : ∫ ω, φ (query ω) (sample ω) ∂P ≤ σ2 :=
+    integral_comp_le_of_indep_fixed_integral_bound_aestronglyMeasurable
+      (P := P) (ν := Measure.map sample P) (φ := φ)
+      (X := query) (Y := sample) (C := σ2)
+      (by simpa [φ] using hres_sq_prod) hquery hsample hindep rfl hφ_int
+      (fun x => (hfixed x).2)
+  exact ⟨by simpa [φ] using hφ_int, by simpa [φ] using hφ_le⟩
+
+-- Phase 4 merged from focused staging declarations.
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: finite weighted oracle second-moment integral bound; orig was
+--   `partB_noiseBudget_integral_le`, renamed away from the Part B local proof
+--   boundary while retaining the stochastic-optimization term "oracle".
+-- generality used: arbitrary measure space, arbitrary finite index set,
+--   nonnegative deterministic real coefficients, and a residual process into a
+--   normed additive group; no probability, filtration, independence,
+--   convexity, smoothness, Hilbert, or finite-dimensional structure is used.
+-- portable call pattern: stochastic algorithm proofs with a finite window of
+--   generated oracle residuals use per-index squared-residual integrability
+--   and second-moment bounds to control the integrated weighted noise budget;
+--   the window, coefficients, residual process, measure, and variance scale
+--   vary while the conclusion shape is unchanged.
+-- counterargument checked: not paper-local traceability because it packages a
+--   recurring expectation aggregation step; not a pure wrapper because the
+--   closest SOptLib scalar-window lemma assumes already-scaled summand bounds
+--   and does not derive them from nonnegative coefficients and moment bounds.
+-- coverage search: searched `finite weighted integral sum second moment bound
+--   nonnegative coefficients`, `integral finite sum nonnegative weights
+--   functions bounded by constant`, and `oracle second moment integral weighted
+--   finite sum variance bound`. Top hits were
+--   `weighted_variance_sum_expectation_bound`,
+--   `integral_scaled_finset_sum_le_scaled_sum_of_integral_bounds`,
+--   `selected_block_second_moment_integral_le_sum_bounds`, and deterministic
+--   weighted second-moment lemmas; all are partial rather than the same
+--   coefficient-times-squared-residual finite-window contract.
+-- minimal hypotheses: all already minimal; integrability of each squared norm,
+--   its integral bound, and nonnegativity of each coefficient on the finite set
+--   are exactly the facts consumed by integral linearity and monotonicity.
+
+/-- A finite weighted oracle second-moment budget integrates to the weighted
+sum of its per-index second-moment bound.
+
+If every squared residual in a finite window is integrable and has integral at
+most `sigma2`, then any nonnegative deterministic finite weighting of those
+squared residuals has integral at most the coefficient sum times `sigma2`.
+
+Layer: Layer0 | Gap: Level 1 (finite weighted oracle second-moment aggregation)
+Proof: commute the Bochner integral through the finite sum, move deterministic
+  coefficients through each scalar integral, apply the per-index moment bound
+  under nonnegative coefficients, and factor the common budget.
+Source: Mathlib Bochner integral finite-sum linearity, scalar-linearity, and
+  ordered real finite-sum algebra
+Used in: randomized stochastic accelerated-gradient finite-window noise-budget
+  control from generated oracle residual second-moment bounds
+Book citation: book/FOML/NonconvexStochasticAcceleratedGD.json#/main_theorem/proof/22
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic accelerated gradient descent
+  (Algorithm 6.4 and Theorem 6.12) -/
+theorem finite_weighted_oracle_second_moment_integral_le
+    {Ω ι E : Type*} [MeasurableSpace Ω] [SeminormedAddCommGroup E]
+    (μ : Measure Ω) (s : Finset ι) (coeff : ι → ℝ) (δ : ι → Ω → E)
+    (sigma2 : ℝ)
+    (hcoeff_nonneg : ∀ i ∈ s, 0 ≤ coeff i)
+    (hδ_int : ∀ i ∈ s, Integrable (fun ω => ‖δ i ω‖ ^ 2) μ)
+    (hδ_bound : ∀ i ∈ s, (∫ ω, ‖δ i ω‖ ^ 2 ∂μ) ≤ sigma2) :
+    (∫ ω, Finset.sum s (fun i => coeff i * ‖δ i ω‖ ^ 2) ∂μ) ≤
+      Finset.sum s coeff * sigma2 := by
+  classical
+  have hterms_int :
+      ∀ i ∈ s, Integrable (fun ω => coeff i * ‖δ i ω‖ ^ 2) μ := by
+    intro i hi
+    exact (hδ_int i hi).const_mul (coeff i)
+  calc
+    (∫ ω, Finset.sum s (fun i => coeff i * ‖δ i ω‖ ^ 2) ∂μ)
+        = Finset.sum s (fun i =>
+            ∫ ω, coeff i * ‖δ i ω‖ ^ 2 ∂μ) := by
+          rw [integral_finset_sum s hterms_int]
+    _ ≤ Finset.sum s (fun i => coeff i * sigma2) := by
+          refine Finset.sum_le_sum ?_
+          intro i hi
+          rw [integral_const_mul]
+          exact mul_le_mul_of_nonneg_left (hδ_bound i hi) (hcoeff_nonneg i hi)
+    _ = Finset.sum s coeff * sigma2 := by
+          rw [Finset.sum_mul]
+
+end SOptLib
+
+
+-- Phase 4 batch 2 merge from Staging/canonicalDualNorm_residual_sq_integrable_and_integral_le_of_mean_secondMoment.lean
+open MeasureTheory
+open scoped InnerProductSpace
+
+-- Generalization plan (G0):
+-- concept/name: canonical dual norm residual L2 bound from a second moment; orig was component_dual_norm_residual_sq_integrable_bound.
+-- generality used: arbitrary probability space, complete real Hilbert carrier, bounded primal seminorm unit ball, Bochner-integrable sample map, deterministic target equal to its mean, and a canonical-dual second-moment budget; no saddle-point, product-space, convexity, smoothness, filtration, or oracle structure is used.
+-- portable call pattern: stochastic oracle component proofs center a sampled oracle output by its deterministic mean while changing the sample law, component space, seminorm, oracle output, target mean, and moment scale but keeping residual square-integrability and the `4 * M ^ 2` bound.
+-- counterargument checked: not paper-local traceability because it packages the reusable centered-residual second-moment step for any canonical dual norm; not a pure wrapper because it combines support-set boundedness, dual-norm continuity, mean second-moment control, domination, integrability, and integral monotonicity. Existing SOptLib `dualNorm_mean_sq_le_second_moment_bound` covers only the deterministic mean square, so it is reused rather than duplicated.
+-- coverage search: queried `dual norm residual square integrable integral bound mean second moment`, `integrable norm sub mean squared integral less equal four moment`, and LeanSearch for `Y minus its expectation has second moment bounded by four M squared`; top hits were SOptLib.dualNorm_mean_sq_le_second_moment_bound, SOptLib integral norm-square centering lemmas for ambient norms, Mathlib real variance lemmas, and the local private theorem, none providing the canonicalDualNorm residual integrability plus integral bound.
+-- minimal hypotheses: completeness supports Bochner integration, and bounded primal unit-ball control is the exact regularity needed for support-set boundedness and continuity of the canonical dual norm; all algorithm fields are abstracted to `μ`, `p`, `Y`, `target`, and `M`.
+
+/-- Centering a random vector by its Bochner mean preserves a canonical dual-norm
+second-moment bound up to the factor `4`.
+
+If `target` is the mean of `Y` and the squared canonical dual norm of `Y` is
+integrable with integral at most `M ^ 2`, then the squared canonical dual norm
+of the residual `Y - target` is integrable and has integral at most
+`4 * M ^ 2`.
+
+Layer: Layer0 | Gap: Level 1 (canonical dual-norm centered residual moment bound)
+Proof: derive bounded support sets and continuity from primal unit-ball
+  ambient control, reuse `dualNorm_mean_sq_le_second_moment_bound` for the
+  target, dominate the residual square by
+  `2 * ‖Y‖_*^2 + 2 * ‖target‖_*^2`, then apply integrability by domination and
+  integral monotonicity.
+Source: SOptLib canonical dual norms, Bochner integration over probability
+  spaces, and Mathlib real ordered-ring moment estimates
+Used in: stochastic convex-concave saddle-point fixed-query oracle residual
+  bounds after replacing component oracle samples by their deterministic means
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/assumptions/4
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, stochastic mirror descent for stochastic convex-concave
+  saddle point problems -/
+theorem canonicalDualNorm_residual_sq_integrable_and_integral_le_of_mean_secondMoment
+    {Ω B : Type*} [MeasurableSpace Ω]
+    [NormedAddCommGroup B] [InnerProductSpace ℝ B] [CompleteSpace B]
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    (p : Seminorm ℝ B)
+    (hcontrol : ∃ C : ℝ, ∀ u : B, p u ≤ 1 → ‖u‖ ≤ C)
+    (Y : Ω → B) (target : B) (M : ℝ)
+    (hY_int : Integrable Y μ)
+    (htarget : target = ∫ ω, Y ω ∂μ)
+    (hY_sq_int : Integrable (fun ω => (SOptLib.canonicalDualNorm p (Y ω)) ^ 2) μ)
+    (hY_sq_bound : ∫ ω, (SOptLib.canonicalDualNorm p (Y ω)) ^ 2 ∂μ ≤ M ^ 2) :
+    Integrable (fun ω => (SOptLib.canonicalDualNorm p (Y ω - target)) ^ 2) μ ∧
+      ∫ ω, (SOptLib.canonicalDualNorm p (Y ω - target)) ^ 2 ∂μ ≤ 4 * M ^ 2 := by
+  classical
+  rcases hcontrol with ⟨C, hC⟩
+  let Zsq : Ω → ℝ := fun ω => (SOptLib.canonicalDualNorm p (Y ω)) ^ 2
+  let Csq : ℝ := (SOptLib.canonicalDualNorm p target) ^ 2
+  let R : Ω → ℝ := fun ω => (SOptLib.canonicalDualNorm p (Y ω - target)) ^ 2
+  let Dom : Ω → ℝ := fun ω => 2 * Zsq ω + 2 * Csq
+  have hsupport :
+      ∀ zeta : B,
+        BddAbove {r : ℝ | ∃ u : B, p u ≤ 1 ∧ r = |inner ℝ zeta u|} := by
+    intro zeta
+    exact SOptLib.canonicalDualNorm_supportSet_bddAbove p zeta ⟨C, hC⟩
+  have hdual_cont : Continuous (fun zeta : B => SOptLib.canonicalDualNorm p zeta) :=
+    SOptLib.canonicalDualNorm_continuous (p := p) (C := C) hC
+  have hmean_sq : Csq ≤ M ^ 2 := by
+    simpa [Csq] using
+      (dualNorm_mean_sq_le_second_moment_bound
+        (μ := μ) p (Y := Y) (target := target) (M := M)
+        (fun ω => hsupport (Y ω)) hY_int htarget hY_sq_int hY_sq_bound)
+  have hR_meas : AEStronglyMeasurable R μ := by
+    have hvec : AEStronglyMeasurable (fun ω => Y ω - target) μ :=
+      hY_int.aestronglyMeasurable.sub aestronglyMeasurable_const
+    have hdual :
+        AEStronglyMeasurable (fun ω => SOptLib.canonicalDualNorm p (Y ω - target)) μ :=
+      hdual_cont.comp_aestronglyMeasurable hvec
+    simpa [R] using hdual.pow 2
+  have hDom_int : Integrable Dom μ := by
+    have hZ : Integrable Zsq μ := by
+      simpa [Zsq] using hY_sq_int
+    have hC : Integrable (fun _ω : Ω => 2 * Csq) μ :=
+      integrable_const (2 * Csq)
+    simpa [Dom, Zsq] using (hZ.const_mul 2).add hC
+  have hpoint : ∀ ω, R ω ≤ Dom ω := by
+    intro ω
+    simpa [R, Dom, Zsq, Csq] using
+      SOptLib.canonicalDualNorm_sub_sq_le_two_mul_sq_add_two_mul_sq
+        (p := p) (a := Y ω) (b := target)
+        (hsupport (Y ω)) (hsupport (-target))
+  have hR_int : Integrable R μ := by
+    refine Integrable.mono' hDom_int hR_meas ?_
+    refine Filter.Eventually.of_forall fun ω => ?_
+    have hnonneg : 0 ≤ R ω := by
+      simp [R, sq_nonneg]
+    rw [Real.norm_eq_abs, abs_of_nonneg hnonneg]
+    exact hpoint ω
+  have hmono : ∫ ω, R ω ∂μ ≤ ∫ ω, Dom ω ∂μ :=
+    integral_mono_ae hR_int hDom_int (Filter.Eventually.of_forall hpoint)
+  have hDom_integral :
+      ∫ ω, Dom ω ∂μ = 2 * ∫ ω, Zsq ω ∂μ + 2 * Csq := by
+    have hZ : Integrable Zsq μ := by
+      simpa [Zsq] using hY_sq_int
+    simp [Dom, MeasureTheory.integral_add (hZ.const_mul 2)
+      (integrable_const (2 * Csq)), MeasureTheory.integral_const_mul]
+  constructor
+  · simpa [R] using hR_int
+  · calc
+      ∫ ω, (SOptLib.canonicalDualNorm p (Y ω - target)) ^ 2 ∂μ
+          = ∫ ω, R ω ∂μ := by rfl
+      _ ≤ ∫ ω, Dom ω ∂μ := hmono
+      _ = 2 * ∫ ω, Zsq ω ∂μ + 2 * Csq := hDom_integral
+      _ ≤ 4 * M ^ 2 := by
+        have hZ_bound : ∫ ω, Zsq ω ∂μ ≤ M ^ 2 := by
+          simpa [Zsq] using hY_sq_bound
+        nlinarith
+
+
+-- Phase 4 batch 2 merge from Staging/oracleResidual_dual_sq_le_two_oracle_sq_add_two_mean_bound_sq.lean
+-- Generalization plan (G0):
+-- concept/name: oracle residual dual-gauge square absorption; orig was oracle_noise_square_absorbed_by_oracle_square.
+-- generality used: an arbitrary additive group carrying a real-valued dual gauge, a pointwise residual decomposition `noise = G - g`, a two-term squared gauge split for sums, evenness of the gauge, gauge nonnegativity, and a deterministic mean-oracle gauge bound; no measure, finite-dimensional, convexity, smoothness, or oracle structure is used.
+-- portable call pattern: stochastic mirror descent, saddle-point mirror descent, and variance-reduction proofs can bound a centered oracle residual square by the sampled oracle square plus a deterministic mean budget while changing the ambient oracle space, gauge, square-split theorem, and mean-bound source.
+-- counterargument checked: not paper-local traceability because the same residual absorption step recurs whenever oracle noise is `G - g`; not a pure wrapper because it packages residual decomposition, square splitting, sign invariance, and square conversion from a deterministic mean bound. Existing SOptLib and staged hits cover independent residual moment transfer, canonical/product dual square splits, and mean-oracle bounds separately, but not this reusable pointwise composition.
+-- coverage search: searched `oracle residual dual square bounded by oracle square mean bound`, `dual gauge residual square two oracle square mean bound`, and LeanSearch for `nonnegative subadditive function even square of residual G minus g bounded by twice square G plus twice square bound on g`; top hits were `twoBlockDualGauge_add_sq_le_two_mul_sq_add_two_mul_sq`, `canonicalDualNorm_sub_sq_le_two_mul_sq_add_two_mul_sq`, `dualNorm_mean_sq_le_second_moment_bound`, and Mathlib subadditive finite-sum lemmas, all partial rather than this residual absorption contract.
+-- minimal hypotheses: global oracle/setup assumptions are reduced to pointwise algebraic hypotheses; `0 ≤ M` and gauge nonnegativity are exactly what converts `dual g ≤ M` into the squared mean budget.
+
+/-- A centered oracle residual square is absorbed by the sampled oracle square and a
+deterministic mean-oracle budget.
+
+If `noise = G - g`, the squared dual gauge has the usual two-term split for
+sums, the gauge is even under negation, and the deterministic mean term is
+bounded by `M`, then the residual square is bounded by
+`2 * dual G ^ 2 + 2 * M ^ 2`.
+
+Layer: Layer0 | Gap: Level 0 (pointwise oracle residual square absorption)
+Proof: rewrite the residual as `G + (-g)`, apply the supplied squared
+  gauge split, use gauge evenness on the mean term, and convert
+  `dual g ≤ M` to a square bound by nonnegativity.
+Source: Mathlib ordered real square inequalities and additive-group algebra,
+  combined with stochastic-optimization dual-gauge residual decompositions
+Used in: stochastic convex-concave saddle-point mirror descent when replacing
+  an oracle-noise dual square by a sampled product-oracle square plus the
+  deterministic mean-oracle scale in pathwise large-deviation bounds
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/algorithm_spec
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, stochastic mirror descent for stochastic convex-concave
+  saddle point problems -/
+theorem oracleResidual_dual_sq_le_two_oracle_sq_add_two_mean_bound_sq
+    {E : Type*} [AddGroup E]
+    (dual : E → ℝ) (noise G g : E) (M : ℝ)
+    (hnoise : noise = G - g)
+    (hdual_nonneg : ∀ x, 0 ≤ dual x)
+    (hdual_add_sq :
+      ∀ a b : E, dual (a + b) ^ 2 ≤ 2 * dual a ^ 2 + 2 * dual b ^ 2)
+    (hdual_neg : ∀ x : E, dual (-x) = dual x)
+    (hM_nonneg : 0 ≤ M)
+    (hgM : dual g ≤ M) :
+    dual noise ^ 2 ≤ 2 * dual G ^ 2 + 2 * M ^ 2 := by
+  rw [hnoise, sub_eq_add_neg]
+  have htri :
+      dual (G + -g) ^ 2 ≤ 2 * dual G ^ 2 + 2 * dual (-g) ^ 2 :=
+    hdual_add_sq G (-g)
+  have hgM_sq : dual g ^ 2 ≤ M ^ 2 :=
+    (sq_le_sq₀ (hdual_nonneg g) hM_nonneg).mpr hgM
+  have hneg_sq : dual (-g) ^ 2 = dual g ^ 2 := by
+    rw [hdual_neg]
+  nlinarith
+
+
+-- Phase 4 batch 2 merge from Staging/boundedDirection_oracleResidual_inner_scaled_sq_le_oracle_sq_add_half.lean
+open scoped InnerProductSpace
+
+-- Generalization plan (G0):
+-- concept/name: bounded-direction oracle-residual inner-product scaled-square absorption; orig was fixed_fiber_cross_term_scaled_sq_le_oracle_scaled_sq_add_half.
+-- generality used: arbitrary real Hilbert additive normed group, abstract primal and dual gauges, pointwise primal-dual support, a bounded deterministic direction, a radius-square budget, a positive stepsize and oracle scale, and pointwise dual-gauge residual absorption from oracle and mean terms; no measure, independence, filtration, finite-dimensional, convexity, or smoothness assumptions are used.
+-- portable call pattern: stochastic mirror-descent, saddle-point mirror-descent, and light-tail oracle proofs fix a query and direction, bound the direction radius, split the centered oracle residual square into sampled-oracle and mean-oracle budgets, then need the same scaled-square exponential-moment domination step while changing the query type, sample type, gauges, radius, stepsize, and oracle-size source.
+-- counterargument checked: not paper-local traceability because the proof packages a reusable pointwise support-plus-residual-square absorption step before MGF bounds; not a pure wrapper because it combines primal-dual support, radius squaring, residual decomposition, denominator cancellation, and oracle square absorption. Existing staged `oracleResidual_dual_sq_le_two_oracle_sq_add_two_mean_bound_sq` covers only the residual-square split, and Layer1 descent/proximal Young lemmas have different Bregman/descent conclusions.
+-- coverage search: searched `bounded direction oracle residual inner product scaled square less than oracle square plus half Young inequality` and `inner product bounded by dual norm primal norm squared absorption scaled square`; top hits were `oracleResidual_dual_sq_le_two_oracle_sq_add_two_mean_bound_sq`, `one_step_descent_absorb_residual_cross_term`, `neg_inner_sub_bregman_young_le_scaled_dualNorm_sq`, and primal-dual support lemmas, all partial rather than this fixed-fiber scaled-square oracle-residual contract.
+-- minimal hypotheses: source setup fields are reduced to pointwise support, gauge nonnegativity/additive-square/evenness, mean bound, positive `γ` and `M`, direction radius bound, and `R ^ 2 ≤ 2`; no sign assumption on `R` is needed beyond the stated feasible direction bound.
+
+/-- A bounded direction turns an oracle-residual inner product into a scaled oracle-square
+budget plus one half.
+
+If a direction has primal gauge at most `γ * R`, with `R ^ 2 ≤ 2`, and the
+dual-gauge square of the centered residual `G x ξ - g x` is absorbed by the
+sampled oracle square plus a deterministic mean budget, then the scaled square
+of `-⟪d, G x ξ - g x⟫` is bounded by the sampled oracle square at scale `M`
+plus `1 / 2`.
+
+Layer: Layer0 | Gap: Level 1 (bounded-direction oracle-residual scaled-square absorption)
+Proof: apply the primal-dual support inequality to square the residual inner product, use `R ^ 2 ≤ 2` to match the source denominator, reuse the residual-square oracle absorption theorem, and finish by positive denominator cancellation.
+Source: Mathlib real Hilbert inner-product support inequalities and ordered-field square arithmetic, combined with SOptLib pointwise oracle-residual square absorption
+Used in: stochastic convex-concave saddle-point mirror descent fixed-fiber cross-term square control before converting oracle light-tail bounds to scalar cross-term exponential moments
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/key_lemmas/1
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic mirror descent for stochastic convex-concave saddle point problems -/
+theorem boundedDirection_oracleResidual_inner_scaled_sq_le_oracle_sq_add_half
+    {E X S : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+    (primalNorm dualNorm : E → ℝ)
+    (G : X → S → E) (g : X → E)
+    (x : X) (ξ : S) (d : E) (γ M R : ℝ)
+    (hγ_pos : 0 < γ)
+    (hM_pos : 0 < M)
+    (hR_sq_le_two : R ^ 2 ≤ 2)
+    (hdir : primalNorm d ≤ γ * R)
+    (hsupport : ∀ z w : E, |⟪w, z⟫_ℝ| ≤ dualNorm z * primalNorm w)
+    (hdual_nonneg : ∀ z : E, 0 ≤ dualNorm z)
+    (hdual_add_sq :
+      ∀ a b : E, dualNorm (a + b) ^ 2 ≤
+        2 * dualNorm a ^ 2 + 2 * dualNorm b ^ 2)
+    (hdual_neg : ∀ z : E, dualNorm (-z) = dualNorm z)
+    (hmean_le : dualNorm (g x) ≤ M) :
+    (-⟪d, G x ξ - g x⟫_ℝ) ^ 2 / (8 * γ ^ 2 * M ^ 2) ≤
+      dualNorm (G x ξ) ^ 2 / (2 * M ^ 2) + (1 / 2 : ℝ) := by
+  let residual : E := G x ξ - g x
+  let oracleSq : ℝ := dualNorm (G x ξ) ^ 2
+  let residualSq : ℝ := dualNorm residual ^ 2
+  have hresidual_absorb :
+      residualSq ≤ 2 * oracleSq + 2 * M ^ 2 := by
+    simpa [residual, residualSq, oracleSq] using
+      oracleResidual_dual_sq_le_two_oracle_sq_add_two_mean_bound_sq
+        (dual := dualNorm) (noise := residual) (G := G x ξ) (g := g x) (M := M)
+        (hnoise := rfl) (hdual_nonneg := hdual_nonneg)
+        (hdual_add_sq := hdual_add_sq) (hdual_neg := hdual_neg)
+        (hM_nonneg := le_of_lt hM_pos) (hgM := hmean_le)
+  have hinner_abs :
+      |⟪d, residual⟫_ℝ| ≤ dualNorm residual * (γ * R) := by
+    have hinner : |⟪d, residual⟫_ℝ| ≤ dualNorm residual * primalNorm d :=
+      hsupport residual d
+    exact hinner.trans (mul_le_mul_of_nonneg_left hdir (hdual_nonneg residual))
+  have hinner_sq :
+      (-⟪d, residual⟫_ℝ) ^ 2 ≤ 2 * γ ^ 2 * residualSq := by
+    let y : ℝ := dualNorm residual * (γ * R)
+    have hxy : |-⟪d, residual⟫_ℝ| ≤ y := by
+      dsimp [y]
+      rwa [abs_neg]
+    have hsq_abs : |-⟪d, residual⟫_ℝ| ^ 2 ≤ y ^ 2 :=
+      pow_le_pow_left₀ (abs_nonneg _) hxy 2
+    have hy_sq_le : y ^ 2 ≤ 2 * γ ^ 2 * residualSq := by
+      have hy_sq :
+          y ^ 2 = residualSq * (γ ^ 2 * R ^ 2) := by
+        dsimp [y, residualSq]
+        ring
+      rw [hy_sq]
+      have hγ_sq_nonneg : 0 ≤ γ ^ 2 := sq_nonneg γ
+      have hscale : γ ^ 2 * R ^ 2 ≤ γ ^ 2 * 2 :=
+        mul_le_mul_of_nonneg_left hR_sq_le_two hγ_sq_nonneg
+      have hresidualSq_nonneg : 0 ≤ residualSq := sq_nonneg _
+      calc
+        residualSq * (γ ^ 2 * R ^ 2)
+            ≤ residualSq * (γ ^ 2 * 2) :=
+              mul_le_mul_of_nonneg_left hscale hresidualSq_nonneg
+        _ = 2 * γ ^ 2 * residualSq := by ring
+    calc
+      (-⟪d, residual⟫_ℝ) ^ 2 = |-⟪d, residual⟫_ℝ| ^ 2 := by rw [sq_abs]
+      _ ≤ y ^ 2 := hsq_abs
+      _ ≤ 2 * γ ^ 2 * residualSq := hy_sq_le
+  have hγ_sq_pos : 0 < γ ^ 2 := sq_pos_of_pos hγ_pos
+  have hM_sq_pos : 0 < M ^ 2 := sq_pos_of_pos hM_pos
+  have hden_pos : 0 < 8 * γ ^ 2 * M ^ 2 := by positivity
+  have hden4_pos : 0 < 4 * M ^ 2 := by positivity
+  have hstep1 :
+      (-⟪d, residual⟫_ℝ) ^ 2 / (8 * γ ^ 2 * M ^ 2) ≤
+        (2 * γ ^ 2 * residualSq) / (8 * γ ^ 2 * M ^ 2) :=
+    div_le_div_of_nonneg_right hinner_sq (le_of_lt hden_pos)
+  have hstep1_eq :
+      (2 * γ ^ 2 * residualSq) / (8 * γ ^ 2 * M ^ 2) =
+        residualSq / (4 * M ^ 2) := by
+    field_simp [ne_of_gt hγ_pos, ne_of_gt hM_pos,
+      ne_of_gt hγ_sq_pos, ne_of_gt hM_sq_pos]
+    ring_nf
+  have hstep2 :
+      residualSq / (4 * M ^ 2) ≤
+        (2 * oracleSq + 2 * M ^ 2) / (4 * M ^ 2) :=
+    div_le_div_of_nonneg_right hresidual_absorb (le_of_lt hden4_pos)
+  have hstep2_eq :
+      (2 * oracleSq + 2 * M ^ 2) / (4 * M ^ 2) =
+        oracleSq / (2 * M ^ 2) + (1 / 2 : ℝ) := by
+    field_simp [ne_of_gt hM_pos, ne_of_gt hM_sq_pos]
+    ring_nf
+  calc
+    (-⟪d, G x ξ - g x⟫_ℝ) ^ 2 / (8 * γ ^ 2 * M ^ 2)
+        = (-⟪d, residual⟫_ℝ) ^ 2 / (8 * γ ^ 2 * M ^ 2) := by rfl
+    _ ≤ (2 * γ ^ 2 * residualSq) / (8 * γ ^ 2 * M ^ 2) := hstep1
+    _ = residualSq / (4 * M ^ 2) := hstep1_eq
+    _ ≤ (2 * oracleSq + 2 * M ^ 2) / (4 * M ^ 2) := hstep2
+    _ = oracleSq / (2 * M ^ 2) + (1 / 2 : ℝ) := hstep2_eq
+    _ = dualNorm (G x ξ) ^ 2 / (2 * M ^ 2) + (1 / 2 : ℝ) := by rfl
+
+
+-- Phase 4 batch 2 merge from Staging/boundedDirection_oracleResidual_exp_square_mgf_bound_of_oracle_exp_moment.lean
+open MeasureTheory
+open scoped InnerProductSpace
+
+-- Generalization plan (G0):
+-- concept/name: bounded-direction oracle-residual square-exponential MGF control from a fixed-query oracle light-tail moment; orig was fixed_fiber_cross_term_exp_square_mgf_bound.
+-- generality used: arbitrary measurable sample space with a probability measure, an arbitrary real Hilbert additive normed group with its Borel measurable structure, measurable subtraction, and product open-set measurability for inner-product scalarization, abstract query type, stochastic oracle and mean oracle maps, abstract primal and dual gauges, a fixed query, direction, stepsize, oracle scale, and direction-radius parameter; no convexity, filtration, independence, finite-dimensional, or saddle-product structure is used.
+-- portable call pattern: mirror-descent and saddle-point light-tail proofs fix a query and bounded direction, control the centered oracle-residual inner product by the sampled oracle gauge, and then need integrability plus an `exp 1` bound for the scalar square-exponential MGF while changing the oracle, mean oracle, gauges, stepsize, scale, sample law, and query type.
+-- counterargument checked: not paper-local traceability because the theorem packages the recurring transition from oracle light-tail control to fixed-direction residual light-tail control; not a duplicate because existing staged declarations cover only the pointwise scaled-square absorption or the later linear-MGF conversion, while this statement supplies the missing square-exponential integral bound.
+-- coverage search: searched `bounded direction oracle residual exp square mgf bound oracle exp moment`, `exp square inner oracle residual bounded direction oracle exponential moment integrable integral exp one`, and `rpow half integrable integral le square root exponential moment bound`; top hits were `boundedDirection_oracleResidual_inner_scaled_sq_le_oracle_sq_add_half`, `fixed_direction_oracle_residual_linear_mgf_of_exp_square_mgf`, `productOracle_expMoment_bound_of_component_bounds`, and `integral_rpow_le_rpow_of_integrable_nonneg_of_integral_le`, all ingredients or adjacent steps rather than this complete fixed-fiber MGF transfer.
+-- minimal hypotheses: the source setup fields are reduced to measurability of the fixed oracle fiber, the oracle square-exponential integrability and `exp 1` integral bound, positive `γ` and `M`, `R ^ 2 ≤ 2`, the bounded direction hypothesis, pointwise primal-dual support, dual-gauge nonnegativity/additive-square/evenness, and the mean-oracle gauge bound.
+
+/-- A bounded direction transfers an oracle square-exponential moment to a residual
+cross-term square-exponential moment.
+
+For a fixed query `x` and deterministic direction `d`, a pointwise
+primal-dual support inequality and bounded-direction hypothesis reduce the
+scalar residual square `(-⟪d, G x ξ - g x⟫)^2` to one half of the sampled oracle
+square-exponential budget.  If the sampled oracle has exponential moment at
+scale `M`, then the residual cross term has the corresponding `exp 1` MGF
+bound at scale `8 * γ^2 * M^2`.
+
+Layer: Layer0 | Gap: Level 1 (bounded-direction oracle-residual square-exponential MGF transfer)
+Proof: combine the pointwise bounded-direction residual-square absorption with monotonicity of `Real.exp`, dominate by `exp (1 / 2) * Z ^ (1 / 2)`, and apply the SOptLib fractional-moment Jensen bound to the nonnegative oracle exponential `Z`.
+Source: Mathlib real exponential/order APIs and Bochner integral monotonicity, together with SOptLib fractional-moment Jensen and oracle-residual square-absorption lemmas
+Used in: stochastic convex-concave saddle-point mirror descent fixed-fiber cross-term light-tail control before applying the centered scalar MGF conversion
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/key_lemmas/1
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic mirror descent for stochastic convex-concave saddle point problems -/
+theorem boundedDirection_oracleResidual_exp_square_mgf_bound_of_oracle_exp_moment
+    {X S E : Type*} [MeasurableSpace S]
+    [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+    [MeasurableSpace E] [BorelSpace E] [OpensMeasurableSpace E]
+    [OpensMeasurableSpace (E × E)] [MeasurableSub₂ E]
+    (P : Measure S) [IsProbabilityMeasure P]
+    (G : X → S → E) (g : X → E)
+    (primalNorm dualNorm : E → ℝ)
+    (x : X) (d : E) (γ M R : ℝ)
+    (hGx_meas : Measurable (fun ξ : S => G x ξ))
+    (horacle_exp_int :
+      Integrable
+        (fun ξ =>
+          Real.exp (dualNorm (G x ξ) ^ 2 / M ^ 2)) P)
+    (horacle_exp_bound :
+      ∫ ξ, Real.exp (dualNorm (G x ξ) ^ 2 / M ^ 2) ∂P ≤ Real.exp 1)
+    (hγ_pos : 0 < γ)
+    (hM_pos : 0 < M)
+    (hR_sq_le_two : R ^ 2 ≤ 2)
+    (hdir : primalNorm d ≤ γ * R)
+    (hsupport : ∀ z w : E, |⟪w, z⟫_ℝ| ≤ dualNorm z * primalNorm w)
+    (hdual_nonneg : ∀ z : E, 0 ≤ dualNorm z)
+    (hdual_add_sq :
+      ∀ a b : E, dualNorm (a + b) ^ 2 ≤
+        2 * dualNorm a ^ 2 + 2 * dualNorm b ^ 2)
+    (hdual_neg : ∀ z : E, dualNorm (-z) = dualNorm z)
+    (hmean_le : dualNorm (g x) ≤ M) :
+    Integrable
+        (fun ξ =>
+          Real.exp
+            (((-⟪d, G x ξ - g x⟫_ℝ) ^ 2) /
+              (8 * γ ^ 2 * M ^ 2))) P ∧
+      ∫ ξ,
+          Real.exp
+            (((-⟪d, G x ξ - g x⟫_ℝ) ^ 2) /
+              (8 * γ ^ 2 * M ^ 2)) ∂P ≤
+        Real.exp 1 := by
+  let Z : S → ℝ := fun ξ =>
+    Real.exp (dualNorm (G x ξ) ^ 2 / M ^ 2)
+  let F : S → ℝ := fun ξ =>
+    Real.exp
+      (((-⟪d, G x ξ - g x⟫_ℝ) ^ 2) /
+        (8 * γ ^ 2 * M ^ 2))
+  have hZ_int : Integrable Z P := by
+    simpa [Z] using horacle_exp_int
+  have hZ_bound : ∫ ξ, Z ξ ∂P ≤ Real.exp 1 := by
+    simpa [Z] using horacle_exp_bound
+  have hp : (1 / 2 : ℝ) ∈ Set.Icc (0 : ℝ) 1 := by norm_num
+  have hZ_rpow_aesm :
+      AEStronglyMeasurable (fun ξ => Real.rpow (Z ξ) (1 / 2 : ℝ)) P :=
+    (Real.continuous_rpow_const hp.1).comp_aestronglyMeasurable
+      hZ_int.aestronglyMeasurable
+  have hZ_rpow_int :
+      Integrable (fun ξ => Real.rpow (Z ξ) (1 / 2 : ℝ)) P := by
+    have hmajorant_int : Integrable (fun ξ => Z ξ + 1) P :=
+      hZ_int.add (integrable_const (c := (1 : ℝ)))
+    refine hmajorant_int.mono' hZ_rpow_aesm ?_
+    refine Filter.Eventually.of_forall fun ξ => ?_
+    have hZ_nonneg : 0 ≤ Z ξ := le_of_lt (Real.exp_pos _)
+    have hpow_nonneg : 0 ≤ Real.rpow (Z ξ) (1 / 2 : ℝ) :=
+      Real.rpow_nonneg hZ_nonneg _
+    rw [Real.norm_of_nonneg hpow_nonneg]
+    exact rpow_le_self_add_one_of_nonneg_of_mem_Icc hZ_nonneg hp
+  have hmajorant_int :
+      Integrable
+        (fun ξ => Real.exp (1 / 2 : ℝ) * Real.rpow (Z ξ) (1 / 2 : ℝ)) P :=
+    hZ_rpow_int.const_mul (Real.exp (1 / 2 : ℝ))
+  have hF_aesm : AEStronglyMeasurable F P := by
+    have hmean :
+        Measurable (fun _ξ : S => g x) :=
+      measurable_const
+    have hres :
+        Measurable (fun ξ : S => G x ξ - g x) :=
+      hGx_meas.sub hmean
+    have hinner :
+        Measurable (fun ξ : S => ⟪d, G x ξ - g x⟫_ℝ) :=
+      continuous_inner.measurable.comp
+        ((measurable_const : Measurable (fun _ξ : S => d)).prodMk hres)
+    have hscalar :
+        Measurable F :=
+      (Real.continuous_exp.comp
+        ((((continuous_id.neg).pow 2).div_const
+          (8 * γ ^ 2 * M ^ 2)))).measurable.comp hinner
+    exact hscalar.aestronglyMeasurable
+  have hF_le :
+      ∀ ξ, F ξ ≤ Real.exp (1 / 2 : ℝ) * Real.rpow (Z ξ) (1 / 2 : ℝ) := by
+    intro ξ
+    have hscaled :=
+      boundedDirection_oracleResidual_inner_scaled_sq_le_oracle_sq_add_half
+        (primalNorm := primalNorm) (dualNorm := dualNorm)
+        (G := G) (g := g)
+        (x := x) (ξ := ξ) (d := d)
+        (γ := γ) (M := M) (R := R)
+        (hγ_pos := hγ_pos) (hM_pos := hM_pos)
+        (hR_sq_le_two := hR_sq_le_two) (hdir := hdir)
+        (hsupport := hsupport) (hdual_nonneg := hdual_nonneg)
+        (hdual_add_sq := hdual_add_sq) (hdual_neg := hdual_neg)
+        (hmean_le := hmean_le)
+    let y : ℝ := dualNorm (G x ξ) ^ 2 / M ^ 2
+    have hrpow_exp :
+        Real.rpow (Z ξ) (1 / 2 : ℝ) = Real.exp (y / 2) := by
+      change Real.rpow (Real.exp y) (1 / 2 : ℝ) = Real.exp (y / 2)
+      simpa [div_eq_mul_inv, mul_comm, mul_left_comm, mul_assoc] using
+        (Real.exp_mul y (1 / 2 : ℝ)).symm
+    have hhalf_arg :
+        dualNorm (G x ξ) ^ 2 / (2 * M ^ 2) = y / 2 := by
+      dsimp [y]
+      field_simp [ne_of_gt hM_pos, ne_of_gt (sq_pos_of_pos hM_pos)]
+    calc
+      F ξ ≤ Real.exp
+          (dualNorm (G x ξ) ^ 2 / (2 * M ^ 2) + (1 / 2 : ℝ)) := by
+            exact Real.exp_le_exp.mpr (by simpa [F] using hscaled)
+      _ = Real.exp (1 / 2 : ℝ) * Real.rpow (Z ξ) (1 / 2 : ℝ) := by
+            rw [Real.exp_add, hhalf_arg, hrpow_exp]
+            ring
+  have hF_int : Integrable F P :=
+    hmajorant_int.mono' hF_aesm
+      (Filter.Eventually.of_forall fun ξ => by
+        have hF_nonneg : 0 ≤ F ξ := le_of_lt (Real.exp_pos _)
+        rw [Real.norm_of_nonneg hF_nonneg]
+        exact hF_le ξ)
+  have hhalf_integral :
+      ∫ ξ, Real.rpow (Z ξ) (1 / 2 : ℝ) ∂P ≤
+        Real.rpow (Real.exp 1) (1 / 2 : ℝ) :=
+    integral_rpow_le_rpow_of_integrable_nonneg_of_integral_le
+      (P := P) hZ_int
+      (Filter.Eventually.of_forall fun ξ => le_of_lt (Real.exp_pos _))
+      hp hZ_bound
+  constructor
+  · simpa [F] using hF_int
+  · calc
+      ∫ ξ, F ξ ∂P
+          ≤ ∫ ξ, Real.exp (1 / 2 : ℝ) * Real.rpow (Z ξ) (1 / 2 : ℝ) ∂P :=
+            integral_mono hF_int hmajorant_int hF_le
+      _ = Real.exp (1 / 2 : ℝ) *
+            ∫ ξ, Real.rpow (Z ξ) (1 / 2 : ℝ) ∂P := by
+            rw [MeasureTheory.integral_const_mul]
+      _ ≤ Real.exp (1 / 2 : ℝ) * Real.rpow (Real.exp 1) (1 / 2 : ℝ) :=
+            mul_le_mul_of_nonneg_left hhalf_integral (le_of_lt (Real.exp_pos _))
+      _ = Real.exp 1 := by
+            have hrpow_one :
+                Real.rpow (Real.exp 1) (1 / 2 : ℝ) = Real.exp (1 / 2 : ℝ) := by
+              change Real.rpow (Real.exp 1) (1 / 2 : ℝ) = Real.exp (1 / 2 : ℝ)
+              simpa [div_eq_mul_inv, mul_comm, mul_left_comm, mul_assoc] using
+                (Real.exp_mul (1 : ℝ) (1 / 2 : ℝ)).symm
+            rw [hrpow_one, ← Real.exp_add]
+            congr
+            norm_num
+
+
+-- Phase 4 batch 2 merge from Staging/boundedDirection_oracleResidual_linear_mgf_of_exp_square_mgf.lean
+open MeasureTheory
+open scoped InnerProductSpace
+
+-- Generalization plan (G0):
+-- concept/name: fixed-query oracle residual scalarized against a fixed direction, with linear MGF control from square-exponential MGF control; orig was fixed_fiber_bounded_cross_term_linear_mgf and the staged name removes saddle-point setup fields while keeping stochastic-oracle vocabulary.
+-- generality used: arbitrary measurable sample space, probability measure, query type, complete real Hilbert-space-valued oracle and mean map, fixed query and direction, positive square-exponential scale; no convexity, filtration, independence, bounded direction, or finite-dimensional hypotheses are used.
+-- portable call pattern: stochastic mirror-descent and saddle-point concentration proofs fix a query and deterministic direction, prove residual integrability/centering plus square-exponential control for the scalar cross term, then need the one-step linear MGF bound with the same quadratic scale.
+-- counterargument checked: the scalar MGF conversion is already staged as centered_exp_square_moment_to_linear_mgf_bound, but this theorem is not a pure rename because it packages the Hilbert oracle-residual scalarization and centering bridge that callers otherwise repeat.
+-- coverage search: searched "centered Hilbert inner product residual bounded direction exponential square moment linear mgf bound" and "integral inner constant equals inner integral continuous linear map"; top hits were centered_exp_square_moment_to_linear_mgf_bound, fixed_fiber_bounded_cross_term_linear_mgf, inner_integral_oracle_residual_eq_zero_of_integral_eq_zero, and related random-query centering lemmas, giving partial ingredient coverage only.
+-- minimal hypotheses: the source nonnegativity hypothesis on ν is unused and dropped; the proof only needs positivity of the square-exponential scale, while residual integrability, residual centering, and square-exponential control are the exact proof inputs.
+
+/-- A centered Hilbert-valued oracle residual has a linear MGF after fixed-direction scalarization.
+
+For a fixed query `q` and deterministic direction `d`, if the oracle residual
+`G q ξ - meanG q` is Bochner integrable and centered, and the scalar cross term
+has square-exponential moment bounded by `exp 1` at scale `σ2`, then the
+corresponding linear MGF is bounded by the Lan Lemma 4.1 quadratic constant.
+
+Layer: Layer0 | Gap: Level 1 (fixed-query oracle residual linear MGF)
+Proof: scalarize the centered Hilbert residual by the continuous inner-product
+  functional, convert centering through Bochner integration, then apply the
+  staged centered square-exponential-to-linear MGF theorem.
+Source: Mathlib Bochner integration for continuous linear maps and SOptLib scalar light-tail MGF conversion
+Used in: stochastic convex-concave saddle-point mirror descent fixed-fiber cross-term control before chronological prefix MGF transfer
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/key_lemmas/1
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic mirror descent for stochastic convex-concave saddle point problems -/
+theorem fixed_direction_oracle_residual_linear_mgf_of_exp_square_mgf
+    {Sample E Q : Type*} [MeasurableSpace Sample]
+    [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
+    {P : Measure Sample} [IsProbabilityMeasure P]
+    (G : Q → Sample → E) (meanG : Q → E)
+    (q : Q) (d : E) {ν σ2 : ℝ}
+    (hσ2_pos : 0 < σ2)
+    (hres_int : Integrable (fun ξ => G q ξ - meanG q) P)
+    (hres_centered : ∫ ξ, G q ξ - meanG q ∂P = 0)
+    (hexp_sq_int :
+      Integrable
+        (fun ξ =>
+          Real.exp (((-⟪d, G q ξ - meanG q⟫_ℝ) ^ 2) /
+            σ2)) P)
+    (hexp_sq_bound :
+      ∫ ξ,
+          Real.exp (((-⟪d, G q ξ - meanG q⟫_ℝ) ^ 2) /
+            σ2) ∂P ≤
+        Real.exp 1) :
+    Integrable
+        (fun ξ => Real.exp (ν * (-⟪d, G q ξ - meanG q⟫_ℝ))) P ∧
+      ∫ ξ, Real.exp (ν * (-⟪d, G q ξ - meanG q⟫_ℝ)) ∂P ≤
+        Real.exp (3 * ν ^ 2 * σ2 / 4) := by
+  let X : Sample → ℝ := fun ξ => -⟪d, G q ξ - meanG q⟫_ℝ
+  have hX_int : Integrable X P := by
+    have hinner :
+        Integrable (fun ξ => ⟪G q ξ - meanG q, d⟫_ℝ) P :=
+      hres_int.inner_const d
+    have hinner_neg := hinner.neg
+    refine hinner_neg.congr ?_
+    exact Filter.Eventually.of_forall fun ξ => by
+      dsimp [X]
+      simp [real_inner_comm]
+  have hX_centered : ∫ ξ, X ξ ∂P = 0 := by
+    have hlin :
+        ∫ ξ, ((innerSL ℝ) d) (G q ξ - meanG q) ∂P =
+          ((innerSL ℝ) d) (∫ ξ, G q ξ - meanG q ∂P) :=
+      ContinuousLinearMap.integral_comp_comm (L := (innerSL ℝ) d) hres_int
+    have hinner_zero :
+        ∫ ξ, ⟪d, G q ξ - meanG q⟫_ℝ ∂P = 0 := by
+      calc
+        ∫ ξ, ⟪d, G q ξ - meanG q⟫_ℝ ∂P
+            = ∫ ξ, ((innerSL ℝ) d) (G q ξ - meanG q) ∂P := by rfl
+        _ = ((innerSL ℝ) d) (∫ ξ, G q ξ - meanG q ∂P) := hlin
+        _ = 0 := by rw [hres_centered]; simp
+    calc
+      ∫ ξ, X ξ ∂P
+          = -∫ ξ, ⟪d, G q ξ - meanG q⟫_ℝ ∂P := by
+            change
+              (∫ ξ, -⟪d, G q ξ - meanG q⟫_ℝ ∂P) =
+                -∫ ξ, ⟪d, G q ξ - meanG q⟫_ℝ ∂P
+            rw [MeasureTheory.integral_neg]
+      _ = 0 := by rw [hinner_zero]; simp
+  simpa [X] using
+    centered_exp_square_moment_to_linear_mgf_bound
+      (μ := P) (X := X) (ν := ν) (σ2 := σ2)
+      (hσ2_pos := hσ2_pos) (hX_int := hX_int)
+      (hX_centered := hX_centered)
+      (hexp_sq_int := hexp_sq_int) (hexp_sq_bound := hexp_sq_bound)
+
+
+-- Phase 4 batch 2 merge from Staging/twoBlockSignedOracle_residual_integrable_and_centered.lean
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: signed two-block oracle residual integrability and centering; orig was fixed_fiber_product_residual_centered, renamed to expose the fixed-query residual assembled from primal and negated dual oracle blocks.
+-- generality used: arbitrary sample/query types, arbitrary complete real normed component spaces, an abstract probability measure, component oracle maps, component mean maps, component Bochner integrability, and pointwise mean identities; no finite-dimensional, convexity, smoothness, filtration, carrier, or algorithm-update hypotheses are used.
+-- portable call pattern: stochastic saddle mirror descent, mirror-prox, and two-block stochastic approximation proofs can call this fixed-fiber centering step after changing the query type, sample law, component oracle kernels, and deterministic component targets while keeping signed product residual integrability and zero mean.
+-- counterargument checked: not paper-local traceability because it packages a reusable fixed-query saddle-oracle residual endpoint; not a pure wrapper because callers otherwise repeat product integrability, signed second-block integration, `WithLp.toLp` integral transport, and probability-space centering. Mathlib has the component product facts but not the two-block signed oracle residual contract.
+-- coverage search: queried `product residual integrable integral zero component means`, `integrable pair product integral zero sub component integral`, `Prod integrable integral zero component functions fst snd`, and LeanSearch for product functions integrable with zero integral; top hits were Mathlib `integral_pair`, `MeasureTheory.Integrable.prodMk`, `MeasureTheory.integrable_prodLp_iff`, and SOptLib random-query oracle-centering/scalarization lemmas, all partial and none stating the fixed signed two-block residual integrability plus centered conclusion.
+-- minimal hypotheses: probability is necessary for the constant mean integral in the centered residual; completeness is needed for Bochner integrals in each component and the `WithLp` product; all other algorithm fields are abstracted to pointwise component integrability and mean identities.
+
+/-- Component integrability and component mean identities center a signed two-block
+oracle residual.
+
+For fixed query blocks `x` and `y`, if both component stochastic oracle fibers are
+Bochner integrable and their deterministic targets are their expectations, then
+the `WithLp` product residual `[Gx; -Gy] - [gx; -gy]` is integrable and has
+Bochner integral zero.
+
+Layer: Layer0 | Gap: Level 1 (fixed signed two-block oracle residual centering)
+Proof: assemble component integrability with `Integrable.prodMk`, move the
+  integral through the continuous `WithLp.toLp` product equivalence, rewrite the
+  component integrals by the mean identities, and subtract the constant mean on
+  a probability space.
+Source: Mathlib Bochner integration for products, negation, constants, and
+  continuous linear equivalences in `WithLp` product spaces
+Used in: stochastic convex-concave saddle-point mirror descent when Assumption
+  7's component unbiasedness is converted into the fixed-fiber product residual
+  centeredness used before random-query martingale cancellation
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/assumptions/4
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, stochastic mirror descent for stochastic convex-concave
+  saddle point problems -/
+theorem twoBlockSignedOracle_residual_integrable_and_centered
+    {S X Y EX EY : Type*} [MeasurableSpace S]
+    [NormedAddCommGroup EX] [NormedSpace ℝ EX] [CompleteSpace EX]
+    [NormedAddCommGroup EY] [NormedSpace ℝ EY] [CompleteSpace EY]
+    (μ : Measure S) [IsProbabilityMeasure μ]
+    (Gx : X → Y → S → EX) (Gy : X → Y → S → EY)
+    (gx : X → Y → EX) (gy : X → Y → EY)
+    (x : X) (y : Y)
+    (hGx : Integrable (fun s => Gx x y s) μ)
+    (hGy : Integrable (fun s => Gy x y s) μ)
+    (hgx : gx x y = ∫ s, Gx x y s ∂μ)
+    (hgy : gy x y = ∫ s, Gy x y s ∂μ) :
+    Integrable
+        (fun s =>
+          WithLp.toLp 2 (Gx x y s, -Gy x y s) -
+            WithLp.toLp 2 (gx x y, -gy x y)) μ ∧
+      ∫ s,
+          WithLp.toLp 2 (Gx x y s, -Gy x y s) -
+            WithLp.toLp 2 (gx x y, -gy x y) ∂μ = 0 := by
+  let mean : WithLp 2 (EX × EY) := WithLp.toLp 2 (gx x y, -gy x y)
+  let oracle : S → WithLp 2 (EX × EY) :=
+    fun s => WithLp.toLp 2 (Gx x y s, -Gy x y s)
+  have hGyNeg : Integrable (fun s => -Gy x y s) μ := by
+    simpa only using hGy.neg
+  have hpair :
+      Integrable (fun s => (Gx x y s, -Gy x y s)) μ :=
+    hGx.prodMk hGyNeg
+  have hOracle : Integrable oracle μ := by
+    simpa [oracle] using
+      (ContinuousLinearMap.integrable_comp
+        ((WithLp.prodContinuousLinearEquiv (p := 2) (𝕜 := ℝ) EX EY).symm :
+          (EX × EY) →L[ℝ] WithLp 2 (EX × EY)) hpair)
+  have hMean : Integrable (fun _s : S => mean) μ := integrable_const mean
+  have hpairIntegral :
+      (∫ s, (Gx x y s, -Gy x y s) ∂μ) =
+        (∫ s, Gx x y s ∂μ, -∫ s, Gy x y s ∂μ) := by
+    rw [integral_pair
+      (f := fun s => Gx x y s)
+      (g := fun s => -Gy x y s)
+      hGx hGyNeg, integral_neg]
+  have hOracleIntegral : (∫ s, oracle s ∂μ) = mean := by
+    calc
+      ∫ s, oracle s ∂μ
+          = WithLp.toLp 2 (∫ s, (Gx x y s, -Gy x y s) ∂μ) := by
+              simpa [oracle] using
+                (ContinuousLinearEquiv.integral_comp_comm
+                  ((WithLp.prodContinuousLinearEquiv (p := 2) (𝕜 := ℝ) EX EY).symm)
+                  (fun s => (Gx x y s, -Gy x y s)))
+      _ = mean := by
+              rw [hpairIntegral]
+              simp [mean, hgx, hgy]
+  constructor
+  · simpa [oracle, mean] using hOracle.sub hMean
+  · rw [MeasureTheory.integral_sub hOracle hMean, hOracleIntegral]
+    simp [mean]
+
+
+-- Phase 4 batch 2 merge from Staging/twoBlockSignedOracle_secondMoment_integrable_and_le.lean
+open MeasureTheory
+open scoped InnerProductSpace
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: twoBlockSignedOracle_secondMoment_integrable_and_le exposes the two-block signed product-oracle second-moment aggregation; orig was product_oracle_second_moment_bound.
+-- generality used: arbitrary sample measurable space and measure, two real Hilbert blocks, component primal seminorms, real scale and component budget constants, and pointwise component sample maps; no probability, finite-dimensionality, convexity, smoothness, or bundled oracle hypotheses are used.
+-- portable call pattern: stochastic saddle mirror descent, mirror-prox, and two-block primal-dual stochastic approximation proofs call this after obtaining component squared canonical-dual integrability and moment budgets, while changing the sample law, component oracle kernels, norms, and scale constants.
+-- counterargument checked: not paper-local traceability because it packages the reusable moment aggregation from component dual gauges to a signed product dual gauge; not a pure wrapper because it combines integrability transport, integral linearity, the signed product dual-norm square formula, and the named two-block scale; existing product dual-norm square and scale lemmas cover only lower-level pieces.
+-- coverage search: searched `two block signed oracle second moment integrable integral bound component canonical dual norm scaled product dual norm`, `integrable integral weighted sum component second moment bounds product dual norm`, and LeanSearch `integral of weighted sum bounded by weighted sum of integral bounds integrable functions`; top hits were `twoBlockScaledProductDualNorm_sq_toLp_neg_right`, `twoBlockOracleSecondMomentScale`, `selected_block_second_moment_integral_le_sum_bounds`, and Mathlib integral finite-sum/additivity lemmas, all partial rather than this two-block signed product-oracle moment contract.
+-- minimal hypotheses: all already minimal; the proof needs only component scalar-square integrability and integral upper bounds, and uses nonnegativity of `2 * DX^2` and `2 * DY^2` internally by positivity.
+
+/-- Component second-moment bounds control the signed two-block product oracle.
+
+If the component sampled blocks have integrable squared canonical dual norms
+bounded by `MX ^ 2` and `MY ^ 2`, then the squared scaled product dual norm of
+the signed block sample `(GX ξ, -GY ξ)` is integrable and its integral is
+bounded by the square of `twoBlockOracleSecondMomentScale DX DY MX MY`.
+
+Layer: Layer0 | Gap: Level 1 (signed two-block oracle second-moment aggregation)
+Proof: rewrite the product dual-norm square by
+  `twoBlockScaledProductDualNorm_sq_toLp_neg_right`, transport integrability
+  across the pointwise equality, commute the integral through the weighted
+  two-term sum, apply the component bounds under nonnegative scalar weights,
+  and close with `twoBlockOracleSecondMomentScale_sq`.
+Source: Mathlib Bochner integral additivity and scalar linearity over real
+  functions, SOptLib canonical dual norms, scaled product dual norms, and
+  two-block oracle second-moment scales
+Used in: stochastic convex-concave saddle-point mirror descent when deriving
+  the product-space stochastic-oracle second-moment bound from the two
+  component oracle moment assumptions
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/assumptions/7
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, stochastic mirror descent for stochastic convex-concave
+  saddle point problems -/
+theorem twoBlockSignedOracle_secondMoment_integrable_and_le
+    {S EX EY : Type*} [MeasurableSpace S]
+    [NormedAddCommGroup EX] [InnerProductSpace ℝ EX]
+    [NormedAddCommGroup EY] [InnerProductSpace ℝ EY]
+    (P : Measure S)
+    (normX : Seminorm ℝ EX) (normY : Seminorm ℝ EY)
+    (DX DY MX MY : ℝ) (GX : S → EX) (GY : S → EY)
+    (hX_int :
+      Integrable (fun ξ => (canonicalDualNorm normX (GX ξ)) ^ 2) P)
+    (hY_int :
+      Integrable (fun ξ => (canonicalDualNorm normY (GY ξ)) ^ 2) P)
+    (hX_bound :
+      ∫ ξ, (canonicalDualNorm normX (GX ξ)) ^ 2 ∂P ≤ MX ^ 2)
+    (hY_bound :
+      ∫ ξ, (canonicalDualNorm normY (GY ξ)) ^ 2 ∂P ≤ MY ^ 2) :
+    Integrable
+        (fun ξ =>
+          (twoBlockScaledProductDualNorm normX normY DX DY
+            (WithLp.toLp 2 (GX ξ, -GY ξ))) ^ 2) P ∧
+      ∫ ξ,
+          (twoBlockScaledProductDualNorm normX normY DX DY
+            (WithLp.toLp 2 (GX ξ, -GY ξ))) ^ 2 ∂P ≤
+        twoBlockOracleSecondMomentScale DX DY MX MY ^ 2 := by
+  let Xsq : S → ℝ := fun ξ => (canonicalDualNorm normX (GX ξ)) ^ 2
+  let Ysq : S → ℝ := fun ξ => (canonicalDualNorm normY (GY ξ)) ^ 2
+  let productSq : S → ℝ := fun ξ =>
+    (twoBlockScaledProductDualNorm normX normY DX DY
+      (WithLp.toLp 2 (GX ξ, -GY ξ))) ^ 2
+  have hprod_eq :
+      ∀ ξ, productSq ξ = 2 * DX ^ 2 * Xsq ξ + 2 * DY ^ 2 * Ysq ξ := by
+    intro ξ
+    simpa [productSq, Xsq, Ysq] using
+      (twoBlockScaledProductDualNorm_sq_toLp_neg_right
+        normX normY DX DY (GX ξ) (GY ξ))
+  have hprod_int : Integrable productSq P := by
+    refine ((hX_int.const_mul (2 * DX ^ 2)).add
+      (hY_int.const_mul (2 * DY ^ 2))).congr ?_
+    exact Filter.Eventually.of_forall (fun ξ => by
+      simpa [Xsq, Ysq] using (hprod_eq ξ).symm)
+  refine ⟨by simpa [productSq] using hprod_int, ?_⟩
+  have hbound :
+      ∫ ξ, productSq ξ ∂P ≤
+        2 * DX ^ 2 * MX ^ 2 + 2 * DY ^ 2 * MY ^ 2 := by
+    calc
+      ∫ ξ, productSq ξ ∂P =
+          ∫ ξ, 2 * DX ^ 2 * Xsq ξ + 2 * DY ^ 2 * Ysq ξ ∂P := by
+            apply integral_congr_ae
+            exact Filter.Eventually.of_forall hprod_eq
+      _ = 2 * DX ^ 2 * ∫ ξ, Xsq ξ ∂P +
+            2 * DY ^ 2 * ∫ ξ, Ysq ξ ∂P := by
+            rw [MeasureTheory.integral_add (hX_int.const_mul (2 * DX ^ 2))
+              (hY_int.const_mul (2 * DY ^ 2))]
+            rw [MeasureTheory.integral_const_mul, MeasureTheory.integral_const_mul]
+      _ ≤ 2 * DX ^ 2 * MX ^ 2 + 2 * DY ^ 2 * MY ^ 2 := by
+            have hcx : 0 ≤ 2 * DX ^ 2 := by positivity
+            have hcy : 0 ≤ 2 * DY ^ 2 := by positivity
+            exact add_le_add
+              (mul_le_mul_of_nonneg_left (by simpa [Xsq] using hX_bound) hcx)
+              (mul_le_mul_of_nonneg_left (by simpa [Ysq] using hY_bound) hcy)
+  calc
+    ∫ ξ,
+        (twoBlockScaledProductDualNorm normX normY DX DY
+          (WithLp.toLp 2 (GX ξ, -GY ξ))) ^ 2 ∂P
+        ≤ 2 * DX ^ 2 * MX ^ 2 + 2 * DY ^ 2 * MY ^ 2 := by
+          simpa [productSq] using hbound
+    _ = twoBlockOracleSecondMomentScale DX DY MX MY ^ 2 := by
+          exact (twoBlockOracleSecondMomentScale_sq DX DY MX MY).symm
+
+end SOptLib
+
+
+-- Phase 4 batch 2 merge from Staging/twoBlockSignedMeanOracle_dualNorm_le_of_secondMoment_bounds.lean
+open MeasureTheory
+open scoped InnerProductSpace
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: twoBlockSignedMeanOracle_dualNorm_le_of_secondMoment_bounds exposes the deterministic signed two-block mean-oracle dual-norm bound from component second-moment budgets; orig was meanOracle_productDualNorm_le_M.
+-- generality used: arbitrary probability measure, two complete real Hilbert blocks, component primal seminorms, signed component mean fields, and component second-moment bounds; no convexity, smoothness, finite-dimensionality, carrier, iterate, or bundled setup hypotheses are used.
+-- portable call pattern: stochastic saddle mirror descent, mirror-prox, and primal-dual stochastic approximation proofs call this after proving component unbiasedness and component oracle second-moment budgets, while changing the sample law, component oracle kernels, component norms, and scale constants.
+-- counterargument checked: not paper-local traceability because it packages the standard transition from component stochastic moment assumptions to a deterministic signed product mean-oracle bound; not a duplicate of the staged stochastic product second-moment theorem, which bounds sampled signed oracles rather than their Bochner means; not a caller-side expression because it composes two mean/Jensen contractions with the product dual-norm square formula and product scale.
+-- coverage search: searched `signed product mean oracle dual norm bound second moment component bounds`, `two block signed mean oracle dual norm second moment`, and catalog/SOptLib entries for `meanOracle`, `dualNorm`, and `secondMoment`; relevant hits were `dualNorm_mean_sq_le_second_moment_bound`, `twoBlockSignedOracle_secondMoment_integrable_and_le`, `twoBlockScaledProductDualNorm_sq_toLp_neg_right`, and `twoBlockOracleSecondMomentScale`, all partial rather than this deterministic two-block mean-oracle contract.
+-- minimal hypotheses: the statement keeps exactly the single-block support, integrability, unbiasedness, and second-moment hypotheses required by `dualNorm_mean_sq_le_second_moment_bound`; `CompleteSpace` is inherited from that mean/Jensen theorem and no finite-dimensional assumption is used.
+
+/-- Component second-moment bounds control the signed two-block deterministic mean oracle.
+
+If each component oracle has a Bochner mean `gx` or `gy` and its squared
+canonical dual norm has second moment bounded by `MX ^ 2` or `MY ^ 2`, then
+the scaled product dual norm of the signed mean block `(gx, -gy)` is bounded by
+`twoBlockOracleSecondMomentScale DX DY MX MY`.
+
+Layer: Layer0 | Gap: Level 1 (signed two-block mean-oracle dual-norm bound)
+Proof: apply the single-block canonical-dual mean second-moment bound to both
+  components, rewrite the signed product dual-norm square as the weighted sum
+  of component canonical-dual squares, and compare squares against the named
+  two-block oracle second-moment scale.
+Source: SOptLib canonical dual-norm Jensen bounds for Bochner means, scaled
+  two-block product dual norms, and Mathlib real square-root order arithmetic
+Used in: stochastic convex-concave saddle-point mirror descent when replacing
+  the deterministic product mean oracle by the combined component
+  second-moment scale in one-step regret bounds
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/assumptions/7
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, stochastic mirror descent for stochastic convex-concave
+  saddle point problems -/
+theorem twoBlockSignedMeanOracle_dualNorm_le_of_secondMoment_bounds
+    {Ω EX EY : Type*} [MeasurableSpace Ω]
+    [NormedAddCommGroup EX] [InnerProductSpace ℝ EX] [CompleteSpace EX]
+    [NormedAddCommGroup EY] [InnerProductSpace ℝ EY] [CompleteSpace EY]
+    {μ : Measure Ω} [IsProbabilityMeasure μ]
+    (normX : Seminorm ℝ EX) (normY : Seminorm ℝ EY)
+    (DX DY MX MY : ℝ) (GX : Ω → EX) (GY : Ω → EY)
+    (gx : EX) (gy : EY)
+    (hX_support :
+      ∀ ω,
+        BddAbove {r : ℝ | ∃ d : EX, normX d ≤ 1 ∧ r = |inner ℝ (GX ω) d|})
+    (hY_support :
+      ∀ ω,
+        BddAbove {r : ℝ | ∃ d : EY, normY d ≤ 1 ∧ r = |inner ℝ (GY ω) d|})
+    (hGX_integrable : Integrable GX μ)
+    (hGY_integrable : Integrable GY μ)
+    (hgx_eq_integral : gx = ∫ ω, GX ω ∂μ)
+    (hgy_eq_integral : gy = ∫ ω, GY ω ∂μ)
+    (hGX_second_moment_integrable :
+      Integrable (fun ω => (canonicalDualNorm normX (GX ω)) ^ 2) μ)
+    (hGY_second_moment_integrable :
+      Integrable (fun ω => (canonicalDualNorm normY (GY ω)) ^ 2) μ)
+    (hGX_second_moment_bound :
+      ∫ ω, (canonicalDualNorm normX (GX ω)) ^ 2 ∂μ ≤ MX ^ 2)
+    (hGY_second_moment_bound :
+      ∫ ω, (canonicalDualNorm normY (GY ω)) ^ 2 ∂μ ≤ MY ^ 2) :
+    twoBlockScaledProductDualNorm normX normY DX DY (WithLp.toLp 2 (gx, -gy)) ≤
+      twoBlockOracleSecondMomentScale DX DY MX MY := by
+  have hx :
+      (canonicalDualNorm normX gx) ^ 2 ≤ MX ^ 2 := by
+    exact
+      (_root_.dualNorm_mean_sq_le_second_moment_bound
+        (μ := μ) normX
+        (Y := GX) (target := gx) (M := MX)
+        hX_support hGX_integrable hgx_eq_integral
+        hGX_second_moment_integrable hGX_second_moment_bound)
+  have hy :
+      (canonicalDualNorm normY gy) ^ 2 ≤ MY ^ 2 := by
+    exact
+      (_root_.dualNorm_mean_sq_le_second_moment_bound
+        (μ := μ) normY
+        (Y := GY) (target := gy) (M := MY)
+        hY_support hGY_integrable hgy_eq_integral
+        hGY_second_moment_integrable hGY_second_moment_bound)
+  have hsq :
+      (twoBlockScaledProductDualNorm normX normY DX DY
+        (WithLp.toLp 2 (gx, -gy))) ^ 2 ≤
+        twoBlockOracleSecondMomentScale DX DY MX MY ^ 2 := by
+    rw [twoBlockScaledProductDualNorm_sq_toLp_neg_right,
+      twoBlockOracleSecondMomentScale_sq]
+    have hDX_nonneg : 0 ≤ 2 * DX ^ 2 := by positivity
+    have hDY_nonneg : 0 ≤ 2 * DY ^ 2 := by positivity
+    exact add_le_add
+      (mul_le_mul_of_nonneg_left hx hDX_nonneg)
+      (mul_le_mul_of_nonneg_left hy hDY_nonneg)
+  have hdual_nonneg :
+      0 ≤ twoBlockScaledProductDualNorm normX normY DX DY
+        (WithLp.toLp 2 (gx, -gy)) := by
+    simp [twoBlockScaledProductDualNorm_def]
+  have hscale_nonneg : 0 ≤ twoBlockOracleSecondMomentScale DX DY MX MY := by
+    rw [twoBlockOracleSecondMomentScale_def]
+    exact Real.sqrt_nonneg _
+  exact (sq_le_sq₀ hdual_nonneg hscale_nonneg).mp hsq
+
+end SOptLib
+
+
+-- Phase 4 batch 2 merge from Staging/productOracle_expMoment_bound_of_component_bounds.lean
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: productOracle_expMoment_bound_of_component_bounds exposes the two-block product-oracle square-exponential moment aggregation; orig was product_stochastic_oracle_exp_moment_bound.
+-- generality used: arbitrary sample measurable space and measure, arbitrary product and component oracle output types, scalar dual gauges, positive component square weights, a product-dual square formula, product scale equality, product exponential a.e. strong measurability, and component exponential integrability/bounds; no convexity, smoothness, Hilbert, probability, independence, or finite-dimensional hypotheses are used.
+-- portable call pattern: two-block stochastic mirror descent, mirror-prox, and primal-dual oracle analyses can call this after proving component light-tail bounds and a product-dual square decomposition, while changing the sample law, oracle kernels, gauges, weights, and product scale.
+-- counterargument checked: not paper-local because the theorem states a reusable light-tail aggregation from component oracle moments to a product oracle moment; not a pure wrapper because it combines weighted exponential convexity, domination-based integrability, and integral aggregation; existing two-block light-tail predicates only store component assumptions and do not derive the product bound.
+-- coverage search: searched "product oracle exponential moment bound component bounds dual norm square", "integrable exp square sum component exponential moment bound", and inspected `two_block_oracle_exponential_moment_bound`, `integrable_exp_weighted_sum_le_of_exp_integral_bounds`, and `Real.exp_finset_weighted_sum_le_sum_weighted_exp`; hits covered the component predicate or finite Jensen step only, not this product-oracle square bridge.
+-- minimal hypotheses: positivity is needed only for the two convex weights; product exponential a.e. strong measurability is the exact measurability needed for domination; component scale positivity is not required beyond the caller's component exponential bounds and square decomposition.
+
+/-- Component square-exponential bounds imply a product-oracle square-exponential bound.
+
+If the product dual square decomposes into two positive weighted component
+dual-square terms and the product scale is the sum of those weights, then
+component `exp (dual^2 / scale^2)` moment bounds by `exp 1` give the same
+integrability and integral bound for the product oracle.
+
+Layer: Layer0 | Gap: Level 1 (two-block product-oracle exponential moment aggregation)
+Proof: rewrite the product square by the supplied decomposition, apply convexity of `Real.exp` to the two normalized component terms, dominate the product exponential by the weighted sum of component exponentials, and integrate.
+Source: Mathlib convexity of the real exponential and Bochner integral monotonicity/linearity APIs
+Used in: stochastic convex-concave saddle-point mirror descent fixed-query light-tail proof, after component oracle exponential moments and product-dual square decomposition are available
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/assumptions/16
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic mirror descent for stochastic convex-concave saddle point problems -/
+theorem productOracle_expMoment_bound_of_component_bounds
+    {Xi E EX EY : Type*} [MeasurableSpace Xi]
+    (P : Measure Xi) (G : Xi → E) (GX : Xi → EX) (GY : Xi → EY)
+    (dualProd : E → ℝ) (dualX : EX → ℝ) (dualY : EY → ℝ)
+    (A B M2 MX MY : ℝ)
+    (hA_pos : 0 < A) (hB_pos : 0 < B)
+    (hM2_eq : M2 = A + B)
+    (hprod_sq :
+      ∀ ξ,
+        (dualProd (G ξ)) ^ 2 =
+          A * ((dualX (GX ξ)) ^ 2 / MX ^ 2) +
+            B * ((dualY (GY ξ)) ^ 2 / MY ^ 2))
+    (hprod_exp_aesm :
+      AEStronglyMeasurable
+        (fun ξ => Real.exp (((dualProd (G ξ)) ^ 2) / M2)) P)
+    (hX_int :
+      Integrable (fun ξ => Real.exp (((dualX (GX ξ)) ^ 2) / MX ^ 2)) P)
+    (hX_bound :
+      ∫ ξ, Real.exp (((dualX (GX ξ)) ^ 2) / MX ^ 2) ∂P ≤ Real.exp 1)
+    (hY_int :
+      Integrable (fun ξ => Real.exp (((dualY (GY ξ)) ^ 2) / MY ^ 2)) P)
+    (hY_bound :
+      ∫ ξ, Real.exp (((dualY (GY ξ)) ^ 2) / MY ^ 2) ∂P ≤ Real.exp 1) :
+    Integrable (fun ξ => Real.exp (((dualProd (G ξ)) ^ 2) / M2)) P ∧
+      ∫ ξ, Real.exp (((dualProd (G ξ)) ^ 2) / M2) ∂P ≤ Real.exp 1 := by
+  let Xexp : Xi → ℝ := fun ξ => Real.exp (((dualX (GX ξ)) ^ 2) / MX ^ 2)
+  let Yexp : Xi → ℝ := fun ξ => Real.exp (((dualY (GY ξ)) ^ 2) / MY ^ 2)
+  let F : Xi → ℝ := fun ξ => Real.exp (((dualProd (G ξ)) ^ 2) / M2)
+  let H : Xi → ℝ := fun ξ => A / (A + B) * Xexp ξ + B / (A + B) * Yexp ξ
+  have hAB_pos : 0 < A + B := add_pos hA_pos hB_pos
+  have hcoeffA_nonneg : 0 ≤ A / (A + B) :=
+    div_nonneg hA_pos.le hAB_pos.le
+  have hcoeffB_nonneg : 0 ≤ B / (A + B) :=
+    div_nonneg hB_pos.le hAB_pos.le
+  have hcoeff_sum : A / (A + B) + B / (A + B) = 1 := by
+    field_simp [ne_of_gt hAB_pos]
+  have hH_int : Integrable H P := by
+    simpa [H, Xexp, Yexp] using
+      (hX_int.const_mul (A / (A + B))).add
+        (hY_int.const_mul (B / (A + B)))
+  have hpoint : ∀ ξ, F ξ ≤ H ξ := by
+    intro ξ
+    let x : ℝ := (dualX (GX ξ)) ^ 2 / MX ^ 2
+    let y : ℝ := (dualY (GY ξ)) ^ 2 / MY ^ 2
+    have harg :
+        ((dualProd (G ξ)) ^ 2) / M2 =
+          A / (A + B) * x + B / (A + B) * y := by
+      rw [hprod_sq ξ, hM2_eq]
+      field_simp [ne_of_gt hAB_pos]
+      ring
+    have hJ :=
+      convexOn_exp.2 (Set.mem_univ x) (Set.mem_univ y)
+        hcoeffA_nonneg hcoeffB_nonneg hcoeff_sum
+    calc
+      F ξ = Real.exp (A / (A + B) * x + B / (A + B) * y) := by
+        simp [F, harg]
+      _ ≤ A / (A + B) * Real.exp x + B / (A + B) * Real.exp y := by
+        simpa [smul_eq_mul] using hJ
+      _ = H ξ := by
+        simp [H, Xexp, Yexp, x, y]
+  have hF_int : Integrable F P := by
+    refine hH_int.mono' ?_ ?_
+    · simpa [F] using hprod_exp_aesm
+    · refine Filter.Eventually.of_forall ?_
+      intro ξ
+      simpa [F, Real.norm_of_nonneg (le_of_lt (Real.exp_pos _))] using hpoint ξ
+  have hmono : ∫ ξ, F ξ ∂P ≤ ∫ ξ, H ξ ∂P :=
+    integral_mono hF_int hH_int hpoint
+  have hH_integral :
+      ∫ ξ, H ξ ∂P =
+        A / (A + B) * ∫ ξ, Xexp ξ ∂P +
+          B / (A + B) * ∫ ξ, Yexp ξ ∂P := by
+    simp [H, MeasureTheory.integral_add
+      (hX_int.const_mul (A / (A + B)))
+      (hY_int.const_mul (B / (A + B))), MeasureTheory.integral_const_mul,
+      Xexp, Yexp]
+  constructor
+  · simpa [F] using hF_int
+  · calc
+      ∫ ξ, Real.exp (((dualProd (G ξ)) ^ 2) / M2) ∂P
+          = ∫ ξ, F ξ ∂P := rfl
+      _ ≤ ∫ ξ, H ξ ∂P := hmono
+      _ = A / (A + B) * ∫ ξ, Xexp ξ ∂P +
+            B / (A + B) * ∫ ξ, Yexp ξ ∂P := hH_integral
+      _ ≤ A / (A + B) * Real.exp 1 +
+            B / (A + B) * Real.exp 1 := by
+          exact add_le_add
+            (mul_le_mul_of_nonneg_left hX_bound hcoeffA_nonneg)
+            (mul_le_mul_of_nonneg_left hY_bound hcoeffB_nonneg)
+      _ = Real.exp 1 := by
+          rw [← add_mul, hcoeff_sum, one_mul]
+
+
+-- Phase 4 batch 2 merge from Staging/randomQuery_oracleResidual_gauge_sq_integrable_and_integral_le_of_indep_fixed.lean
+open MeasureTheory ProbabilityTheory
+
+-- Generalization plan (G0):
+-- concept/name: independent random-query oracle residual gauge-square integrability and
+--   fixed-fiber integral-bound transfer; orig was
+--   randomQuery_productGauge_oracleResidual_sq_integrable_and_integral_le.
+-- generality used: arbitrary measurable source, query, and sample spaces; an abstract
+--   probability measure; arbitrary residual codomain and scalar gauge; product-law
+--   a.e. strong measurability of the squared gauge, with no normed-space,
+--   finite-dimensional, smoothness, or convexity assumptions.
+-- portable call pattern: stochastic mirror/saddle-point and variance-reduction proofs vary
+--   the adapted query, fresh sample, residual kernel, gauge, and variance budget while
+--   retaining the paired residual gauge-square integrability and expectation bound.
+-- counterargument checked: SOptLib already has the norm-square theorem
+--   randomQuery_oracleResidual_sq_integrable_and_integral_le_of_indep_fixed, but it fixes
+--   the gauge to the ambient norm; this theorem is genuinely different because callers can
+--   use a product dual gauge, seminorm, or other non-norm residual size functional.
+-- coverage search: searched "random query oracle residual gauge square integrable integral
+--   bound independent fixed" and "integrable composition independent fixed integral bound
+--   aestrongly measurable"; top hits were the norm-square oracle theorem and the Glue
+--   independent-composition transfer lemmas, so coverage is partial rather than full.
+-- minimal hypotheses: the sample law is the pushforward Measure.map sample P, so no separate
+--   law equality or sample-law probability instance is assumed; nonnegativity follows from
+--   squaring the real gauge, and all remaining hypotheses feed the two Glue transfer lemmas.
+
+/-- A squared gauge of an oracle residual at an independent random query is integrable and
+retains a uniform fixed-query integral bound.
+
+This packages the common step where the residual size is measured by a caller-provided real
+gauge rather than by the ambient norm.
+
+Layer: Layer0 | Gap: Level 1 (independent random-query oracle residual gauge-square transfer)
+Proof: apply the product-law a.e.-measurable fixed-fiber integrability transfer to the squared gauge, then apply the matching independent-composition integral-bound transfer.
+Source: Mathlib product-measure Bochner integration and probability independence joint-law APIs
+Used in: stochastic convex-concave saddle-point oracle-noise control at a strict-past query paired with a fresh iid sample
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/algorithm_spec
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic convex-concave saddle point -/
+theorem randomQuery_oracleResidual_gauge_sq_integrable_and_integral_le_of_indep_fixed
+    {Ω X S E : Type*} [MeasurableSpace Ω] [MeasurableSpace X] [MeasurableSpace S]
+    (P : Measure Ω) [IsProbabilityMeasure P]
+    (query : Ω → X) (sample : Ω → S)
+    (residual : X → S → E) (gauge : E → ℝ) (C : ℝ)
+    (hres_sq_prod :
+      AEStronglyMeasurable
+        (fun p : X × S => gauge (residual p.1 p.2) ^ 2)
+        ((Measure.map query P).prod (Measure.map sample P)))
+    (hquery : AEMeasurable query P) (hsample : AEMeasurable sample P)
+    (hindep : IndepFun query sample P)
+    (hfixed : ∀ x,
+      Integrable (fun s => gauge (residual x s) ^ 2) (Measure.map sample P) ∧
+        ∫ s, gauge (residual x s) ^ 2 ∂Measure.map sample P ≤ C) :
+    Integrable
+        (fun ω => gauge (residual (query ω) (sample ω)) ^ 2) P ∧
+      ∫ ω, gauge (residual (query ω) (sample ω)) ^ 2 ∂P ≤ C := by
+  let φ : X → S → ℝ := fun x s => gauge (residual x s) ^ 2
+  have hφ_int : Integrable (fun ω => φ (query ω) (sample ω)) P :=
+    integrable_comp_of_indep_fixed_integral_bound_aestronglyMeasurable
+      (P := P) (ν := Measure.map sample P) (φ := φ)
+      (X := query) (Y := sample) (C := C)
+      (by simpa [φ] using hres_sq_prod) hquery hsample hindep rfl
+      (by intro x s; exact sq_nonneg _)
+      (fun x => (hfixed x).1) (fun x => (hfixed x).2)
+  have hφ_le : ∫ ω, φ (query ω) (sample ω) ∂P ≤ C :=
+    integral_comp_le_of_indep_fixed_integral_bound_aestronglyMeasurable
+      (P := P) (ν := Measure.map sample P) (φ := φ)
+      (X := query) (Y := sample) (C := C)
+      (by simpa [φ] using hres_sq_prod) hquery hsample hindep rfl hφ_int
+      (fun x => (hfixed x).2)
+  exact ⟨by simpa [φ] using hφ_int, by simpa [φ] using hφ_le⟩
+
+
+-- Phase 4 batch 2 merge from Staging/randomQuery_oracle_gauge_sq_integrable_and_integral_le_of_indep_fixed.lean
+open MeasureTheory ProbabilityTheory
+
+-- Generalization plan (G0):
+-- concept/name: independent random-query oracle gauge-square integrability and
+--   fixed-fiber integral-bound transfer; orig was
+--   randomQuery_productGauge_stochasticOracle_sq_integrable_and_integral_le.
+-- generality used: arbitrary measurable source, query, and sample spaces; an
+--   abstract probability measure on the source; an explicit fixed sample law;
+--   arbitrary oracle codomain and real gauge; product-law a.e. strong
+--   measurability of the squared gauge, with no normed-space, finite-dimensional,
+--   smoothness, or convexity assumptions.
+-- portable call pattern: stochastic mirror, saddle-point, block, and
+--   variance-reduction proofs vary the adapted query, fresh sample law, oracle
+--   kernel, gauge, and moment budget while retaining the same paired
+--   gauge-square integrability and expectation bound.
+-- counterargument checked: not paper-local and not a pure wrapper; the staged
+--   residual-gauge theorem has an alpha-equivalent pushforward-law shape for a
+--   residual kernel, while this law-explicit uncentered oracle statement matches
+--   fixed-sample-law hypotheses directly and the older SOptLib uncentered moment
+--   theorem requires stronger global measurability.
+-- coverage search: searched "independent random query oracle gauge square
+--   integrable integral bound fixed fiber" and semantic Mathlib "independent
+--   random variables fixed fiber integral bound product measure integrable"; top
+--   hits were the residual gauge-square theorem, SOptLib
+--   `random_iterate_uncentered_oracle_moment_bound_of_fixed`, and Glue
+--   independent-composition transfer lemmas, so coverage is partial rather than
+--   full for the law-scoped uncentered gauge contract.
+-- minimal hypotheses: the fixed sample law is explicit because the caller has a
+--   named iid sample distribution; sample-law finiteness follows from the law
+--   equality and source probability, nonnegativity follows from squaring the real
+--   gauge, and all remaining hypotheses feed the two Glue transfer lemmas.
+
+/-- A squared gauge of an oracle at an independent random query is integrable and
+retains a uniform fixed-query integral bound under a named fixed sample law.
+
+This packages the common step where the oracle size is measured by a
+caller-provided real gauge rather than by the ambient norm, and where the fixed
+fiber hypotheses are stated under the fresh sample law.
+
+Layer: Layer0 | Gap: Level 1 (law-scoped independent random-query oracle gauge-square transfer)
+Proof: apply the product-law a.e.-measurable fixed-fiber integrability transfer to the squared gauge, then apply the matching independent-composition integral-bound transfer.
+Source: Mathlib product-measure Bochner integration and probability independence joint-law APIs
+Used in: stochastic convex-concave saddle-point uncentered oracle second-moment control at a strict-past query paired with a fresh iid sample
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/algorithm_spec
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic convex-concave saddle point -/
+theorem randomQuery_oracle_gauge_sq_integrable_and_integral_le_of_indep_fixed
+    {Ω X S E : Type*} [MeasurableSpace Ω] [MeasurableSpace X] [MeasurableSpace S]
+    (P : Measure Ω) [IsProbabilityMeasure P]
+    (ν : Measure S) (query : Ω → X) (sample : Ω → S)
+    (G : X → S → E) (gauge : E → ℝ) (C : ℝ)
+    (horacle_sq_prod :
+      AEStronglyMeasurable
+        (fun p : X × S => gauge (G p.1 p.2) ^ 2)
+        ((Measure.map query P).prod ν))
+    (hquery : AEMeasurable query P) (hsample : AEMeasurable sample P)
+    (hindep : IndepFun query sample P)
+    (hdist : Measure.map sample P = ν)
+    (hfixed : ∀ x,
+      Integrable (fun s => gauge (G x s) ^ 2) ν ∧
+        ∫ s, gauge (G x s) ^ 2 ∂ν ≤ C) :
+    Integrable
+        (fun ω => gauge (G (query ω) (sample ω)) ^ 2) P ∧
+      ∫ ω, gauge (G (query ω) (sample ω)) ^ 2 ∂P ≤ C := by
+  let φ : X → S → ℝ := fun x s => gauge (G x s) ^ 2
+  have hφ_int : Integrable (fun ω => φ (query ω) (sample ω)) P :=
+    integrable_comp_of_indep_fixed_integral_bound_aestronglyMeasurable
+      (P := P) (ν := ν) (φ := φ)
+      (X := query) (Y := sample) (C := C)
+      (by simpa [φ] using horacle_sq_prod) hquery hsample hindep hdist
+      (by intro x s; exact sq_nonneg _)
+      (fun x => (hfixed x).1) (fun x => (hfixed x).2)
+  have hφ_le : ∫ ω, φ (query ω) (sample ω) ∂P ≤ C :=
+    integral_comp_le_of_indep_fixed_integral_bound_aestronglyMeasurable
+      (P := P) (ν := ν) (φ := φ)
+      (X := query) (Y := sample) (C := C)
+      (by simpa [φ] using horacle_sq_prod) hquery hsample hindep hdist hφ_int
+      (fun x => (hfixed x).2)
+  exact ⟨by simpa [φ] using hφ_int, by simpa [φ] using hφ_le⟩
+
+
+open MeasureTheory ProbabilityTheory
+open scoped InnerProductSpace
+
+-- Generalization plan (G0):
+-- concept/name: uncentered oracle second-moment bound from a mean and centered variance; orig was
+--   `sampleGradient_secondMoment_le`, renamed away from sample-gradient and setup-field vocabulary.
+-- generality used: arbitrary measurable sample space, probability measure, complete real Hilbert space,
+--   Bochner-integrable random vector, integrable centered squared norm, unbiased mean identity, and a
+--   pointwise-in-the-call centered variance budget; no finite-dimensional or optimization assumptions.
+-- portable call pattern: stochastic-gradient, zeroth-order, control-variate, and variance-reduction
+--   analyses instantiate `G`, `target`, and `sigma` with their oracle, deterministic mean, and noise
+--   scale while reusing the same uncentered second-moment conclusion.
+-- counterargument checked: this is not paper-local traceability or a caller-side wrapper; it packages
+--   the standard Hilbert variance decomposition and inequality. Existing SOptLib entries cover finite
+--   weighted sums or other dual-norm bounds, but not this probability-measure Hilbert statement.
+-- coverage search: searched `integral norm squared second moment variance mean bound` and
+--   `Hilbert random vector uncentered second moment centered variance`; the closest hit,
+--   `integral_norm_sq_eq_integral_norm_sq_sub_mean_add_norm_sq_of_integral_eq`, is the equality
+--   component and is composed here with the variance inequality.
+-- minimal hypotheses: probability normalization, complete real inner-product normed additive group,
+--   vector integrability, centered-square integrability, mean equality, and the centered integral bound.
+
+/-- An unbiased Hilbert-valued oracle has uncentered second moment bounded by the
+centered variance budget plus the squared norm of its deterministic mean.
+
+Layer: Layer0 | Gap: Level 1 (oracle second-moment variance decomposition)
+Proof: apply the Bochner Hilbert variance decomposition to rewrite the uncentered
+  integral, then use monotonicity of addition with the centered variance bound and
+  commute the two scalar summands.
+Source: Mathlib Bochner integration and real inner-product norm-square identities,
+  together with the SOptLib Hilbert variance decomposition theorem
+Used in: stochastic-gradient and zeroth-order oracle estimates where an unbiased
+  sample direction's centered second moment is bounded by a variance scale
+Book citation: book/FOML/StochasticZerothOrder.json#/main_theorem/proof/6
+Origin algorithm: Lan, First-Order and Stochastic Optimization Methods for Machine Learning,
+  randomized stochastic gradient-free method -/
+theorem oracle_second_moment_le_norm_target_sq_add_variance
+    {Omega E : Type*} [MeasurableSpace Omega]
+    [NormedAddCommGroup E] [InnerProductSpace Real E] [CompleteSpace E]
+    (P : Measure Omega) [IsProbabilityMeasure P]
+    (G : Omega -> E) (target : E) (sigma : Real)
+    (hG_int : Integrable G P)
+    (hcenter_sq : Integrable (fun omega => ‖G omega - target‖ ^ (2 : Nat)) P)
+    (hmean : (∫ omega, G omega ∂P) = target)
+    (hvar : (∫ omega, ‖G omega - target‖ ^ (2 : Nat) ∂P) ≤ sigma ^ (2 : Nat)) :
+    (∫ omega, ‖G omega‖ ^ (2 : Nat) ∂P) ≤
+      ‖target‖ ^ (2 : Nat) + sigma ^ (2 : Nat) := by
+  have hsecond_eq :=
+    integral_norm_sq_eq_integral_norm_sq_sub_mean_add_norm_sq_of_integral_eq
+      P G target hG_int hcenter_sq hmean
+  calc
+    (∫ omega, ‖G omega‖ ^ (2 : Nat) ∂P) =
+        (∫ omega, ‖G omega - target‖ ^ (2 : Nat) ∂P) +
+          ‖target‖ ^ (2 : Nat) := hsecond_eq
+    _ ≤ sigma ^ (2 : Nat) + ‖target‖ ^ (2 : Nat) := add_le_add hvar le_rfl
+    _ = ‖target‖ ^ (2 : Nat) + sigma ^ (2 : Nat) := by rw [add_comm]
+
+
+-- Phase 4 batch 3 merge from Staging/oracle_secondMoment_integrable_of_centered_secondMoment_integrable.lean
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: oracle second-moment integrability from centered second-moment
+--   integrability; orig was `sampleGradient_norm_sq_integrable`, renamed away
+--   from the paper's sample-gradient object.
+-- generality used: arbitrary measurable sample space, finite measure, normed
+--   additive commutative group, a.e. strongly measurable oracle, and deterministic target; no
+--   probability normalization, inner product, completeness, or finite dimension.
+-- portable call pattern: stochastic-gradient, zeroth-order, control-variate,
+--   and variance-reduction proofs establish centered L2 control for a fixed-query
+--   oracle and then need its uncentered second moment to be well-defined while
+--   changing the oracle, sample law, query, and deterministic target.
+-- counterargument checked: not paper-local traceability and not a pure wrapper;
+--   Mathlib provides the separate `MemLp` conversion, addition, and constant
+--   membership facts, but no declaration packages this centered-to-uncentered
+--   squared-norm integrability contract.
+-- coverage search: queried `squared norm integrable from centered squared norm
+--   integrable mean integrable probability measure`, `integrable squared norm
+--   add constant of centered squared norm`, and LeanSearch for `MemLp f minus
+--   constant implies MemLp f on a finite measure space`; top hits were Mathlib
+--   `MeasureTheory.MemLp.add`, `MeasureTheory.memLp_const`, and
+--   `memLp_two_iff_integrable_sq_norm`, plus SOptLib `integrable_sq_norm_sub`,
+--   which only derives L2 for a difference from two already-L2 processes.
+-- minimal hypotheses: a.e. strong measurability of `G` is exactly what the L2
+--   characterization needs; finite measure is exactly what makes the deterministic
+--   target belong to L2.
+
+/-- An a.e. strongly measurable oracle with an integrable centered squared norm has an
+integrable uncentered squared norm under any finite measure.
+
+Layer: Layer0 | Gap: Level 1 (centered-to-uncentered oracle L2 integrability)
+Proof: convert the centered squared-norm hypothesis to `MemLp` at exponent two,
+  add back the deterministic target using finite-measure constant membership,
+  and convert the resulting L2 membership to squared-norm integrability.
+Source: Mathlib measure-theoretic `MemLp` closure under addition, constant
+  membership for finite measures, and the squared-norm characterization of L2
+Used in: fixed-query stochastic-gradient and zeroth-order oracle estimates before
+  applying uncentered second-moment bounds to an unbiased sample direction
+Book citation: book/FOML/StochasticZerothOrder.json#/assumptions/2
+Origin algorithm: Lan, First-Order and Stochastic Optimization Methods for Machine
+  Learning, randomized stochastic gradient-free method -/
+theorem oracle_second_moment_integrable_of_centered_second_moment_integrable
+    {Omega E : Type*} [MeasurableSpace Omega] [NormedAddCommGroup E]
+    (P : Measure Omega) [IsFiniteMeasure P]
+    (G : Omega -> E) (target : E)
+    (hG_meas : AEStronglyMeasurable G P)
+    (hcenter_sq : Integrable (fun omega => ‖G omega - target‖ ^ (2 : Nat)) P) :
+    Integrable (fun omega => ‖G omega‖ ^ (2 : Nat)) P := by
+  have hcenter_meas :
+      AEStronglyMeasurable (fun omega => G omega - target) P :=
+    hG_meas.sub aestronglyMeasurable_const
+  have hcenter_l2 : MemLp (fun omega => G omega - target) 2 P :=
+    (memLp_two_iff_integrable_sq_norm hcenter_meas).2 hcenter_sq
+  have hG_l2 : MemLp G 2 P := by
+    convert hcenter_l2.add (memLp_const target) using 1
+    funext omega
+    exact (sub_add_cancel (G omega) target).symm
+  exact
+    (memLp_two_iff_integrable_sq_norm hG_meas).1 hG_l2
+
+-- Phase 4 batch 3 merge from Staging/forwardDifferenceOracle_norm_sq_integrable_and_integral_le_sampleGradient.lean
+
+open MeasureTheory ProbabilityTheory
+open scoped Gradient InnerProductSpace
+
+-- Generalization plan (G0):
+-- concept/name: product-law squared-moment bound for a Gaussian forward-difference oracle; orig was
+--   `rsgfOracle_norm_sq_integrable_and_secondMoment_le_sampleGradient`.
+-- generality used: arbitrary sample type with a probability measure, finite-dimensional real inner-product normed space E with Borel and second-countable measurable structure, sample objective kernel F, positive smoothing scale and Lipschitz-gradient constant, a.e. sample smoothness, sample-gradient second-moment integrability, and a fixed query x.
+-- portable call pattern: stochastic zeroth-order and Gaussian random-search analyses can instantiate the sample law, objective kernel, smoothness constant, smoothing parameter, and query while reusing the same product-law oracle-square integrability and dimension-dependent bound.
+-- counterargument checked: this is not paper-local traceability or a caller-side wrapper; it composes the fixed-sample Gaussian moment estimate with product Fubini and domination, a proof step needed by any sampled forward-difference oracle. Existing entries provide only the fixed-fiber estimate or generic product criteria.
+-- coverage search: searched `product law forward difference oracle squared norm integrable second moment sample gradient` and inspected `forwardDifference_gaussian_norm_sq_integrable_and_integral_le_of_lipschitzGradient`, `integrable_prod_of_nonneg_fiber_integral_le_integrable_bound`, and `integrable_prod_iff`; no existing declaration covers this sampled-kernel composition.
+-- minimal hypotheses: probability of P supplies finiteness, finite-dimensionality is required by the standard Gaussian law and its moment bound, pointwise sample measurability and a.e. Lipschitz-gradient regularity provide product a.e. measurability, and only the sample-gradient squared norm integrability is needed from the outer law.
+
+/-- A sampled forward finite-difference oracle is square-integrable under the
+product of a sample law and a standard Gaussian direction, with its second
+moment bounded by the sample-gradient second moment and the Gaussian smoothing
+remainder.
+
+Layer: Layer0 | Gap: Level 2 (sampled Gaussian forward-difference second-moment composition)
+Proof: establish product-law a.e. strong measurability from sample measurability and a.e. continuous fibers, apply the fixed-sample Gaussian forward-difference estimate fiberwise, then use product integrability and Fubini with an integrable sample-gradient bound.
+Source: Mathlib product-measure Bochner integration and Fubini APIs together with Lipschitz-gradient Taylor bounds and standard Gaussian moments
+Used in: stochastic zeroth-order descent proofs when converting per-sample Gaussian oracle estimates into the unconditional product-law second moment needed for unbiasedness and variance arguments
+Book citation: book/FOML/StochasticZerothOrder.json#/algorithm_spec
+Origin algorithm: G. Lan, First-Order and Stochastic Optimization Methods for Machine Learning, randomized stochastic gradient-free method -/
+theorem forwardDifferenceOracle_norm_sq_integrable_and_integral_le_sampleGradient
+    {E Sample : Type*}
+    [NormedAddCommGroup E] [InnerProductSpace ℝ E] [FiniteDimensional ℝ E]
+    [MeasurableSpace E] [BorelSpace E] [SecondCountableTopology E]
+    [MeasurableSpace Sample]
+    (P : Measure Sample) [IsProbabilityMeasure P]
+    (F : E → Sample → ℝ) (L μ : ℝ) (x : E)
+    (hF_meas : ∀ y : E, Measurable (F y))
+    (hF_smooth_ae : ∀ᵐ ξ ∂P, SOptLib.LipschitzGradientObjective
+      (fun y : E => F y ξ) L)
+    (hgrad_sq_int : Integrable
+      (fun ξ => ‖gradient (fun y : E => F y ξ) x‖ ^ (2 : ℕ)) P)
+    (hL : 0 < L) (hμ : 0 < μ) :
+    Integrable
+        (fun z : Sample × E =>
+          ‖SOptLib.forwardDifferenceOracle F μ x z.1 z.2‖ ^ (2 : ℕ))
+        (P.prod (stdGaussian E)) ∧
+      (∫ z : Sample × E,
+          ‖SOptLib.forwardDifferenceOracle F μ x z.1 z.2‖ ^ (2 : ℕ)
+            ∂(P.prod (stdGaussian E))) ≤
+        2 * ((Module.finrank ℝ E : ℝ) + 4) *
+            (∫ ξ, ‖gradient (fun y : E => F y ξ) x‖ ^ (2 : ℕ) ∂P) +
+          μ ^ (2 : ℕ) * L ^ (2 : ℕ) / 2 *
+            ((Module.finrank ℝ E : ℝ) + 6) ^ (3 : ℕ) := by
+  letI : IsProbabilityMeasure (stdGaussian E) := inferInstance
+  let φ : Sample × E → ℝ := fun z =>
+    ‖SOptLib.forwardDifferenceOracle F μ x z.1 z.2‖ ^ (2 : ℕ)
+  let A : Sample → ℝ := fun ξ =>
+    2 * ((Module.finrank ℝ E : ℝ) + 4) *
+        ‖gradient (fun y : E => F y ξ) x‖ ^ (2 : ℕ) +
+      μ ^ (2 : ℕ) * L ^ (2 : ℕ) / 2 *
+        ((Module.finrank ℝ E : ℝ) + 6) ^ (3 : ℕ)
+  have hφ_aesm : AEStronglyMeasurable φ (P.prod (stdGaussian E)) := by
+    have hswap_aesm :
+        AEStronglyMeasurable
+          (fun p : E × Sample =>
+            SOptLib.forwardDifferenceOracle F μ x p.2 p.1)
+          ((stdGaussian E).prod P) := by
+      refine aestronglyMeasurable_prod_of_continuous_ae_of_fiber
+        (νQ := stdGaussian E) (νSample := P)
+        (kernel := fun u ξ => SOptLib.forwardDifferenceOracle F μ x ξ u)
+        (queryPoint := fun u : E => u) ?_ ?_ ?_
+      · exact continuous_id.stronglyMeasurable
+      · filter_upwards [hF_smooth_ae] with ξ hξ
+        unfold SOptLib.forwardDifferenceOracle
+        have hcont1 : Continuous (fun u : E => F (x + μ • u) ξ) := by
+          exact hξ.1.continuous.comp
+            (continuous_const.add (continuous_const.smul continuous_id))
+        have hcont0 : Continuous (fun _u : E => F x ξ) := continuous_const
+        exact (((hcont1.sub hcont0).div_const μ).smul continuous_id)
+      · intro u
+        unfold SOptLib.forwardDifferenceOracle
+        have hplus : Measurable (fun ξ => F (x + μ • u) ξ) :=
+          hF_meas (x + μ • u)
+        have hx' : Measurable (fun ξ => F x ξ) := hF_meas x
+        exact (((hplus.sub hx').div_const μ).smul_const u).aestronglyMeasurable
+    have hswap_norm := (hswap_aesm.norm.aemeasurable.pow_const 2).aestronglyMeasurable
+    simpa [φ, Function.comp_def] using hswap_norm.prod_swap
+  have hA_int : Integrable A P := by
+    exact (hgrad_sq_int.const_mul (2 * ((Module.finrank ℝ E : ℝ) + 4))).add
+      (integrable_const _)
+  have hfiber :
+      ∀ᵐ ξ ∂P,
+        Integrable (fun u : E => φ (ξ, u)) (stdGaussian E) ∧
+          (∫ u : E, φ (ξ, u) ∂stdGaussian E) ≤ A ξ := by
+    filter_upwards [hF_smooth_ae] with ξ hξ
+    simpa [φ, A] using
+      (forward_difference_gaussian_norm_sq_integrable_and_integral_le_of_lipschitz_gradient
+        (E := E) (f := fun y : E => F y ξ) (L := L) (μ := μ) (x := x)
+        hξ hL.le hμ)
+  have hφ_nonneg : ∀ z : Sample × E, 0 ≤ φ z := by
+    intro z
+    exact sq_nonneg _
+  have hprod_int : Integrable φ (P.prod (stdGaussian E)) := by
+    rw [MeasureTheory.integrable_prod_iff hφ_aesm]
+    constructor
+    · exact hfiber.mono fun ξ hξ => hξ.1
+    · refine Integrable.mono hA_int hφ_aesm.norm.integral_prod_right' ?_
+      filter_upwards [hfiber] with ξ hξ
+      have h_abs_eq :
+          (∫ u : E, ‖φ (ξ, u)‖ ∂stdGaussian E) =
+            ∫ u : E, φ (ξ, u) ∂stdGaussian E := by
+        refine integral_congr_ae (Filter.Eventually.of_forall ?_)
+        intro u
+        exact Real.norm_of_nonneg (hφ_nonneg (ξ, u))
+      have h_int_nonneg : 0 ≤ ∫ u : E, φ (ξ, u) ∂stdGaussian E :=
+        integral_nonneg fun u => hφ_nonneg (ξ, u)
+      have hA_nonneg : 0 ≤ A ξ := le_trans h_int_nonneg hξ.2
+      rw [h_abs_eq, Real.norm_eq_abs, abs_of_nonneg h_int_nonneg,
+        Real.norm_eq_abs, abs_of_nonneg hA_nonneg]
+      exact hξ.2
+  have hinner_int : Integrable
+      (fun ξ => ∫ u : E, φ (ξ, u) ∂stdGaussian E) P := by
+    refine Integrable.mono hA_int hφ_aesm.integral_prod_right' ?_
+    filter_upwards [hfiber] with ξ hξ
+    have h_int_nonneg : 0 ≤ ∫ u : E, φ (ξ, u) ∂stdGaussian E :=
+      integral_nonneg fun u => hφ_nonneg (ξ, u)
+    have hA_nonneg : 0 ≤ A ξ := le_trans h_int_nonneg hξ.2
+    rw [Real.norm_eq_abs, abs_of_nonneg h_int_nonneg,
+      Real.norm_eq_abs, abs_of_nonneg hA_nonneg]
+    exact hξ.2
+  refine ⟨hprod_int, ?_⟩
+  calc
+    (∫ z : Sample × E,
+        ‖SOptLib.forwardDifferenceOracle F μ x z.1 z.2‖ ^ (2 : ℕ)
+          ∂(P.prod (stdGaussian E))) =
+        ∫ z : Sample × E, φ z ∂(P.prod (stdGaussian E)) := by rfl
+    _ = ∫ ξ : Sample, ∫ u : E, φ (ξ, u) ∂stdGaussian E ∂P := by
+      exact MeasureTheory.integral_prod φ hprod_int
+    _ ≤ ∫ ξ : Sample, A ξ ∂P := by
+      exact integral_mono_ae
+        hinner_int hA_int
+        (hfiber.mono fun ξ hξ => hξ.2)
+    _ = 2 * ((Module.finrank ℝ E : ℝ) + 4) *
+          (∫ ξ, ‖gradient (fun y : E => F y ξ) x‖ ^ (2 : ℕ) ∂P) +
+        μ ^ (2 : ℕ) * L ^ (2 : ℕ) / 2 *
+          ((Module.finrank ℝ E : ℝ) + 6) ^ (3 : ℕ) := by
+      dsimp [A]
+      rw [integral_add]
+      · rw [integral_const_mul, integral_const]
+        simp
+      · exact hgrad_sq_int.const_mul _
+      · exact integrable_const _
+
+-- Phase 4 batch 3 merge from Staging/integral_forwardDifferenceOracle_eq_forwardDifference_objective_of_integral_eq.lean
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: sample-integrated forward finite-difference oracle identity; orig was
+--   `rsgfOracle_sample_integral_eq_objective_forward_difference`.
+-- generality used: arbitrary measurable sample space, arbitrary sample measure, real-valued
+--   sample loss and objective, and a real normed additive group with a real normed-space action;
+--   completeness is used only for the Bochner constant-scalar integral transport; no probability,
+--   smoothness, convexity, oracle, or finite-dimensional assumptions are used.
+-- portable call pattern: zeroth-order and stochastic finite-difference proofs integrate the two
+--   fixed-query sample losses, rewrite their means as a deterministic objective, and retain the
+--   same directional forward-difference vector while changing the sample law, loss, objective,
+--   base point, direction, and smoothing scale.
+-- counterargument checked: not paper-local traceability or a caller-side wrapper because it
+--   packages the nontrivial Bochner linearity and scalar-division transport needed by every
+--   sampled finite-difference unbiasedness proof. Existing objective-realization projections
+--   provide the two input identities but no theorem for their scaled directional difference.
+-- coverage search: searched `integral forward difference oracle equals objective forward difference
+--   integrable`, `sampled finite difference integral objective`, and inspected the existing
+--   product-law Fubini bridge and `StochasticObjectiveRealization.integral_eq`; those are partial
+--   (product integration or single-fiber identities), so this fixed-direction composition is not
+--   duplicated.
+-- minimal hypotheses: two pointwise integrability hypotheses and two pointwise integral-equality
+--   hypotheses replace the source's all-query stochastic-objective structure; no nonzero-scale
+--   assumption is needed because scalar division is total in Lean.
+
+/-- Integrating a forward finite-difference oracle over samples gives the deterministic
+forward difference whenever the two queried sample losses are integrable and their
+Bochner integrals equal the corresponding objective values.
+
+Layer: Layer0 | Gap: Level 1 (sampled forward-difference expectation bridge)
+Proof: expand the named oracle, move the constant direction through the Bochner integral,
+transport scalar division through integration, and apply integral subtraction followed by the
+two supplied objective-identification equalities.
+Source: Mathlib Bochner integral linearity, scalar multiplication, and division API for
+real-valued integrands.
+Used in: fixed-direction zeroth-order unbiasedness steps that convert the sample expectation of
+a two-query directional estimator into the deterministic objective forward difference.
+Book citation: book/FOML/StochasticZerothOrder.json#/assumptions/4
+Origin algorithm: Lan, First-Order and Stochastic Optimization Methods for Machine Learning,
+randomized stochastic gradient-free method -/
+theorem integral_forwardDifferenceOracle_eq_forwardDifference_objective_of_integral_eq
+    {E Sample : Type*} [MeasurableSpace Sample]
+    [NormedAddCommGroup E] [NormedSpace ℝ E] [CompleteSpace E]
+    (P : Measure Sample) (F : E → Sample → ℝ) (f : E → ℝ)
+    (μ : ℝ) (x u : E)
+    (hplus_int : Integrable (fun ξ => F (x + μ • u) ξ) P)
+    (hx_int : Integrable (fun ξ => F x ξ) P)
+    (hplus_eq : (∫ ξ, F (x + μ • u) ξ ∂P) = f (x + μ • u))
+    (hx_eq : (∫ ξ, F x ξ ∂P) = f x) :
+    (∫ ξ, SOptLib.forwardDifferenceOracle F μ x ξ u ∂P) =
+      (((f (x + μ • u) - f x) / μ) • u) := by
+  calc
+    (∫ ξ, SOptLib.forwardDifferenceOracle F μ x ξ u ∂P)
+        = ∫ ξ, (((F (x + μ • u) ξ - F x ξ) / μ) • u) ∂P := by
+            simp [SOptLib.forwardDifferenceOracle]
+    _ = ((∫ ξ, (F (x + μ • u) ξ - F x ξ) / μ ∂P) • u) := by
+            rw [integral_smul_const]
+    _ = (((∫ ξ, F (x + μ • u) ξ - F x ξ ∂P) / μ) • u) := by
+            rw [MeasureTheory.integral_div]
+    _ = ((((∫ ξ, F (x + μ • u) ξ ∂P) -
+              (∫ ξ, F x ξ ∂P)) / μ) • u) := by
+            rw [MeasureTheory.integral_sub hplus_int hx_int]
+    _ = (((f (x + μ • u) - f x) / μ) • u) := by
+            rw [hplus_eq, hx_eq]
+
+-- Phase 4 batch 3 merge from Staging/forwardDifferenceOracle_secondMoment_le_objective_gap_sigma.lean
+
+open MeasureTheory
+open scoped Gradient InnerProductSpace
+
+-- Generalization plan (G0):
+-- concept/name: oracle squared-moment to objective-gap conversion; orig was
+--   `rsgfOracle_secondMoment_le_objective_gap_sigma`.
+-- generality used: arbitrary sample and direction measures, a real inner-product
+--   normed space, an abstract sampled oracle, objective, variance scale, smoothing
+--   and smoothness parameters, and a natural dimension parameter; only the supplied
+--   oracle moment and gradient-gap inequalities are used.
+-- portable call pattern: Gaussian finite-difference, randomized search, and other
+--   stochastic-oracle analyses call this after proving a moment bound in terms of
+--   `‖∇ f x‖² + σ²`; the oracle, measures, objective, dimension, and parameters vary.
+-- counterargument checked: this is not paper-local traceability or a caller-side
+--   wrapper; it composes two nontrivial bounds into the reusable objective-gap form.
+--   The existing SOptLib gradient-gap theorem supplies the second premise, while no
+--   existing declaration combines it with an oracle product-law moment estimate.
+-- coverage search: queried `oracle second moment objective gap variance bound` and
+--   `oracle second moment upper bound objective gap from smooth gradient norm bound`;
+--   inspected `SOptLib.norm_sq_gradient_le_two_mul_smoothness_mul_sub_inf` and
+--   related Oracle entries, finding no matching compound conclusion.
+-- minimal hypotheses: no probability, function-measurability, or finite-dimensional
+--   assumptions are needed; completeness is required only by Mathlib's canonical
+--   gradient operator, and coefficient nonnegativity is derived from `n : ℕ`.
+
+/-- A sampled oracle second-moment estimate becomes an objective-gap estimate when
+the squared true gradient is bounded by smoothness times the objective gap.
+
+Layer: Layer0 | Gap: Level 1 (oracle moment to objective-gap conversion)
+Proof: scale the supplied gradient-gap inequality by the nonnegative coefficient
+  `2 * ((n : ℝ) + 4)` and combine it with the oracle moment premise using ordered
+  real arithmetic.
+Source: stochastic-oracle second-moment estimates, smooth nonconvex gradient-gap
+  bounds, and Mathlib ordered-real multiplication.
+Used in: Gaussian forward-difference descent recursions when replacing the oracle's
+  true-gradient square contribution by the objective gap and variance budget.
+Book citation: book/FOML/StochasticZerothOrder.json#/algorithm_spec
+Origin algorithm: G. Lan, First-Order and Stochastic Optimization Methods for Machine
+  Learning, randomized stochastic gradient-free method -/
+theorem forwardDifferenceOracle_secondMoment_le_objective_gap_sigma
+    {E Sample : Type*}
+    [NormedAddCommGroup E] [InnerProductSpace ℝ E] [CompleteSpace E]
+    [MeasurableSpace Sample] [MeasurableSpace E]
+    (P : Measure Sample) (ν : Measure E)
+    (oracle : E → Sample → E → E) (f : E → ℝ)
+    (n : ℕ) (fInf L μ σ : ℝ) (x : E)
+    (hbase :
+      (∫ z : Sample × E, ‖oracle x z.1 z.2‖ ^ (2 : ℕ) ∂(P.prod ν)) ≤
+        2 * ((n : ℝ) + 4) * (‖∇ f x‖ ^ (2 : ℕ) + σ ^ (2 : ℕ)) +
+          μ ^ (2 : ℕ) * L ^ (2 : ℕ) / 2 * ((n : ℝ) + 6) ^ (3 : ℕ))
+    (hgrad : ‖∇ f x‖ ^ (2 : ℕ) ≤ 2 * L * (f x - fInf)) :
+    (∫ z : Sample × E, ‖oracle x z.1 z.2‖ ^ (2 : ℕ) ∂(P.prod ν)) ≤
+      4 * ((n : ℝ) + 4) * L * (f x - fInf) +
+        2 * ((n : ℝ) + 4) * σ ^ (2 : ℕ) +
+        μ ^ (2 : ℕ) * L ^ (2 : ℕ) / 2 * ((n : ℝ) + 6) ^ (3 : ℕ) := by
+  have hc : 0 ≤ 2 * ((n : ℝ) + 4) := by
+    have hn : 0 ≤ (n : ℝ) := Nat.cast_nonneg n
+    nlinarith
+  have hmul := mul_le_mul_of_nonneg_left hgrad hc
+  calc
+    (∫ z : Sample × E, ‖oracle x z.1 z.2‖ ^ (2 : ℕ) ∂(P.prod ν))
+        ≤ 2 * ((n : ℝ) + 4) * (‖∇ f x‖ ^ (2 : ℕ) + σ ^ (2 : ℕ)) +
+            μ ^ (2 : ℕ) * L ^ (2 : ℕ) / 2 * ((n : ℝ) + 6) ^ (3 : ℕ) := hbase
+    _ ≤ 4 * ((n : ℝ) + 4) * L * (f x - fInf) +
+          2 * ((n : ℝ) + 4) * σ ^ (2 : ℕ) +
+          μ ^ (2 : ℕ) * L ^ (2 : ℕ) / 2 * ((n : ℝ) + 6) ^ (3 : ℕ) := by
+      nlinarith [hmul]
+
+-- Phase 4 batch 3 merge from Staging/integral_forwardDifferenceOracle_eq_gradient_gaussianSmoothing_of_value_unbiased.lean
+
+open MeasureTheory
+open scoped Gradient
+
+-- Generalization plan (G0):
+-- concept/name: unbiased sampled forward-difference oracle for a Gaussian-smoothed gradient;
+--   orig was `rsgfOracle_unbiased_smoothed`.
+-- generality used: arbitrary measurable sample and finite-dimensional real inner-product spaces,
+--   arbitrary S-finite sample and direction measures, a sampled value kernel, and a deterministic
+--   objective; only product integrability, value unbiasedness at the queried points, and the
+--   deterministic forward-difference characterization of the smoothed gradient are assumed.
+-- portable call pattern: a stochastic zeroth-order or Gaussian random-search proof changes the
+--   sample law, direction law, sampled value oracle, objective, smoothing radius, and query while
+--   retaining that the joint finite-difference expectation is the Gaussian-smoothed gradient.
+-- counterargument checked: the result is not paper-local or a pure wrapper because it composes
+--   sample-value unbiasedness, Bochner Fubini, and a deterministic smoothing-gradient
+--   characterization into the unconditional vector-valued oracle identity used by later residual
+--   and descent arguments.
+-- coverage search: searched `finite difference oracle product expectation equals gradient gaussian
+--   smoothing value unbiased`, `forward difference gaussian integral equals gradient smoothing`,
+--   and Mathlib semantic search for the Gaussian forward-difference identity. The closest hits
+--   were the fixed-direction sample integral theorem, the generic product Fubini bridge, and the
+--   Gaussian-smoothing differentiation theorem; each is partial and none has this joint contract.
+-- minimal hypotheses: global stochastic-objective realization is weakened to integrability and
+--   mean identities at the base point and almost every shifted point; probability, Borel,
+--   smoothness, convexity, and positivity assumptions are not used.
+
+/-- The joint expectation of a sampled forward finite-difference oracle equals the
+gradient of the Gaussian-smoothed objective when sampled values are unbiased at the
+queried points and the deterministic direction average characterizes that gradient.
+
+Layer: Layer0 | Gap: Level 1 (sampled forward-difference unbiasedness for Gaussian smoothing)
+Proof: identify almost every sample-fiber mean by Bochner integral linearity, apply product
+Fubini to replace the joint expectation by the deterministic direction average, and use the
+supplied `HasGradientAt` characterization of Gaussian smoothing.
+Source: Mathlib Bochner product integration and gradient calculus, together with the SOptLib
+forward-difference oracle and Gaussian-smoothing model APIs
+Used in: stochastic zeroth-order residual centering, where the product-law mean of the sampled
+finite-difference estimator is replaced by the Gaussian-smoothed objective gradient
+Book citation: book/FOML/StochasticZerothOrder.json#/key_lemmas/3
+Origin algorithm: Lan, First-Order and Stochastic Optimization Methods for Machine Learning,
+randomized stochastic gradient-free method -/
+theorem integral_forwardDifferenceOracle_eq_gradient_gaussianSmoothing_of_value_unbiased
+    {Sample E : Type*} [MeasurableSpace Sample]
+    [NormedAddCommGroup E] [InnerProductSpace ℝ E] [FiniteDimensional ℝ E]
+    [MeasurableSpace E]
+    (P : Measure Sample) (nu : Measure E) [SFinite P] [SFinite nu]
+    (F : E → Sample → ℝ) (f : E → ℝ) (mu : ℝ) (x : E)
+    (h_oracle_int :
+      Integrable
+        (fun z : Sample × E => SOptLib.forwardDifferenceOracle F mu x z.1 z.2)
+        (P.prod nu))
+    (hx_int : Integrable (fun xi => F x xi) P)
+    (hshift_int : ∀ᵐ u ∂nu, Integrable (fun xi => F (x + mu • u) xi) P)
+    (hx_eq : (∫ xi, F x xi ∂P) = f x)
+    (hshift_eq : ∀ᵐ u ∂nu, (∫ xi, F (x + mu • u) xi ∂P) = f (x + mu • u))
+    (hgradient :
+      HasGradientAt (SOptLib.gaussianSmoothing f mu)
+        (∫ u : E, (((f (x + mu • u) - f x) / mu) • u) ∂nu) x) :
+    (∫ z : Sample × E, SOptLib.forwardDifferenceOracle F mu x z.1 z.2
+        ∂(P.prod nu)) =
+      ∇ (SOptLib.gaussianSmoothing f mu) x := by
+  calc
+    (∫ z : Sample × E, SOptLib.forwardDifferenceOracle F mu x z.1 z.2
+        ∂(P.prod nu)) =
+        ∫ u : E, (((f (x + mu • u) - f x) / mu) • u) ∂nu := by
+          exact integral_prod_eq_integral_fiber_integral_of_integrable
+            (muA := nu) (muB := P)
+            (K := fun u xi => SOptLib.forwardDifferenceOracle F mu x xi u)
+            (M := fun u => (((f (x + mu • u) - f x) / mu) • u))
+            h_oracle_int
+            (hshift_int.and hshift_eq |>.mono fun u hu =>
+              integral_forwardDifferenceOracle_eq_forwardDifference_objective_of_integral_eq
+                P F f mu x u hu.1 hx_int hu.2 hx_eq)
+    _ = ∇ (SOptLib.gaussianSmoothing f mu) x := hgradient.gradient.symm
+
+-- Phase 4 batch 3 merge from Staging/aestronglyMeasurable_target_of_integral_oracle_eq.lean
+
+open MeasureTheory
+
+-- Generalization plan (G0):
+-- concept/name: a.e. strong measurability of an oracle target identified with
+--   a parameterized Bochner integral; orig was
+--   `rsgf_smoothing_gradient_random_query_aestronglyMeasurable`.
+-- generality used: arbitrary query, sample, and normed real vector spaces;
+--   arbitrary base measure and an `SFinite` sample measure; no probability,
+--   finite-dimensionality, convexity, smoothness, or independence assumptions.
+-- portable call pattern: stochastic-gradient, variance-reduced, and zeroth-order
+--   oracle proofs use this after proving product-law measurability of an oracle
+--   evaluated at a random query and identifying its fiber mean with a target;
+--   the query process, oracle, target, and two measures may all vary.
+-- counterargument checked: this is not paper-local traceability or a pure
+--   caller-side rename. It packages the reusable transition from product-law
+--   a.e. strong measurability and unbiasedness to target measurability at a
+--   random query, while Mathlib only supplies the integral-measurability edge.
+-- coverage search: queried `aestrongly measurable target integral oracle
+--   equality` and semantically searched for a.e. measurable parameterized
+--   Bochner integrals. Mathlib `AEStronglyMeasurable.integral_prod_right'` is
+--   the main ingredient; SOptLib `oracleMean_measurable_of_eq_integral`
+--   requires global joint measurability and concludes ordinary measurability,
+--   so it does not cover this product-law a.e. statement.
+-- minimal hypotheses: unbiasedness is required only along `Xrand`; the source
+--   probability laws are weakened to arbitrary measures, retaining only
+--   `SFinite muS` for the parameterized Bochner integral.
+
+/-- A target evaluated at a random query is a.e. strongly measurable when it
+agrees there with the fiber integral of a product-law measurable oracle.
+
+Layer: Layer0 | Gap: Level 0 (random-query oracle-mean measurability)
+Proof: apply Mathlib's product-measure parameterized Bochner-integral
+  measurability theorem, then transport the result through the pointwise
+  oracle-mean equality along the random query.
+Source: Mathlib product-measure Bochner integration and a.e. strong
+  measurability APIs
+Used in: stochastic-gradient and zeroth-order residual constructions when an
+  unbiased sampled oracle supplies measurability of the target at a random
+  iterate
+Book citation: book/FOML/StochasticZerothOrder.json#/key_lemmas/3
+Origin algorithm: G. Lan, First-Order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic gradient-free method -/
+theorem aestronglyMeasurable_target_of_integral_oracle_eq
+    {Omega X S E : Type*} [MeasurableSpace Omega] [MeasurableSpace S]
+    [NormedAddCommGroup E] [NormedSpace ℝ E]
+    {nu : Measure Omega} {muS : Measure S} [SFinite muS]
+    (Xrand : Omega -> X) (G : X -> S -> E) (target : X -> E)
+    (hG : AEStronglyMeasurable
+      (fun p : Omega × S => G (Xrand p.1) p.2) (nu.prod muS))
+    (hmean : ∀ omega, (∫ s, G (Xrand omega) s ∂muS) = target (Xrand omega)) :
+    AEStronglyMeasurable (fun omega => target (Xrand omega)) nu := by
+  have h_integral :
+      AEStronglyMeasurable
+        (fun omega => ∫ s, G (Xrand omega) s ∂muS) nu :=
+    hG.integral_prod_right'
+  exact h_integral.congr (Filter.Eventually.of_forall hmean)

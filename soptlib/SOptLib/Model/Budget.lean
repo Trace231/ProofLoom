@@ -2,6 +2,7 @@ import Mathlib.Algebra.BigOperators.Group.Finset.Basic
 import Mathlib.Data.Real.Sqrt
 import Mathlib.Tactic
 import SOptLib.Model.Iterates
+import SOptLib.Model.Objective
 
 /-- Objective-gap radius obtained by scaling an initial objective gap by a
 positive smoothness parameter and taking the square root.
@@ -311,6 +312,102 @@ theorem strongConvexInitialVarianceBudget_nonneg
   rw [strongConvexInitialVarianceBudget_def]
   exact add_nonneg (add_nonneg (mul_nonneg hmu hBregman) hGap)
     (div_nonneg (sq_nonneg sigma0) (mul_nonneg hm hmu))
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: objective-gap scaled-error Lyapunov potential; orig was
+--   `theorem1ShiftedLyapunovPotential`, renamed away from the theorem number
+--   and shifted-paper terminology while retaining the mathematical shape.
+-- generality used: arbitrary state and sample spaces and normed error carriers; no
+--   measure, probability, measurability, integrability, inner-product,
+--   completeness, convexity, smoothness, oracle, or finite-dimensional
+--   assumptions are used.
+-- portable call pattern: recursive-momentum, variance-reduced stochastic
+--   gradient, and adaptive stochastic methods use an objective-gap plus a
+--   scaled normalized squared estimator error as a Lyapunov process; the
+--   objective process, lower reference value, error process, normalization,
+--   and scale change while the potential shape stays fixed.
+-- counterargument checked: the formula is short, but it is not merely paper
+--   traceability: it names a standard two-component Lyapunov object, extends
+--   the existing objective-gap integrand with normalized estimator energy,
+--   and carries a reusable pointwise nonnegativity API.
+-- coverage search: searched `lean_search_symbols` for "objective gap plus
+--   scaled squared norm error divided by normalization Lyapunov potential"
+--   and "objective gap normalized error potential equality definition", and
+--   Mathlib LeanSearch for the full formula; `SOptLib.objectiveGapIntegrand`
+--   covers only the first summand, while the other hits concern bounds or
+--   integrability and no declaration covers the combined potential.
+-- minimal hypotheses: the definition needs only a norm on the error
+--   carrier; the nonnegativity theorem uses pointwise lower-bound, scale, and
+--   denominator hypotheses, with no global optimization assumptions.
+
+/-- The objective gap plus a scaled normalized squared-error term along a
+stochastic process.
+
+`objectiveGapScaledErrorPotential` is the two-component Lyapunov quantity
+formed from pointwise suboptimality and estimator-error energy.  The scale and
+normalization process are explicit so the same object accommodates fixed and
+adaptive stochastic methods.
+
+Layer: Model | Concept: objective-gap scaled-error Lyapunov potential
+Proof: (definitional construction; objective-gap integrand plus a scaled squared norm divided by a time-dependent normalization)
+Source: stochastic-approximation Lyapunov potentials and Mathlib squared-norm arithmetic
+Used in: recursive-momentum and variance-reduced stochastic-gradient telescopes combining objective descent with normalized estimator-error recurrence
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/main_theorem/proof/0
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+noncomputable def objectiveGapScaledErrorPotential
+    {Ω X E : Type*} [Norm E]
+    (objective : X → ℝ) (output : ℕ → Ω → X)
+    (err : ℕ → Ω → E) (denominator : ℕ → Ω → ℝ)
+    (optimum scale : ℝ) (n : ℕ) (ω : Ω) : ℝ :=
+  objectiveGapIntegrand objective optimum output n ω +
+    scale * (‖err n ω‖ ^ 2 / denominator n ω)
+
+/-- The objective-gap scaled-error potential unfolds to its two summands.
+
+Layer: Model | Gap: Level 0 (objective-gap scaled-error potential formula)
+Proof: by rfl after unfolding `objectiveGapScaledErrorPotential` and `objectiveGapIntegrand`.
+Source: stochastic-approximation Lyapunov potentials and Mathlib squared-norm arithmetic
+Used in: recursive-momentum Lyapunov telescopes where objective descent is paired with a normalized squared estimator-error recurrence
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/main_theorem/proof/0
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+@[simp]
+theorem objectiveGapScaledErrorPotential_def
+    {Ω X E : Type*} [Norm E]
+    (objective : X → ℝ) (output : ℕ → Ω → X)
+    (err : ℕ → Ω → E) (denominator : ℕ → Ω → ℝ)
+    (optimum scale : ℝ) (n : ℕ) (ω : Ω) :
+    objectiveGapScaledErrorPotential objective output err denominator optimum scale n ω =
+      objective (output n ω) - optimum +
+        scale * (‖err n ω‖ ^ 2 / denominator n ω) := by
+  rfl
+
+/-- The objective-gap scaled-error potential is nonnegative when the reference
+value is a pointwise lower bound and the scale and normalization are
+nonnegative.
+
+Layer: Model | Gap: Level 0 (objective-gap scaled-error potential nonnegativity)
+Proof: unfold the potential, use the objective lower bound for the gap, and combine nonnegativity of the scale, squared norm, and denominator through `div_nonneg`, `mul_nonneg`, and `add_nonneg`.
+Source: Mathlib ordered-field nonnegativity lemmas for subtraction, products, quotients, and squared norms
+Used in: stochastic Lyapunov telescopes that discard a terminal objective-gap plus normalized estimator-error potential
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/main_theorem/proof/14
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem objectiveGapScaledErrorPotential_nonneg
+    {Ω X E : Type*} [Norm E]
+    (objective : X → ℝ) (output : ℕ → Ω → X)
+    (err : ℕ → Ω → E) (denominator : ℕ → Ω → ℝ)
+    (optimum scale : ℝ) (n : ℕ) (ω : Ω)
+    (hoptimum : optimum ≤ objective (output n ω))
+    (hscale : 0 ≤ scale)
+    (hdenominator : 0 ≤ denominator n ω) :
+    0 ≤ objectiveGapScaledErrorPotential objective output err denominator
+      optimum scale n ω := by
+  rw [objectiveGapScaledErrorPotential_def]
+  exact add_nonneg (sub_nonneg.mpr hoptimum)
+    (mul_nonneg hscale (div_nonneg (sq_nonneg _) hdenominator))
+
+end SOptLib
 
 -- Merged from Staging/staleGradientGeometricInitialBudget.lean
 -- Generalization plan (G0):

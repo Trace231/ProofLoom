@@ -1,26 +1,58 @@
 import Mathlib.Analysis.Calculus.AddTorsor.AffineMap
 import Mathlib.Analysis.InnerProductSpace.Basic
+import Mathlib.Analysis.InnerProductSpace.PiL2
 import Mathlib.Analysis.Normed.Affine.Isometry
 import Mathlib.Topology.Algebra.AffineSubspace
 import Mathlib.Analysis.SpecialFunctions.Log.Base
+import Mathlib.Analysis.CStarAlgebra.CStarMatrix
+import Mathlib.Analysis.CStarAlgebra.ContinuousFunctionalCalculus.Instances
+import Mathlib.Analysis.CStarAlgebra.ContinuousFunctionalCalculus.Unique
+import Mathlib.Analysis.Matrix.HermitianFunctionalCalculus
+import Mathlib.Analysis.Matrix.Order
 -- SOptLib/Glue/Algebra.lean
 import Mathlib.Algebra.BigOperators.Intervals
+import Mathlib.Algebra.BigOperators.Module
 import Mathlib.Algebra.Order.Interval.Finset.SuccPred
 import Mathlib.Algebra.Order.Field.GeomSum
+import Mathlib.Algebra.Order.Field.Power
 import Mathlib.Algebra.Ring.GeomSum
 import Mathlib.Algebra.BigOperators.Field
 import Mathlib.Algebra.BigOperators.Ring.Finset
+import Mathlib.Algebra.BigOperators.Fin
+import Mathlib.Algebra.BigOperators.Group.List.Basic
 import Mathlib.Algebra.Order.BigOperators.Group.Finset
 import Mathlib.Algebra.Order.Chebyshev
 import Mathlib.Algebra.Order.Ring.Basic
+import Mathlib.Algebra.Order.Ring.Abs
+import Mathlib.Algebra.Ring.Equiv
 import Mathlib.Analysis.Normed.Module.Basic
+import Mathlib.Analysis.Normed.Field.Basic
+import Mathlib.Analysis.Matrix.Normed
 import Mathlib.Analysis.MeanInequalitiesPow
+import Mathlib.Analysis.SpecificLimits.ArithmeticGeometric
 import Mathlib.Data.Finset.Image
 import Mathlib.Data.Finset.Max
+import Mathlib.Data.Fintype.BigOperators
+import Mathlib.Data.Matrix.Mul
 import Mathlib.Data.Real.Archimedean
 import Mathlib.Data.Real.Sqrt
+import Mathlib.Dynamics.BirkhoffSum.NormedSpace
+import Mathlib.LinearAlgebra.Matrix.BilinearForm
+import Mathlib.LinearAlgebra.Matrix.Kronecker
+import Mathlib.LinearAlgebra.Matrix.NonsingularInverse
+import Mathlib.LinearAlgebra.Matrix.PosDef
+import Mathlib.LinearAlgebra.Matrix.Reindex
+import Mathlib.LinearAlgebra.Matrix.Rank
+import Mathlib.LinearAlgebra.Matrix.Stochastic
+import Mathlib.LinearAlgebra.Matrix.Trace
+import Mathlib.LinearAlgebra.Matrix.ToLinearEquiv
+import Mathlib.FieldTheory.IsAlgClosed.Spectrum
+import Mathlib.LinearAlgebra.Eigenspace.Basic
+import Mathlib.LinearAlgebra.Eigenspace.Minpoly
+import Mathlib.Algebra.Module.LinearMap.End
 import Mathlib.Tactic
-
+import Mathlib.Topology.Algebra.Module.FiniteDimension
+import Mathlib.Topology.Algebra.Module.Equiv
 
 open scoped BigOperators InnerProductSpace
 
@@ -261,6 +293,32 @@ theorem sum_sum_add_const {I J R : Type*} [CommSemiring R]
           c * ∑ i ∈ outer, ((inner i).card : R) := by
       rw [← Finset.sum_mul]
       ring
+
+/-- The squared norm of the coordinate synthesis along an orthonormal basis is the
+sum of the squared coefficients.
+
+Layer: Glue | Gap: Level 2 (named orthonormal-basis Parseval identity in synthesis form)
+Proof: rewrite the synthesized vector through the basis representation, use that
+the representation is an isometry, and simplify the Euclidean coordinate norm.
+Source: finite-dimensional Parseval identity / orthonormal coordinate expansion
+Used in: Gaussian moment bounds for standard Gaussian measures -/
+theorem norm_sq_sum_smul_orthonormalBasis
+    {ι E : Type*} [Fintype ι] [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+    (b : OrthonormalBasis ι ℝ E) (x : ι → ℝ) :
+    ‖∑ i, x i • (b i : E)‖ ^ 2 = ∑ i, (x i) ^ 2 := by
+  let f : EuclideanSpace ℝ ι := (EuclideanSpace.equiv _ ℝ).symm x
+  calc
+    ‖∑ i, x i • (b i : E)‖ ^ 2 = ‖f‖ ^ 2 := by
+      rw [show ∑ i, x i • (b i : E) = b.repr.symm f from by
+        rw [b.sum_repr_symm]
+        rfl]
+      rw [b.repr.symm.norm_map]
+    _ = ∑ i, (f i) ^ 2 := by
+      exact EuclideanSpace.real_norm_sq_eq f
+    _ = ∑ i, (x i) ^ 2 := by
+      refine Finset.sum_congr rfl ?_
+      intro i hi
+      simp [f]
 
 /-- A subset sum scaled by a nonnegative right factor is bounded by the full sum
 scaled by the same factor.
@@ -10371,3 +10429,13188 @@ theorem stale_geometric_noise_budget_le_inverse_contraction_variance_budget
     _ ≤ ((1 - a)⁻¹ * (1 / (m * mu))) * sigma0 ^ 2 := hbudget_scaled
     _ = (1 - a)⁻¹ * (sigma0 ^ 2 / (m * mu)) := by
       field_simp [hm_ne, hmu_ne]
+
+-- Merged from Staging/sum_fin_adjacent_sub_eq_sub.lean
+open scoped BigOperators
+
+/-- The sum of successive drops over `Fin T` is the initial value minus the
+terminal value.
+
+Layer: Glue | Gap: Level 0 (finite-horizon Fin-univ adjacent-difference telescope)
+Proof: reindex the `Fin T` sum as `Finset.range T`, discharge the range guards, and apply `Finset.sum_range_sub'`.
+Source: Mathlib finite big operators, specifically `Finset.sum_fin_eq_sum_range` and `Finset.sum_range_sub'`
+Used in: finite-horizon stochastic momentum Lyapunov telescopes that collapse pointwise potential drops to their initial and terminal potentials
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec
+Origin algorithm: Cutkosky--Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem sum_fin_adjacent_sub_eq_sub
+    {G : Type*} [AddCommGroup G] (T : Nat) (f : Nat → G) :
+    Finset.sum Finset.univ (fun i : Fin T => f i.val - f (i.val + 1)) =
+      f 0 - f T := by
+  rw [Finset.sum_fin_eq_sum_range]
+  have hguard :
+      (∑ x ∈ Finset.range T, if h : x < T then f x - f (x + 1) else 0) =
+        ∑ x ∈ Finset.range T, (f x - f (x + 1)) := by
+    refine Finset.sum_congr rfl ?_
+    intro x hx
+    simp [Finset.mem_range.mp hx]
+  rw [hguard]
+  exact Finset.sum_range_sub' f T
+
+/-- The inverse-cardinality-scaled sum of a finite real family is at most its
+root-sum-of-squares divided by the square root of the cardinality.
+
+Layer: Glue | Gap: Level 1 (finite normalized sum to root-mean-square bound)
+Proof: apply the finite-sum Cauchy--Schwarz square bound, take a real square root, split
+  the square root of the product, and cancel the positive cardinality square root.
+Source: Mathlib Chebyshev finite-sum inequalities and real square-root arithmetic
+Used in: finite-window stochastic convergence bounds converting the uniform average of
+  gradient norms into the expected root-sum-of-squared gradient norms
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/output
+Origin algorithm: Cutkosky--Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STORM -/
+theorem inv_card_mul_sum_le_sqrt_sum_sq_div_sqrt_card
+    {ι : Type*} [Fintype ι] (a : ι → ℝ) :
+    (Fintype.card ι : ℝ)⁻¹ * Finset.sum Finset.univ a ≤
+      Real.sqrt (Finset.sum Finset.univ (fun i => a i ^ 2)) /
+        Real.sqrt (Fintype.card ι : ℝ) := by
+  classical
+  cases isEmpty_or_nonempty ι with
+  | inl _ => simp
+  | inr hι =>
+      letI := hι
+      have hcard_nat : 0 < Fintype.card ι := Fintype.card_pos
+      have hcard_pos : 0 < (Fintype.card ι : ℝ) := by
+        exact_mod_cast hcard_nat
+      have hcard_nonneg : 0 ≤ (Fintype.card ι : ℝ) := le_of_lt hcard_pos
+      have hinv_nonneg : 0 ≤ ((Fintype.card ι : ℝ)⁻¹) :=
+        inv_nonneg.mpr hcard_nonneg
+      have hsq :
+          (Finset.sum Finset.univ a) ^ 2 ≤
+            (Fintype.card ι : ℝ) *
+              Finset.sum Finset.univ (fun i => a i ^ 2) := by
+        simpa using
+          (sq_sum_le_card_mul_sum_sq (s := Finset.univ) (f := a))
+      have hsum_le :
+          Finset.sum Finset.univ a ≤
+            Real.sqrt
+              ((Fintype.card ι : ℝ) *
+                Finset.sum Finset.univ (fun i => a i ^ 2)) :=
+        Real.le_sqrt_of_sq_le hsq
+      have hsqrt_split :
+          Real.sqrt
+              ((Fintype.card ι : ℝ) *
+                Finset.sum Finset.univ (fun i => a i ^ 2)) =
+            Real.sqrt (Fintype.card ι : ℝ) *
+              Real.sqrt (Finset.sum Finset.univ (fun i => a i ^ 2)) := by
+        rw [Real.sqrt_mul hcard_nonneg]
+      have hsqrt_card_ne : Real.sqrt (Fintype.card ι : ℝ) ≠ 0 :=
+        ne_of_gt (Real.sqrt_pos.mpr hcard_pos)
+      calc
+        (Fintype.card ι : ℝ)⁻¹ * Finset.sum Finset.univ a ≤
+            (Fintype.card ι : ℝ)⁻¹ *
+              (Real.sqrt (Fintype.card ι : ℝ) *
+                Real.sqrt (Finset.sum Finset.univ (fun i => a i ^ 2))) := by
+          exact mul_le_mul_of_nonneg_left
+            (by simpa [hsqrt_split] using hsum_le) hinv_nonneg
+        _ = Real.sqrt (Finset.sum Finset.univ (fun i => a i ^ 2)) /
+            Real.sqrt (Fintype.card ι : ℝ) := by
+          field_simp [hsqrt_card_ne]
+          rw [Real.sq_sqrt hcard_nonneg]
+
+open scoped InnerProductSpace
+
+/-- An inner product with a negatively scaled vector, plus a weighted norm
+square, is controlled by the squared reference vector and squared error.
+
+For scalar coefficients `L` and `eta`, when `epsilon = d - g`, `L > 0`, and
+`0 <= eta <= 1 / (4 * L)`, the left-hand side is at most
+`-eta / 4 * ||g||^2 + 3 * eta / 4 * ||epsilon||^2`.
+
+Layer: Glue | Gap: Level 1 (inner-product and norm-square coefficient collection)
+Proof: decompose the direction into the reference vector and its error, absorb the cross term with Hilbert-space Young, split the direction norm square, and use the scalar upper bound to collect coefficients.
+Source: Mathlib real inner-product algebra and ordered-field arithmetic, together with SOptLib Hilbert Young absorption and binary norm-square splitting
+Used in: biased SGD, stochastic recursive momentum, variance-reduced, and learned-direction estimates after reducing to the corresponding inner-product and norm-square inequality
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/key_lemmas/0/proof
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem inner_neg_smul_add_half_mul_norm_sq_le_of_le_inv_four_mul
+    {E : Type*} [SeminormedAddCommGroup E] [InnerProductSpace ℝ E]
+    (g d epsilon : E) {L eta : ℝ}
+    (hL_pos : 0 < L)
+    (heta_nonneg : 0 ≤ eta)
+    (heta_le : eta ≤ (1 : ℝ) / (4 * L))
+    (hepsilon : epsilon = d - g) :
+    inner ℝ g (-eta • d) + (L / 2) * ‖-eta • d‖ ^ 2 ≤
+      (-eta / 4) * ‖g‖ ^ 2 + (3 * eta / 4) * ‖epsilon‖ ^ 2 := by
+  subst epsilon
+  have hd_eq : d = g + (d - g) := by abel
+  have hetaL_sq_le : L * eta ^ 2 ≤ eta / 4 := by
+    have hmul := mul_le_mul_of_nonneg_left heta_le heta_nonneg
+    have hL_nonneg : 0 ≤ L := le_of_lt hL_pos
+    have htmp : eta * eta ≤ eta * ((1 : ℝ) / (4 * L)) := by
+      simpa [pow_two] using hmul
+    have hden_ne : 4 * L ≠ 0 := by positivity
+    calc
+      L * eta ^ 2 = L * (eta * eta) := by ring
+      _ ≤ L * (eta * ((1 : ℝ) / (4 * L))) :=
+        mul_le_mul_of_nonneg_left htmp hL_nonneg
+      _ = eta / 4 := by field_simp [hden_ne]
+  have hyoung :
+      -inner ℝ g (d - g) ≤
+        (1 / 2) * ‖g‖ ^ 2 + (1 / 2) * ‖d - g‖ ^ 2 := by
+    have h :=
+      neg_inner_le_half_mul_norm_sq_add_inv_two_mul_norm_sq
+        (E := E) (q := (1 : ℝ)) (by norm_num) g (d - g)
+    nlinarith
+  have hinner :
+      inner ℝ g (-eta • d) ≤
+        (-eta / 2) * ‖g‖ ^ 2 + (eta / 2) * ‖d - g‖ ^ 2 := by
+    have hinner_expand :
+        inner ℝ g d = ‖g‖ ^ 2 + inner ℝ g (d - g) := by
+      calc
+        inner ℝ g d = inner ℝ g (g + (d - g)) := by
+          rw [show g + (d - g) = d by abel]
+        _ = inner ℝ g g + inner ℝ g (d - g) := by rw [inner_add_right]
+        _ = ‖g‖ ^ 2 + inner ℝ g (d - g) := by rw [real_inner_self_eq_norm_sq]
+    have hyoung_scaled :
+        eta * (-inner ℝ g (d - g)) ≤
+          eta * ((1 / 2) * ‖g‖ ^ 2 + (1 / 2) * ‖d - g‖ ^ 2) :=
+      mul_le_mul_of_nonneg_left hyoung heta_nonneg
+    calc
+      inner ℝ g (-eta • d) = -eta * inner ℝ g d := by
+        simp [inner_smul_right]
+      _ = -eta * (‖g‖ ^ 2 + inner ℝ g (d - g)) := by rw [hinner_expand]
+      _ = -eta * ‖g‖ ^ 2 + eta * (-inner ℝ g (d - g)) := by ring
+      _ ≤ -eta * ‖g‖ ^ 2 +
+          eta * ((1 / 2) * ‖g‖ ^ 2 + (1 / 2) * ‖d - g‖ ^ 2) := by
+        linarith
+      _ = (-eta / 2) * ‖g‖ ^ 2 + (eta / 2) * ‖d - g‖ ^ 2 := by ring
+  have hnorm_split :
+      ‖-eta • d‖ ^ 2 ≤
+        eta ^ 2 * (2 * ‖g‖ ^ 2 + 2 * ‖d - g‖ ^ 2) := by
+    have hnorm_eq : ‖-eta • d‖ ^ 2 = eta ^ 2 * ‖d‖ ^ 2 := by
+      rw [norm_smul]
+      have hsq_abs : ‖(-eta : ℝ)‖ ^ 2 = eta ^ 2 := by
+        rw [Real.norm_eq_abs, sq_abs]
+        ring
+      rw [mul_pow, hsq_abs]
+    rw [hnorm_eq, hd_eq]
+    have hdiff_eq : g + (d - g) - g = d - g := by abel
+    simpa [hdiff_eq] using
+      mul_le_mul_of_nonneg_left
+        (SOptLib.norm_add_sq_le_two_mul_norm_sq_add_two_mul_norm_sq g (d - g))
+        (sq_nonneg eta)
+  have hsmooth :
+      (L / 2) * ‖-eta • d‖ ^ 2 ≤
+        (eta / 4) * ‖g‖ ^ 2 + (eta / 4) * ‖d - g‖ ^ 2 := by
+    have hcoef_nonneg : 0 ≤ L / 2 := by positivity
+    have hstep := mul_le_mul_of_nonneg_left hnorm_split hcoef_nonneg
+    have hcoef_g :
+        (L / 2) * (eta ^ 2 * (2 * ‖g‖ ^ 2 + 2 * ‖d - g‖ ^ 2)) =
+          (L * eta ^ 2) * ‖g‖ ^ 2 + (L * eta ^ 2) * ‖d - g‖ ^ 2 := by
+      ring
+    calc
+      (L / 2) * ‖-eta • d‖ ^ 2 ≤
+          (L / 2) * (eta ^ 2 * (2 * ‖g‖ ^ 2 + 2 * ‖d - g‖ ^ 2)) := hstep
+      _ = (L * eta ^ 2) * ‖g‖ ^ 2 + (L * eta ^ 2) * ‖d - g‖ ^ 2 := hcoef_g
+      _ ≤ (eta / 4) * ‖g‖ ^ 2 + (eta / 4) * ‖d - g‖ ^ 2 := by
+        exact add_le_add
+          (mul_le_mul_of_nonneg_right hetaL_sq_le (sq_nonneg ‖g‖))
+          (mul_le_mul_of_nonneg_right hetaL_sq_le (sq_nonneg ‖d - g‖))
+  calc
+    inner ℝ g (-eta • d) + (L / 2) * ‖-eta • d‖ ^ 2 ≤
+        ((-eta / 2) * ‖g‖ ^ 2 + (eta / 2) * ‖d - g‖ ^ 2) +
+          ((eta / 4) * ‖g‖ ^ 2 + (eta / 4) * ‖d - g‖ ^ 2) :=
+      add_le_add hinner hsmooth
+    _ = (-eta / 4) * ‖g‖ ^ 2 + (3 * eta / 4) * ‖d - g‖ ^ 2 := by ring
+
+/-- A weighted centered estimator-difference cross term is the difference of its
+two endpoint residual cross terms.
+
+Layer: Glue | Gap: Level 0 (weighted centered-difference residual decomposition)
+Proof: expand both inner-product differences and move the real scalar into the right slot; commutativity and ring normalization identify the resulting terms.
+Source: Mathlib real inner-product bilinearity via `inner_sub_left`, `inner_sub_right`, and `inner_smul_right`
+Used in: paired-oracle, recursive-momentum, and variance-reduced estimator proofs before endpoint residual cross terms are canceled separately
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec/steps/5
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem weighted_inner_centered_difference_eq_residual_inner_sub
+    {E : Type*} [SeminormedAddCommGroup E] [InnerProductSpace ℝ E]
+    (w : ℝ) (gNext gPrev mNext mPrev : E) :
+    w * inner ℝ (mNext - mPrev)
+        ((gNext - gPrev) - (mNext - mPrev)) =
+      inner ℝ (gNext - mNext) (w • (mNext - mPrev)) -
+        inner ℝ (gPrev - mPrev) (w • (mNext - mPrev)) := by
+  rw [inner_smul_right, inner_smul_right]
+  simp only [inner_sub_left, inner_sub_right, real_inner_comm]
+  ring
+
+namespace SOptLib
+
+/-- A complementary quadratic weight and reciprocal-increment allowance absorb
+into a negative error drift.
+
+If the quadratic coefficient is nonnegative and at most one after scaling, the
+curvature, requested decay, and reciprocal slack fit within that coefficient,
+and the reciprocal increment is bounded by the slack, then the squared
+complementary weighted error is bounded by the requested negative drift.
+
+Layer: Glue | Gap: Level 1 (complementary quadratic reciprocal-drift absorption)
+Proof: reduce the squared complementary factor to its unsquared value, drop the
+  nonpositive quartic cross term, apply the reciprocal-increment and coefficient
+  budgets, and multiply by the nonnegative error mass.
+Source: Mathlib linear ordered-field division, polynomial normalization, and
+  multiplication-monotonicity APIs
+Used in: recursive-momentum and adaptive Lyapunov one-step estimates that absorb
+  a reciprocal-step-size increment into a negative estimator-error drift
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/main_theorem/proof/10
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in
+  Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem complementary_quadratic_weight_reciprocal_increment_absorb
+    {K : Type*} [Field K] [LinearOrder K] [IsStrictOrderedRing K]
+    (eta prev coefficient curvature decay slack errorSq : K)
+    (heta_pos : 0 < eta)
+    (hcoefficient_nonneg : 0 ≤ coefficient)
+    (hcurvature_nonneg : 0 ≤ curvature)
+    (hweight_le_one : coefficient * eta ^ 2 ≤ 1)
+    (herrorSq_nonneg : 0 ≤ errorSq)
+    (hcoefficient_budget : curvature + decay + slack ≤ coefficient)
+    (hreciprocal_increment : 1 / eta - 1 / prev ≤ slack * eta) :
+    ((1 - coefficient * eta ^ 2) ^ 2 * (1 + curvature * eta ^ 2) *
+          errorSq) / eta -
+        errorSq / prev ≤ -decay * eta * errorSq := by
+  have heta_nonneg : 0 ≤ eta := le_of_lt heta_pos
+  have heta_ne : eta ≠ 0 := ne_of_gt heta_pos
+  have hscaled_nonneg : 0 ≤ coefficient * eta ^ 2 := by positivity
+  have hcomplement_nonneg : 0 ≤ 1 - coefficient * eta ^ 2 :=
+    sub_nonneg.mpr hweight_le_one
+  have hsquare_le :
+      (1 - coefficient * eta ^ 2) ^ 2 ≤
+        1 - coefficient * eta ^ 2 := by
+    nlinarith [sq_nonneg (1 - coefficient * eta ^ 2)]
+  have hfactor_nonneg :
+      0 ≤ (1 + curvature * eta ^ 2) * errorSq / eta := by
+    exact div_nonneg
+      (mul_nonneg (by positivity) herrorSq_nonneg) heta_nonneg
+  have hsquared_to_unsquared :
+      ((1 - coefficient * eta ^ 2) ^ 2 *
+            (1 + curvature * eta ^ 2) * errorSq) / eta ≤
+        ((1 - coefficient * eta ^ 2) *
+            (1 + curvature * eta ^ 2) * errorSq) / eta := by
+    have hmul := mul_le_mul_of_nonneg_right hsquare_le hfactor_nonneg
+    simpa [div_eq_mul_inv, mul_assoc] using hmul
+  have hdrop_cross :
+      ((1 - coefficient * eta ^ 2) *
+          (1 + curvature * eta ^ 2)) / eta ≤
+        1 / eta + (curvature - coefficient) * eta := by
+    have heq :
+        ((1 - coefficient * eta ^ 2) *
+            (1 + curvature * eta ^ 2)) / eta =
+          1 / eta + (curvature - coefficient) * eta -
+            coefficient * curvature * eta ^ 3 := by
+      field_simp [heta_ne]
+      ring
+    rw [heq]
+    have hcross_nonneg : 0 ≤ coefficient * curvature * eta ^ 3 := by
+      positivity
+    linarith
+  have hcoefficient :
+      ((1 - coefficient * eta ^ 2) *
+            (1 + curvature * eta ^ 2)) / eta -
+          1 / prev ≤
+        -decay * eta := by
+    calc
+      ((1 - coefficient * eta ^ 2) *
+              (1 + curvature * eta ^ 2)) / eta -
+            1 / prev
+          ≤ (1 / eta + (curvature - coefficient) * eta) -
+              1 / prev := sub_le_sub_right hdrop_cross (1 / prev)
+      _ = (1 / eta - 1 / prev) + (curvature - coefficient) * eta := by ring
+      _ ≤ slack * eta + (curvature - coefficient) * eta := by
+            simpa [add_comm] using
+              add_le_add_right hreciprocal_increment
+                ((curvature - coefficient) * eta)
+      _ ≤ -decay * eta := by
+            nlinarith
+  have hcoefficient_mul :
+      ((((1 - coefficient * eta ^ 2) *
+              (1 + curvature * eta ^ 2)) / eta -
+            1 / prev) * errorSq) ≤
+        (-decay * eta) * errorSq :=
+    mul_le_mul_of_nonneg_right hcoefficient herrorSq_nonneg
+  have hunsquared :
+      ((1 - coefficient * eta ^ 2) *
+            (1 + curvature * eta ^ 2) * errorSq) / eta -
+          errorSq / prev ≤
+        -decay * eta * errorSq := by
+    calc
+      ((1 - coefficient * eta ^ 2) *
+              (1 + curvature * eta ^ 2) * errorSq) / eta -
+            errorSq / prev =
+          (((1 - coefficient * eta ^ 2) *
+                (1 + curvature * eta ^ 2)) / eta -
+              1 / prev) * errorSq := by ring
+      _ ≤ (-decay * eta) * errorSq := hcoefficient_mul
+      _ = -decay * eta * errorSq := by ring
+  exact le_trans
+    (sub_le_sub_right hsquared_to_unsquared (errorSq / prev)) hunsquared
+
+end SOptLib
+
+/-- A one-based prefix sum is bounded by an additive accumulator whose initial value is
+nonnegative and whose successors add the corresponding increments.
+
+Layer: Glue | Gap: Level 1 (one-based additive-accumulator prefix bound)
+Proof: induct on the horizon, split the final point with `Finset.sum_Icc_succ_top`, and use
+  monotonicity of addition together with the nonnegative initial accumulator.
+Source: Mathlib finite sums over natural closed intervals and ordered additive monoids
+Used in: adaptive-gradient and recursive-momentum denominator comparisons that discard a
+  nonnegative initialization term from a cumulative squared-gradient or error accumulator
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/algorithm_spec
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD,
+  STOchastic Recursive Momentum -/
+theorem sum_Icc_one_le_accumulator_of_nonneg_init_of_succ
+    {R : Type*} [AddCommMonoid R] [Preorder R] [IsOrderedAddMonoid R]
+    (A increment : ℕ → R) (t : ℕ)
+    (hA_zero : 0 ≤ A 0)
+    (hA_succ : ∀ n, A (n + 1) = A n + increment (n + 1)) :
+    (Finset.Icc 1 t).sum increment ≤ A t := by
+  induction t with
+  | zero =>
+      simpa using hA_zero
+  | succ t ih =>
+      calc
+        (Finset.Icc 1 (t + 1)).sum increment =
+            (Finset.Icc 1 t).sum increment + increment (t + 1) :=
+          Finset.sum_Icc_succ_top (Nat.succ_le_succ (Nat.zero_le t)) increment
+        _ ≤ A t + increment (t + 1) := add_le_add_left ih _
+        _ = A (t + 1) := (hA_succ t).symm
+
+/-- A squared scale plus a one-based prefix through the next index is bounded by an offset
+plus the current accumulator when the next increment and doubled square fit their budgets.
+
+Layer: Glue | Gap: Level 1 (shifted prefix-denominator comparison)
+Proof: split the top endpoint with `Finset.sum_Icc_succ_top`, then combine the prefix and
+  next-increment bounds and absorb two copies of the squared scale into the offset.
+Source: Mathlib finite sums over natural closed intervals and ordered additive arithmetic
+Used in: adaptive logarithmic-sum estimates comparing a shifted sampled-increment denominator
+  with the denominator generated by a cumulative algorithmic accumulator
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/main_theorem/proof/3
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in Non-Convex SGD,
+  STOchastic Recursive Momentum -/
+theorem sq_add_sum_Icc_succ_le_offset_add_accumulator
+    {R : Type*} [Semiring R] [Preorder R] [IsOrderedAddMonoid R]
+    (increment accumulator : ℕ → R) (scale offset : R) (t : ℕ)
+    (hprefix : (Finset.Icc 1 t).sum increment ≤ accumulator t)
+    (hnext : increment (t + 1) ≤ scale ^ 2)
+    (hoffset : 2 * scale ^ 2 ≤ offset) :
+    scale ^ 2 + (Finset.Icc 1 (t + 1)).sum increment ≤
+      offset + accumulator t := by
+  rw [Finset.sum_Icc_succ_top (Nat.succ_le_succ (Nat.zero_le t))]
+  calc
+    scale ^ 2 + ((Finset.Icc 1 t).sum increment + increment (t + 1)) =
+        (scale ^ 2 + increment (t + 1)) + (Finset.Icc 1 t).sum increment := by
+      rw [add_comm ((Finset.Icc 1 t).sum increment) (increment (t + 1)), add_assoc]
+    _ ≤ (scale ^ 2 + scale ^ 2) + accumulator t :=
+      add_le_add (add_le_add (le_refl _) hnext) hprefix
+    _ = 2 * scale ^ 2 + accumulator t := by rw [two_mul]
+    _ ≤ offset + accumulator t := add_le_add hoffset (le_refl _)
+
+/-- Bound a scaled three-term squared norm while retaining the cross terms with
+the third summand.
+
+When the first scalar coefficient is quadratic in the positive scale, applying
+Young's inequality only to the first two summands yields three diagonal square
+terms and leaves both inner products with the third summand explicit.
+
+Layer: Glue | Gap: Level 1 (asymmetric scaled three-term Hilbert Young bound)
+Proof: expand the outer sum by real Hilbert polarization, apply SOptLib's binary
+  norm-square Young inequality to the first two summands, then normalize scalar
+  multiples and substitute the quadratic first-coefficient identity.
+Source: Mathlib real inner-product polarization and normed-module scalar APIs,
+  together with SOptLib's binary norm-square Young inequality
+Used in: recursive-estimator and stochastic-momentum error recurrences before
+  conditional centering cancels cross terms with the previous estimator error
+Book citation: book/STORM/StochasticRecursiveMomentum.json#/key_lemmas/3/proof/9
+Origin algorithm: Cutkosky and Orabona, Momentum-Based Variance Reduction in
+  Non-Convex SGD, STOchastic Recursive Momentum -/
+theorem norm_three_term_sq_div_le_of_first_coeff_eq
+    {E : Type*} [SeminormedAddCommGroup E] [InnerProductSpace ℝ E]
+    {η a b c : ℝ} (hη_pos : 0 < η) (ha : a = c * η ^ 2)
+    (N D e : E) :
+    ‖(a • N + b • D) + b • e‖ ^ 2 / η ≤
+      2 * c ^ 2 * η ^ 3 * ‖N‖ ^ 2 +
+        2 * b ^ 2 / η * ‖D‖ ^ 2 +
+        b ^ 2 * ‖e‖ ^ 2 / η +
+        inner ℝ N ((2 * a * b / η) • e) +
+        inner ℝ D ((2 * b ^ 2 / η) • e) := by
+  have hη_nonneg : 0 ≤ η := le_of_lt hη_pos
+  have hη_ne : η ≠ 0 := ne_of_gt hη_pos
+  have hyoung :
+      ‖a • N + b • D‖ ^ 2 ≤
+        2 * ‖a • N‖ ^ 2 + 2 * ‖b • D‖ ^ 2 :=
+    SOptLib.norm_add_sq_le_two_mul_norm_sq_add_two_mul_norm_sq (a • N) (b • D)
+  have hquad :
+      ‖(a • N + b • D) + b • e‖ ^ 2 ≤
+        2 * ‖a • N‖ ^ 2 + 2 * ‖b • D‖ ^ 2 +
+          2 * inner ℝ (a • N + b • D) (b • e) + ‖b • e‖ ^ 2 := by
+    rw [norm_add_sq_real]
+    nlinarith [hyoung]
+  have hnorm_a : ‖a • N‖ ^ 2 = a ^ 2 * ‖N‖ ^ 2 := by
+    rw [norm_smul]
+    rw [Real.norm_eq_abs, mul_pow, sq_abs]
+  have hnorm_b : ‖b • D‖ ^ 2 = b ^ 2 * ‖D‖ ^ 2 := by
+    rw [norm_smul]
+    rw [Real.norm_eq_abs, mul_pow, sq_abs]
+  have hnorm_e : ‖b • e‖ ^ 2 = b ^ 2 * ‖e‖ ^ 2 := by
+    rw [norm_smul]
+    rw [Real.norm_eq_abs, mul_pow, sq_abs]
+  have hinner_expand :
+      inner ℝ (a • N + b • D) (b • e) =
+        a * b * inner ℝ N e + b ^ 2 * inner ℝ D e := by
+    rw [inner_add_left, inner_smul_left, inner_smul_left,
+      inner_smul_right, inner_smul_right]
+    simp
+    ring
+  have hdiv :
+      ‖(a • N + b • D) + b • e‖ ^ 2 / η ≤
+        (2 * ‖a • N‖ ^ 2 + 2 * ‖b • D‖ ^ 2 +
+          2 * inner ℝ (a • N + b • D) (b • e) + ‖b • e‖ ^ 2) / η :=
+    div_le_div_of_nonneg_right hquad hη_nonneg
+  have hscalar :
+      (2 * ‖a • N‖ ^ 2 + 2 * ‖b • D‖ ^ 2 +
+          2 * inner ℝ (a • N + b • D) (b • e) + ‖b • e‖ ^ 2) / η =
+        2 * c ^ 2 * η ^ 3 * ‖N‖ ^ 2 +
+          2 * b ^ 2 / η * ‖D‖ ^ 2 +
+          b ^ 2 * ‖e‖ ^ 2 / η +
+          inner ℝ N ((2 * a * b / η) • e) +
+          inner ℝ D ((2 * b ^ 2 / η) • e) := by
+    rw [hnorm_a, hnorm_b, hnorm_e, hinner_expand, ha]
+    rw [inner_smul_right, inner_smul_right]
+    field_simp [hη_ne]
+    ring
+  exact hdiv.trans_eq hscalar
+
+-- Phase 4 merged from focused staging declarations.
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: div_sub_le_sum_of_sub_mul_le_mul_sum exposes positive-scalar
+--   normalization of a subtractive inequality with three additive budget
+--   terms; orig was scalar_divided_of_sub_mul_le, renamed away from local
+--   scalar/telescope wording while retaining the ordered-field operation.
+-- generality used: an arbitrary linearly ordered field presented in Mathlib's
+--   ordered-field typeclass style, with six scalar variables and one
+--   positivity hypothesis; no measure, independence, integrability,
+--   convexity, smoothness, oracle, topology, norm, inner-product, schedule,
+--   or finite-dimensional assumptions are used.
+-- portable call pattern: accelerated, mirror-descent, and variance-reduction
+--   proofs call this after a Gamma-normalized telescope leaves
+--   `A - gamma * L <= gamma * C + gamma * B + gamma * D`; the terminal value,
+--   retained left term, three budgets, and positive normalizer vary while the
+--   post-division inequality shape is unchanged.
+-- counterargument checked: the proof is a compact ordered-field calculation,
+--   but it is not paper-local traceability or a pure rename because it
+--   packages a recurring denominator-clearing and additive-budget collection
+--   step not exposed as one callable Mathlib/SOptLib theorem.
+-- coverage search: searched SOptLib and Mathlib for `from A - gamma times L
+--   less equal gamma times sum prove A divided gamma minus L`, `division
+--   inequality subtract multiply positive scalar ordered field`, and catalog
+--   terms `positive denominator`, `coefficient normalization`, and
+--   `mul_sum`; top hits were partial, including Mathlib
+--   `div_le_div_of_nonneg_right`, `div_le_div_iff_of_pos_right`, and SOptLib
+--   ordered-field coefficient-normalization lemmas with different contracts.
+-- minimal hypotheses: all hypotheses are pointwise scalar facts; positivity
+--   of `gamma` is exactly what is needed to multiply by `gamma⁻¹` and clear
+--   the denominator.
+
+/-- Divide a subtractive inequality by a positive scalar and collect three budgets.
+
+If `A - gamma * L` is bounded by the three terms
+`gamma * C + gamma * B + gamma * D`, then division by the positive scalar
+`gamma` yields `A / gamma - L <= C + B + D`.
+
+Layer: Glue | Gap: Level 0 (positive scalar normalization)
+Proof: multiply the assumed inequality by the nonnegative inverse of the
+  positive scalar, clear the nonzero denominator, and finish by linear
+  ordered-field arithmetic.
+Source: Mathlib ordered-field division, inverse positivity, and linear
+  arithmetic APIs
+Used in: stochastic accelerated gradient descent after the Gamma-normalized
+  Part B telescope, converting a retained gradient term and three scaled
+  budgets into the divided terminal inequality
+Book citation: book/FOML/NonconvexStochasticAcceleratedGD.json#/main_theorem/proof/16
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, nonconvex stochastic accelerated gradient descent -/
+theorem div_sub_le_sum_of_sub_mul_le_mul_sum
+    {R : Type*} [Field R] [LinearOrder R] [IsStrictOrderedRing R]
+    {A L C B D gamma : R} (hgamma_pos : 0 < gamma)
+    (h : A - gamma * L <= gamma * C + gamma * B + gamma * D) :
+    A / gamma - L <= C + B + D := by
+  have hmul := mul_le_mul_of_nonneg_left h (le_of_lt (inv_pos.mpr hgamma_pos))
+  field_simp [ne_of_gt hgamma_pos] at hmul ⊢
+  linarith
+
+end SOptLib
+
+-- Phase 4 batch 1 merge from Staging/finset_min_image_mul_sum_le_sum_mul_of_nonneg.lean
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: finite infimum coefficient weighted-sum bound; orig was
+--   outputBlockFactor_mul_blockNormSq_le_weighted_block_sum.
+-- generality used: arbitrary nonempty finite index type, ordered commutative
+--   semiring coefficients, and nonnegative weight families; no measure,
+--   independence, convexity, smoothness, oracle, normed-space, or
+--   finite-dimensional assumptions are used.
+-- portable call pattern: finite-coordinate descent and randomized block proofs
+--   compare a global sum of nonnegative coordinate certificates with the same
+--   certificates weighted by coordinate coefficients; the coefficients and
+--   nonnegative certificates vary while the minimum-times-sum conclusion stays
+--   fixed.
+-- counterargument checked: the proof is a short finite-sum monotonicity
+--   argument, but it is not a paper-local wrapper because it removes the block
+--   descent formula and applies to any finite coefficient family; the existing
+--   block-specific `min_block_descent_factor_mul_sum_le_weighted_sum` is a
+--   specialization rather than a duplicate.
+-- coverage search: queried "minimum coefficient times sum nonnegative terms
+--   less equal weighted sum", "Finset minimum image multiply sum less equal
+--   sum multiply nonnegative", and LeanSearch for "minimum of finite infimum
+--   times sum of nonnegative terms less or equal sum of coefficients times
+--   terms"; hits included Mathlib finite-sum/image APIs, SOptLib finite-image
+--   extrema packaging, and the block-specific minimum-descent-factor bound,
+--   but no paper-free lemma with this full statement.
+-- minimal hypotheses: `[Fintype I] [Nonempty I]` form the univ-indexed finite
+--   nonempty infimum, the ordered commutative semiring classes support
+--   finite-sum order and nonnegative right-multiplication, and `∀ i, 0 ≤ y i` is exactly the
+--   monotonicity condition.
+
+/-- The finite infimum coefficient of a finite family times a nonnegative finite sum is
+bounded by the corresponding weighted sum.
+
+For a nonempty finite index type, if every `y i` is nonnegative, then
+`inf_i c i * sum_i y i <= sum_i c i * y i`.
+
+Layer: Glue | Gap: Level 0 (finite infimum coefficient weighted-sum comparison)
+Proof: pull the infimum coefficient through the finite sum, compare each
+  summand with `Finset.inf'_le`, and multiply on the right by the nonnegative
+  weight.
+Source: Mathlib finite-set infimum and finite big-operator order APIs
+Used in: randomized block mirror descent conversion from full block-certificate
+  energy to the coefficient-weighted sampled-block descent sum
+Book citation: book/FOML/NonconvexStochasticBlockMirrorDescent.json#/algorithm_spec/output
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, nonconvex stochastic block mirror descent -/
+theorem finset_inf_mul_sum_le_sum_mul_of_nonneg
+    {I R : Type*} [Fintype I] [Nonempty I]
+    [CommSemiring R] [LinearOrder R] [IsOrderedRing R]
+    (c y : I → R)
+    (hy_nonneg : ∀ i, 0 ≤ y i) :
+    Finset.univ.inf' Finset.univ_nonempty c * (∑ i, y i) ≤
+      ∑ i, c i * y i := by
+  classical
+  rw [Finset.mul_sum]
+  refine Finset.sum_le_sum ?_
+  intro i _hi
+  exact mul_le_mul_of_nonneg_right
+    (Finset.inf'_le (s := Finset.univ) (f := c) (b := i) (by simp)) (hy_nonneg i)
+
+end SOptLib
+
+-- Phase 4 batch 1 merge from Staging/exact_descent_of_stochastic_descent_lipschitz_residual.lean
+-- Generalization plan (G0):
+-- concept/name: half-weighted squared-norm bound given a weighted base-vector
+--   bound and norm-distance control
+-- generality used: arbitrary real inner-product seminormed additive group; no
+--   topology beyond norm and inner-product algebra is used
+-- portable call pattern: convert a weighted squared-norm bound for one vector,
+--   plus a norm-distance comparison to another vector, into the corresponding
+--   half-weighted squared-norm bound for the second vector
+-- counterargument checked: not a duplicate of the nearby absorbed-cross-term
+--   bound, which removes the target cross term and bounds the base square
+--   instead
+-- coverage search: searched "half weighted norm squared upper bound given
+--   weighted norm squared plus inner product and norm difference bound"; closest
+--   hits were norm_sq_add_inner_le_base_sq_add_err_sq_of_norm_sub_le_of_budget
+--   and binary norm-square Young bounds, both partial but not this transfer
+--   statement
+-- minimal hypotheses: all already pointwise; NormedAddCommGroup weakened to
+--   SeminormedAddCommGroup because only norm, subtraction, and real
+--   inner-product algebra are used
+
+/-- A half-weighted squared norm bound given a full-weighted base-vector bound.
+
+If a nonnegative weight times the squared norm of `x` is controlled by a scalar
+term and a cross term with `err`, and `x` is within `‖err‖` of `y`, then the
+half-weighted squared norm of `y` is controlled by the same scalar term, the
+cross term with `y`, and two copies of the error square scaled by `γ`.
+
+Layer: Glue | Gap: Level 1 (weighted squared-norm perturbation transfer)
+Proof: split the target vector through the base vector and error, use the binary norm-square Young bound and Cauchy-Schwarz, then collect the scalar factors with ordered-ring arithmetic.
+Source: Mathlib real inner-product Cauchy-Schwarz and norm-square inequalities, with SOptLib binary norm-square Young algebra
+Used in: vector perturbation estimates that transfer a weighted squared-norm
+  bound for a base vector to a nearby target vector before integration or
+  finite aggregation -/
+theorem half_weight_norm_sq_le_of_weight_norm_sq_le_add_inner_of_norm_sub_le
+    {E : Type*} [SeminormedAddCommGroup E] [InnerProductSpace ℝ E]
+    (γ a D : ℝ) (x y err : E)
+    (hγ : 0 ≤ γ)
+    (ha_nonneg : 0 ≤ a)
+    (ha_le_one : a ≤ 1)
+    (hbase :
+      γ * a * ‖x‖ ^ 2 ≤
+        D + γ * ⟪err, x⟫_ℝ)
+    (hdist : ‖x - y‖ ≤ ‖err‖) :
+    (γ / 2) * a * ‖y‖ ^ 2 ≤
+      D + γ * ⟪err, y⟫_ℝ + 2 * γ * ‖err‖ ^ 2 := by
+  have hsq_y :
+      ‖y‖ ^ 2 ≤ 2 * ‖x‖ ^ 2 + 2 * ‖err‖ ^ 2 := by
+    have hsplit :
+        ‖y‖ ^ 2 ≤ 2 * ‖x‖ ^ 2 + 2 * ‖y - x‖ ^ 2 := by
+      calc
+        ‖y‖ ^ 2 = ‖x + (y - x)‖ ^ 2 := by
+          congr 1
+          abel
+        _ ≤ 2 * ‖x‖ ^ 2 + 2 * ‖y - x‖ ^ 2 :=
+          SOptLib.norm_add_sq_le_two_mul_norm_sq_add_two_mul_norm_sq
+            x (y - x)
+    have hdiff_sq : ‖y - x‖ ^ 2 ≤ ‖err‖ ^ 2 := by
+      have hdiff : ‖y - x‖ ≤ ‖err‖ := by
+        simpa [norm_sub_rev] using hdist
+      nlinarith [hdiff, norm_nonneg (y - x), norm_nonneg err]
+    nlinarith
+  have hleft_split :
+      (γ / 2) * a * ‖y‖ ^ 2 ≤
+        γ * a * ‖x‖ ^ 2 + γ * a * ‖err‖ ^ 2 := by
+    have hcoef_nonneg : 0 ≤ (γ / 2) * a := by positivity
+    have hmul :=
+      mul_le_mul_of_nonneg_left hsq_y hcoef_nonneg
+    nlinarith
+  have hinner_err :
+      ⟪err, x - y⟫_ℝ ≤ ‖err‖ ^ 2 := by
+    calc
+      ⟪err, x - y⟫_ℝ ≤ |⟪err, x - y⟫_ℝ| := le_abs_self _
+      _ ≤ ‖err‖ * ‖x - y‖ := abs_real_inner_le_norm err (x - y)
+      _ ≤ ‖err‖ * ‖err‖ :=
+        mul_le_mul_of_nonneg_left hdist (norm_nonneg err)
+      _ = ‖err‖ ^ 2 := by ring
+  have hinner_x :
+      ⟪err, x⟫_ℝ ≤ ⟪err, y⟫_ℝ + ‖err‖ ^ 2 := by
+    have hx_decomp : x = y + (x - y) := by
+      abel
+    calc
+      ⟪err, x⟫_ℝ =
+          ⟪err, y + (x - y)⟫_ℝ := by
+            exact congrArg (fun z => ⟪err, z⟫_ℝ) hx_decomp
+      _ = ⟪err, y⟫_ℝ + ⟪err, x - y⟫_ℝ := by
+            rw [inner_add_right]
+      _ ≤ ⟪err, y⟫_ℝ + ‖err‖ ^ 2 :=
+        add_le_add le_rfl hinner_err
+  have hbase_target :
+      γ * a * ‖x‖ ^ 2 ≤
+        D + γ * ⟪err, y⟫_ℝ + γ * ‖err‖ ^ 2 := by
+    have hcross :
+        γ * ⟪err, x⟫_ℝ ≤
+          γ * (⟪err, y⟫_ℝ + ‖err‖ ^ 2) :=
+      mul_le_mul_of_nonneg_left hinner_x hγ
+    have hbase' :
+        γ * a * ‖x‖ ^ 2 ≤
+          D + γ * ⟪err, x⟫_ℝ := by
+      simpa using hbase
+    nlinarith
+  have herror_factor :
+      γ * a * ‖err‖ ^ 2 ≤ γ * ‖err‖ ^ 2 := by
+    have hγa_le : γ * a ≤ γ * 1 :=
+      mul_le_mul_of_nonneg_left ha_le_one hγ
+    have hmul :=
+      mul_le_mul_of_nonneg_right hγa_le (sq_nonneg ‖err‖)
+    simpa [mul_assoc] using hmul
+  have hfinal :
+      (γ / 2) * a * ‖y‖ ^ 2 ≤
+        D + γ * ⟪err, y⟫_ℝ + 2 * γ * ‖err‖ ^ 2 := by
+    nlinarith
+  simpa using hfinal
+
+-- Phase 4 batch 1 merge from Staging/coercive_lower_tail_of_pos_quadratic_add_clm_add_const_add_nonneg.lean
+-- Generalization plan (G0):
+-- concept/name: continuous-linear-functional coercive lower tail; orig was
+--   `coercive_tail_of_pos_quadratic_add_clm_add_const_add_nonneg`.
+-- generality used: real seminormed additive group and normed space are enough;
+--   no measure, convexity, smoothness, oracle, Hilbert, completeness, or
+--   finite-dimensional assumptions are used.
+-- portable call pattern: noncompact prox-subproblem existence proofs use an
+--   affine lower minorant, a positive quadratic prox term, and a nonnegative
+--   residual to produce an eventual lower tail; the carrier, center,
+--   functional, residual, and objective vary while the conclusion stays fixed.
+-- counterargument checked: not paper-local traceability because it removes a
+--   recurring coercivity bridge from affine lower models to compact truncation;
+--   not a pure wrapper because it handles continuous linear functionals and a
+--   constant shift rather than the existing inner-product-only lower-tail API.
+-- coverage search: project query `positive quadratic plus continuous linear
+--   functional plus nonnegative residual coercive lower tail` found
+--   `coercive_lower_bound_of_pos_quadratic_add_linear_add_nonneg` as partial
+--   coverage and scalar `exists_nonneg_forall_le_quadratic_sub_linear_of_pos`;
+--   LeanSearch for `continuous linear map absolute value apply bounded by
+--   operator norm times norm` found Mathlib `ContinuousLinearMap.le_opNorm`,
+--   but no complete lower-tail theorem with the constant shift.
+-- minimal hypotheses: global Hilbert/completeness assumptions were weakened
+--   to the pointwise normed-space facts used by the proof; residual
+--   nonnegativity and the lower-model inequality remain pointwise on `X`.
+
+open scoped InnerProductSpace
+
+/-- A positive centered quadratic plus a continuous linear functional, constant shift,
+and nonnegative residual gives a coercive lower-tail bound.
+
+If `F` is bounded below on `X` by
+`a * ‖x - z‖ ^ 2 + ell x + c + Rterm x`, where `a > 0` and the residual is
+nonnegative on `X`, then every real target is eventually below `F` outside a
+sufficiently large ball centered at `z`.
+
+Layer: Layer0 | Gap: Level 1 (continuous-linear positive quadratic coercive lower tail)
+Proof: use the operator-norm bound to dominate the continuous linear functional
+  by a scalar linear loss from `z`, apply the scalar positive-quadratic lower-tail
+  radius, and transfer the lower model to `F`.
+Source: Mathlib continuous-linear-map operator norms and SOptLib positive quadratic
+  lower-tail algebra
+Used in: nonconvex stochastic block mirror descent block prox-solvability, where
+  an affine minorant and a positive prox quadratic give compact truncation for a
+  noncompact block subproblem
+Book citation: book/FOML/NonconvexStochasticBlockMirrorDescent.json#/algorithm_spec
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, nonconvex stochastic block mirror descent -/
+theorem coercive_lower_tail_of_pos_quadratic_add_clm_add_const_add_nonneg_glue
+    {E : Type*} [SeminormedAddCommGroup E] [NormedSpace ℝ E]
+    {X : Set E} (x0 z : E) {a : ℝ} (ell : E →L[ℝ] ℝ)
+    (c : ℝ) (Rterm F : E → ℝ)
+    (ha : 0 < a)
+    (hF_lower :
+      ∀ x : E, x ∈ X →
+        a * ‖x - z‖ ^ 2 + ell x + c + Rterm x ≤ F x)
+    (hRterm_nonneg : ∀ x : E, x ∈ X → 0 ≤ Rterm x) :
+    ∀ B : ℝ, ∃ R : ℝ, ‖x0 - z‖ ≤ R ∧
+      ∀ x : E, x ∈ X → R ≤ ‖x - z‖ → B ≤ F x := by
+  intro B
+  obtain ⟨R0, _hR0_nonneg, hR0_tail⟩ :=
+    exists_nonneg_forall_le_quadratic_sub_linear_of_pos
+      (a := a) ha ‖ell‖ (ell z + c) B
+  let R : ℝ := max R0 ‖x0 - z‖
+  refine ⟨R, ?_, ?_⟩
+  · dsimp [R]
+    exact le_max_right _ _
+  · intro x hx hfar
+    have hR0_le_R : R0 ≤ R := by
+      dsimp [R]
+      exact le_max_left _ _
+    have hR0_le_norm : R0 ≤ ‖x - z‖ := le_trans hR0_le_R hfar
+    have hscalar :
+        B ≤ a * ‖x - z‖ ^ 2 - ‖ell‖ * ‖x - z‖ + (ell z + c) :=
+      hR0_tail ‖x - z‖ hR0_le_norm
+    have hell_abs : |ell (x - z)| ≤ ‖ell‖ * ‖x - z‖ := by
+      simpa [Real.norm_eq_abs] using ell.le_opNorm (x - z)
+    have hell_lower : -(‖ell‖ * ‖x - z‖) ≤ ell (x - z) := by
+      have hneg_abs : -ell (x - z) ≤ |ell (x - z)| := neg_le_abs _
+      linarith
+    have hell_decomp : ell x = ell z + ell (x - z) := by
+      rw [map_sub]
+      abel
+    have hlinear :
+        ell z + c - ‖ell‖ * ‖x - z‖ ≤ ell x + c := by
+      nlinarith
+    have hresidual : 0 ≤ Rterm x := hRterm_nonneg x hx
+    have hmodel :
+        B ≤ a * ‖x - z‖ ^ 2 + ell x + c + Rterm x := by
+      nlinarith
+    exact le_trans hmodel (hF_lower x hx)
+
+-- Generalization plan (G0):
+-- concept/name: supremum of an attained upper-bounded two-argument range; orig was sourceDGFDiameterSq_eq_of_attained_value.
+-- generality used: arbitrary domain types A and B, a kernel V valued in a conditionally complete lattice, one attained pair, and a pointwise upper-bound hypothesis; no measure, topology, convexity, or finite-dimensional assumptions.
+-- portable call pattern: diameter, residual-envelope, and maximum-value arguments can instantiate the two domain types, the value kernel, the attaining pair, and the upper-bound proof while preserving the same supremum equality and universal bound conclusion.
+-- counterargument checked: not paper-local because it removes all DGF and saddle-point names; not a pure wrapper because it packages the reusable nonempty/bounded supremum argument and paired post-rewrite bound. The closest existing SOptLib theorem bregmanDiameterSq_eq_declared_max is Bregman-specific and same-type, so it does not cover arbitrary two-domain kernels.
+-- coverage search: searched "sSup range equals attained upper bound all values bounded", "sSup range uncurry attained upper bound", and LeanSearch natural language for an attained upper-bound supremum; top hits were Mathlib IsLUB.csSup_eq/csSup APIs and SOptLib bregmanDiameterSq_eq_declared_max, partial ingredients only.
+-- minimal hypotheses: all already minimal; the attaining values a and b give nonemptiness, and the universal upper bound gives the least-upper-bound proof.
+
+/-- The supremum of a two-argument kernel range equals an attained value
+that upper-bounds every kernel value, and every kernel value is bounded by that
+supremum.
+
+Layer: Glue | Gap: Level 1 (attained upper-bound supremum for binary ranges)
+Proof: view the binary kernel as a range over product pairs, build nonemptiness
+  from the attained pair, build the least-upper-bound property from the
+  pointwise upper bound, then apply `IsLUB.csSup_eq`.
+Source: Mathlib conditionally complete lattice supremum APIs
+Used in: stochastic saddle-point product DGF diameter normalization after a declared
+  product-core maximizer supplies the attained value and pairwise upper bound
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/algorithm_spec
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine
+  Learning, stochastic mirror descent for stochastic convex-concave saddle point problems -/
+theorem sSup_range_uncurry_eq_of_attained_upper_bound
+    {A B α : Type*} [ConditionallyCompleteLattice α] (V : A → B → α) {d : α}
+    {a : A} {b : B}
+    (hd : d = V a b) (hupper : ∀ a' : A, ∀ b' : B, V a' b' ≤ d) :
+    sSup (Set.image2 V Set.univ Set.univ) = d ∧
+      ∀ a' : A, ∀ b' : B, V a' b' ≤ sSup (Set.image2 V Set.univ Set.univ) := by
+  let S : Set α := Set.image2 V Set.univ Set.univ
+  have hd_mem : d ∈ S := by
+    rw [hd]
+    exact Set.mem_image2_of_mem (Set.mem_univ a) (Set.mem_univ b)
+  have hS_nonempty : S.Nonempty := by
+    exact ⟨d, hd_mem⟩
+  have hS_lub : IsLUB S d := by
+    constructor
+    · rintro r ⟨a', _ha', b', _hb', rfl⟩
+      exact hupper a' b'
+    · intro u hu
+      exact hu hd_mem
+  have hsup : sSup S = d := hS_lub.csSup_eq hS_nonempty
+  constructor
+  · exact hsup
+  · intro a' b'
+    simpa [S, hsup] using hupper a' b'
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: two-block product gradient-difference pairing split from one-point displacement split; orig was productDGF_gradient_pairing_split_of_displacement_split and is renamed to expose the Hilbert product pairing algebra rather than source-DGF notation.
+-- generality used: arbitrary real inner-product component spaces, arbitrary product core and carrier sets with core included in carrier, arbitrary full and component gradient maps, and arbitrary real scale denominators; no measure, filtration, convexity, smoothness, oracle, completeness, or finite-dimensional hypotheses are used.
+-- portable call pattern: product mirror descent, saddle-point mirror prox, and block mirror algorithms call this after proving a selected product-gradient pairing decomposition against every feasible displacement, then need the monotonicity pairing between two core endpoints to split into scaled component monotonicity pairings.
+-- counterargument checked: not paper-local traceability because the theorem packages the reusable two-direction lift from one-point displacement identities to endpoint gradient-difference identities; not covered by the staged one-point displacement split, which supplies only each endpoint equation and does not perform the antisymmetrization step; Mathlib has `inner_sub_left` and `inner_neg_right` but no carrier/core two-block scaled pairing split.
+-- coverage search: queried `inner product product gradient pairing split displacement split endpoints`, `inner product difference gradients endpoint pairing displacement forward reverse split`, and `inner product gradient difference equals difference of endpoint displacement pairings`; hits were local private declarations, staged `sourceProductDGF_gradient_displacement_split`, and basic Mathlib inner-product bilinearity, with no full statement covering this endpoint split.
+-- minimal hypotheses: all already minimal; core-to-carrier inclusion is exactly what permits applying the one-point displacement hypothesis in both directions, and scale positivity/nonzero, finite dimensionality, differentiability, and DGF assumptions are unused.
+
+/-- A two-block product gradient-difference pairing splits once every feasible
+one-point displacement pairing splits.
+
+For two core endpoints `x` and `x'`, apply the displacement split first from
+`x` to `x'` and then from `x'` to `x`; the second identity is negated and
+combined with left-linearity of the real inner product.
+
+Layer: Glue | Gap: Level 1 (two-block endpoint pairing split from displacement split)
+Proof: specialize the displacement split in both directions, rewrite the
+  reversed displacement by negating the inner product, and normalize with
+  `inner_sub_left` and real ring arithmetic.
+Source: Mathlib real Hilbert-space inner-product bilinearity and `WithLp`
+  product coordinate subtraction
+Used in: stochastic convex-concave saddle-point mirror descent when the scaled
+  product DGF monotonicity pairing between two core points is reduced to the
+  two component DGF monotonicity pairings
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/assumptions/7
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic convex-concave saddle point mirror descent -/
+theorem inner_product_product_gradient_pairing_split_of_displacement_split
+    {EX EY : Type*}
+    [NormedAddCommGroup EX] [InnerProductSpace ℝ EX]
+    [NormedAddCommGroup EY] [InnerProductSpace ℝ EY]
+    (core carrier : Set (WithLp 2 (EX × EY)))
+    (fullGrad : WithLp 2 (EX × EY) → WithLp 2 (EX × EY))
+    (gradX : EX → EX) (gradY : EY → EY)
+    (sx sy : ℝ)
+    (hcore_subset : core ⊆ carrier)
+    (hdisp : ∀ z ∈ core, ∀ u ∈ carrier,
+      ⟪fullGrad z, u - z⟫_ℝ =
+        ⟪gradX z.fst, u.fst - z.fst⟫_ℝ / sx +
+          ⟪gradY z.snd, u.snd - z.snd⟫_ℝ / sy)
+    {x x' : WithLp 2 (EX × EY)}
+    (hx : x ∈ core) (hx' : x' ∈ core) :
+    ⟪fullGrad x' - fullGrad x, x' - x⟫_ℝ =
+      ⟪gradX x'.fst - gradX x.fst, x'.fst - x.fst⟫_ℝ / sx +
+        ⟪gradY x'.snd - gradY x.snd, x'.snd - x.snd⟫_ℝ / sy := by
+  have hfwd :
+      ⟪fullGrad x, x' - x⟫_ℝ =
+        ⟪gradX x.fst, x'.fst - x.fst⟫_ℝ / sx +
+          ⟪gradY x.snd, x'.snd - x.snd⟫_ℝ / sy :=
+    hdisp x hx x' (hcore_subset hx')
+  have hrev :
+      ⟪fullGrad x', x - x'⟫_ℝ =
+        ⟪gradX x'.fst, x.fst - x'.fst⟫_ℝ / sx +
+          ⟪gradY x'.snd, x.snd - x'.snd⟫_ℝ / sy :=
+    hdisp x' hx' x (hcore_subset hx)
+  have hrev_neg :
+      ⟪fullGrad x', x' - x⟫_ℝ =
+        ⟪gradX x'.fst, x'.fst - x.fst⟫_ℝ / sx +
+          ⟪gradY x'.snd, x'.snd - x.snd⟫_ℝ / sy := by
+    calc
+      ⟪fullGrad x', x' - x⟫_ℝ = -⟪fullGrad x', x - x'⟫_ℝ := by
+        rw [← inner_neg_right]
+        congr 1
+        abel
+      _ =
+          -(⟪gradX x'.fst, x.fst - x'.fst⟫_ℝ / sx +
+            ⟪gradY x'.snd, x.snd - x'.snd⟫_ℝ / sy) := by
+        rw [hrev]
+      _ =
+          ⟪gradX x'.fst, x'.fst - x.fst⟫_ℝ / sx +
+            ⟪gradY x'.snd, x'.snd - x.snd⟫_ℝ / sy := by
+        rw [show
+            ⟪gradX x'.fst, x'.fst - x.fst⟫_ℝ =
+              -⟪gradX x'.fst, x.fst - x'.fst⟫_ℝ by
+            rw [← inner_neg_right]
+            congr 1
+            abel]
+        rw [show
+            ⟪gradY x'.snd, x'.snd - x.snd⟫_ℝ =
+              -⟪gradY x'.snd, x.snd - x'.snd⟫_ℝ by
+            rw [← inner_neg_right]
+            congr 1
+            abel]
+        ring
+  calc
+    ⟪fullGrad x' - fullGrad x, x' - x⟫_ℝ =
+        ⟪fullGrad x', x' - x⟫_ℝ - ⟪fullGrad x, x' - x⟫_ℝ := by
+      rw [inner_sub_left]
+    _ =
+        (⟪gradX x'.fst, x'.fst - x.fst⟫_ℝ / sx +
+          ⟪gradY x'.snd, x'.snd - x.snd⟫_ℝ / sy) -
+        (⟪gradX x.fst, x'.fst - x.fst⟫_ℝ / sx +
+          ⟪gradY x.snd, x'.snd - x.snd⟫_ℝ / sy) := by
+      rw [hrev_neg, hfwd]
+    _ =
+        ⟪gradX x'.fst - gradX x.fst, x'.fst - x.fst⟫_ℝ / sx +
+          ⟪gradY x'.snd - gradY x.snd, x'.snd - x.snd⟫_ℝ / sy := by
+      rw [inner_sub_left, inner_sub_left]
+      ring
+
+-- Generalization plan (G0):
+-- concept/name: weighted two-term real Cauchy-Schwarz inequality; orig was `weighted_two_term_mul_le_sqrt`.
+-- generality used: six real scalar parameters with nonnegative primal/dual components and positive weights; no measure, convexity, smoothness, oracle, topology, completeness, or finite-dimensional hypotheses are used.
+-- portable call pattern: product-gauge and two-block stochastic-optimization proofs call this when converting two component support bounds into a single weighted square-root product bound while changing component magnitudes and block weights.
+-- counterargument checked: not paper-local traceability because the statement is pure ordered-field/square-root algebra; not a pure wrapper because Mathlib provides finite Cauchy-Schwarz (`Real.sum_mul_le_sqrt_mul_sqrt`) but not this weighted two-scalar specialization with reciprocal weights and scalar positivity hypotheses.
+-- coverage search: searched `weighted two term Cauchy Schwarz sqrt inequality`, the displayed weighted square-root formula, CATALOG/SOptLib/Staging for `weighted_two_term`, `mul_add_mul_le_sqrt`, `sqrt weighted sq`, and LeanSearch for weighted two-term Cauchy-Schwarz; top relevant hits were Mathlib `Real.sum_mul_le_sqrt_mul_sqrt`, `NNReal.sum_mul_le_sqrt_mul_sqrt`, and an internal local copy inside a product-gauge staging proof, all partial rather than a reusable public scalar lemma.
+-- minimal hypotheses: `alpha beta` are positive to use reciprocal square-root weights; the component values are arbitrary real scalars, as in finite real Cauchy-Schwarz.
+
+/-- A weighted two-term Cauchy-Schwarz inequality over real scalars.
+
+For nonnegative component magnitudes and positive weights, the two-term
+pairing `a * c + b * d` is bounded by the product of the weighted square
+root and the reciprocal-weighted square root.
+
+Layer: Glue | Gap: Level 0 (weighted two-term square-root Cauchy-Schwarz)
+Proof: compare nonnegative sides by squaring, rewrite square roots with
+  `Real.sq_sqrt`, clear the positive denominators, and finish with the
+  nonnegativity of a square.
+Source: Mathlib real square-root order APIs and ordered-field arithmetic for
+  the finite-dimensional Cauchy-Schwarz inequality
+Used in: stochastic convex-concave saddle-point product-gauge bounds when two
+  component support inequalities are assembled into a single weighted
+  primal-dual product estimate
+Book citation: book/FOML/StochasticConvexConcaveSaddlePoint.json#/key_lemmas/0
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, stochastic mirror descent for stochastic convex-concave
+  saddle point problems -/
+theorem mul_add_mul_le_sqrt_weighted_sq_mul_sqrt_inv_weighted_sq
+    {a b c d alpha beta : ℝ} (halpha : 0 < alpha) (hbeta : 0 < beta) :
+    a * c + b * d ≤
+      Real.sqrt (alpha * a ^ 2 + beta * b ^ 2) *
+        Real.sqrt (c ^ 2 / alpha + d ^ 2 / beta) := by
+  let f : Fin 2 → ℝ := fun i =>
+    if i = 0 then Real.sqrt alpha * a else Real.sqrt beta * b
+  let g : Fin 2 → ℝ := fun i =>
+    if i = 0 then c / Real.sqrt alpha else d / Real.sqrt beta
+  have hcs := Real.sum_mul_le_sqrt_mul_sqrt (Finset.univ : Finset (Fin 2)) f g
+  have hleft :
+      (∑ i ∈ (Finset.univ : Finset (Fin 2)), f i * g i) = a * c + b * d := by
+    simp [f, g, Fin.sum_univ_two]
+    field_simp [Real.sqrt_ne_zero'.2 halpha, Real.sqrt_ne_zero'.2 hbeta]
+  have hright1 :
+      (∑ i ∈ (Finset.univ : Finset (Fin 2)), f i ^ 2) =
+        alpha * a ^ 2 + beta * b ^ 2 := by
+    simp [f, Fin.sum_univ_two, mul_pow, Real.sq_sqrt (le_of_lt halpha),
+      Real.sq_sqrt (le_of_lt hbeta)]
+  have hright2 :
+      (∑ i ∈ (Finset.univ : Finset (Fin 2)), g i ^ 2) =
+        c ^ 2 / alpha + d ^ 2 / beta := by
+    simp [g, Fin.sum_univ_two, div_pow, Real.sq_sqrt (le_of_lt halpha),
+      Real.sq_sqrt (le_of_lt hbeta)]
+  calc
+    a * c + b * d =
+        ∑ i ∈ (Finset.univ : Finset (Fin 2)), f i * g i := hleft.symm
+    _ ≤ Real.sqrt (∑ i ∈ (Finset.univ : Finset (Fin 2)), f i ^ 2) *
+        Real.sqrt (∑ i ∈ (Finset.univ : Finset (Fin 2)), g i ^ 2) := hcs
+    _ = Real.sqrt (alpha * a ^ 2 + beta * b ^ 2) *
+        Real.sqrt (c ^ 2 / alpha + d ^ 2 / beta) := by rw [hright1, hright2]
+
+end SOptLib
+
+open Finset
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: one-based closed finite-window recurrence telescope with a
+--   zero residual sequence; orig was
+--   `sum_Icc_one_step_terminal_eq_of_residual_zero`, retained because it names
+--   the `Finset.Icc` window, one-step recurrence, terminal endpoint, and the
+--   decisive residual-zero hypothesis without paper vocabulary.
+-- generality used: natural-number closed intervals and ring-valued scalar
+--   sequences; no measure, filtration, independence, integrability,
+--   convexity, smoothness, oracle, carrier, or finite-dimensional hypotheses
+--   are used.
+-- portable call pattern: stochastic descent proofs with an expected potential
+--   recurrence sum one-step identities over `k = 1, ..., N`; the leading
+--   decrement, cancelling residual, tail budget, weights, and horizon change
+--   while the terminal telescope conclusion has the same shape.
+-- counterargument checked: the core telescope is already available as
+--   `sum_Icc_sub_succ`, and Mathlib has `Finset.sum_Ico_sub`; neither packages
+--   a weighted one-step recurrence together with residual-zero cancellation,
+--   so this is more than a pure rename or caller-side expression.
+-- coverage search: queried "sum over Icc one step equality telescopes terminal
+--   equality residual zero", "closed interval sum recurrence telescope terminal
+--   value", and LeanSearch "sum over interval of successive differences
+--   telescopes to first minus last"; hits included local private theorem,
+--   `sum_Icc_sub_succ`, `Finset.sum_Ico_sub`, `Finset.sum_range_sub`, and
+--   weighted telescope lemmas, but no full recurrence-plus-residual statement.
+-- minimal hypotheses: generalized from `Real` to `[Ring R]`; all remaining
+--   hypotheses are pointwise recurrence data needed by the conclusion.
+-- revision: removed the positive-horizon hypothesis; the zero-horizon case is
+--   the empty closed interval, and the positive case uses the same telescope.
+
+/-- A one-based closed-window scalar recurrence telescopes to the terminal value
+after a residual sequence vanishes.
+
+If every step on `Finset.Icc 1 N` satisfies
+`A (k + 1) = A k - 2 * w k * B k - 2 * w k * C k
+  + w k ^ 2 * D k`
+and the residual term is zero on the same window, then the terminal value
+equals the initial value minus the accumulated leading budget plus the
+accumulated tail budget.
+
+Layer: Glue | Gap: Level 1 (one-based recurrence telescope with zero residual)
+Proof: rewrite each step as a potential drop, sum over the closed interval,
+  apply `sum_Icc_sub_succ`, and distribute finite sums over subtraction.
+Source: Mathlib finite sums over natural intervals and ring arithmetic, via
+  SOptLib's `sum_Icc_sub_succ`
+Used in: randomized stochastic gradient-free convex-distance recursion after
+  conditional mean-zero residual terms have been cancelled
+Book citation: book/FOML/StochasticZerothOrder.json#/main_theorem/proof/15
+Origin algorithm: G. Lan, First-Order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic gradient-free method -/
+theorem sum_Icc_one_step_terminal_eq_of_residual_zero
+    {R : Type*} [Ring R]
+    (A B C D w : ℕ → R) :
+    ∀ N : ℕ,
+      (∀ k, k ∈ Icc 1 N →
+        A (k + 1) =
+          A k - 2 * w k * B k - 2 * w k * C k +
+            w k ^ (2 : ℕ) * D k) →
+      (∀ k, k ∈ Icc 1 N → C k = 0) →
+      A (N + 1) =
+        A 1 -
+          2 * Finset.sum (Icc 1 N) (fun k => w k * B k) +
+          Finset.sum (Icc 1 N) (fun k => w k ^ (2 : ℕ) * D k) := by
+  classical
+  intro N hstep hresidual
+  cases N with
+  | zero =>
+      simp
+  | succ N =>
+  have hN : 1 ≤ N.succ := Nat.succ_pos N
+  have hdrop :
+      Finset.sum (Icc 1 N.succ) (fun k => A k - A (k + 1)) =
+        Finset.sum (Icc 1 N.succ)
+          (fun k => 2 * w k * B k - w k ^ (2 : ℕ) * D k) := by
+    refine Finset.sum_congr rfl ?_
+    intro k hk
+    have hstep_k := hstep k hk
+    have hresidual_k := hresidual k hk
+    rw [hstep_k, hresidual_k]
+    noncomm_ring
+  have htel :
+      Finset.sum (Icc 1 N.succ) (fun k => A k - A (k + 1)) =
+        A 1 - A (N.succ + 1) := by
+    simpa using sum_Icc_sub_succ A 1 N.succ hN
+  have hsum_two :
+      Finset.sum (Icc 1 N.succ) (fun k => 2 * w k * B k) =
+        2 * Finset.sum (Icc 1 N.succ) (fun k => w k * B k) := by
+    rw [Finset.mul_sum]
+    refine Finset.sum_congr rfl ?_
+    intro k hk
+    noncomm_ring
+  have hbudget :
+      Finset.sum (Icc 1 N.succ)
+          (fun k => 2 * w k * B k - w k ^ (2 : ℕ) * D k) =
+        2 * Finset.sum (Icc 1 N.succ) (fun k => w k * B k) -
+          Finset.sum (Icc 1 N.succ)
+            (fun k => w k ^ (2 : ℕ) * D k) := by
+    rw [Finset.sum_sub_distrib, hsum_two]
+  have htotal :
+      A 1 - A (N.succ + 1) =
+        2 * Finset.sum (Icc 1 N.succ) (fun k => w k * B k) -
+          Finset.sum (Icc 1 N.succ)
+            (fun k => w k ^ (2 : ℕ) * D k) := by
+    rw [← htel, hdrop, hbudget]
+  calc
+    A (N.succ + 1) = A 1 - (A 1 - A (N.succ + 1)) := by noncomm_ring
+    _ =
+        A 1 -
+          (2 * Finset.sum (Icc 1 N.succ) (fun k => w k * B k) -
+            Finset.sum (Icc 1 N.succ)
+              (fun k => w k ^ (2 : ℕ) * D k)) := by
+          rw [htotal]
+    _ =
+        A 1 -
+          2 * Finset.sum (Icc 1 N.succ) (fun k => w k * B k) +
+          Finset.sum (Icc 1 N.succ)
+            (fun k => w k ^ (2 : ℕ) * D k) := by
+          noncomm_ring
+
+
+open scoped InnerProductSpace
+
+-- Generalization plan (G0):
+-- concept/name: bounded full-space affine inner-product support; orig was
+--   `bounded_affine_inner_support_zero_slope`, renamed to expose both the
+--   zero-slope and supremum conclusions
+-- generality used: an arbitrary real normed additive commutative group with an
+--   inner-product-space structure, an affine constant, and a slope vector; no
+--   completeness, finite-dimensionality, measure, convexity, or oracle assumptions
+-- portable call pattern: Fenchel, Lagrangian, support-function, and primal-dual
+--   residual proofs call this when finiteness of a supremum over the full dual
+--   space must identify a vanishing slope and reduce the supremum to its constant
+-- counterargument checked: this is not paper-local traceability or a caller-side
+--   rewrite because it packages the nontrivial unbounded-ray contradiction with
+--   the resulting exact supremum; no single Mathlib or SOptLib declaration covers
+--   both conclusions
+-- coverage search: queried SOptLib/project symbols for `bounded above affine inner
+--   product full space implies slope zero and supremum equals constant`, `BddAbove
+--   range inner product linear functional zero`, and `sSup affine inner support
+--   equals constant`; no exact hits were returned. Mathlib LeanSearch for the full
+--   contract returned HTTP 500; direct source search found `real_inner_self_pos`,
+--   `real_inner_smul_right`, and `csSup_singleton`, but no packaged theorem
+-- minimal hypotheses: all already minimal; norm separation supplied by the
+--   inner-product-space structure is exactly what turns a nonzero slope into an
+--   unbounded positive ray
+
+/-- A bounded full-space affine inner-product support has zero slope and supremum
+equal to its affine constant.
+
+If all values `c + ⟪d, y⟫_ℝ`, with unrestricted `y`, are bounded above,
+then testing positive scalar multiples of `d` forces `d = 0`.  The support set
+is consequently the singleton `{c}`, whose real supremum is `c`.
+
+Layer: Glue | Gap: Level 1 (bounded full-space affine support characterization)
+Proof: contradict boundedness along a sufficiently large positive multiple of
+  a nonzero slope, using positivity of its self inner product; then rewrite the
+  support as a singleton and apply `csSup_singleton`.
+Source: Mathlib real inner-product positivity and conditionally complete real
+  supremum APIs
+Used in: Fenchel, Lagrangian, and primal-dual residual arguments that turn
+  finiteness of a full-dual-space affine support into an exact feasibility
+  identity and a constant residual value
+Book citation: book/research/Source.json#/key_lemmas/2/proof/2
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic decentralized communication sliding -/
+theorem eq_zero_and_sSup_affine_inner_support_eq_of_bddAbove
+    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+    (c : ℝ) (d : E)
+    (h_bdd : BddAbove {q : ℝ | ∃ y : E, q = c + inner ℝ d y}) :
+    d = 0 ∧ sSup {q : ℝ | ∃ y : E, q = c + inner ℝ d y} = c := by
+  have hd : d = 0 := by
+    rcases h_bdd with ⟨B, hB⟩
+    by_contra hd_ne
+    have hdd_pos : 0 < inner ℝ d d := real_inner_self_pos.mpr hd_ne
+    let a : ℝ := (B - c + 1) / inner ℝ d d
+    let q : ℝ := c + inner ℝ d (a • d)
+    have hq_mem : q ∈ {r : ℝ | ∃ y : E, r = c + inner ℝ d y} :=
+      ⟨a • d, rfl⟩
+    have hq_le : q ≤ B := hB hq_mem
+    have hq_eq : q = B + 1 := by
+      dsimp [q, a]
+      rw [real_inner_smul_right]
+      field_simp [ne_of_gt hdd_pos]
+      ring
+    linarith
+  refine ⟨hd, ?_⟩
+  subst d
+  have hset :
+      {q : ℝ | ∃ y : E, q = c + inner ℝ (0 : E) y} = ({c} : Set ℝ) := by
+    ext q
+    simp
+  rw [hset, csSup_singleton]
+
+-- Generalization plan (G0):
+-- concept/name: shifted-ratio two-square budget; orig was
+--   `cs_weighted_oracle_square_budget_pointwise_le`, renamed to expose the
+--   real-algebra inequality rather than the SDCS weights or oracle terminology
+-- generality used: four arbitrary scalars in a linearly ordered field, with positivity only of the
+--   denominator scale and a lower bound of one on the ratio parameter; no
+--   vector-space, measure, convexity, smoothness, or oracle assumptions
+-- portable call pattern: polynomial-weight, increasing-weight, and inner-loop
+--   stochastic budget proofs can vary the positive scale, ratio parameter, and
+--   two scalar error components while retaining the same diagonal square budget
+-- counterargument checked: this is short scalar algebra, but it packages the
+--   recurring combination of a shifted-ratio bound, a two-term square bound,
+--   and positive-denominator cancellation; no single Mathlib or SOptLib theorem
+--   supplies that complete contract
+-- coverage search: queried `positive denominator shifted ratio square of sum
+--   bounded by four sum of squares`, `square of sum upper bound sum of squares`,
+--   and the displayed real inequality; the closest SOptLib hit was
+--   `SOptLib.norm_add_sq_le_two_mul_norm_sq_add_two_mul_norm_sq`, which covers
+--   only the sum-square component, while Mathlib semantic search returned HTTP
+--   500 and direct source search found no exact shifted-ratio inequality
+-- minimal hypotheses: `0 < eta` permits denominator cancellation and `1 <= r`
+--   bounds `r + 1` by `2 * r`; the source assumptions `0 <= M` and `0 <= d`
+--   are unused and have been removed
+
+
+/-- A shifted ratio times the square of a sum is bounded by four times the
+sum of the component squares after division by a positive scale.
+
+Layer: Glue | Gap: Level 1 (shifted-ratio two-square budget)
+Proof: bound `r + 1` by `2 * r` and `(M + d)^2` by twice the sum of squares, multiply the inequalities, and cancel the positive factors `eta` and `r`.
+Source: Mathlib ordered-field arithmetic, nonnegative squares, and positive-denominator cancellation
+Used in: polynomial-weight and increasing-weight stochastic inner-loop analyses that reduce a weighted oracle-square contribution to a uniform diagonal square budget
+Book citation: book/research/Source.json#/algorithm_spec/parameters/8
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic decentralized communication sliding -/
+theorem add_one_mul_add_sq_div_mul_le_four_mul_sq_add_sq_div_of_one_le
+    {K : Type*} [Field K] [LinearOrder K] [IsStrictOrderedRing K]
+    (r eta M d : K) (hEta : 0 < eta) (hr : 1 ≤ r) :
+    (r + 1) * (M + d) ^ 2 / (eta * r) ≤
+      4 * (M ^ 2 + d ^ 2) / eta := by
+  have hr_pos : 0 < r := lt_of_lt_of_le zero_lt_one hr
+  have hr_bound : r + 1 ≤ 2 * r := by
+    nlinarith
+  have hsq : (M + d) ^ 2 ≤ 2 * (M ^ 2 + d ^ 2) := by
+    nlinarith [sq_nonneg (M - d)]
+  have hprod :
+      (r + 1) * (M + d) ^ 2 ≤
+        (2 * r) * (2 * (M ^ 2 + d ^ 2)) := by
+    exact mul_le_mul hr_bound hsq (sq_nonneg (M + d)) (by positivity)
+  field_simp [hEta.ne', hr_pos.ne']
+  nlinarith
+
+
+open scoped BigOperators InnerProductSpace
+
+-- Generalization plan (G0):
+-- concept/name: finite-path squared-increment bound from a telescoping coercive energy inequality; orig was finite_path_sq_increment_le_of_telescope
+-- generality used: an arbitrary real inner-product space, two vector-valued paths, two scalar potentials, and real coefficients; no completeness, finite-dimensionality, measure, convexity, or stochastic assumptions
+-- portable call pattern: mirror, proximal, implicit, and inexact descent analyses whose path, forcing sequence, linear drift, objective, potential, reference point, and constants vary while the same finite-horizon squared-increment estimate is required
+-- counterargument checked: this is not paper-local traceability or a one-line wrapper because it composes telescoping, path-length endpoint control, Hilbert-space dual bounds, and Young absorption into an explicit estimate used as a finite-horizon moment envelope
+-- coverage search: searched `finite path sum squared norm increments upper bound telescoping energy forcing initial distance`, `total squared increments upper bound of telescoping energy inequality endpoint potential`, and `sum range telescoping nonnegative terminal potential one step bound squared norm Young inequality`; `summed_one_step_gap_bound_of_telescope`, `sum_range_sub_succ_le_first_of_last_nonneg`, and `mirror_descent_sum_bound_of_three_point_and_young` cover only constituent telescope patterns, not this endpoint-growth and squared-increment conclusion
+-- minimal hypotheses: dropped the source hypothesis `0 ≤ M`, which is unused; endpoint control is pointwise at `u 0` and `u n`, and only terminal potential nonnegativity is assumed
+
+/-- A finite path satisfying a coercive one-step energy inequality has its total
+squared increment bounded by squared forcing magnitudes and its initial distance
+from a fixed reference point.
+
+Layer: Glue | Gap: Level 1 (telescoping coercive energy to finite-path squared-increment bound)
+Proof: sum and telescope the one-step inequalities, bound the endpoint displacement by path length, control the linear and forcing pairings by Cauchy--Schwarz, then absorb each path increment with Young's inequality.
+Source: Mathlib finite range-sum telescoping, real Hilbert-space Cauchy--Schwarz, norm triangle inequalities, and ordered-field square completion
+Used in: finite-horizon mirror, proximal, implicit, and inexact descent moment estimates after a local energy recurrence has been established
+Book citation: book/research/Source.json#/algorithm_spec/steps
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic decentralized communication sliding -/
+theorem sum_sq_increment_le_of_telescoping_energy
+    {E : Type*} [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+    (u delta : ℕ → E) (w xRef : E) (f V : E → ℝ)
+    (eta M C : ℝ) (n : ℕ)
+    (heta : 0 < eta) (hC : 0 ≤ C)
+    (hV0 : V (u 0) = 0) (hVn : 0 ≤ V (u n))
+    (hf0 : |f (u 0) - f xRef| ≤ C * ‖u 0 - xRef‖)
+    (hfn : |f (u n) - f xRef| ≤ C * ‖u n - xRef‖)
+    (hstep : ∀ r ∈ Finset.range n,
+      (eta / 2) * ‖u (r + 1) - u r‖ ^ 2 +
+          inner ℝ w (u (r + 1) - u r) +
+          f (u (r + 1)) - f (u r) +
+          eta * V (u (r + 1)) - eta * V (u r) ≤
+        inner ℝ (delta r) (u (r + 1) - u r) +
+          M * ‖u (r + 1) - u r‖) :
+    (∑ r ∈ Finset.range n, ‖u (r + 1) - u r‖ ^ 2) ≤
+      (4 / eta ^ 2) *
+          (∑ r ∈ Finset.range n,
+            (‖delta r‖ + M + ‖w‖ + C) ^ 2) +
+        (8 * C / eta) * ‖u 0 - xRef‖ := by
+  classical
+  let Q : ℝ := ∑ r ∈ Finset.range n, ‖u (r + 1) - u r‖ ^ 2
+  let L : ℝ := ∑ r ∈ Finset.range n, ‖u (r + 1) - u r‖
+  let B : ℕ → ℝ := fun r => ‖delta r‖ + M + ‖w‖ + C
+  have hsum := Finset.sum_le_sum hstep
+  have hwtel :
+      (∑ r ∈ Finset.range n, inner ℝ w (u (r + 1) - u r)) =
+        inner ℝ w (u n - u 0) := by
+    simp_rw [inner_sub_right]
+    have h := Finset.sum_range_sub' (fun r => inner ℝ w (u r)) n
+    simpa only [← Finset.sum_neg_distrib, neg_sub] using congrArg Neg.neg h
+  have hftel :
+      (∑ r ∈ Finset.range n, (f (u (r + 1)) - f (u r))) =
+        f (u n) - f (u 0) := by
+    have h := Finset.sum_range_sub' (fun r => f (u r)) n
+    simpa only [← Finset.sum_neg_distrib, neg_sub] using congrArg Neg.neg h
+  have hVtel :
+      (∑ r ∈ Finset.range n, (eta * V (u (r + 1)) - eta * V (u r))) =
+        eta * V (u n) - eta * V (u 0) := by
+    have h := Finset.sum_range_sub' (fun r => eta * V (u r)) n
+    simpa only [← Finset.sum_neg_distrib, neg_sub] using congrArg Neg.neg h
+  have henergy :
+      (eta / 2) * Q + inner ℝ w (u n - u 0) +
+          (f (u n) - f (u 0)) + eta * V (u n) ≤
+        (∑ r ∈ Finset.range n,
+          inner ℝ (delta r) (u (r + 1) - u r)) + M * L := by
+    have henergy' :
+        (eta / 2) * Q + inner ℝ w (u n - u 0) +
+            (f (u n) - f (u 0)) + eta * V (u n) - eta * V (u 0) ≤
+          (∑ r ∈ Finset.range n,
+            inner ℝ (delta r) (u (r + 1) - u r)) + M * L := by
+      have hleft :
+          (∑ r ∈ Finset.range n,
+            ((eta / 2) * ‖u (r + 1) - u r‖ ^ 2 +
+                inner ℝ w (u (r + 1) - u r) +
+                f (u (r + 1)) - f (u r) +
+                eta * V (u (r + 1)) - eta * V (u r))) =
+            (eta / 2) * Q + inner ℝ w (u n - u 0) +
+              (f (u n) - f (u 0)) + eta * V (u n) - eta * V (u 0) := by
+        rw [show
+          (∑ r ∈ Finset.range n,
+            ((eta / 2) * ‖u (r + 1) - u r‖ ^ 2 +
+                inner ℝ w (u (r + 1) - u r) +
+                f (u (r + 1)) - f (u r) +
+                eta * V (u (r + 1)) - eta * V (u r))) =
+              (eta / 2) * Q +
+                (∑ r ∈ Finset.range n, inner ℝ w (u (r + 1) - u r)) +
+                (∑ r ∈ Finset.range n, (f (u (r + 1)) - f (u r))) +
+                (∑ r ∈ Finset.range n,
+                  (eta * V (u (r + 1)) - eta * V (u r))) by
+            dsimp [Q]
+            simp only [Finset.sum_add_distrib, Finset.sum_sub_distrib,
+              ← Finset.mul_sum]
+            ring]
+        rw [hwtel, hftel, hVtel]
+        ring
+      have hright :
+          (∑ r ∈ Finset.range n,
+            (inner ℝ (delta r) (u (r + 1) - u r) +
+              M * ‖u (r + 1) - u r‖)) =
+            (∑ r ∈ Finset.range n,
+              inner ℝ (delta r) (u (r + 1) - u r)) + M * L := by
+        dsimp [L]
+        simp only [Finset.sum_add_distrib, ← Finset.mul_sum]
+      rw [hleft, hright] at hsum
+      exact hsum
+    simpa [hV0] using henergy'
+  have hpath : ‖u n - u 0‖ ≤ L := by
+    have hsumvec : u n - u 0 = ∑ r ∈ Finset.range n, (u (r + 1) - u r) := by
+      have h := Finset.sum_range_sub' u n
+      calc
+        u n - u 0 = -(u 0 - u n) := by abel
+        _ = -(∑ r ∈ Finset.range n, (u r - u (r + 1))) := by rw [h]
+        _ = ∑ r ∈ Finset.range n, (u (r + 1) - u r) := by
+          rw [← Finset.sum_neg_distrib]
+          apply Finset.sum_congr rfl
+          intro r _hr
+          abel
+    rw [hsumvec]
+    exact norm_sum_le _ _
+  have href : ‖u n - xRef‖ ≤ L + ‖u 0 - xRef‖ := by
+    calc
+      ‖u n - xRef‖ = ‖(u n - u 0) + (u 0 - xRef)‖ := by congr 1 <;> abel
+      _ ≤ ‖u n - u 0‖ + ‖u 0 - xRef‖ := norm_add_le _ _
+      _ ≤ L + ‖u 0 - xRef‖ := by
+        simpa [add_comm] using add_le_add_right hpath ‖u 0 - xRef‖
+  have hfdiff :
+      -(f (u n) - f (u 0)) ≤ C * L + 2 * C * ‖u 0 - xRef‖ := by
+    have habs :
+        |f (u n) - f (u 0)| ≤ C * L + 2 * C * ‖u 0 - xRef‖ := by
+      calc
+        |f (u n) - f (u 0)| =
+            |(f (u n) - f xRef) - (f (u 0) - f xRef)| := by ring_nf
+        _ ≤ |f (u n) - f xRef| + |f (u 0) - f xRef| := abs_sub _ _
+        _ ≤ C * ‖u n - xRef‖ + C * ‖u 0 - xRef‖ := add_le_add hfn hf0
+        _ ≤ C * (L + ‖u 0 - xRef‖) + C * ‖u 0 - xRef‖ := by
+          gcongr
+        _ = C * L + 2 * C * ‖u 0 - xRef‖ := by ring
+    exact le_trans (neg_le_abs _) habs
+  have hw :
+      -(inner ℝ w (u n - u 0)) ≤ ‖w‖ * L := by
+    calc
+      -(inner ℝ w (u n - u 0)) ≤ |inner ℝ w (u n - u 0)| := neg_le_abs _
+      _ ≤ ‖w‖ * ‖u n - u 0‖ := abs_real_inner_le_norm _ _
+      _ ≤ ‖w‖ * L := mul_le_mul_of_nonneg_left hpath (norm_nonneg _)
+  have hnoise :
+      (∑ r ∈ Finset.range n,
+          inner ℝ (delta r) (u (r + 1) - u r)) ≤
+        ∑ r ∈ Finset.range n,
+          ‖delta r‖ * ‖u (r + 1) - u r‖ := by
+    exact Finset.sum_le_sum (fun r _hr => real_inner_le_norm _ _)
+  have hrough :
+      (eta / 2) * Q ≤
+        ∑ r ∈ Finset.range n, B r * ‖u (r + 1) - u r‖ +
+          2 * C * ‖u 0 - xRef‖ := by
+    have hVterm : 0 ≤ eta * V (u n) := mul_nonneg (le_of_lt heta) hVn
+    have hbase :
+        (eta / 2) * Q ≤
+          (∑ r ∈ Finset.range n,
+            ‖delta r‖ * ‖u (r + 1) - u r‖) +
+            M * L + ‖w‖ * L + C * L +
+              2 * C * ‖u 0 - xRef‖ := by
+      linarith
+    calc
+      (eta / 2) * Q ≤
+          (∑ r ∈ Finset.range n,
+            ‖delta r‖ * ‖u (r + 1) - u r‖) +
+            M * L + ‖w‖ * L + C * L +
+              2 * C * ‖u 0 - xRef‖ := hbase
+      _ = ∑ r ∈ Finset.range n, B r * ‖u (r + 1) - u r‖ +
+            2 * C * ‖u 0 - xRef‖ := by
+          simp only [B, L]
+          simp_rw [add_mul]
+          simp only [Finset.sum_add_distrib, ← Finset.mul_sum]
+  have hyoung :
+      ∀ r, B r * ‖u (r + 1) - u r‖ ≤
+        (eta / 4) * ‖u (r + 1) - u r‖ ^ 2 + (B r) ^ 2 / eta := by
+    intro r
+    have hs := sq_nonneg (eta * ‖u (r + 1) - u r‖ - 2 * B r)
+    have hmul :
+        eta * (B r * ‖u (r + 1) - u r‖) ≤
+          eta * ((eta / 4) * ‖u (r + 1) - u r‖ ^ 2 + (B r) ^ 2 / eta) := by
+      field_simp [ne_of_gt heta]
+      nlinarith
+    nlinarith [hmul]
+  have hyoung_sum := Finset.sum_le_sum (s := Finset.range n) (fun r _hr => hyoung r)
+  have hhalf :
+      (eta / 4) * Q ≤
+        (1 / eta) * (∑ r ∈ Finset.range n, (B r) ^ 2) +
+          2 * C * ‖u 0 - xRef‖ := by
+    dsimp [Q] at hrough ⊢
+    have heta_ne : eta ≠ 0 := ne_of_gt heta
+    simp only [Finset.sum_add_distrib, ← Finset.mul_sum] at hyoung_sum
+    have hdivsum :
+        (∑ r ∈ Finset.range n, (B r) ^ 2 / eta) =
+          (1 / eta) * (∑ r ∈ Finset.range n, (B r) ^ 2) := by
+      simp [div_eq_mul_inv, Finset.mul_sum, mul_comm]
+    rw [hdivsum] at hyoung_sum
+    linarith
+  dsimp [Q, B] at hhalf ⊢
+  have heta_sq_pos : 0 < eta ^ 2 := sq_pos_of_pos heta
+  have hscale := mul_le_mul_of_nonneg_left hhalf (show 0 ≤ 4 / eta by positivity)
+  field_simp [ne_of_gt heta, ne_of_gt heta_sq_pos] at hscale ⊢
+  nlinarith
+
+-- Generalization plan (G0):
+-- concept/name: shifted quadratic ratio identity and uniform upper bound, named
+--   `add_one_mul_add_two_div_mul_add_three_eq_and_le_three_halves`; orig was
+--   `inner_step_terminal_ratio_identity_and_bound_pattern`
+-- generality used: one scalar in a linearly ordered field with the pointwise lower
+--   bound `1 ≤ T`; no
+--   measure, vector-space, convexity, smoothness, oracle, filtration, topology,
+--   or finite-dimensional assumptions are used
+-- portable call pattern: polynomially weighted proximal, accelerated, and
+--   communication-sliding inner-loop analyses can vary the positive real step
+--   count and outer coefficient while retaining the same exact shifted ratio
+--   identity and its uniform `3 / 2` upper bound
+-- counterargument checked: the formula is compact scalar algebra, but the
+--   compound identity-and-bound contract is reused both to normalize expanded
+--   endpoint coefficients and to bound terminal coefficients; it is neither a
+--   paper-local notation wrapper nor a pure rename of one library theorem
+-- coverage search: queried SOptLib for `real shifted quadratic ratio equals one
+--   plus reciprocal correction and bounded by three halves when one less than
+--   variable` and `add one times add two divided by variable times add three
+--   equals and upper bound`; no matching declaration was found. The closest
+--   catalogued ratio lemmas concern geometric or parameter-choice ratios with
+--   different statements; Mathlib semantic search returned HTTP 500
+-- minimal hypotheses: `1 ≤ T` both makes `T` and `T + 3` nonzero for the exact
+--   identity and gives the denominator lower bound needed for `≤ 3 / 2`
+
+
+/-- For a parameter at least one in a linearly ordered field, the shifted quadratic ratio is one plus
+its reciprocal correction and is at most three halves.
+
+Layer: Glue | Gap: Level 1 (shifted quadratic ratio identity and bound)
+Proof: derive positivity of both denominator factors, clear denominators for the exact identity, and use nonlinear arithmetic with `1 ≤ T` for the upper bound.
+Source: Mathlib ordered-field division, polynomial normalization, and nonlinear arithmetic APIs
+Used in: polynomially weighted proximal and accelerated inner loops when rewriting expanded endpoint coefficients and uniformly bounding their terminal ratio
+Book citation: book/research/Source.json#/main_theorem/proof/4
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, Stochastic Decentralized Communication Sliding -/
+theorem add_one_mul_add_two_div_mul_add_three_eq_and_le_three_halves
+    {K : Type*} [Field K] [LinearOrder K] [IsStrictOrderedRing K]
+    (T : K) (hT : 1 ≤ T) :
+    ((T + 1) * (T + 2)) / (T * (T + 3)) =
+        1 + 2 / (T * (T + 3)) ∧
+      ((T + 1) * (T + 2)) / (T * (T + 3)) ≤ 3 / 2 := by
+  have hT_pos : 0 < T := lt_of_lt_of_le zero_lt_one hT
+  have hT3_pos : 0 < T + 3 := by nlinarith
+  constructor
+  · field_simp [hT_pos.ne', hT3_pos.ne']
+    ring
+  · field_simp [hT_pos.ne', hT3_pos.ne']
+    nlinarith
+
+
+open scoped InnerProductSpace
+
+-- Generalization plan (G0):
+-- concept/name: mul_inner_le_quadratic_sum_of_norm_sq_le_mul exposes a
+--   discriminant-form Young absorption inequality; orig was
+--   stacked_inner_young_absorption_of_sq_bound_nonneg
+-- generality used: a seminormed additive commutative group with a real inner
+--   product; arbitrary real `K` and nonnegative remaining coefficients and
+--   budget; no measure,
+--   completeness, finite-dimensionality, convexity, or oracle assumptions
+-- portable call pattern: primal-dual, network, and proximal estimates absorb a
+--   scaled Hilbert cross term after changing the residual vectors and the
+--   nonnegative scalar norm-square budget while retaining the same conclusion
+-- counterargument checked: this is not paper-local or a pure wrapper because it
+--   packages an external norm-square bound with a division-free discriminant
+--   condition and remains valid when either quadratic coefficient is zero
+-- coverage search: searched SOptLib symbols for inner-product quadratic
+--   absorption from a norm-square bound and queried Mathlib LeanSearch for the
+--   full discriminant shape (the service returned HTTP 500); the closest hit,
+--   young_absorb_inner_of_norm_sq_budget, requires positive denominator data
+--   and uses a different two-stage budget contract, so coverage is partial
+-- minimal hypotheses: nonnegativity of `K` is dropped because only the two
+--   composite bounds involving `K` are needed; all remaining sign assumptions
+--   transport inequalities or establish nonnegative sides
+
+/-- A norm-square budget and a discriminant bound absorb a scaled inner product.
+
+If `‖g‖² ≤ K * q` and `c² * K ≤ 4 * A * B`, with `A`, `B`, `c`, and `q`
+nonnegative, then the cross term `c * ⟪g, v⟫_ℝ` is bounded by
+the two quadratic budgets `A * q` and `B * ‖v‖²`.  The division-free form
+also covers vanishing budget coefficients.
+
+Layer: Glue | Gap: Level 1 (degenerate-safe discriminant Young absorption)
+Proof: apply Hilbert-space Cauchy--Schwarz, propagate the norm-square and
+  discriminant bounds, and compare the resulting nonnegative quantities by
+  squaring against the completed square `(A * q - B * ‖v‖²)²`.
+Source: Mathlib real Hilbert-space Cauchy--Schwarz, nonnegative square
+  comparison, and ordered-ring arithmetic APIs
+Used in: primal-dual network and proximal descent proofs when a bounded linear
+  residual cross term must be absorbed into primal and dual quadratic budgets,
+  including degenerate zero-budget branches
+Book citation: book/research/Source.json#/key_lemmas/5/proof/8
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic decentralized communication sliding -/
+theorem mul_inner_le_quadratic_sum_of_norm_sq_le_mul
+    {E : Type*} [SeminormedAddCommGroup E] [InnerProductSpace ℝ E]
+    {A B c K q : ℝ} {g v : E}
+    (hA : 0 ≤ A) (hB : 0 ≤ B) (hc : 0 ≤ c) (hq : 0 ≤ q)
+    (hcoef : c ^ 2 * K ≤ 4 * A * B)
+    (hg : ‖g‖ ^ 2 ≤ K * q) :
+    c * ⟪g, v⟫_ℝ ≤ A * q + B * ‖v‖ ^ 2 := by
+  have hinner : c * ⟪g, v⟫_ℝ ≤ c * (‖g‖ * ‖v‖) := by
+    exact mul_le_mul_of_nonneg_left
+      (le_trans (le_abs_self _) (abs_real_inner_le_norm g v)) hc
+  have hcoef_q : c ^ 2 * K * q ≤ 4 * A * B * q :=
+    mul_le_mul_of_nonneg_right hcoef hq
+  have hcg : c ^ 2 * ‖g‖ ^ 2 ≤ c ^ 2 * (K * q) :=
+    mul_le_mul_of_nonneg_left hg (sq_nonneg c)
+  have hcg' : c ^ 2 * ‖g‖ ^ 2 ≤ 4 * A * B * q := by
+    nlinarith [hcoef_q, hcg]
+  have hleft_bound :
+      c ^ 2 * ‖g‖ ^ 2 * ‖v‖ ^ 2 ≤ 4 * A * B * q * ‖v‖ ^ 2 :=
+    mul_le_mul_of_nonneg_right hcg' (sq_nonneg ‖v‖)
+  have hyoung_sq :
+      4 * A * B * q * ‖v‖ ^ 2 ≤ (A * q + B * ‖v‖ ^ 2) ^ 2 := by
+    nlinarith [sq_nonneg (A * q - B * ‖v‖ ^ 2)]
+  have hprod_sq :
+      (c * (‖g‖ * ‖v‖)) ^ 2 ≤ (A * q + B * ‖v‖ ^ 2) ^ 2 := by
+    calc
+      (c * (‖g‖ * ‖v‖)) ^ 2 = c ^ 2 * ‖g‖ ^ 2 * ‖v‖ ^ 2 := by ring
+      _ ≤ 4 * A * B * q * ‖v‖ ^ 2 := hleft_bound
+      _ ≤ (A * q + B * ‖v‖ ^ 2) ^ 2 := hyoung_sq
+  have hright_nonneg : 0 ≤ A * q + B * ‖v‖ ^ 2 :=
+    add_nonneg (mul_nonneg hA hq) (mul_nonneg hB (sq_nonneg ‖v‖))
+  have hprod_nonneg : 0 ≤ c * (‖g‖ * ‖v‖) :=
+    mul_nonneg hc (mul_nonneg (norm_nonneg g) (norm_nonneg v))
+  exact hinner.trans ((sq_le_sq₀ hprod_nonneg hright_nonneg).mp hprod_sq)
+
+
+open scoped InnerProductSpace
+
+-- Generalization plan (G0):
+-- concept/name: residual_branches_of_retained_quadratic_bound_nonneg exposes
+--   degenerate-safe extraction of two residual branches from one retained
+--   quadratic inequality; orig was
+--   sdcs_residual_branches_of_retained_terminal_bound_nonneg_tau
+-- generality used: a seminormed additive commutative group with a real inner
+--   product; arbitrary real quadratic weight, coupling budget, and remainder;
+--   no measure, completeness, finite-dimensionality, convexity, smoothness,
+--   oracle, network, or algorithm assumptions
+-- portable call pattern: primal-dual, proximal, and distributed convergence
+--   proofs vary the Hilbert residual vectors, retained energy majorant,
+--   quadratic weights, and remainder while extracting the same separate
+--   primal and dual residual bounds, including a zero dual stepsize
+-- counterargument checked: this is not paper-local traceability or a one-line
+--   wrapper because it combines two Young absorptions with a separate
+--   zero-stepsize collapse; the existing absorption lemma supplies only the
+--   positive-branch inner-product estimate, not both retained residual bounds
+-- coverage search: lean_search_symbols queries for "retained quadratic
+--   inequality separate primal dual residual bounds" and "inner product
+--   retained quadratic bound primal dual branch" found only the two private
+--   SDCS declarations and partial Young-absorption infrastructure;
+--   lean_leansearch for the full degenerate-safe branch contract returned HTTP
+--   500, and CATALOG searches found no theorem with this conclusion shape
+-- minimal hypotheses: `1 ≤ theta`, `0 < eta`, `0 ≤ tau`, `0 ≤ K`, the
+--   weight identity, zero-weight compatibility, energy lower bound, norm-square
+--   bound, and retained inequality are exactly used; separate `0 ≤ theta`
+--   and factored weight parameters are unnecessary
+
+/-- A retained quadratic inequality bounds both residual branches, even at zero dual weight.
+
+Suppose a retained energy inequality contains a first quadratic lower bound,
+a dual quadratic term of weight `weight = theta * tau`, and a Hilbert-space
+coupling whose norm square is controlled by `K`.  Under the compatible
+zero-weight condition, the same reduced coefficient bounds the two residual
+energies separately.  When `tau = 0`, `K = 0`, so the coupling vanishes and
+the second branch is identically zero.
+
+Layer: Glue | Gap: Level 1 (degenerate-safe retained quadratic residual branches)
+Proof: split on positivity of the dual stepsize; in the positive branch apply
+  the discriminant-form Hilbert Young inequality twice, and in the zero branch
+  use zero-weight compatibility to force the coupling norm to vanish.
+Source: Mathlib real Hilbert-space Cauchy--Schwarz and ordered-field arithmetic,
+  together with the staged discriminant-form Young absorption inequality
+Used in: primal-dual and distributed convergence proofs extracting separate
+  terminal primal-step and dual-displacement bounds from one retained energy
+  estimate before expectation or maximum aggregation
+Book citation: book/research/Source.json#/key_lemmas/5/proof/15
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic decentralized communication sliding -/
+theorem residual_branches_of_retained_quadratic_bound_nonneg
+    {E : Type*} [SeminormedAddCommGroup E] [InnerProductSpace ℝ E]
+    {theta eta tau weight K R energy : ℝ} {dx g v : E}
+    (heta_pos : 0 < eta) (htau : 0 ≤ tau) (htheta_ge_one : 1 ≤ theta)
+    (hweight : theta * tau = weight)
+    (hK : 0 ≤ K)
+    (hzero : tau = 0 → K = 0)
+    (henergy : (1 / 2 : ℝ) * ‖dx‖ ^ 2 ≤ energy)
+    (hg : ‖g‖ ^ 2 ≤ K * ‖dx‖ ^ 2)
+    (hretained :
+      theta * eta * energy + (weight / 2) * ‖v‖ ^ 2 ≤
+        theta * ⟪g, v⟫_ℝ + R) :
+    let coeff : ℝ := (theta / 2) * (1 - theta * K / (eta * tau))
+    coeff * (eta * ‖dx‖ ^ 2) ≤ R ∧ coeff * (tau * ‖v‖ ^ 2) ≤ R := by
+  by_cases htau_pos : 0 < tau
+  · intro coeff
+    have htheta : 0 ≤ theta := le_trans (by norm_num) htheta_ge_one
+    have heta_nonneg : 0 ≤ eta := le_of_lt heta_pos
+    have hB_nonneg : 0 ≤ weight / 2 := by
+      rw [← hweight]
+      positivity
+    have hcoeff_eta_expand :
+        coeff * eta = theta * eta / 2 - (theta ^ 2 * K) / (2 * tau) := by
+      dsimp [coeff]
+      field_simp [heta_pos.ne', htau_pos.ne']
+    have hcoeff_tau_expand :
+        coeff * tau = theta * tau / 2 - (theta ^ 2 * K) / (2 * eta) := by
+      dsimp [coeff]
+      field_simp [heta_pos.ne', htau_pos.ne']
+    have hA_primal_nonneg : 0 ≤ (theta ^ 2 * K) / (2 * tau) := by
+      positivity
+    have hA_dual_nonneg : 0 ≤ (theta ^ 2 * K) / (2 * eta) := by
+      positivity
+    have hYoungPrimal :
+        theta * ⟪g, v⟫_ℝ ≤
+          ((theta ^ 2 * K) / (2 * tau)) * ‖dx‖ ^ 2 +
+            (weight / 2) * ‖v‖ ^ 2 := by
+      have hcoef :
+          theta ^ 2 * K ≤
+            4 * ((theta ^ 2 * K) / (2 * tau)) * (weight / 2) := by
+        rw [← hweight]
+        field_simp [htau_pos.ne']
+        nlinarith [
+          mul_nonneg (sub_nonneg.mpr htheta_ge_one)
+            (mul_nonneg (sq_nonneg theta) hK)]
+      exact
+        mul_inner_le_quadratic_sum_of_norm_sq_le_mul
+          (A := (theta ^ 2 * K) / (2 * tau)) (B := weight / 2)
+          (c := theta) (K := K) (q := ‖dx‖ ^ 2) (g := g) (v := v)
+          hA_primal_nonneg hB_nonneg htheta (sq_nonneg ‖dx‖) hcoef hg
+    have hYoungDual :
+        theta * ⟪g, v⟫_ℝ ≤
+          (theta * eta / 2) * ‖dx‖ ^ 2 +
+            ((theta ^ 2 * K) / (2 * eta)) * ‖v‖ ^ 2 := by
+      have hcoef :
+          theta ^ 2 * K ≤
+            4 * (theta * eta / 2) * ((theta ^ 2 * K) / (2 * eta)) := by
+        field_simp [heta_pos.ne']
+        nlinarith [
+          mul_nonneg (sub_nonneg.mpr htheta_ge_one)
+            (mul_nonneg (sq_nonneg theta) hK)]
+      have hA : 0 ≤ theta * eta / 2 := by positivity
+      exact
+        mul_inner_le_quadratic_sum_of_norm_sq_le_mul
+          (A := theta * eta / 2) (B := (theta ^ 2 * K) / (2 * eta))
+          (c := theta) (K := K) (q := ‖dx‖ ^ 2) (g := g) (v := v)
+          hA hA_dual_nonneg htheta (sq_nonneg ‖dx‖) hcoef hg
+    have henergy_scaled :
+        (theta * eta / 2) * ‖dx‖ ^ 2 ≤ theta * eta * energy := by
+      have hscale : 0 ≤ theta * eta := mul_nonneg htheta heta_nonneg
+      have h := mul_le_mul_of_nonneg_left henergy hscale
+      nlinarith
+    constructor
+    · calc
+        coeff * (eta * ‖dx‖ ^ 2) =
+            (theta * eta / 2) * ‖dx‖ ^ 2 -
+              ((theta ^ 2 * K) / (2 * tau)) * ‖dx‖ ^ 2 := by
+                calc
+                  coeff * (eta * ‖dx‖ ^ 2) =
+                      (coeff * eta) * ‖dx‖ ^ 2 := by ring
+                  _ = (theta * eta / 2 - theta ^ 2 * K / (2 * tau)) *
+                      ‖dx‖ ^ 2 := by rw [hcoeff_eta_expand]
+                  _ = (theta * eta / 2) * ‖dx‖ ^ 2 -
+                      (theta ^ 2 * K / (2 * tau)) * ‖dx‖ ^ 2 := by ring
+        _ ≤ theta * eta * energy + (weight / 2) * ‖v‖ ^ 2 -
+              theta * ⟪g, v⟫_ℝ := by
+                linarith [henergy_scaled, hYoungPrimal]
+        _ ≤ R := by linarith
+    · calc
+        coeff * (tau * ‖v‖ ^ 2) =
+            (theta * tau / 2) * ‖v‖ ^ 2 -
+              ((theta ^ 2 * K) / (2 * eta)) * ‖v‖ ^ 2 := by
+                calc
+                  coeff * (tau * ‖v‖ ^ 2) =
+                      (coeff * tau) * ‖v‖ ^ 2 := by ring
+                  _ = (theta * tau / 2 - theta ^ 2 * K / (2 * eta)) *
+                      ‖v‖ ^ 2 := by rw [hcoeff_tau_expand]
+                  _ = (theta * tau / 2) * ‖v‖ ^ 2 -
+                      (theta ^ 2 * K / (2 * eta)) * ‖v‖ ^ 2 := by ring
+        _ = (weight / 2) * ‖v‖ ^ 2 -
+              ((theta ^ 2 * K) / (2 * eta)) * ‖v‖ ^ 2 := by
+                rw [← hweight]
+        _ ≤ theta * eta * energy + (weight / 2) * ‖v‖ ^ 2 -
+              theta * ⟪g, v⟫_ℝ := by
+                linarith [henergy_scaled, hYoungDual]
+        _ ≤ R := by linarith
+  · intro coeff
+    have htau_zero : tau = 0 := le_antisymm (le_of_not_gt htau_pos) htau
+    have htheta_pos : 0 < theta := lt_of_lt_of_le zero_lt_one htheta_ge_one
+    have htheta : 0 ≤ theta := le_of_lt htheta_pos
+    have heta_nonneg : 0 ≤ eta := le_of_lt heta_pos
+    have hweight_zero : weight = 0 := by
+      simpa [htau_zero] using hweight.symm
+    have hK_zero : K = 0 := hzero htau_zero
+    have hg_nonpos : ‖g‖ ^ 2 ≤ 0 := by simpa [hK_zero] using hg
+    have hg_sq_zero : ‖g‖ ^ 2 = 0 := le_antisymm hg_nonpos (sq_nonneg ‖g‖)
+    have hg_norm_zero : ‖g‖ = 0 := sq_eq_zero_iff.mp hg_sq_zero
+    have hinner_zero : ⟪g, v⟫_ℝ = 0 := by
+      have habs_le : |⟪g, v⟫_ℝ| ≤ 0 := by
+        simpa [hg_norm_zero] using abs_real_inner_le_norm g v
+      exact abs_eq_zero.mp (le_antisymm habs_le (abs_nonneg _))
+    have hretained_energy : theta * eta * energy ≤ R := by
+      nlinarith [hretained]
+    have henergy_scaled :
+        (theta * eta / 2) * ‖dx‖ ^ 2 ≤ theta * eta * energy := by
+      have hscale : 0 ≤ theta * eta := mul_nonneg htheta heta_nonneg
+      have h := mul_le_mul_of_nonneg_left henergy hscale
+      nlinarith
+    constructor
+    · calc
+        coeff * (eta * ‖dx‖ ^ 2) = (theta * eta / 2) * ‖dx‖ ^ 2 := by
+          dsimp [coeff]
+          simp [htau_zero]
+          ring
+        _ ≤ theta * eta * energy := henergy_scaled
+        _ ≤ R := hretained_energy
+    · calc
+        coeff * (tau * ‖v‖ ^ 2) = 0 := by simp [htau_zero]
+        _ ≤ R := by
+          have hleft_nonneg : 0 ≤ theta * eta * energy := by
+            have hscaled_nonneg : 0 ≤ (theta * eta / 2) * ‖dx‖ ^ 2 := by
+              positivity
+            exact le_trans hscaled_nonneg henergy_scaled
+          linarith
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: constant-effective-weight finite potential-drop telescope with a
+--   retained closed-interval penalty tail; orig was
+--   `sdcs_dual_drop_sum_le_endpoint_sub_tail`.
+-- generality used: linearly ordered fields and natural-indexed scalar sequences;
+--   no measure, probability, convexity, smoothness, oracle, vector-space, or
+--   finite-dimensional assumptions are used.
+-- portable call pattern: weighted primal-dual, proximal, and Lyapunov analyses
+--   can sum potential drops minus nonnegative penalties when two varying scalar
+--   factors have constant product; the factors, potential, penalty, and horizon
+--   vary while the endpoint-minus-retained-tail conclusion is unchanged.
+-- counterargument checked: this is not paper-local traceability or a pure
+--   wrapper: it combines constant-effective-weight normalization, a range
+--   telescope, a one-based initial/tail split, and dropping only the first
+--   nonnegative penalty while retaining the full `Icc 2 N` tail.
+-- coverage search: queried "constant effective weight finite difference penalty
+--   sum bounded endpoint drop retained tail penalty" and "sum range constant
+--   coefficient successive differences nonnegative first penalty endpoint minus
+--   tail"; `sum_range_sub_succ_le_first_of_last_nonneg` and
+--   `sum_Icc_one_eq_first_add_tail` cover individual steps, while
+--   `sum_weighted_sub_mul_le_first_sub_tail` and
+--   `sum_Icc_mono_coeff_mul_sub_le_terminal_sub_tail` have different coefficient
+--   and tail contracts; Mathlib semantic search returned no applicable result.
+-- minimal hypotheses: constant-product equality is required only on active
+--   indices, and penalty nonnegativity is required only at the first active
+--   index even though the originating theorem provides it on the whole window.
+
+/-- A constant-effective-weight potential-drop sum is bounded by its endpoint
+drop minus the retained penalty tail.
+
+If the products `a t * b t` are equal to their first value on a positive finite
+window, then summing the weighted drops of `D` minus penalties `E` telescopes.
+Nonnegativity of the first penalty allows only that initial term to be dropped;
+the penalties on `Finset.Icc 2 N` remain in the conclusion.
+
+Layer: Glue | Gap: Level 1 (constant-weight drop telescope with retained penalty tail)
+Proof: normalize the factorized weights to their first product, telescope the
+  successive differences with `Finset.sum_range_sub'`, split the shifted penalty
+  range with `sum_Icc_one_eq_first_add_tail`, and discard the nonnegative first term.
+Source: Mathlib finite sums over natural ranges and linearly ordered field arithmetic,
+  together with SOptLib's one-based closed-interval initial/tail split
+Used in: weighted primal-dual and proximal telescopes that cancel later penalty
+  terms against lagged budgets while discarding only the first nonnegative penalty
+Book citation: book/research/Source.json#/key_lemmas/5/proof/10
+Origin algorithm: Lan and Zhou, Stochastic Decentralized Communication Sliding -/
+theorem sum_range_constant_weight_drop_sub_le_endpoint_sub_Icc_tail
+    {R : Type*} [Field R] [LinearOrder R] [IsStrictOrderedRing R]
+    (a b D E : ℕ → R) (N : ℕ) (hN : 1 ≤ N)
+    (hweight_nonneg : 0 ≤ a 1 * b 1)
+    (hweight : ∀ t, 2 ≤ t → t ≤ N → a t * b t = a 1 * b 1)
+    (hE_one_nonneg : 0 ≤ E 1) :
+    (∑ k ∈ Finset.range N,
+      a (k + 1) * (b (k + 1) / 2) *
+        (D k - D (k + 1) - E (k + 1))) ≤
+      (a 1 * b 1 / 2) * (D 0 - D N) -
+        ∑ t ∈ Finset.Icc 2 N, a t * (b t / 2) * E t := by
+  classical
+  let c : R := a 1 * b 1
+  have hc : 0 ≤ c := by simpa [c] using hweight_nonneg
+  have hweight_one :
+      ∀ t, 1 ≤ t → t ≤ N → a t * b t = c := by
+    intro t ht1 htN
+    by_cases ht2 : 2 ≤ t
+    · simpa [c] using hweight t ht2 htN
+    · have ht_eq : t = 1 := by omega
+      subst ht_eq
+      rfl
+  have hdrop_eq :
+      (∑ k ∈ Finset.range N,
+        a (k + 1) * (b (k + 1) / 2) *
+          (D k - D (k + 1) - E (k + 1))) =
+        (c / 2) * (D 0 - D N) -
+          ∑ k ∈ Finset.range N, (c / 2) * E (k + 1) := by
+    calc
+      (∑ k ∈ Finset.range N,
+        a (k + 1) * (b (k + 1) / 2) *
+          (D k - D (k + 1) - E (k + 1))) =
+          ∑ k ∈ Finset.range N,
+            (c / 2) * (D k - D (k + 1) - E (k + 1)) := by
+            refine Finset.sum_congr rfl ?_
+            intro k hk
+            have hk1 : 1 ≤ k + 1 := Nat.succ_pos k
+            have hkN : k + 1 ≤ N := Nat.succ_le_of_lt (Finset.mem_range.mp hk)
+            have hct : a (k + 1) * b (k + 1) = c :=
+              hweight_one (k + 1) hk1 hkN
+            rw [← hct]
+            ring
+      _ =
+          (c / 2) * (∑ k ∈ Finset.range N, (D k - D (k + 1))) -
+            ∑ k ∈ Finset.range N, (c / 2) * E (k + 1) := by
+            simp [Finset.mul_sum, mul_sub, Finset.sum_sub_distrib]
+      _ = (c / 2) * (D 0 - D N) -
+            ∑ k ∈ Finset.range N, (c / 2) * E (k + 1) := by
+            rw [Finset.sum_range_sub']
+  have htail_range :
+      (∑ k ∈ Finset.range N, (c / 2) * E (k + 1)) =
+        (c / 2) * E 1 + ∑ t ∈ Finset.Icc 2 N, (c / 2) * E t := by
+    have hsplit :=
+      sum_Icc_one_eq_first_add_tail (fun t => (c / 2) * E t) N hN
+    have hrange :
+        (∑ k ∈ Finset.range N, (c / 2) * E (k + 1)) =
+          ∑ t ∈ Finset.Icc 1 N, (c / 2) * E t := by
+      rw [sum_Icc_one_eq_sum_range_succ]
+    rw [hrange, hsplit]
+  have htail_weight :
+      (∑ t ∈ Finset.Icc 2 N, a t * (b t / 2) * E t) =
+        ∑ t ∈ Finset.Icc 2 N, (c / 2) * E t := by
+    refine Finset.sum_congr rfl ?_
+    intro t ht
+    have ht2 : 2 ≤ t := (Finset.mem_Icc.mp ht).1
+    have htN : t ≤ N := (Finset.mem_Icc.mp ht).2
+    have hct : a t * b t = c := hweight_one t (by omega) htN
+    rw [← hct]
+    ring
+  rw [hdrop_eq, htail_range, htail_weight]
+  have hfirst_nonneg : 0 ≤ (c / 2) * E 1 := by positivity
+  linarith
+
+-- Generalization plan (G0):
+-- concept/name: two-square-root budget aggregation with a nonnegative displacement;
+--   orig was `sqrt_two_budget_sum_le`, renamed
+--   `sqrt_add_sq_add_sqrt_two_mul_add_sq_le_three_sqrt_add_four_mul`
+-- generality used: two real scalars with pointwise nonnegativity assumptions; no
+--   measure, vector-space, finite-dimensionality, convexity, smoothness, oracle,
+--   independence, or filtration assumptions are used
+-- portable call pattern: stochastic primal-dual, communication-sliding, and residual
+--   rate proofs can vary a nonnegative variance or energy budget and a deterministic
+--   displacement while retaining the same two-square-root aggregation and constants
+-- counterargument checked: although purely scalar, this is not paper-local traceability
+--   or a pure rename; it packages two coupled square-root estimates and their final
+--   constant aggregation, while the closest Mathlib lemmas cover only one-root shapes
+-- coverage search: queried `square root sum upper bound nonnegative real plus square`,
+--   `sqrt A plus d squared upper bound sqrt A plus d`, `Real sqrt add le`, and the
+--   precise displayed inequality; Mathlib's `sqrt_one_add_norm_sq_le` is only a
+--   specialization, SOptLib square-root normalization hits have different conclusions,
+--   and Mathlib semantic search returned HTTP 500, so no complete match was found
+-- minimal hypotheses: `0 <= A` is needed to identify the square of `sqrt A`, and
+--   `0 <= d` is needed for the linear displacement upper bounds; both are pointwise
+
+
+/-- For a nonnegative budget and displacement, the sum of the budget-displacement
+square root, its doubled counterpart, and the displacement is bounded by three budget
+square roots plus four displacements.
+
+Layer: Glue | Gap: Level 1 (two-square-root nonnegative budget aggregation)
+Proof: bound each square root by a linear combination of `Real.sqrt A` and `d` via `Real.sqrt_le_iff`, `Real.sq_sqrt`, and nonlinear arithmetic, then add the bounds.
+Source: Mathlib real square-root order characterization and square-root square identity, with ordered-ring nonlinear arithmetic
+Used in: stochastic primal-dual and distributed consensus residual proofs that combine two second-moment budget roots with a deterministic initial displacement
+Book citation: book/research/Source.json#/main_theorem/proof/11
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, Stochastic Decentralized Communication Sliding -/
+theorem sqrt_add_sq_add_sqrt_two_mul_add_sq_le_three_sqrt_add_four_mul
+    {A d : Real} (hA : 0 <= A) (hd : 0 <= d) :
+    Real.sqrt (A + d ^ 2) + Real.sqrt (2 * A + 2 * d ^ 2) + d <=
+      3 * Real.sqrt A + 4 * d := by
+  have hFirst : Real.sqrt (A + d ^ 2) <= Real.sqrt A + d := by
+    rw [Real.sqrt_le_iff]
+    constructor
+    · positivity
+    · nlinarith [Real.sq_sqrt hA, Real.sqrt_nonneg A]
+  have hSecond : Real.sqrt (2 * A + 2 * d ^ 2) <=
+      2 * Real.sqrt A + 2 * d := by
+    rw [Real.sqrt_le_iff]
+    constructor
+    · positivity
+    · nlinarith [Real.sq_sqrt hA, Real.sqrt_nonneg A]
+  linarith
+
+
+open scoped InnerProductSpace
+
+-- Generalization plan (G0):
+-- concept/name: half-weighted endpoint norm-square and squared-distance-drop
+--   polarization identity; orig was `stackedNormSq_endpoint_dual_identity`
+-- generality used: an arbitrary seminormed additive commutative group with a
+--   real inner-product space structure, one real coefficient, and three
+--   vectors; no measure, completeness, finite-dimensionality, convexity,
+--   smoothness, oracle, or optimization assumptions are used
+-- portable call pattern: primal-dual, proximal, projected-gradient, and
+--   estimate-sequence proofs change the reference point, initial and terminal
+--   endpoints, and scalar weight while reusing the same endpoint polarization
+--   equality to expose a displacement pairing
+-- counterargument checked: this is not paper-local traceability or a pure
+--   rename; it packages two norm-square expansions, endpoint cancellation,
+--   scalar weighting, and orientation of the displacement pairing into the
+--   exact reusable equality needed by callers
+-- coverage search: queried `half norm square squared distance difference inner
+--   product polarization identity`, `weighted terminal norm square distance
+--   drop endpoint displacement inner product`, and `norm squared difference
+--   equality inner subtraction real inner product`; Mathlib provides
+--   `norm_sub_sq_real`, while the closest SOptLib hits are update-specialized
+--   or inequality-valued distance-drop lemmas, so coverage is partial
+-- minimal hypotheses: `[SeminormedAddCommGroup E] [InnerProductSpace ℝ E]`
+--   are sufficient; no sign or nonzero condition on the scalar is needed
+
+/-- A half-weighted endpoint norm square plus a squared-distance drop equals
+the initial endpoint norm square plus the endpoint-displacement pairing.
+
+Layer: Glue | Gap: Level 1 (weighted Hilbert endpoint polarization identity)
+Proof: expand both squared distances with `norm_sub_sq_real`, distribute the endpoint inner product, use symmetry of the real inner product, and normalize the scalar ring expression.
+Source: Mathlib real inner-product polarization (`norm_sub_sq_real`), inner-product bilinearity, and commutative-ring normalization APIs
+Used in: primal-dual and proximal telescoping arguments that convert terminal norm and comparison-distance terms into an initial norm budget plus a pairing with the endpoint displacement
+Book citation: book/research/Source.json#/key_lemmas/5/proof/10
+Origin algorithm: Guanghui Lan, First-order and Stochastic Optimization Methods for Machine Learning, stochastic decentralized communication sliding -/
+theorem half_mul_norm_sq_add_half_mul_sq_dist_drop_eq
+    {E : Type*} [SeminormedAddCommGroup E] [InnerProductSpace ℝ E]
+    (c : ℝ) (y y0 yN : E) :
+    (c / 2) * ‖yN‖ ^ 2 +
+        (c / 2) * (‖y - y0‖ ^ 2 - ‖y - yN‖ ^ 2) =
+      (c / 2) * ‖y0‖ ^ 2 + c * ⟪yN - y0, y⟫_ℝ := by
+  rw [norm_sub_sq_real, norm_sub_sq_real]
+  simp [inner_sub_left, real_inner_comm]
+  ring
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: terminal-plus-lagged finite-sum domination by a one-based
+--   successor range; orig was `terminal_add_lagged_le_range_sum_of_lagged_le`.
+-- generality used: an arbitrary ordered additive commutative monoid, two
+--   natural-indexed sequences, and a positive finite horizon; no measure,
+--   filtration, independence, integrability, convexity, smoothness, oracle,
+--   vector-space, or finite-dimensional assumptions are used.
+-- portable call pattern: one-based recurrence, delayed-term, and telescope
+--   proofs retain a terminal budget while bounding predecessor-indexed terms;
+--   the ordered additive codomain, sequences, and positive horizon vary while
+--   the terminal-plus-lagged comparison has the same shape.
+-- counterargument checked: the result is short, but it is not a pure rename or
+--   paper-local wrapper: it composes finite-sum monotonicity with two distinct
+--   one-based interval reindexings to package a recurring aggregation boundary.
+-- coverage search: searched `ordered additive terminal plus lagged predecessor
+--   sum bounded by one based range sum under pointwise bounds`, `finite sum
+--   inequality terminal add predecessor interval pointwise le range successor`,
+--   and `sum Icc lagged le sum range succ of pointwise le`; SOptLib's
+--   `sum_Icc_one_eq_terminal_add_lagged` and
+--   `sum_Icc_one_eq_sum_range_succ` cover the equality components, while the
+--   other recurrence and shifted-sum hits have different contracts; Mathlib
+--   semantic search was unavailable and source search found only generic
+--   `Finset.sum_le_sum` and endpoint-reindexing components, not this inequality.
+-- minimal hypotheses: all already minimal; positivity of the horizon is needed
+--   by the terminal-lagged split, and the pointwise bound is required only on
+--   the active predecessor window.
+
+/-- A terminal value plus a pointwise-bounded lagged sum is at most the
+corresponding one-based successor range sum.
+
+For a positive horizon, the terminal value `B N` completes the
+predecessor-indexed `B` tail into the one-based sum; pointwise domination of the
+lagged `A` terms therefore yields the range-sum bound.
+
+Layer: Glue | Gap: Level 1 (terminal-plus-lagged finite-sum domination)
+Proof: apply `Finset.sum_le_sum` on the predecessor window, add the common
+  terminal term, then use SOptLib's terminal-lagged split and successor-range
+  reindexing identities.
+Source: Mathlib ordered additive commutative monoids and finite sums over natural
+  intervals, together with SOptLib's one-based finite-sum reindexing identities
+Used in: retained-terminal proximal and delayed-budget recurrence estimates that
+  charge lagged predecessor terms to a one-based sum while preserving its endpoint
+Book citation: book/research/Source.json#/key_lemmas/5
+Origin algorithm: Lan and Zhou, Stochastic Decentralized Communication Sliding -/
+theorem terminal_add_sum_Icc_lagged_le_sum_range_succ_of_lagged_le
+    {R : Type*} [AddCommMonoid R] [Preorder R] [IsOrderedAddMonoid R]
+    (A B : ℕ → R) (N : ℕ) (hN : 1 ≤ N)
+    (hLagged : ∀ t ∈ Finset.Icc 2 N, A (t - 1) ≤ B (t - 1)) :
+    B N + ∑ t ∈ Finset.Icc 2 N, A (t - 1) ≤
+      ∑ k ∈ Finset.range N, B (k + 1) := by
+  classical
+  have hLaggedSum :
+      (∑ t ∈ Finset.Icc 2 N, A (t - 1)) ≤
+        ∑ t ∈ Finset.Icc 2 N, B (t - 1) :=
+    Finset.sum_le_sum hLagged
+  calc
+    B N + ∑ t ∈ Finset.Icc 2 N, A (t - 1) ≤
+        B N + ∑ t ∈ Finset.Icc 2 N, B (t - 1) :=
+      add_le_add le_rfl hLaggedSum
+    _ = ∑ t ∈ Finset.Icc 1 N, B t :=
+      (sum_Icc_one_eq_terminal_add_lagged B N hN).symm
+    _ = ∑ k ∈ Finset.range N, B (k + 1) :=
+      sum_Icc_one_eq_sum_range_succ N B
+
+-- Generalization plan (G0):
+-- concept/name: scaled seminorm bound for a mapped value plus an endpoint displacement split through a reference point; orig was `theorem811_scaledPerturbation_norm_le`
+-- generality used: arbitrary additive real modules, separate domain and codomain seminorms, an arbitrary mapped function, nonnegative output and endpoint scales, and only the pointwise map bound used by the proof; no topology, normed-space, inner-product, finite-dimensional, measure, convexity, smoothness, or oracle assumptions
+-- portable call pattern: distributed primal-dual, saddle-point, and operator-splitting analyses can vary the primal and dual spaces, seminorms, coupling map, output scale, endpoint states, and reference dual point while retaining the same scaled endpoint-residual estimate
+-- counterargument checked: the result is not paper-local traceability or a pure rename; it composes operator control, seminorm homogeneity, and an arbitrary-reference endpoint split into the reusable residual bound consumed by later expectation estimates
+-- coverage search: queried `seminorm scalar multiple linear map plus endpoint difference upper bound operator bound reference point`, `seminorm map add sub triangle scale nonnegative`, and `seminorm linear map bounded add endpoint displacement`; the closest SOptLib hits were `map_le_inducedSeminormOperatorNorm_mul` and `norm_add_nonneg_smul_sub_center_sub_le`, both partial, while Mathlib semantic search was unavailable and Mathlib symbol search exposed only the component seminorm APIs
+-- minimal hypotheses: the map estimate is pointwise at the supplied displacement; nonnegativity of `scale` and `L` is exactly what removes absolute values and preserves inequalities; all hypotheses are used
+
+
+namespace SOptLib
+
+/-- A nonnegative scalar multiple of a mapped value plus an endpoint
+displacement is controlled after splitting that displacement through a reference point.
+
+Layer: Glue | Gap: Level 1 (scaled seminorm endpoint-residual composition)
+Proof: apply seminorm homogeneity and subadditivity, use the supplied pointwise map bound, split the endpoint difference through the reference point, and collect the two nonnegative scalar factors.
+Source: Mathlib seminorm homogeneity, negation invariance, subadditivity, and ordered real multiplication
+Used in: distributed primal-dual and saddle-point convergence proofs that turn a scaled terminal perturbation into primal-displacement and reference-split dual residuals before taking expectations
+Book citation: book/research/Source.json#/main_theorem/proof/7
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, Stochastic Decentralized Communication Sliding -/
+theorem seminorm_smul_map_add_endpoint_sub_le
+    {V W : Type*}
+    [AddCommGroup V] [Module ℝ V]
+    [AddCommGroup W] [Module ℝ W]
+    (p : Seminorm ℝ V) (q : Seminorm ℝ W) (A : V → W)
+    (scale L : ℝ) (dx : V) (yN y0 yRef : W)
+    (hscale : 0 ≤ scale) (hL : 0 ≤ L)
+    (hA : q (A dx) ≤ L * p dx) :
+    q (scale • (A dx + L • (yN - y0))) ≤
+      scale * L * (p dx + q (yRef - yN) + q (yRef - y0)) := by
+  have hDualSplit :
+      q (yN - y0) ≤ q (yRef - yN) + q (yRef - y0) := by
+    calc
+      q (yN - y0) = q ((yN - yRef) + (yRef - y0)) := by
+        congr 1
+        abel
+      _ ≤ q (yN - yRef) + q (yRef - y0) := map_add_le_add q _ _
+      _ = q (yRef - yN) + q (yRef - y0) := by
+        rw [show yN - yRef = -(yRef - yN) by abel, map_neg_eq_map]
+  have hInside :
+      q (A dx + L • (yN - y0)) ≤
+        L * (p dx + q (yRef - yN) + q (yRef - y0)) := by
+    calc
+      q (A dx + L • (yN - y0)) ≤
+          q (A dx) + q (L • (yN - y0)) := map_add_le_add q _ _
+      _ = q (A dx) + L * q (yN - y0) := by
+        rw [map_smul_eq_mul, Real.norm_eq_abs, abs_of_nonneg hL]
+      _ ≤ L * p dx + L * (q (yRef - yN) + q (yRef - y0)) :=
+        add_le_add hA (mul_le_mul_of_nonneg_left hDualSplit hL)
+      _ = L * (p dx + q (yRef - yN) + q (yRef - y0)) := by ring
+  calc
+    q (scale • (A dx + L • (yN - y0))) =
+        scale * q (A dx + L • (yN - y0)) := by
+      rw [map_smul_eq_mul, Real.norm_eq_abs, abs_of_nonneg hscale]
+    _ ≤ scale * (L * (p dx + q (yRef - yN) + q (yRef - y0))) :=
+      mul_le_mul_of_nonneg_left hInside hscale
+    _ = scale * L * (p dx + q (yRef - yN) + q (yRef - y0)) := by ring
+
+end SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: scaled positive-denominator budget transfer, named
+--   `eight_mul_div_two_mul_le_four_mul_of_scaled_denominator_lower_bound`;
+--   orig was `theorem811_variance_budget_scalar_le`
+-- generality used: five scalars in an arbitrary linearly ordered field, with
+--   positivity only for the four denominator factors; no measure, vector-space,
+--   convexity, smoothness, oracle, or stochastic assumptions are used
+-- portable call pattern: stochastic-gradient, communication-sliding, and
+--   variance-reduced rate proofs can vary their aggregate variance scale,
+--   horizon, operator scale, radius budget, and chosen inner budget while using
+--   the same conversion from a scaled budget lower bound to a rate contribution
+-- counterargument checked: although this is scalar algebra, it is not a pure
+--   rename or paper-local wrapper: it packages the full recurring denominator
+--   transfer rather than one caller-side rewrite or one Mathlib division lemma
+-- coverage search: queried SOptLib for `real division upper bound from scaled
+--   denominator lower bound positive factors`, the displayed implication, and
+--   positive-denominator coefficient transfers; the closest hit
+--   `div_le_mul_div_of_nonneg_of_pos_of_pos_of_le_mul` has a different
+--   reciprocal bridge and requires a nonnegative numerator. Mathlib semantic
+--   search returned HTTP 500; Mathlib's ordered-field division lemmas cover only
+--   individual proof steps, not this compound implication
+-- minimal hypotheses: `0 < N`, `0 < L`, `0 < D`, and `0 < T` are exactly the
+--   denominator guards used; the source proof's `0 < A` hypothesis is unused
+
+
+/-- A scaled denominator lower bound controls the corresponding variance-budget
+rate term.
+
+If `A * N / (L^2 * D)` is at most a positive budget `T`, then the normalized
+term `8 * A / (T * (2 * L))` is at most `(L / N) * (4 * D)`.
+
+Layer: Glue | Gap: Level 1 (scaled positive-denominator budget transfer)
+Proof: multiply the lower bound by the positive scale `L^2 * D`, then clear the
+  positive denominators `T`, `L`, and `N` and normalize the resulting polynomial inequality.
+Source: Mathlib linearly ordered field division, positive multiplication, and nonlinear arithmetic APIs
+Used in: stochastic communication-sliding and variance-reduced rate proofs that turn an inner-budget lower bound into a per-iteration variance contribution bound
+Book citation: book/research/Source.json#/main_theorem/proof/6
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, Stochastic Decentralized Communication Sliding -/
+theorem eight_mul_div_two_mul_le_four_mul_of_scaled_denominator_lower_bound
+    {K : Type*} [Field K] [LinearOrder K] [IsStrictOrderedRing K]
+    (A N L D T : K)
+    (hN_pos : 0 < N) (hL_pos : 0 < L) (hD_pos : 0 < D) (hT_pos : 0 < T)
+    (hLower : A * N / (L ^ 2 * D) <= T) :
+    8 * A / (T * (2 * L)) <= (L / N) * (4 * D) := by
+  have hLD_pos : 0 < L ^ 2 * D :=
+    mul_pos (sq_pos_of_pos hL_pos) hD_pos
+  have hCore : A * N <= T * (L ^ 2 * D) := by
+    calc
+      A * N = (A * N / (L ^ 2 * D)) * (L ^ 2 * D) := by
+        field_simp [hLD_pos.ne']
+      _ <= T * (L ^ 2 * D) :=
+        mul_le_mul_of_nonneg_right hLower hLD_pos.le
+  field_simp [hT_pos.ne', hL_pos.ne', hN_pos.ne']
+  nlinarith [hCore]
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: normalized weighted-sum translation identity; orig was
+--   `weighted_average_sub_target_eq_average_residual`.
+-- generality used: an arbitrary field, additive commutative group, module,
+--   finite index set, scalar weights, nonzero total weight, points, and target;
+--   no order, norm, topology, measure, convexity, or finite-dimensionality.
+-- portable call pattern: averaged-iterate, barycentric, and stochastic-output
+--   proofs translate a normalized weighted sum by a reference point; the finite
+--   window, scalar field, weights, points, normalizer, and target may all vary.
+-- counterargument checked: this is not paper-local traceability or a pure
+--   wrapper: it combines inverse-total cancellation with finite weighted-sum
+--   distribution. Equal-weight cardinality centering lemmas are strictly less
+--   general, and the weighted Jensen theorem only contains this as an internal step.
+-- coverage search: queried `normalized finite weighted sum minus target equals
+--   normalized weighted sum displacements total weight nonzero`, `inverse scalar
+--   smul weighted sum subtraction constant sum weights`, and `sum smul vector
+--   subtraction constant weighted vsub`; SOptLib hits
+--   `inv_card_smul_sum_sub_const_eq`,
+--   `miniBatchAverage_sub_target_eq_average_residual`,
+--   `finset_weighted_residual_sum_eq_zero`, and
+--   `norm_sq_weighted_average_sub_le_inv_mul_sum` are partial, while Mathlib's
+--   `Finset.sum_smul_vsub_const_eq_weightedVSubOfPoint_sub` gives an unnormalized
+--   affine-torsor decomposition rather than this normalized module equality.
+-- minimal hypotheses: `Field K`, `AddCommGroup V`, `Module K V`, the total-weight
+--   equality, and nonzeroness of the total weight are all that the proof uses.
+
+/-- Subtracting a target from a normalized finite weighted sum equals the
+normalized weighted sum of the displacements from that target.
+
+When `W` is the nonzero sum of the weights on `s`, translation by `z` commutes
+with normalization by `W`.
+
+Layer: Glue | Gap: Level 1 (normalized finite weighted-sum translation identity)
+Proof: express the target using `W⁻¹ * W = 1`, factor the outer scalar through
+  subtraction, distribute the total weight over the target, and combine the
+  finite sums pointwise with scalar distributivity.
+Source: Mathlib finite big-operator algebra, field inverse cancellation, and
+  module scalar-distribution APIs
+Used in: averaged-iterate, barycentric-output, and stochastic weighted-output
+  proofs that rewrite displacement of an average as an average of displacements
+Book citation: book/research/Source.json#/algorithm_spec/steps/7
+Origin algorithm: Lan and Zhou, Stochastic Decentralized Communication Sliding -/
+theorem inv_smul_weighted_sum_sub_eq_inv_smul_sum_weighted_sub
+    {K ι V : Type*} [DivisionSemiring K] [AddCommGroup V] [Module K V]
+    (s : Finset ι) (weight : ι → K) (W : K)
+    (hW : W = ∑ i ∈ s, weight i) (hW_ne : W ≠ 0)
+    (p : ι → V) (z : V) :
+    W⁻¹ • (∑ i ∈ s, weight i • p i) - z =
+      W⁻¹ • (∑ i ∈ s, weight i • (p i - z)) := by
+  calc
+    W⁻¹ • (∑ i ∈ s, weight i • p i) - z =
+        W⁻¹ • (∑ i ∈ s, weight i • p i) - (W⁻¹ * W) • z := by
+          rw [inv_mul_cancel₀ hW_ne, one_smul]
+    _ = W⁻¹ • (∑ i ∈ s, weight i • p i) - W⁻¹ • (W • z) := by
+          rw [smul_smul]
+    _ = W⁻¹ • ((∑ i ∈ s, weight i • p i) - W • z) := by
+          rw [smul_sub]
+    _ = W⁻¹ • ((∑ i ∈ s, weight i • p i) - (∑ i ∈ s, weight i) • z) := by
+          rw [← hW]
+    _ = W⁻¹ • ((∑ i ∈ s, weight i • p i) - (∑ i ∈ s, weight i • z)) := by
+          rw [Finset.sum_smul]
+    _ = W⁻¹ • (∑ i ∈ s, weight i • (p i - z)) := by
+          congr 1
+          rw [← Finset.sum_sub_distrib]
+          refine Finset.sum_congr rfl ?_
+          intro i _hi
+          rw [smul_sub]
+
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: successor decomposition of a strict `Fin` prefix sum; orig was
+--   fin_prefix_sum_succ_addCommMonoid, renamed sum_fin_lt_succ_eq_sum_fin_lt_add
+-- generality used: an arbitrary finite horizon, additive commutative monoid codomain,
+--   summand, and valid natural prefix index; no order, topology, measure, optimization,
+--   scalar-action, or finite-dimensional assumptions are used
+-- portable call pattern: finite-horizon accumulator inductions for AdaGrad, Shampoo,
+--   online mirror descent, and stochastic-gradient methods vary the horizon, additive
+--   state type, summand, and current index while exposing the same new endpoint term
+-- counterargument checked: Mathlib's `Fin.partialSum_succ` gives the analogous recurrence
+--   for the named `Fin.partialSum` representation, but does not rewrite a fixed-horizon
+--   `Fin T` sum masked by a strict index bound; this representation bridge is repeatedly
+--   useful at recurrence call sites and is not paper-local traceability or a pure rename
+-- coverage search: searches for "finite sum over Fin indices less than successor equals
+--   prefix sum plus successor term", "Fin partialSum successor masked fixed horizon sum",
+--   and "sum Iio add endpoint equals Iic" found `Fin.partialSum_succ`,
+--   `Finset.sum_range_succ`, and `Finset.sum_Iio_add_eq_sum_Iic`; all are supporting or
+--   alternate-representation results, and no Mathlib/SOptLib theorem has this full contract
+-- minimal hypotheses: `AddCommMonoid` is minimal for the unordered `Fin T` big operator;
+--   `n < T` is exactly the condition required to form the newly exposed endpoint
+
+/-- Extending a strict prefix mask on `Fin T` by one adds exactly its new endpoint.
+
+Layer: Glue | Gap: Level 0 (fixed-horizon masked Fin prefix successor decomposition)
+Proof: rewrite both conditional sums as filtered sums, identify the successor filter as insertion of the valid endpoint into the preceding filter, and apply `Finset.sum_insert`.
+Source: Mathlib finite big operators on `Fin`, `Finset.sum_filter`, `Finset.sum_insert`, and natural successor order
+Used in: finite-horizon accumulator inductions for tensor, full-matrix, and diagonal Shampoo states, and coordinatewise adaptive-gradient prefix bounds
+Book citation: book/research/Source.json#/algorithm_spec
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithms 1, 2, and 3 -/
+theorem sum_fin_lt_succ_eq_sum_fin_lt_add {T : Nat} {α : Type*}
+    [AddCommMonoid α] (f : Fin T → α) {n : Nat} (hn : n < T) :
+    (∑ s : Fin T, if s.1 < n + 1 then f s else 0) =
+      (∑ s : Fin T, if s.1 < n then f s else 0) + f ⟨n, hn⟩ := by
+  classical
+  let a : Fin T := ⟨n, hn⟩
+  have hfilter :
+      Finset.univ.filter (fun s : Fin T => s.1 < n + 1) =
+        insert a (Finset.univ.filter (fun s : Fin T => s.1 < n)) := by
+    ext s
+    simp only [Finset.mem_filter, Finset.mem_univ, true_and, Finset.mem_insert]
+    constructor
+    · intro hs
+      have hle : s.1 ≤ n := Nat.lt_succ_iff.mp hs
+      rcases Nat.lt_or_eq_of_le hle with hlt | heq
+      · exact Or.inr hlt
+      · left
+        ext
+        exact heq
+    · intro hs
+      rcases hs with hs | hs
+      · rw [hs]
+        exact Nat.lt_succ_self n
+      · exact Nat.lt_trans hs (Nat.lt_succ_self n)
+  calc
+    (∑ s : Fin T, if s.1 < n + 1 then f s else 0) =
+        Finset.sum (Finset.univ.filter (fun s : Fin T => s.1 < n + 1)) f := by
+          simp [Finset.sum_filter]
+    _ = Finset.sum (insert a (Finset.univ.filter (fun s : Fin T => s.1 < n))) f := by
+          rw [hfilter]
+    _ = f a + Finset.sum (Finset.univ.filter (fun s : Fin T => s.1 < n)) f := by
+          rw [Finset.sum_insert]
+          simp [a]
+    _ = (∑ s : Fin T, if s.1 < n then f s else 0) + f ⟨n, hn⟩ := by
+          simp [Finset.sum_filter, a, add_comm]
+
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: a term is bounded by a nonnegative base plus the inclusive
+--   prefix sum of a nonnegative additive stream; orig was
+--   generic_prefix_outer_le_next_hhat_base
+-- generality used: an arbitrary ordered additive commutative monoid, an
+--   arbitrary nonnegative base, and terms that are nonnegative on the strict
+--   prefix; no matrix, scalar, finite-dimensional, measure, convexity,
+--   smoothness, oracle, or algorithm-state assumptions
+-- portable call pattern: scalar, vector, matrix, and product-valued adaptive
+--   accumulators can bound their current nonnegative increment by an inclusive
+--   regularized prefix sum while changing the horizon, carrier, stream, base,
+--   and current time
+-- counterargument checked: this composes prefix decomposition with ordered
+--   additive nonnegativity, but is not a pure rename of either ingredient; it
+--   exposes the recurring fixed-horizon masked-prefix-plus-base contract
+-- coverage search: searches for "term less than or equal to nonnegative base
+--   plus inclusive finite prefix sum of nonnegative terms" found
+--   `Finset.single_le_sum` and `sum_fin_lt_succ_eq_sum_fin_lt_add`; the former
+--   lacks the fixed-horizon masked-prefix/base contract and the latter is only
+--   the required equality
+-- minimal hypotheses: `AddCommMonoid`, `Preorder`, and `IsOrderedAddMonoid`
+--   are exactly the algebraic and order structure used; nonnegativity is
+--   required only for the base and terms in the strict prefix
+
+/-- A term is bounded by a nonnegative base plus the inclusive finite prefix of
+a pointwise nonnegative additive stream.
+
+Layer: Glue | Gap: Level 1 (inclusive additive-prefix domination)
+Proof: split the inclusive masked `Fin` sum into its strict prefix and current endpoint, prove the base-plus-prefix remainder nonnegative by finite-sum closure, and use monotonicity of addition
+Source: Mathlib ordered additive monoids and finite-sum nonnegativity, together with `sum_fin_lt_succ_eq_sum_fin_lt_add`
+Used in: adaptive scalar, diagonal, block, and full-matrix methods proving that the current nonnegative increment lies below the next regularized accumulator
+Book citation: book/research/Source.json#/key_lemmas/1
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithms 1, 2, and 3 -/
+theorem term_le_base_add_sum_fin_lt_next_of_nonneg
+    {T : Nat} {R : Type*} [AddCommMonoid R] [Preorder R]
+    [IsOrderedAddMonoid R]
+    (A : Fin T → R) (base : R) (hbase : 0 ≤ base) (t : Fin T)
+    (hA : ∀ s, s.1 < t.1 → 0 ≤ A s) :
+    A t ≤ base + ∑ s : Fin T, if s.1 < t.1 + 1 then A s else 0 := by
+  classical
+  rw [sum_fin_lt_succ_eq_sum_fin_lt_add A t.2]
+  have hprefix :
+      0 ≤ ∑ s : Fin T, if s.1 < t.1 then A s else 0 := by
+    apply Finset.sum_nonneg
+    intro s _hs
+    by_cases hst : s.1 < t.1
+    · simpa [hst] using hA s hst
+    · simp [hst]
+  calc
+    A t ≤
+        (base + ∑ s : Fin T, if s.1 < t.1 then A s else 0) + A t :=
+      le_add_of_nonneg_left (add_nonneg hbase hprefix)
+    _ = base + ((∑ s : Fin T, if s.1 < t.1 then A s else 0) + A t) :=
+      add_assoc _ _ _
+
+
+
+namespace SOptLib
+
+universe u
+
+-- Generalization plan (G0):
+-- concept/name: star-algebra complexification of finite real square matrices;
+--   orig was helperModulePrivate_realMatrixComplexification, renamed
+--   realMatrixComplexification
+-- generality used: an arbitrary finite index type with decidable equality; no fixed
+--   matrix dimension, order hypothesis, topology, measure, convexity, smoothness, or
+--   oracle assumptions are needed
+-- portable call pattern: finite-dimensional matrix optimization arguments change the
+--   index type and real matrix, then use the same embedding to transport Loewner-order
+--   or continuous-functional-calculus facts to complex C-star matrices
+-- counterargument checked: this is not merely paper traceability or a caller-side cast;
+--   it bundles entrywise real-to-complex conversion, matrix multiplication, the star
+--   operation, real scalar action, and the CStarMatrix representation into one canonical
+--   homomorphism, and the source already repeats that construction at independent call sites
+-- coverage search: symbol queries for finite real matrix complexification and star-algebra
+--   embeddings found only the two Shampoo-local copies; Mathlib semantic search found
+--   CStarMatrix.mapₙₐ, AlgHom.mapMatrix, and CStarMatrix.ofMatrixStarAlgEquiv, which are
+--   construction components but do not provide this unital real-linear embedding
+-- minimal hypotheses: Fintype supports matrix multiplication and CStarMatrix algebra
+--   structure; DecidableEq supplies identity matrices required by the unital algebras
+
+/-- Entrywise complexification as a real star-algebra homomorphism from finite real square
+matrices to complex C-star matrices.
+
+Layer: Glue | Concept: finite real matrix complexification into a complex C-star algebra
+Proof: (definitional construction; compose the entrywise real-to-complex star-algebra map with the matrix-to-CStarMatrix star-algebra equivalence)
+Source: Mathlib `Complex.ofReal`, `AlgHom.mapMatrix`, and `CStarMatrix.ofMatrixStarAlgEquiv`
+Used in: matrix adaptive-gradient proofs that transport Loewner-order and continuous-functional-calculus statements from real positive-semidefinite preconditioners to complex C-star matrices
+Book citation: book/research/Source.json#/source_outline
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithms 1--3 -/
+noncomputable def realMatrixComplexification
+    {ι : Type u} [Fintype ι] [DecidableEq ι] :
+    Matrix ι ι ℝ →⋆ₐ[ℝ] CStarMatrix ι ι ℂ :=
+  let scalarCast : ℝ →⋆ₐ[ℝ] ℂ :=
+    { toFun := fun r => (r : ℂ)
+      map_one' := Complex.ofReal_one
+      map_mul' := Complex.ofReal_mul
+      map_zero' := Complex.ofReal_zero
+      map_add' := Complex.ofReal_add
+      commutes' := fun _ => rfl
+      map_star' := fun r => by simp }
+  let matrixCast : Matrix ι ι ℝ →⋆ₐ[ℝ] Matrix ι ι ℂ :=
+    StarAlgHom.mk (AlgHom.mapMatrix scalarCast.toAlgHom)
+      (by
+        intro A
+        change Matrix.map (star A) scalarCast = star (Matrix.map A scalarCast)
+        ext i j
+        simp [scalarCast, Matrix.star_eq_conjTranspose])
+  let e : Matrix ι ι ℂ ≃⋆ₐ[ℝ] CStarMatrix ι ι ℂ :=
+    (CStarMatrix.ofMatrixStarAlgEquiv (n := ι) (A := ℂ)).restrictScalars ℝ
+  StarAlgHom.mk (e.toAlgEquiv.toAlgHom.comp matrixCast.toAlgHom)
+    (by
+      intro A
+      change e (matrixCast (star A)) = star (e (matrixCast A))
+      rw [map_star matrixCast, map_star e])
+
+/-- Complexifying a real matrix coerces each entry from `ℝ` to `ℂ`.
+
+Layer: Glue | Gap: Level 0 (coordinate specification of real matrix complexification)
+Proof: by rfl after unfolding `realMatrixComplexification` and its entrywise matrix map
+Source: Mathlib `Complex.ofReal`, `Matrix.map`, and `CStarMatrix.ofMatrix`
+Used in: entrywise checks that the complex C-star matrix embedding preserves real matrix identities, adjoints, and quadratic-form order witnesses
+Book citation: book/research/Source.json#/source_outline
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithms 1--3 -/
+@[simp]
+theorem realMatrixComplexification_apply
+    {ι : Type u} [Fintype ι] [DecidableEq ι]
+    (A : Matrix ι ι ℝ) (i j : ι) :
+    realMatrixComplexification A i j = (A i j : ℂ) := by
+  rfl
+
+/-- Entrywise complexification of finite real square matrices is injective.
+
+Layer: Glue | Gap: Level 1 (faithfulness of real matrix complexification)
+Proof: compare entries of equal complexifications and use injectivity of the real embedding
+into the complex numbers
+Source: Mathlib `Complex.ofReal_injective` and matrix extensionality
+Used in: reflecting equalities of complex C-star matrices back to real matrix identities
+Book citation: book/research/Source.json#/source_outline
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithms 1--3 -/
+theorem realMatrixComplexification_injective
+    {ι : Type u} [Fintype ι] [DecidableEq ι] :
+    Function.Injective (realMatrixComplexification (ι := ι)) := by
+  intro A B hAB
+  ext i j
+  apply Complex.ofReal_injective
+  simpa using congrArg (fun C : CStarMatrix ι ι ℂ => C i j) hAB
+
+end SOptLib
+
+
+
+namespace SOptLib
+
+universe u
+
+-- Generalization plan (G0):
+-- concept/name: continuity of finite real-matrix complexification; orig was
+--   continuous_realMatrixComplexification and its concept-derived name is retained
+-- generality used: an arbitrary finite index type with decidable equality; no fixed
+--   matrix dimension, measure, convexity, smoothness, or oracle assumptions are used
+-- portable call pattern: full-matrix adaptive-gradient and matrix
+--   multiplicative-weights proofs change the finite index type and convergent matrix
+--   family while using the same continuous complexification to transport limits or
+--   continuous-functional-calculus identities into a complex C-star matrix algebra
+-- counterargument checked: this is a short composition theorem, but not a pure rename
+--   or caller-side expression; it supplies the missing topological API for the canonical
+--   staged complexification and is independently needed by limit and CFC transport steps
+-- coverage search: queries for "continuous real matrix complexification finite matrix
+--   entrywise cast star algebra homomorphism" and "continuity of entrywise map on finite
+--   matrices induced by a continuous scalar function" found the staged
+--   realMatrixComplexification definition and Mathlib Continuous.matrix_map, but no
+--   theorem giving continuity of the composite into CStarMatrix
+-- minimal hypotheses: Fintype is needed for the CStarMatrix norm topology comparison;
+--   DecidableEq is inherited from the unital star-algebra complexification definition
+
+/-- Entrywise complexification from finite real square matrices to complex C-star matrices
+is continuous.
+
+Layer: Glue | Gap: Level 1 (continuity of finite real-matrix complexification)
+Proof: prove continuity of the entrywise real-to-complex cast in the product topology, then compose it with the continuous matrix-to-CStarMatrix uniform embedding.
+Source: Mathlib matrix product topology and `CStarMatrix.uniformEmbedding_ofMatrix`
+Used in: adaptive-matrix limit arguments and continuous-functional-calculus transport from convergent real preconditioner families to complex C-star matrices
+Book citation: book/research/Source.json#/source_outline
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithms 1--3 -/
+theorem continuous_realMatrixComplexification
+    {ι : Type u} [Fintype ι] [DecidableEq ι] :
+    Continuous (realMatrixComplexification (ι := ι)) := by
+  change Continuous (fun M : Matrix ι ι ℝ =>
+    CStarMatrix.ofMatrix (Matrix.map M fun r : ℝ => (r : ℂ)))
+  have hcast : Continuous (fun M : Matrix ι ι ℝ =>
+      Matrix.map M fun r : ℝ => (r : ℂ)) := by
+    apply continuous_pi
+    intro i
+    apply continuous_pi
+    intro j
+    change Continuous (fun M : Matrix ι ι ℝ => (M i j : ℂ))
+    fun_prop
+  exact
+    CStarMatrix.uniformEmbedding_ofMatrix.isUniformInducing.isInducing.continuous.comp hcast
+
+end SOptLib
+
+
+
+open scoped ComplexOrder Kronecker MatrixOrder
+
+namespace Matrix
+
+-- Generalization plan (G0):
+-- concept/name: joint Loewner monotonicity of the binary matrix Kronecker
+--   product on the positive-semidefinite cone; orig was the local block
+--   `binary_kronecker_mono_of_posSemidef_of_le`
+-- generality used: arbitrary `RCLike` scalars and arbitrary finite row/column
+--   index types for both square matrices; no fixed dimensions, decidable
+--   equality, optimization, measure, convexity, or oracle assumptions are used
+-- portable call pattern: matrix and tensor adaptive-gradient proofs compare
+--   Kronecker-assembled preconditioners while changing both factor spaces, all
+--   four factors, and the two factorwise Loewner bounds
+-- counterargument checked: this is not paper-local traceability or a pure
+--   rename; it packages joint monotonicity, whereas Mathlib only provides PSD
+--   closure of a single binary Kronecker product
+-- coverage search: symbol searches for `kronecker_mono_of_posSemidef_of_le`
+--   and natural-language searches for Kronecker Loewner monotonicity found
+--   `Matrix.PosSemidef.kronecker` and the staged dependent-family theorem
+--   `SOptLib.tensorKronecker_mono_of_forall_le`; the former is only a proof
+--   ingredient and the latter concerns the distinct named dependent product
+-- minimal hypotheses: only the two lower factors are assumed PSD; positivity
+--   of the upper factors follows from their Loewner bounds, and `Finite`
+--   suffices because Mathlib's binary Kronecker PSD theorem uses that class
+
+/-- The binary Kronecker product is jointly monotone in Loewner order when its
+two lower factors are positive semidefinite.
+
+Layer: Glue | Gap: Level 1 (binary Kronecker joint Loewner monotonicity)
+Proof: derive positivity of the upper right factor, decompose the Kronecker-product difference into two Kronecker products of PSD matrices, and add their positivity witnesses.
+Source: Mathlib matrix Loewner order and `Matrix.PosSemidef.kronecker`
+Used in: matrix and tensor adaptive-gradient arguments that lift simultaneous factorwise accumulator bounds to an assembled Kronecker preconditioner bound
+Book citation: book/research/Source.json#/key_lemmas/4
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithms 1 and 2 -/
+theorem kronecker_mono_of_posSemidef_of_le
+    {𝕜 : Type u} [RCLike 𝕜]
+    {m : Type v} [Finite m] {n : Type w} [Finite n]
+    (A B : Matrix m m 𝕜) (C D : Matrix n n 𝕜)
+    (hA : A.PosSemidef) (hC : C.PosSemidef)
+    (hAB : A ≤ B) (hCD : C ≤ D) :
+    A ⊗ₖ C ≤ B ⊗ₖ D := by
+  rw [Matrix.le_iff]
+  have hD : D.PosSemidef :=
+    Matrix.nonneg_iff_posSemidef.mp (le_trans hC.nonneg hCD)
+  have hLeft : ((B - A) ⊗ₖ D).PosSemidef := hAB.kronecker hD
+  have hRight : (A ⊗ₖ (D - C)).PosSemidef := hA.kronecker hCD
+  have hSum : (((B - A) ⊗ₖ D) + (A ⊗ₖ (D - C))).PosSemidef :=
+    hLeft.add hRight
+  have hDiff :
+      B ⊗ₖ D - A ⊗ₖ C = (B - A) ⊗ₖ D + A ⊗ₖ (D - C) := by
+    ext ij kl
+    rcases ij with ⟨i, k⟩
+    rcases kl with ⟨j, l⟩
+    simp [sub_mul, mul_sub]
+  simpa [hDiff] using hSum
+
+end Matrix
+
+/-! Phase 4 batch 9: `Matrix_dependentProductL2Seminorm_mulVec_smul_le_of_scalar`. -/
+
+open scoped BigOperators InnerProductSpace
+
+namespace Matrix
+
+/-- A nonnegative scalar L2 action bound for a finite real matrix lifts with the
+same constant to vectors valued in a real inner-product space.
+
+Layer: Glue | Gap: Level 2 (scalar-to-Hilbert finite-matrix L2 tensorization)
+Proof: restrict to the finite-dimensional span of the finitely many input coordinates, expand in an orthonormal basis there, apply the supplied scalar squared-energy estimate basis coordinate by basis coordinate, sum, and take square roots using nonnegativity of the bound.
+Source: Mathlib finite-span and real orthonormal-basis APIs, Parseval's finite sum-of-squared-coordinates identity, and literal finite L2 energies
+Used in: consensus, gradient-tracking, and block-vector recursions where a scalar matrix spectral bound must control the Frobenius/L2 energy of a Hilbert-valued distributed state
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/algorithm_spec/steps/0
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem dependentProductL2Seminorm_mulVec_smul_le_of_scalar
+    {ι κ E : Type*} [Fintype ι] [Fintype κ]
+    [NormedAddCommGroup E] [InnerProductSpace ℝ E]
+    (A : Matrix ι κ ℝ) (c : ℝ) (X : κ → E)
+    (hc : 0 ≤ c)
+    (hscalar : ∀ x : κ → ℝ,
+      Real.sqrt (∑ i : ι, ‖(Matrix.mulVec A x) i‖ ^ 2) ≤
+        c * Real.sqrt (∑ j : κ, ‖x j‖ ^ 2)) :
+    Real.sqrt (∑ i : ι, ‖∑ j : κ, A i j • X j‖ ^ 2) ≤
+      c * Real.sqrt (∑ j : κ, ‖X j‖ ^ 2) := by
+  classical
+  let F := Submodule.span ℝ (Set.range X)
+  let X' : κ → F := fun j => ⟨X j, Submodule.subset_span (Set.mem_range_self j)⟩
+  letI : FiniteDimensional ℝ F :=
+    FiniteDimensional.span_of_finite ℝ (Set.finite_range X)
+  let b := stdOrthonormalBasis ℝ F
+  have hrowSq (k : Fin (Module.finrank ℝ F)) :
+      (∑ i : ι,
+          ‖(Matrix.mulVec A (fun j => inner ℝ (b k) (X' j))) i‖ ^ 2) ≤
+        c ^ 2 * ∑ j : κ, ‖inner ℝ (b k) (X' j)‖ ^ 2 := by
+    have hout : 0 ≤ ∑ i : ι,
+        ‖(Matrix.mulVec A (fun j => inner ℝ (b k) (X' j))) i‖ ^ 2 :=
+      Finset.sum_nonneg fun _ _ => sq_nonneg _
+    have hin : 0 ≤ ∑ j : κ, ‖inner ℝ (b k) (X' j)‖ ^ 2 :=
+      Finset.sum_nonneg fun _ _ => sq_nonneg _
+    have hact := hscalar (fun j => inner ℝ (b k) (X' j))
+    have hsq := (sq_le_sq₀ (Real.sqrt_nonneg _)
+      (mul_nonneg hc (Real.sqrt_nonneg _))).2 hact
+    rw [Real.sq_sqrt hout, mul_pow, Real.sq_sqrt hin] at hsq
+    exact hsq
+  have henergy :
+      (∑ i : ι, ‖∑ j : κ, A i j • X' j‖ ^ 2) ≤
+        c ^ 2 * ∑ j : κ, ‖X' j‖ ^ 2 := by
+    calc
+      (∑ i : ι, ‖∑ j : κ, A i j • X' j‖ ^ 2) =
+          ∑ i : ι, ∑ k : Fin (Module.finrank ℝ F),
+            inner ℝ (b k) (∑ j : κ, A i j • X' j) ^ 2 := by
+              apply Finset.sum_congr rfl
+              intro i _
+              exact (b.sum_sq_inner_right (∑ j : κ, A i j • X' j)).symm
+      _ = ∑ k : Fin (Module.finrank ℝ F),
+          ∑ i : ι,
+            ‖(Matrix.mulVec A (fun j => inner ℝ (b k) (X' j))) i‖ ^ 2 := by
+              rw [Finset.sum_comm]
+              apply Finset.sum_congr rfl
+              intro k _
+              unfold Matrix.mulVec
+              apply Finset.sum_congr rfl
+              intro i _
+              simp only [inner_sum, real_inner_smul_right]
+              rw [Real.norm_eq_abs, sq_abs]
+              rfl
+      _ ≤ ∑ k : Fin (Module.finrank ℝ F),
+          c ^ 2 * ∑ j : κ, ‖inner ℝ (b k) (X' j)‖ ^ 2 :=
+        Finset.sum_le_sum fun k _ => hrowSq k
+      _ = c ^ 2 * ∑ j : κ, ‖X' j‖ ^ 2 := by
+              rw [← Finset.mul_sum]
+              congr 1
+              rw [Finset.sum_comm]
+              apply Finset.sum_congr rfl
+              intro j _
+              simpa [Real.norm_eq_abs, sq_abs] using b.sum_sq_inner_right (X' j)
+  have hlift :
+      Real.sqrt (∑ i : ι, ‖∑ j : κ, A i j • X' j‖ ^ 2) ≤
+        c * Real.sqrt (∑ j : κ, ‖X' j‖ ^ 2) := by
+    calc
+      Real.sqrt (∑ i : ι, ‖∑ j : κ, A i j • X' j‖ ^ 2) ≤
+          Real.sqrt (c ^ 2 * ∑ j : κ, ‖X' j‖ ^ 2) :=
+        Real.sqrt_le_sqrt henergy
+      _ = c * Real.sqrt (∑ j : κ, ‖X' j‖ ^ 2) := by
+        rw [Real.sqrt_mul (sq_nonneg c), Real.sqrt_sq_eq_abs, abs_of_nonneg hc]
+  simpa [X'] using hlift
+
+end Matrix
+
+/-! Phase 4 batch 9: `inner_neg_smul_three_term_add_quadratic_le_of_mul_le`. -/
+
+open scoped InnerProductSpace
+
+-- Generalization plan (G0):
+-- concept/name: inner_neg_smul_three_term_add_quadratic_le_of_mul_le exposes a
+--   three-term Hilbert descent inequality with one retained cross term; orig
+--   was hybrid_center_descent_algebra
+-- generality used: a seminormed additive commutative group with a real inner
+--   product; nonnegative smoothness and step scalars, a positive gain scalar,
+--   and one scalar small-product bound; no measure, completeness,
+--   finite-dimensionality, convexity, smoothness-function, or oracle assumptions
+-- portable call pattern: stochastic gradient, gradient-tracking, and inexact
+--   descent proofs vary the Hilbert space, smoothness and gain scalars,
+--   reference and approximate gradients, deterministic direction error, and
+--   centered noise while retaining the same pathwise inequality for later
+--   martingale cancellation
+-- counterargument checked: this is not paper-local traceability or a pure
+--   caller-side wrapper because it packages several coupled Young absorptions
+--   and preserves a specifically chosen noise cross term; the closest existing
+--   two-term descent lemma neither accepts the second perturbation nor retains
+--   a noise pairing
+-- coverage search: precise SOptLib searches found
+--   inner_neg_smul_add_half_mul_norm_sq_le_of_le_inv_four_mul and generic Young
+--   absorption lemmas as partial hits; Mathlib LeanSearch returned only norm
+--   expansion and inner-product primitives, so no declaration covers the full
+--   three-term conclusion
+-- minimal hypotheses: the source assumptions `0 < L` and `0 < alpha` are
+--   weakened to `0 <= L` and `0 <= alpha`; positivity of `H` is required for
+--   denominator cancellation, and the small-product inequality is unchanged
+
+/-- A scaled three-term direction satisfies a descent bound with one retained cross term.
+
+For nonnegative `L` and `alpha`, positive `H`, and `alpha * L * H ≤ 1 / 40`,
+the smooth quadratic model along `-alpha • (H • g + d + z)` is bounded by a
+decrease in `‖g‖²`, deterministic error budgets for `d` and `q - g`, a noise
+budget for `z`, and the unabsorbed pairing with `z`.
+
+Layer: Glue | Gap: Level 1 (three-term Hilbert descent with retained noise cross term)
+Proof: expand the reference as `(q - g) + g`, apply weighted Hilbert Young
+  inequalities to the deterministic cross terms, split the deterministic norm
+  square, and use the small-product hypothesis to absorb its coefficients while
+  retaining the selected noise pairing.
+Source: Mathlib real inner-product norm expansions and Cauchy--Schwarz, together
+  with SOptLib binary norm-square Young splitting
+Used in: stochastic gradient and distributed gradient-tracking one-step smooth
+  descent before conditional-mean cancellation of the centered-noise cross term
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/4/proof/3
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem inner_neg_smul_three_term_add_quadratic_le_of_mul_le
+    {E : Type*} [SeminormedAddCommGroup E] [InnerProductSpace ℝ E]
+    (L H alpha : ℝ) (hL : 0 ≤ L) (hH : 0 < H) (halpha : 0 ≤ alpha)
+    (hsmall : alpha * L * H ≤ 1 / 40) (q g d z : E) :
+    ⟪q, -alpha • (H • g + d + z)⟫_ℝ +
+        (L / 2) * ‖-alpha • (H • g + d + z)‖ ^ 2 ≤
+      -((5 * alpha * H) / 8) * ‖g‖ ^ 2 +
+        (21 * alpha / (8 * H)) * ‖d‖ ^ 2 +
+        (5 * alpha * H / 2) * ‖q - g‖ ^ 2 +
+        (5 / 8) * L * alpha ^ 2 * ‖z‖ ^ 2 +
+        ⟪-alpha • q + (L * alpha ^ 2 * H) • g, z⟫_ℝ := by
+  let a : E := q - g
+  have hq : q = a + g := by simp [a]
+  have hag : -⟪a, g⟫_ℝ ≤ ‖a‖ * ‖g‖ := by
+    exact (neg_le_abs ⟪a, g⟫_ℝ).trans (abs_real_inner_le_norm a g)
+  have hgd : -⟪g, d⟫_ℝ ≤ ‖g‖ * ‖d‖ := by
+    exact (neg_le_abs ⟪g, d⟫_ℝ).trans (abs_real_inner_le_norm g d)
+  have had : -⟪a, d⟫_ℝ ≤ ‖a‖ * ‖d‖ := by
+    exact (neg_le_abs ⟪a, d⟫_ℝ).trans (abs_real_inner_le_norm a d)
+  have hdz : ⟪d, z⟫_ℝ ≤ ‖d‖ * ‖z‖ := by
+    exact (le_abs_self ⟪d, z⟫_ℝ).trans (abs_real_inner_le_norm d z)
+  have halphaH : 0 ≤ alpha * H := mul_nonneg halpha hH.le
+  have halpha_div_H : 0 ≤ alpha / H := div_nonneg halpha hH.le
+  have hcross_ag :
+      -alpha * H * ⟪a, g⟫_ℝ ≤
+        (alpha * H / 8) * ‖g‖ ^ 2 + 2 * alpha * H * ‖a‖ ^ 2 := by
+    calc
+      -alpha * H * ⟪a, g⟫_ℝ ≤ alpha * H * (‖a‖ * ‖g‖) := by
+        nlinarith [mul_le_mul_of_nonneg_left hag halphaH]
+      _ ≤ (alpha * H / 8) * ‖g‖ ^ 2 +
+          2 * alpha * H * ‖a‖ ^ 2 := by
+        have hs : 0 ≤ (alpha * H / 8) * (‖g‖ - 4 * ‖a‖) ^ 2 :=
+          mul_nonneg (div_nonneg halphaH (by norm_num))
+            (sq_nonneg (‖g‖ - 4 * ‖a‖))
+        nlinarith
+  have hcross_gd :
+      -alpha * ⟪g, d⟫_ℝ ≤
+        (alpha * H / 8) * ‖g‖ ^ 2 +
+          (2 * alpha / H) * ‖d‖ ^ 2 := by
+    calc
+      -alpha * ⟪g, d⟫_ℝ ≤ alpha * (‖g‖ * ‖d‖) := by
+        nlinarith [mul_le_mul_of_nonneg_left hgd halpha]
+      _ ≤ (alpha * H / 8) * ‖g‖ ^ 2 +
+          (2 * alpha / H) * ‖d‖ ^ 2 := by
+        have hpoly :
+            H * (‖g‖ * ‖d‖) ≤
+              H * (H / 8 * ‖g‖ ^ 2 + 2 / H * ‖d‖ ^ 2) := by
+          calc
+            H * (‖g‖ * ‖d‖) ≤
+                H ^ 2 / 8 * ‖g‖ ^ 2 + 2 * ‖d‖ ^ 2 := by
+              nlinarith [sq_nonneg (H * ‖g‖ - 4 * ‖d‖)]
+            _ = H * (H / 8 * ‖g‖ ^ 2 + 2 / H * ‖d‖ ^ 2) := by
+              field_simp [hH.ne']
+              <;> ring
+        have hyoung : ‖g‖ * ‖d‖ ≤
+            H / 8 * ‖g‖ ^ 2 + 2 / H * ‖d‖ ^ 2 :=
+          le_of_mul_le_mul_left hpoly hH
+        calc
+          alpha * (‖g‖ * ‖d‖) ≤
+              alpha * (H / 8 * ‖g‖ ^ 2 + 2 / H * ‖d‖ ^ 2) :=
+            mul_le_mul_of_nonneg_left hyoung halpha
+          _ = _ := by ring
+  have hcross_ad :
+      -alpha * ⟪a, d⟫_ℝ ≤
+        (alpha * H / 2) * ‖a‖ ^ 2 +
+          (alpha / (2 * H)) * ‖d‖ ^ 2 := by
+    calc
+      -alpha * ⟪a, d⟫_ℝ ≤ alpha * (‖a‖ * ‖d‖) := by
+        nlinarith [mul_le_mul_of_nonneg_left had halpha]
+      _ ≤ (alpha * H / 2) * ‖a‖ ^ 2 +
+          (alpha / (2 * H)) * ‖d‖ ^ 2 := by
+        have hpoly :
+            H * (‖a‖ * ‖d‖) ≤
+              H * (H / 2 * ‖a‖ ^ 2 + 1 / (2 * H) * ‖d‖ ^ 2) := by
+          calc
+            H * (‖a‖ * ‖d‖) ≤
+                H ^ 2 / 2 * ‖a‖ ^ 2 + 1 / 2 * ‖d‖ ^ 2 := by
+              nlinarith [sq_nonneg (H * ‖a‖ - ‖d‖)]
+            _ = H * (H / 2 * ‖a‖ ^ 2 +
+                1 / (2 * H) * ‖d‖ ^ 2) := by
+              field_simp [hH.ne']
+              <;> ring
+        have hyoung : ‖a‖ * ‖d‖ ≤
+            H / 2 * ‖a‖ ^ 2 + 1 / (2 * H) * ‖d‖ ^ 2 :=
+          le_of_mul_le_mul_left hpoly hH
+        calc
+          alpha * (‖a‖ * ‖d‖) ≤
+              alpha * (H / 2 * ‖a‖ ^ 2 +
+                1 / (2 * H) * ‖d‖ ^ 2) :=
+            mul_le_mul_of_nonneg_left hyoung halpha
+          _ = _ := by ring
+  have hdet_norm : ‖H • g + d‖ ^ 2 ≤
+      2 * H ^ 2 * ‖g‖ ^ 2 + 2 * ‖d‖ ^ 2 := by
+    have hraw := SOptLib.norm_add_sq_le_two_mul_norm_sq_add_two_mul_norm_sq
+      (H • g) d
+    rw [norm_smul, Real.norm_eq_abs, abs_of_pos hH, mul_pow] at hraw
+    nlinarith
+  have hsmooth_nonneg : 0 ≤ L * alpha ^ 2 / 2 := by positivity
+  have hdet_smooth :
+      (L * alpha ^ 2 / 2) * ‖H • g + d‖ ^ 2 ≤
+        L * alpha ^ 2 * H ^ 2 * ‖g‖ ^ 2 +
+          L * alpha ^ 2 * ‖d‖ ^ 2 := by
+    have hmul := mul_le_mul_of_nonneg_left hdet_norm hsmooth_nonneg
+    calc
+      (L * alpha ^ 2 / 2) * ‖H • g + d‖ ^ 2 ≤
+          (L * alpha ^ 2 / 2) *
+            (2 * H ^ 2 * ‖g‖ ^ 2 + 2 * ‖d‖ ^ 2) := hmul
+      _ = L * alpha ^ 2 * H ^ 2 * ‖g‖ ^ 2 +
+          L * alpha ^ 2 * ‖d‖ ^ 2 := by ring
+  have hg_smooth : L * alpha ^ 2 * H ^ 2 ≤ alpha * H / 40 := by
+    have hscale := mul_le_mul_of_nonneg_left hsmall halphaH
+    calc
+      L * alpha ^ 2 * H ^ 2 = (alpha * H) * (alpha * L * H) := by ring
+      _ ≤ (alpha * H) * (1 / 40) := hscale
+      _ = alpha * H / 40 := by ring
+  have hd_smooth : L * alpha ^ 2 ≤ alpha / (40 * H) := by
+    have hscale := mul_le_mul_of_nonneg_left hsmall halpha_div_H
+    calc
+      L * alpha ^ 2 = (alpha / H) * (alpha * L * H) := by
+        field_simp [hH.ne']
+        <;> ring
+      _ ≤ (alpha / H) * (1 / 40) := hscale
+      _ = alpha / (40 * H) := by
+        field_simp [hH.ne']
+        <;> ring
+  have hnoise_cross :
+      L * alpha ^ 2 * ⟪d, z⟫_ℝ ≤
+        alpha / (10 * H) * ‖d‖ ^ 2 +
+          L * alpha ^ 2 / 16 * ‖z‖ ^ 2 := by
+    have hcoeff : 0 ≤ L * alpha ^ 2 := mul_nonneg hL (sq_nonneg alpha)
+    have hfirst :
+        L * alpha ^ 2 * ⟪d, z⟫_ℝ ≤
+          L * alpha ^ 2 * (‖d‖ * ‖z‖) :=
+      mul_le_mul_of_nonneg_left hdz hcoeff
+    have hyoung :
+        L * alpha ^ 2 * (‖d‖ * ‖z‖) ≤
+          alpha / (10 * H) * ‖d‖ ^ 2 +
+            (5 / 2) * L ^ 2 * alpha ^ 3 * H * ‖z‖ ^ 2 := by
+      have hbase :
+          10 * L * alpha * H * (‖d‖ * ‖z‖) ≤
+            ‖d‖ ^ 2 + 25 * L ^ 2 * alpha ^ 2 * H ^ 2 * ‖z‖ ^ 2 := by
+        calc
+          10 * L * alpha * H * (‖d‖ * ‖z‖) ≤
+              10 * L * alpha * H * (‖d‖ * ‖z‖) +
+                (‖d‖ - 5 * L * alpha * H * ‖z‖) ^ 2 :=
+            le_add_of_nonneg_right (sq_nonneg _)
+          _ = ‖d‖ ^ 2 +
+              25 * L ^ 2 * alpha ^ 2 * H ^ 2 * ‖z‖ ^ 2 := by ring
+      have hpoly :
+          (10 * H) * (L * alpha ^ 2 * (‖d‖ * ‖z‖)) ≤
+            (10 * H) * (alpha / (10 * H) * ‖d‖ ^ 2 +
+              (5 / 2) * L ^ 2 * alpha ^ 3 * H * ‖z‖ ^ 2) := by
+        calc
+          (10 * H) * (L * alpha ^ 2 * (‖d‖ * ‖z‖)) =
+              alpha * (10 * L * alpha * H * (‖d‖ * ‖z‖)) := by ring
+          _ ≤ alpha *
+              (‖d‖ ^ 2 + 25 * L ^ 2 * alpha ^ 2 * H ^ 2 * ‖z‖ ^ 2) :=
+            mul_le_mul_of_nonneg_left hbase halpha
+          _ = (10 * H) * (alpha / (10 * H) * ‖d‖ ^ 2 +
+              (5 / 2) * L ^ 2 * alpha ^ 3 * H * ‖z‖ ^ 2) := by
+            field_simp [hH.ne']
+            <;> ring
+      exact le_of_mul_le_mul_left hpoly
+        (mul_pos (by norm_num : (0 : ℝ) < 10) hH)
+    have htail_coeff :
+        (5 / 2) * L ^ 2 * alpha ^ 3 * H ≤ L * alpha ^ 2 / 16 := by
+      have hc : 0 ≤ (5 / 2) * L * alpha ^ 2 := by positivity
+      have hscale := mul_le_mul_of_nonneg_left hsmall hc
+      calc
+        (5 / 2) * L ^ 2 * alpha ^ 3 * H =
+            ((5 / 2) * L * alpha ^ 2) * (alpha * L * H) := by ring
+        _ ≤ ((5 / 2) * L * alpha ^ 2) * (1 / 40) := hscale
+        _ = L * alpha ^ 2 / 16 := by ring
+    have htail :=
+      mul_le_mul_of_nonneg_right htail_coeff (sq_nonneg ‖z‖)
+    have hsumtail :
+        alpha / (10 * H) * ‖d‖ ^ 2 +
+            (5 / 2) * L ^ 2 * alpha ^ 3 * H * ‖z‖ ^ 2 ≤
+          alpha / (10 * H) * ‖d‖ ^ 2 +
+            L * alpha ^ 2 / 16 * ‖z‖ ^ 2 :=
+      add_le_add_right htail (alpha / (10 * H) * ‖d‖ ^ 2)
+    exact hfirst.trans (hyoung.trans hsumtail)
+  have hg_smooth_scaled :=
+    mul_le_mul_of_nonneg_right hg_smooth (sq_nonneg ‖g‖)
+  have hd_smooth_scaled :=
+    mul_le_mul_of_nonneg_right hd_smooth (sq_nonneg ‖d‖)
+  have hdet_final :
+      (L * alpha ^ 2 / 2) * ‖H • g + d‖ ^ 2 ≤
+        (alpha * H / 40) * ‖g‖ ^ 2 +
+          (alpha / (40 * H)) * ‖d‖ ^ 2 :=
+    hdet_smooth.trans (add_le_add hg_smooth_scaled hd_smooth_scaled)
+  rw [hq]
+  simp only [add_sub_cancel_right, inner_add_left, inner_add_right,
+    real_inner_smul_left, real_inner_smul_right, norm_smul,
+    Real.norm_eq_abs, abs_neg, abs_of_nonneg halpha, abs_of_pos hH, mul_pow]
+  rw [norm_add_sq_real (H • g + d) z]
+  simp only [inner_add_left, inner_add_right, real_inner_smul_left,
+    real_inner_smul_right, norm_smul, Real.norm_eq_abs, abs_of_pos hH, mul_pow]
+  rw [real_inner_self_eq_norm_sq]
+  have hg_nonneg : 0 ≤ alpha * H * ‖g‖ ^ 2 :=
+    mul_nonneg halphaH (sq_nonneg _)
+  have hz_nonneg : 0 ≤ alpha ^ 2 * L * ‖z‖ ^ 2 :=
+    mul_nonneg (mul_nonneg (sq_nonneg alpha) hL) (sq_nonneg _)
+  ring_nf at hcross_ag hcross_gd hcross_ad hdet_final hnoise_cross hg_nonneg hz_nonneg ⊢
+  linarith
+
+/-! Phase 4 batch 9: `inverse_linear_add_linear_at_clipped_sqrt_le`. -/
+
+-- Generalization plan (G0):
+-- concept/name: inverse-linear plus linear bound at a cap-clipped square-root
+--   balance; orig was the local block ending in `hlead`
+-- generality used: six real scalars and positivity of the objective-gap scale,
+--   linear coefficient, noise scale, horizon, and cap; no measure, probability,
+--   convexity, smoothness, oracle, vector-space, or dimension assumptions
+-- portable call pattern: stochastic gradient, decentralized gradient-tracking,
+--   and noisy first-order rate proofs vary the positive numerator, linear
+--   coefficient, noise level, horizon, and cap while bounding the same
+--   inverse-stepsize plus stepsize-linear pair by its square-root rate and cap penalty
+-- counterargument checked: although scalar, this is not paper-local traceability
+--   or a one-line wrapper; it packages reciprocal clipping, exact balancing,
+--   square-root normalization, and the final rate inequality in one reusable call
+-- coverage search: symbol queries for "inverse linear plus linear upper bound
+--   clipped square root balance" and the precise displayed shape found no covering
+--   SOptLib declaration; Mathlib semantic search returned only generic Young and
+--   square-root inequalities, while `SOptLib.varianceBalancedStepSize` has a
+--   different formula and conclusion, so coverage is partial
+-- minimal hypotheses: strict positivity of `A`, `B`, `noise`, `T`, and `cap`
+--   makes every reciprocal and square-root balance used in the conclusion valid;
+--   `alpha` needs only the displayed equality to the clipped balance
+
+/-- At a cap-clipped square-root balance, an inverse-linear term plus a linear
+term is bounded by twice its geometric-mean rate plus the inverse-horizon cap
+penalty.
+
+Layer: Glue | Gap: Level 1 (cap-clipped inverse-linear and linear rate balance)
+Proof: compare the reciprocal of the clipped step with the sum of the cap and balance reciprocals, bound the linear term by the unclipped balance, and identify both balanced terms by squaring nonnegative quantities.
+Source: Mathlib real square-root identities, linear-order minimum APIs, and ordered-field arithmetic for bias-variance balancing
+Used in: finite-horizon stochastic and decentralized optimization bounds after choosing a capped constant stepsize that balances an inverse-stepsize descent term against a noise-linear stepsize term
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/main_theorem/proof/14
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem inverse_linear_add_linear_at_clipped_sqrt_le
+    {A B noise T cap alpha : Real}
+    (hA : 0 < A) (hB : 0 < B) (hnoise : 0 < noise)
+    (hT : 0 < T) (hcap : 0 < cap)
+    (halpha : alpha = min cap (Real.sqrt (A / (B * noise ^ 2 * T)))) :
+    A / (alpha * T) + B * alpha * noise ^ 2 ≤
+      2 * noise * Real.sqrt (A * B / T) + A / (cap * T) := by
+  let beta : Real := Real.sqrt (A / (B * noise ^ 2 * T))
+  have hnoise_sq : 0 < noise ^ 2 := sq_pos_of_pos hnoise
+  have hden : 0 < B * noise ^ 2 * T :=
+    mul_pos (mul_pos hB hnoise_sq) hT
+  have hquot : 0 < A / (B * noise ^ 2 * T) := div_pos hA hden
+  have hbeta_pos : 0 < beta := by
+    exact Real.sqrt_pos.2 hquot
+  have hbeta_sq : beta ^ 2 = A / (B * noise ^ 2 * T) := by
+    simpa [beta] using Real.sq_sqrt hquot.le
+  have halpha_min : alpha = min cap beta := by
+    simpa [beta] using halpha
+  have halpha_pos : 0 < alpha := by
+    rw [halpha_min]
+    exact (lt_min_iff).2 ⟨hcap, hbeta_pos⟩
+  have halpha_beta : alpha ≤ beta := by
+    rw [halpha_min]
+    exact min_le_right _ _
+  have hinv : 1 / alpha ≤ 1 / cap + 1 / beta := by
+    rw [halpha_min]
+    rcases le_total cap beta with hle | hle
+    · rw [min_eq_left hle]
+      linarith [(one_div_pos).2 hbeta_pos]
+    · rw [min_eq_right hle]
+      linarith [(one_div_pos).2 hcap]
+  have hreciprocal_balance : A / (beta * T) = B * beta * noise ^ 2 := by
+    have hA_eq : A = beta ^ 2 * (B * noise ^ 2 * T) := by
+      exact ((eq_div_iff (ne_of_gt hden)).mp hbeta_sq).symm
+    rw [hA_eq]
+    field_simp [ne_of_gt hbeta_pos, ne_of_gt hT]
+  have hroot_arg : 0 ≤ A * B / T := by positivity
+  have hbalance_root :
+      B * beta * noise ^ 2 = noise * Real.sqrt (A * B / T) := by
+    have hleft : 0 ≤ B * beta * noise ^ 2 := by positivity
+    have hright : 0 ≤ noise * Real.sqrt (A * B / T) := by positivity
+    have hsquare :
+        (B * beta * noise ^ 2) ^ 2 =
+          (noise * Real.sqrt (A * B / T)) ^ 2 := by
+      rw [show (B * beta * noise ^ 2) ^ 2 =
+          B ^ 2 * beta ^ 2 * (noise ^ 2) ^ 2 by ring,
+        hbeta_sq]
+      rw [show (noise * Real.sqrt (A * B / T)) ^ 2 =
+          noise ^ 2 * (Real.sqrt (A * B / T)) ^ 2 by ring,
+        Real.sq_sqrt hroot_arg]
+      field_simp [ne_of_gt hB, ne_of_gt hnoise_sq, ne_of_gt hT]
+    nlinarith
+  have hinv_scaled := mul_le_mul_of_nonneg_left hinv
+    (div_nonneg hA.le hT.le)
+  have hlinear := mul_le_mul_of_nonneg_left halpha_beta
+    (mul_nonneg hB.le (sq_nonneg noise))
+  calc
+    A / (alpha * T) + B * alpha * noise ^ 2 ≤
+        A / (cap * T) + A / (beta * T) + B * beta * noise ^ 2 := by
+      convert add_le_add hinv_scaled hlinear using 1 <;>
+        field_simp [ne_of_gt halpha_pos, ne_of_gt hcap,
+          ne_of_gt hbeta_pos, ne_of_gt hT]
+    _ = 2 * noise * Real.sqrt (A * B / T) + A / (cap * T) := by
+      rw [hreciprocal_balance, hbalance_root]
+      ring
+
+/-! Phase 4 batch 9: `Module_End_isAlgebraicallySimpleEigenpair_of_eigenspace_span_of_left_eigenvector`. -/
+
+-- Generalization plan (G0):
+-- concept/name: algebraic simplicity from a spanned eigenspace and a normalized
+--   left eigenfunctional; orig was the local generalized-eigenvector exclusion block
+--   in two_step_counterexample_base_unit_algebraically_simple
+-- generality used: an arbitrary field, additive commutative group, module,
+--   endomorphism, eigenvalue, distinguished right vector, and algebraic dual;
+--   no topology, norm, finite-dimensionality, matrix coordinates, or nonzero premise
+-- portable call pattern: perturbation, finite-state Markov-chain, and periodic
+--   linearization proofs vary the field, operator, eigenvalue, and normalized
+--   left/right modes while concluding the same absence of length-two Jordan chains
+-- counterargument checked: this is not paper-local traceability or a one-line
+--   wrapper; the existing complex predicate has only eliminators, while this theorem
+--   constructs its two-clause algebraic-simplicity contract from reusable spectral data
+-- coverage search: lean_search_symbols queries “algebraically simple eigenpair of
+--   eigenspace span normalized left eigenfunctional”, “generalized eigenvector residual
+--   eigenspace left eigenvector pairing nonzero”, and “eigenspace span eigenvector left
+--   eigenvector algebraic multiplicity one” found the complex predicate and its
+--   eliminators but no constructor; LeanSearch found Mathlib generalized-eigenspace
+--   membership APIs, not this normalized-dual bridge
+-- minimal hypotheses: eigenspace spanning, the left-eigenfunctional identity, and
+--   normalization are exactly the three facts used; all are pointwise/algebraic
+
+/-- A one-dimensional eigenspace with a normalized left eigenfunctional has no
+length-two generalized eigenvector chain at the same eigenvalue.
+
+Layer: Glue | Gap: Level 2 (normalized-dual criterion for algebraic simplicity)
+Proof: apply the left eigenfunctional to the residual, use its eigenfunctional law
+to obtain zero, then use eigenspace spanning and normalization to force the residual's
+scalar coefficient to vanish.
+Source: Mathlib linear-algebra endomorphisms, algebraic duals, and eigenspaces
+Used in: perturbation, Markov-chain, and periodic distributed-linearization proofs
+that upgrade a spanned eigenspace and normalized left/right modes to algebraic simplicity
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/13/proof/0
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem Module.End.isAlgebraicallySimpleEigenpair_of_eigenspace_span_of_left_eigenvector
+    {K V : Type*} [CommRing K] [AddCommGroup V] [Module K V]
+    (A : Module.End K V) (mu : K) (right : V) (left : Module.Dual K V)
+    (hspan : ∀ v : V, A v = mu • v → ∃ c : K, v = c • right)
+    (hleft : left.comp A = mu • left)
+    (hnormalized : left right = 1) :
+    (∀ v : V, A v = mu • v → ∃ c : K, v = c • right) ∧
+      ∀ v : V, A (A v - mu • v) = mu • (A v - mu • v) →
+        A v = mu • v := by
+  refine ⟨hspan, ?_⟩
+  intro v hresidual_eigen
+  let residual : V := A v - mu • v
+  have hleft_apply : left (A v) = mu * left v := by
+    simpa using congrArg (fun f : Module.Dual K V => f v) hleft
+  have hleft_residual_zero : left residual = 0 := by
+    simp [residual, hleft_apply]
+  obtain ⟨c, hc⟩ := hspan residual (by simpa [residual] using hresidual_eigen)
+  have hleft_residual_eq : left residual = c := by
+    simp [hc, hnormalized]
+  have hc_zero : c = 0 := by
+    rw [← hleft_residual_eq, hleft_residual_zero]
+  have hresidual_zero : residual = 0 := by
+    rw [hc, hc_zero, zero_smul]
+  exact sub_eq_zero.mp (by simpa [residual] using hresidual_zero)
+
+/-! Phase 4 batch 9: `le_sq_mul_of_sqrt_div_le_mul_sqrt_div`. -/
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: denominator comparison forced by an inverse-square-root rate
+--   comparison; orig was `leading_sqrt_ratio_effective_node_forward`
+-- generality used: five real scalars with positivity of the common numerator,
+--   both denominator scales, and the common horizon scale; no measure,
+--   convexity, algorithmic structure, or separate sign assumption on the
+--   comparison constant
+-- portable call pattern: stochastic and distributed complexity comparisons vary
+--   the positive numerator, denominator scales, horizon scale, and comparison
+--   constant while deriving the same squared-factor bound on the second scale
+-- counterargument checked: although the result is scalar algebra, it is not a
+--   paper-local traceability wrapper or pure rename; it packages squaring two
+--   roots, clearing unequal positive denominators, and cancelling common factors
+-- coverage search: searches for "positive common numerator denominator scales
+--   square root division comparison implies squared constant denominator bound",
+--   "sqrt division inequality square constant denominator", and the proposed
+--   declaration name found Mathlib's `Real.sqrt_le_left`, `Real.sqrt_le_sqrt_iff`,
+--   and `Real.sq_sqrt`, plus SOptLib square-root normalization lemmas, but no full
+--   implication from the displayed rate comparison to the denominator bound
+-- minimal hypotheses: all four positivity hypotheses justify division and
+--   cancellation; the rate comparison itself forces `C > 0`, so the source's
+--   separate hypothesis `0 ≤ C` is intentionally omitted as redundant
+
+/-- Comparing two positive inverse-square-root rates bounds their denominator scales.
+
+If the rates have the same positive numerator and common positive scale, and the
+rate with denominator `e` is at most `C` times the rate with denominator `m`,
+then `m` is at most `C ^ 2 * e`.
+
+Layer: Glue | Gap: Level 1 (inverse-square-root rate comparison inversion)
+Proof: first derive positivity of the comparison constant from the positive rates, then square the comparison, rewrite both squared roots, clear the positive denominators, and cancel the common positive factors.
+Source: Mathlib real square-root order identities `sq_le_sq₀` and `Real.sq_sqrt`, together with ordered-field division and cancellation
+Used in: stochastic and distributed complexity lower-bound arguments that recover denominator-scale growth from a comparison of leading inverse-square-root rates
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/19
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem le_sq_mul_of_sqrt_div_le_mul_sqrt_div
+    {A e m tau C : ℝ}
+    (hA : 0 < A) (he : 0 < e) (hm : 0 < m) (htau : 0 < tau)
+    (hcompare :
+      Real.sqrt (A / (e * tau)) ≤
+        C * Real.sqrt (A / (m * tau))) :
+    m ≤ C ^ 2 * e := by
+  have heTau : 0 < e * tau := mul_pos he htau
+  have hmTau : 0 < m * tau := mul_pos hm htau
+  have hx : 0 < A / (e * tau) := div_pos hA heTau
+  have hy : 0 < A / (m * tau) := div_pos hA hmTau
+  have hC : 0 ≤ C := by
+    have hproduct : 0 < C * Real.sqrt (A / (m * tau)) :=
+      lt_of_lt_of_le (Real.sqrt_pos.2 hx) hcompare
+    exact (pos_of_mul_pos_left hproduct (Real.sqrt_pos.2 hy).le).le
+  have hsquares :
+      (Real.sqrt (A / (e * tau))) ^ 2 ≤
+        (C * Real.sqrt (A / (m * tau))) ^ 2 :=
+    (sq_le_sq₀ (Real.sqrt_nonneg _)
+      (mul_nonneg hC (Real.sqrt_nonneg _))).2 hcompare
+  have hratio :
+      A / (e * tau) ≤ C ^ 2 * (A / (m * tau)) := by
+    simpa [mul_pow, Real.sq_sqrt hx.le, Real.sq_sqrt hy.le] using hsquares
+  have hratio' :
+      A / (e * tau) ≤ (C ^ 2 * A) / (m * tau) := by
+    calc
+      A / (e * tau) ≤ C ^ 2 * (A / (m * tau)) := hratio
+      _ = (C ^ 2 * A) / (m * tau) := by ring
+  have hcross : A * (m * tau) ≤ (C ^ 2 * A) * (e * tau) :=
+    (div_le_div_iff₀ heTau hmTau).mp hratio'
+  have hcancel : (A * tau) * m ≤ (A * tau) * (C ^ 2 * e) := by
+    nlinarith
+  exact (mul_le_mul_iff_of_pos_left (mul_pos hA htau)).mp hcancel
+
+end SOptLib
+
+/-! Phase 4 batch 9: `sqrt_div_le_sqrt_inv_mul_sqrt_div_of_mul_le`. -/
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: inverse-square-root denominator comparison from a multiplicative
+--   denominator lower bound; orig was `leading_sqrt_ratio_effective_node_reverse`
+-- generality used: five real scalars, a nonnegative numerator, and positivity of
+--   the reference denominator, common scale, and comparison factor; no measure,
+--   convexity, smoothness, oracle, algorithmic structure, or finite dimension
+-- portable call pattern: stochastic and distributed rate proofs change the
+--   nonnegative numerator, denominator scales, horizon scale, and positive lower-
+--   comparison factor while reusing the same inverse-square-root rate comparison
+-- counterargument checked: this is not paper-local traceability or a pure wrapper;
+--   it packages positive-denominator transport, inversion of a multiplicative
+--   comparison, square-root monotonicity, and square-root product normalization
+-- coverage search: searches for "square root quotient upper bound denominator
+--   lower comparison positive real", "sqrt division less equal sqrt inverse
+--   multiplier of multiplication lower bound", and the proposed name found
+--   Mathlib's `Real.sqrt_le_sqrt`, `Real.sqrt_mul`, and quotient-order primitives,
+--   plus related SOptLib square-root normalization lemmas, but no full contract
+-- minimal hypotheses: `0 ≤ A`, `0 < m`, `0 < tau`, `0 < c`, and `c * m ≤ e`
+--   suffice; positivity of `e` follows from the comparison, and an outer
+--   nonnegative multiplier is handled at the call site
+
+/-- A multiplicative lower bound on a positive denominator gives the corresponding
+inverse-square-root upper comparison.
+
+If `c * m ≤ e`, with `m`, `tau`, and `c` positive and `A` nonnegative, then
+the rate with denominator `e * tau` is at most `sqrt (c⁻¹)` times the rate
+with denominator `m * tau`.
+
+Layer: Glue | Gap: Level 1 (multiplicative denominator to inverse-square-root comparison)
+Proof: derive positivity of the larger denominator, clear both positive denominator products to compare the square-root arguments, then use square-root monotonicity and `Real.sqrt_mul` for the positive inverse factor.
+Source: Mathlib real square-root monotonicity and multiplication identities, together with ordered-field division and inversion inequalities
+Used in: stochastic and distributed complexity upper-bound arguments that turn effective-size lower comparisons into leading inverse-square-root rate comparisons
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/19
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem sqrt_div_le_sqrt_inv_mul_sqrt_div_of_mul_le
+    {A e m tau c : ℝ}
+    (hA : 0 ≤ A) (hm : 0 < m) (htau : 0 < tau) (hc : 0 < c)
+    (hlower : c * m ≤ e) :
+    Real.sqrt (A / (e * tau)) ≤
+      Real.sqrt (c⁻¹) * Real.sqrt (A / (m * tau)) := by
+  have he : 0 < e := lt_of_lt_of_le (mul_pos hc hm) hlower
+  have heTau : 0 < e * tau := mul_pos he htau
+  have hmTau : 0 < m * tau := mul_pos hm htau
+  have hcInv : 0 < c⁻¹ := inv_pos.mpr hc
+  have hratio : A / (e * tau) ≤ c⁻¹ * (A / (m * tau)) := by
+    rw [div_le_iff₀ heTau]
+    rw [show c⁻¹ * (A / (m * tau)) * (e * tau) =
+      (c⁻¹ * e) * A / m by field_simp [ne_of_gt htau, ne_of_gt hm]]
+    rw [le_div_iff₀ hm]
+    have hcScaled : m ≤ c⁻¹ * e := by
+      rw [le_inv_mul_iff₀ hc]
+      simpa [mul_comm] using hlower
+    nlinarith
+  have hroot := Real.sqrt_le_sqrt hratio
+  rw [Real.sqrt_mul hcInv.le] at hroot
+  exact hroot
+
+end SOptLib
+
+/-! Phase 4 batch 9: `Matrix_euclidean_opNorm_le_sum_norm_mul_sqrt_card`. -/
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: entrywise l1 upper bound for a finite matrix's Euclidean induced operator norm; orig was `matrixEuclideanOperatorNorm_le_sum_abs_mul_sqrt_card`
+-- generality used: arbitrary finite row and column index types and an RCLike scalar field; no nonemptiness, decidable equality, ambient finite-dimensional space, measure, convexity, smoothness, or oracle assumptions
+-- portable call pattern: finite-network and finite-coordinate stability proofs can change the row type, column type, scalar field, and every matrix entry while bounding the Euclidean induced norm by an explicit entrywise sum and input-cardinality factor
+-- counterargument checked: the result is not paper traceability or a pure rename; Mathlib supplies the Euclidean matrix action API but no theorem with this entrywise-l1/cardinality conclusion, and the estimate packages the finite l1-to-l2 argument needed by future matrix bounds
+-- coverage search: `lean_search_symbols` queries "matrix Euclidean operator norm bounded by entrywise sum times square root cardinality", "Matrix l2 opNorm upper bound sum norm entries finite", and "induced Euclidean seminorm operator norm finite matrix entrywise l1 upper bound" found only the source declaration and partial Mathlib/SOptLib APIs; LeanSearch for "operator norm of a finite matrix is bounded by the sum of the norms of its entries" found `Matrix.l2_opNorm_mulVec`, `Matrix.linfty_opNorm_def`, and entrywise supremum facts, but no full bound
+-- minimal hypotheses: finiteness alone supports both sums and the l1-to-l2 cardinality estimate; the proof does not use `Nonempty`, `DecidableEq`, or finite-dimensional typeclasses
+
+namespace Matrix
+
+/-- The Euclidean induced norm of a finite matrix over an `RCLike` field is
+bounded by its entrywise `l¹` sum times the square root of the input
+cardinality.
+
+The induced norm is written by its defining least-nonnegative-bound
+specification, so the result applies without selecting one of Mathlib's scoped
+matrix norm instances.
+
+Layer: Glue | Gap: Level 1 (entrywise bound for a finite Euclidean matrix operator norm)
+Proof: exhibit the stated constant as an admissible action bound, using the triangle inequality and the finite `l² ≤ l¹ ≤ sqrt(card) * l²` comparisons, then apply the real infimum bound.
+Source: Mathlib finite matrix-vector multiplication, finite-sum triangle inequalities, real square roots, and finite Cauchy--Schwarz
+Used in: finite-dimensional stable-propagator and resolvent estimates that replace a Euclidean matrix operator norm by explicit entrywise bounds
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/12/proof/3
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem euclidean_opNorm_le_sum_norm_mul_sqrt_card
+    {m n 𝕜 : Type*} [Fintype m] [Fintype n] [RCLike 𝕜]
+    (A : Matrix m n 𝕜) :
+    sInf {c : ℝ | 0 ≤ c ∧ ∀ x : n → 𝕜,
+      Real.sqrt (∑ i : m, ‖(A *ᵥ x) i‖ ^ 2) ≤
+        c * Real.sqrt (∑ j : n, ‖x j‖ ^ 2)} ≤
+      (∑ i : m, ∑ j : n, ‖A i j‖) *
+        Real.sqrt (Fintype.card n : ℝ) := by
+  classical
+  let aSum : ℝ := ∑ i : m, ∑ j : n, ‖A i j‖
+  let c : ℝ := aSum * Real.sqrt (Fintype.card n : ℝ)
+  have haSum_nonneg : 0 ≤ aSum := by
+    dsimp [aSum]
+    positivity
+  have hc_nonneg : 0 ≤ c := by
+    dsimp [c]
+    positivity
+  have hl2_le_l1 (y : m → 𝕜) :
+      Real.sqrt (∑ i : m, ‖y i‖ ^ 2) ≤ ∑ i : m, ‖y i‖ := by
+    have hsquares :
+        (∑ i : m, ‖y i‖ ^ 2) ≤ (∑ i : m, ‖y i‖) ^ 2 :=
+      Finset.sum_sq_le_sq_sum_of_nonneg (fun _ _ => norm_nonneg _)
+    calc
+      Real.sqrt (∑ i : m, ‖y i‖ ^ 2) ≤
+          Real.sqrt ((∑ i : m, ‖y i‖) ^ 2) := Real.sqrt_le_sqrt hsquares
+      _ = ∑ i : m, ‖y i‖ :=
+        Real.sqrt_sq (Finset.sum_nonneg fun _ _ => norm_nonneg _)
+  have hl1_le_l2 (x : n → 𝕜) :
+      (∑ j : n, ‖x j‖) ≤
+        Real.sqrt (Fintype.card n : ℝ) *
+          Real.sqrt (∑ j : n, ‖x j‖ ^ 2) := by
+    simpa using
+      (Real.sum_mul_le_sqrt_mul_sqrt (Finset.univ : Finset n)
+        (fun _ : n => (1 : ℝ)) (fun j : n => ‖x j‖))
+  have hscalar (x : n → 𝕜) :
+      Real.sqrt (∑ i : m, ‖(A *ᵥ x) i‖ ^ 2) ≤
+        c * Real.sqrt (∑ j : n, ‖x j‖ ^ 2) := by
+    have hentry (j : n) : ‖x j‖ ≤ ∑ k : n, ‖x k‖ :=
+      Finset.single_le_sum (fun i _ => norm_nonneg (x i)) (Finset.mem_univ j)
+    have hl1 :
+        (∑ i : m, ‖(A *ᵥ x) i‖) ≤
+          aSum * ∑ j : n, ‖x j‖ := by
+      calc
+        (∑ i : m, ‖(A *ᵥ x) i‖) =
+            ∑ i : m, ‖∑ j : n, A i j * x j‖ := by
+              simp [Matrix.mulVec, dotProduct]
+        _ ≤ ∑ i : m, ∑ j : n, ‖A i j * x j‖ := by
+              apply Finset.sum_le_sum
+              intro i _
+              exact norm_sum_le _ _
+        _ ≤ ∑ i : m, ∑ j : n, ‖A i j‖ * ∑ k : n, ‖x k‖ := by
+              apply Finset.sum_le_sum
+              intro i _
+              apply Finset.sum_le_sum
+              intro j _
+              rw [norm_mul]
+              exact mul_le_mul_of_nonneg_left (hentry j) (norm_nonneg _)
+        _ = aSum * ∑ j : n, ‖x j‖ := by
+              dsimp [aSum]
+              simp_rw [Finset.sum_mul]
+    calc
+      Real.sqrt (∑ i : m, ‖(A *ᵥ x) i‖ ^ 2) ≤
+          ∑ i : m, ‖(A *ᵥ x) i‖ := hl2_le_l1 _
+      _ ≤ aSum * ∑ j : n, ‖x j‖ := hl1
+      _ ≤ aSum * (Real.sqrt (Fintype.card n : ℝ) *
+            Real.sqrt (∑ j : n, ‖x j‖ ^ 2)) :=
+          mul_le_mul_of_nonneg_left (hl1_le_l2 x) haSum_nonneg
+      _ = c * Real.sqrt (∑ j : n, ‖x j‖ ^ 2) := by
+          dsimp [c]
+          ring
+  apply csInf_le
+  · refine ⟨0, ?_⟩
+    intro d hd
+    exact hd.1
+  · exact ⟨hc_nonneg, hscalar⟩
+
+end Matrix
+
+/-! Phase 4 batch 9: `Matrix_euclidean_opNorm_le_of_entrywise_abs_le`. -/
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: uniform entrywise norm bound for a finite matrix's Euclidean induced operator norm; orig was `matrixEuclideanOperatorNorm_le_of_entrywise_abs_bound`
+-- generality used: arbitrary finite row and column index types and an `RCLike` scalar field; no nonemptiness, decidable equality, ambient finite-dimensional space, measure, convexity, smoothness, or oracle assumptions
+-- portable call pattern: finite-network and finite-coordinate perturbation proofs can change the matrix shape, scalar field, matrix family, and uniform entry bound while retaining the same explicit cardinality-dependent Euclidean operator-norm conclusion
+-- counterargument checked: this is not paper-local traceability or a pure rename; it packages the recurring passage from a uniform coordinate bound to an induced Euclidean matrix bound, while the closest staged theorem requires callers to establish an entrywise double-sum estimate themselves
+-- coverage search: symbol queries `matrix Euclidean operator norm upper bound uniform absolute bound entries cardinality`, `euclidean opNorm le of entrywise abs le`, and `finite matrix operator norm entrywise bound cardinality sqrt`, plus LeanSearch for the full uniform-entry contract, found the source theorem and the partial `Matrix.euclidean_opNorm_le_sum_norm_mul_sqrt_card`, but no Mathlib or SOptLib declaration with this conclusion
+-- minimal hypotheses: `Fintype` and the pointwise entry bound are sufficient; the source's `Nonempty`, `DecidableEq`, and `0 ≤ B` assumptions are unused and therefore omitted
+
+namespace Matrix
+
+/-- A uniform norm bound on the entries of a finite matrix over an `RCLike`
+field gives an explicit cardinality-dependent upper bound on its Euclidean
+induced operator norm.
+
+Layer: Glue | Gap: Level 1 (uniform entrywise bound for a finite Euclidean matrix operator norm)
+Proof: bound the entrywise double sum by `card m * card n * B`, apply `Matrix.euclidean_opNorm_le_sum_norm_mul_sqrt_card`, and multiply by the nonnegative square-root input-cardinality factor.
+Source: Mathlib finite sums, scalar norms, and real square roots, together with the finite-matrix Euclidean operator-norm entry-sum bound
+Used in: finite-network stable-power and matrix-family perturbation estimates that convert uniform coordinate control into a Euclidean operator-norm bound
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/12/proof/3
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem euclidean_opNorm_le_of_entrywise_norm_le
+    {m n 𝕜 : Type*} [Fintype m] [Fintype n] [RCLike 𝕜]
+    (A : Matrix m n 𝕜) (B : ℝ) (hentry : ∀ i j, ‖A i j‖ ≤ B) :
+    sInf {c : ℝ | 0 ≤ c ∧ ∀ x : n → 𝕜,
+      Real.sqrt (∑ i : m, ‖(A *ᵥ x) i‖ ^ 2) ≤
+        c * Real.sqrt (∑ j : n, ‖x j‖ ^ 2)} ≤
+      ((((Fintype.card m : ℝ) * (Fintype.card n : ℝ)) *
+        Real.sqrt (Fintype.card n : ℝ)) * B) := by
+  classical
+  let rows : ℝ := Fintype.card m
+  let cols : ℝ := Fintype.card n
+  have hsqrt_nonneg : 0 ≤ Real.sqrt cols := Real.sqrt_nonneg cols
+  have haSum_le :
+      (∑ i : m, ∑ j : n, ‖A i j‖) ≤ (rows * cols) * B := by
+    calc
+      (∑ i : m, ∑ j : n, ‖A i j‖) ≤
+          ∑ i : m, ∑ _j : n, B := by
+            apply Finset.sum_le_sum
+            intro i _
+            apply Finset.sum_le_sum
+            intro j _
+            exact hentry i j
+      _ = (rows * cols) * B := by
+            dsimp [rows, cols]
+            simp [mul_assoc]
+  calc
+    sInf {c : ℝ | 0 ≤ c ∧ ∀ x : n → 𝕜,
+        Real.sqrt (∑ i : m, ‖(A *ᵥ x) i‖ ^ 2) ≤
+          c * Real.sqrt (∑ j : n, ‖x j‖ ^ 2)} ≤
+        (∑ i : m, ∑ j : n, ‖A i j‖) *
+          Real.sqrt (Fintype.card n : ℝ) :=
+      Matrix.euclidean_opNorm_le_sum_norm_mul_sqrt_card A
+    _ ≤ ((rows * cols) * B) * Real.sqrt cols := by
+      simpa [cols] using mul_le_mul_of_nonneg_right haSum_le hsqrt_nonneg
+    _ = ((rows * cols) * Real.sqrt cols) * B := by ring
+    _ = (((Fintype.card m : ℝ) * (Fintype.card n : ℝ)) *
+          Real.sqrt (Fintype.card n : ℝ)) * B := by rfl
+
+end Matrix
+
+/-! Phase 4 batch 9: `Matrix_mulVec_mem_stdSimplex_of_mem_colStochastic`. -/
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: invariance of the standard simplex under a column-stochastic matrix action; orig was `matrixMulVector_mem_stdSimplex`.
+-- generality used: arbitrary finite decidable index type and ordered semiring of coefficients; no real-specific field, topology, measure, finite-dimensionality, convexity, smoothness, or oracle assumptions are used.
+-- portable call pattern: finite-state Markov, consensus, push-sum, and distributed-optimization proofs change the state type, column-stochastic matrix, and probability vector while retaining standard-simplex membership after `Matrix.mulVec`.
+-- counterargument checked: the proof is short, but it is not a pure rename or paper-local wrapper; it packages the reusable conjunction of nonnegativity and total-mass preservation into the canonical `stdSimplex` invariant.
+-- coverage search: symbol queries "matrix vector product belongs to standard simplex when matrix is column stochastic and vector belongs to standard simplex" and "mulVec standard simplex column stochastic", plus LeanSearch queries for the same contract, found the component lemmas `Matrix.nonneg_mulVec_of_mem_colStochastic` and `Matrix.sum_mulVec_of_mem_colStochastic`, but no theorem with the combined simplex conclusion.
+-- minimal hypotheses: `[Fintype Node] [DecidableEq Node] [Semiring R] [PartialOrder R] [IsOrderedRing R]` are exactly the common assumptions of Mathlib's `Matrix.colStochastic`, matrix-vector action, and `stdSimplex` APIs.
+
+namespace Matrix
+
+/-- A column-stochastic matrix maps every vector in the standard simplex back
+into the standard simplex.
+
+Layer: Glue | Gap: Level 1 (column-stochastic standard-simplex invariance)
+Proof: use column-stochasticity to preserve coordinatewise nonnegativity and the total coordinate sum, then assemble the two defining conditions of `stdSimplex`.
+Source: Mathlib standard simplex membership and column-stochastic matrix-vector action lemmas `Matrix.nonneg_mulVec_of_mem_colStochastic` and `Matrix.sum_mulVec_of_mem_colStochastic`
+Used in: finite-state Markov evolution, consensus and push-sum weight propagation, and distributed gradient-tracking Perron-vector recurrences
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/assumptions/9
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem mulVec_mem_stdSimplex_of_mem_colStochastic
+    {R Node : Type*} [Fintype Node] [DecidableEq Node]
+    [Semiring R] [PartialOrder R] [IsOrderedRing R]
+    {A : Matrix Node Node R} (hA : A ∈ colStochastic R Node)
+    {v : Node → R} (hv : v ∈ stdSimplex R Node) :
+    A *ᵥ v ∈ stdSimplex R Node := by
+  exact ⟨nonneg_mulVec_of_mem_colStochastic hA hv.1,
+    (sum_mulVec_of_mem_colStochastic hA).trans hv.2⟩
+
+end Matrix
+
+/-! Phase 4 batch 9: `Matrix_mul_nonsing_inv_eq_nonsing_inv_mul_of_mul_eq_mul`. -/
+
+-- Generalization plan (G0):
+-- concept/name: commutation with a matrix nonsingular inverse; orig was the local
+--   matrix_mul_nonsing_inv_commute_of_commute block
+-- generality used: arbitrary commutative ring, finite square-matrix index type,
+--   determinant-unit hypothesis, and an equality expressing matrix commutation
+-- portable call pattern: spectral calculus, preconditioning, and rational matrix
+--   identities where the coefficient ring and commuting matrices vary
+-- counterargument checked: Mathlib has generic invOf commutation and the two
+--   nonsingular-inverse cancellation laws, but not this determinant-unit matrix contract
+-- coverage search: queried nonsingular inverse commutation and Commute/invOf;
+--   Matrix.mul_nonsing_inv, Matrix.nonsing_inv_mul, and Commute.invOf_left are partial hits
+-- minimal hypotheses: all already minimal for Mathlib's nonsingular matrix inverse API
+
+/-- A matrix commuting with a matrix of unit determinant also commutes with its
+nonsingular inverse.
+
+Layer: Glue | Gap: Level 1 (nonsingular matrix inverse commutation packaging)
+Proof: Insert the left inverse of `A`, reassociate, use the commutation hypothesis,
+then cancel `A` against its right inverse.
+Source: Mathlib `Matrix.nonsing_inv_mul` and `Matrix.mul_nonsing_inv` from nonsingular matrix inversion
+Used in: resolvent spectral calculus, where a complexified real matrix must commute with the inverse of its scalar-shift resolvent matrix
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/algorithm_spec
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks -/
+theorem Matrix.mul_nonsing_inv_eq_nonsing_inv_mul_of_mul_eq_mul
+    {R κ : Type*} [CommRing R] [Fintype κ] [DecidableEq κ]
+    (A B : Matrix κ κ R) (hA : IsUnit A.det) (hcomm : A * B = B * A) :
+    B * A⁻¹ = A⁻¹ * B := by
+  calc
+    B * A⁻¹ = (A⁻¹ * A) * (B * A⁻¹) := by
+      rw [Matrix.nonsing_inv_mul A hA]
+      simp
+    _ = A⁻¹ * ((A * B) * A⁻¹) := by
+      rw [Matrix.mul_assoc A⁻¹ A (B * A⁻¹)]
+      rw [← Matrix.mul_assoc A B A⁻¹]
+    _ = A⁻¹ * ((B * A) * A⁻¹) := by
+      rw [hcomm]
+    _ = A⁻¹ * (B * (A * A⁻¹)) := by
+      rw [Matrix.mul_assoc]
+    _ = A⁻¹ * B := by
+      rw [Matrix.mul_nonsing_inv A hA]
+      simp
+
+/-! Phase 4 batch 9: `Matrix_mulVec_pos_of_nonneg_of_pos_diagonal`. -/
+
+-- Generalization plan (G0):
+-- concept/name: strict-positivity preservation by left multiplication with a nonnegative matrix having a positive diagonal; orig was mulVec_pos_of_nonneg_of_positiveDiagonal.
+-- generality used: arbitrary finite row-index type and scalar non-unital non-associative semiring with a preorder, additive monotonicity, nonnegative-product monotonicity, and strict positivity of products; no stochasticity, normalization, connectivity, measure, topology, norm, convexity, smoothness, oracle, or finite-dimensional assumptions.
+-- portable call pattern: push-sum, positive-system, consensus, and Perron proofs change the finite state type, ordered scalar type, nonnegative transition or mixing matrix, and strictly positive column while using the same coordinatewise strict-positivity conclusion after one `Matrix.mulVec` step.
+-- counterargument checked: the staged `Matrix.vecMul_pos_of_nonneg_of_pos_diagonal` is the transpose-side row-action companion, not an alpha-equivalent duplicate; this column-action theorem exposes the native `mulVec` contract and combines a positive diagonal contribution with nonnegative remaining summands.
+-- coverage search: `lean_search_symbols` queries "matrix mulVec coordinatewise strictly positive vector nonnegative entries positive diagonal", "mulVec strictly positive nonnegative positive diagonal", and "matrix vector multiplication positive diagonal positive vector" found no applicable Mathlib or SOptLib declaration; LeanSearch for the full preservation contract found no theorem with this conclusion, while Mathlib's `Matrix.mulVec_transpose` only bridges to the distinct `vecMul` operation, so coverage is partial.
+-- minimal hypotheses: `[Fintype Node]` forms each finite dot product; `[NonUnitalNonAssocSemiring R] [Preorder R] [AddLeftMono R] [PosMulMono R]` prove all summands nonnegative, and `[PosMulStrictMono R]` makes the self-indexed summand positive; decidable equality is introduced only inside the proof.
+
+/-- A nonnegative square matrix with positive diagonal maps a coordinatewise
+strictly positive column vector to a coordinatewise strictly positive column vector.
+
+Layer: Glue | Gap: Level 1 (strict-positivity preservation by finite matrix column action)
+Proof: at each output coordinate, select the diagonal summand; it is strictly positive, while every summand in the defining finite dot product is nonnegative, so the selected term is bounded by the full sum.
+Source: Mathlib finite matrix-vector multiplication (`Matrix.mulVec`), ordered-semiring multiplication, and `Finset.single_le_sum`
+Used in: push-sum, positive-system, consensus, and periodic Perron constructions that transport positive column weights through one nonnegative mixing step with positive self-weights
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/assumptions/9
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem Matrix.mulVec_pos_of_nonneg_of_pos_diagonal
+    {Node R : Type*} [Fintype Node]
+    [NonUnitalNonAssocSemiring R] [Preorder R] [AddLeftMono R]
+    [PosMulMono R] [PosMulStrictMono R]
+    (A : Matrix Node Node R) (x : Node -> R)
+    (hA_nonneg : forall i j : Node, 0 <= A i j)
+    (hA_diag : forall i : Node, 0 < A i i)
+    (hx_pos : forall i : Node, 0 < x i) :
+    forall i : Node, 0 < Matrix.mulVec A x i := by
+  classical
+  intro i
+  have hterm : 0 < A i i * x i := mul_pos (hA_diag i) (hx_pos i)
+  have hle : A i i * x i <= ∑ j : Node, A i j * x j := by
+    exact Finset.single_le_sum
+      (fun j _ => mul_nonneg (hA_nonneg i j) (hx_pos j).le)
+      (Finset.mem_univ i)
+  exact hterm.trans_le (by simpa [Matrix.mulVec, dotProduct] using hle)
+
+/-! Phase 4 batch 9: `norm_finset_sum_smul_le_sum_norm_of_mem_stdSimplex`. -/
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: norm bound for a finite simplex-weighted vector sum; orig was `perronLeft_weightedState_norm_le_stateL1Norm`.
+-- generality used: arbitrary finite index type and seminormed additive commutative group with a norm-compatible real scalar action; no decidable equality, vector-space laws, inner product, completeness, finite-dimensionality, measure, convexity, smoothness, oracle, network, or Perron assumptions are used.
+-- portable call pattern: consensus, averaging, mixture, and randomized-output proofs change the finite index type, simplex weights, and vector family while retaining the bound of the weighted aggregate by the unweighted coordinate L1 norm.
+-- counterargument checked: although assembled from short Mathlib component lemmas, the result is not a pure rename or paper-local wrapper; it packages the reusable bridge from standard-simplex membership to an unweighted L1 bound for a vector-valued mixture.
+-- coverage search: symbol queries `norm finite sum scalar multiplication bounded by sum norms nonnegative weights sum one standard simplex` and `mem stdSimplex norm sum smul bounded sum norm`, plus LeanSearch for the complete contract, found the component lemmas `norm_sum_le` and `mem_Icc_of_mem_stdSimplex` but no theorem with this conclusion.
+-- minimal hypotheses: `Fintype Node` supports the total finite sum, while `SeminormedAddCommGroup F`, `SMul Real F`, and `NormSMulClass Real F` are exactly what the triangle inequality and real scalar norm formula require; decidable equality is used only classically inside the proof.
+
+/-- The norm of a finite vector sum weighted by a point of the standard simplex
+is bounded by the sum of the coordinate norms.
+
+Layer: Glue | Gap: Level 1 (simplex-weighted vector sum to coordinate L1 norm)
+Proof: apply the finite-sum triangle inequality, rewrite each nonnegative real scalar norm, and use that every coordinate of a standard-simplex point is at most one.
+Source: Mathlib standard-simplex coordinate bounds `mem_Icc_of_mem_stdSimplex` and finite-sum norm inequality `norm_sum_le`
+Used in: consensus mixtures, distributed-state Perron averages, and randomized-output aggregates before geometric or summability estimates
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/assumptions/9
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem norm_finset_sum_smul_le_sum_norm_of_mem_stdSimplex
+    {Node F : Type*} [Fintype Node]
+    [SeminormedAddCommGroup F] [SMul ℝ F] [NormSMulClass ℝ F]
+    (w : Node → ℝ) (X : Node → F) (hw : w ∈ stdSimplex ℝ Node) :
+    ‖∑ i : Node, w i • X i‖ ≤ ∑ i : Node, ‖X i‖ := by
+  classical
+  calc
+    ‖∑ i : Node, w i • X i‖ ≤ ∑ i : Node, ‖w i • X i‖ := by
+      simpa only using
+        (norm_sum_le (s := (Finset.univ : Finset Node))
+          (f := fun i : Node => w i • X i))
+    _ = ∑ i : Node, w i * ‖X i‖ := by
+      apply Finset.sum_congr rfl
+      intro i _
+      rw [norm_smul, Real.norm_eq_abs, abs_of_nonneg (hw.1 i)]
+    _ ≤ ∑ i : Node, ‖X i‖ := by
+      apply Finset.sum_le_sum
+      intro i _
+      simpa only [one_mul] using
+        mul_le_mul_of_nonneg_right (mem_Icc_of_mem_stdSimplex hw i).2 (norm_nonneg (X i))
+
+/-! Phase 4 batch 9: `range_average_ge_of_tail_lower`. -/
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: finite range-average lower bound from a uniform tail lower
+--   bound; orig was the local `tail_sum` block in
+--   `predictable_feedback_horizon_average_lower`
+-- generality used: an ordered field, a natural-indexed scalar sequence, a
+--   cutoff and finite horizon, pre-cutoff nonnegativity, and a
+--   pointwise tail lower bound; no measure, probability, convexity,
+--   smoothness, oracle, normed-space, or finite-dimensional assumptions
+-- portable call pattern: finite-time lower-bound and impossibility proofs for
+--   stochastic approximation and distributed optimization vary the scalar
+--   performance sequence, cutoff, horizon, and in-range lower constant while
+--   retaining the same surviving-horizon average conclusion
+-- counterargument checked: this is not merely paper-local traceability or a
+--   caller-side rewrite; it packages the reusable induction that converts a
+--   finite-horizon pointwise tail floor and a nonnegative prefix into a normalized
+--   finite-horizon lower bound
+-- coverage search: searched `range average greater equal tail lower bound
+--   nonnegative sequence cutoff`, `finite sum lower bound tail lower
+--   nonnegative real sequence cutoff`, and the precise surviving-fraction
+--   statement in Mathlib LeanSearch; Mathlib returned Cesaro-limit and generic
+--   finite-sum components, while SOptLib had no theorem with this contract
+-- minimal hypotheses: nonnegativity is required only before the cutoff; the
+--   cutoff is at most the horizon, and the tail lower bound is pointwise from
+--   the cutoff up to the horizon
+
+/-- A sequence with a nonnegative prefix and a uniform in-range tail floor has
+its range average bounded below by the floor times the fraction after the cutoff.
+
+Layer: Glue | Gap: Level 1 (finite range-average lower bound from an in-range tail floor)
+Proof: induct from the cutoff using the tail floor to lower-bound each new summand, then multiply the resulting partial-sum bound by the nonnegative inverse horizon.
+Source: Mathlib ordered finite sums over `Finset.range`, natural-number casts, and ordered-field arithmetic
+Used in: finite-horizon nonconvergence and impossibility arguments that turn a uniform post-burn-in performance floor into a lower bound for the full trajectory average
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/10/proof/8
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem range_average_ge_of_tail_lower
+    {K : Type*} [Field K] [LinearOrder K] [IsStrictOrderedRing K]
+    (F : ℕ → K) (m T : ℕ) (c : K)
+    (hmT : m ≤ T)
+    (hprefix_nonneg : ∀ t < m, 0 ≤ F t)
+    (htail_lower : ∀ t, m ≤ t → t < T → c ≤ F t) :
+    c * ((T : K) - (m : K)) / (T : K) ≤
+      (T : K)⁻¹ * ∑ t ∈ Finset.range T, F t := by
+  have hsum : ∀ n : ℕ, m ≤ n → n ≤ T →
+      c * ((n : K) - (m : K)) ≤ ∑ t ∈ Finset.range n, F t := by
+    intro n hmn hnT
+    induction n, hmn using Nat.le_induction with
+    | base =>
+        simp only [sub_self, mul_zero]
+        exact Finset.sum_nonneg fun t ht ↦
+          hprefix_nonneg t (Finset.mem_range.mp ht)
+    | succ n hmn ih =>
+        rw [Finset.sum_range_succ]
+        have hold := ih (by omega)
+        have hnew : c ≤ F n := htail_lower n hmn (by omega)
+        push_cast
+        nlinarith
+  have hT_scalar_nonneg : 0 ≤ (T : K) := by
+    exact_mod_cast Nat.zero_le T
+  calc
+    c * ((T : K) - (m : K)) / (T : K) =
+        (T : K)⁻¹ * (c * ((T : K) - (m : K))) := by ring
+    _ ≤ (T : K)⁻¹ * ∑ t ∈ Finset.range T, F t :=
+      mul_le_mul_of_nonneg_left (hsum T hmT le_rfl)
+        (inv_nonneg.mpr hT_scalar_nonneg)
+
+/-! Phase 4 batch 9: `Matrix_mulVec_inl_eq_smul_of_upperRight_eq_zero`. -/
+
+-- Generalization plan (G0):
+-- concept/name: restriction of a block-triangular matrix eigen-equation to the top-left block; orig was quadraticRestrictedPeriodMatrix_alpha_zero_complex_top_eigen_equation.
+-- generality used: arbitrary finite left and right block index types and a non-unital non-associative semiring of coefficients; the matrix, scalar, and vector are otherwise unrestricted, with no topology, norm, field, decidable-equality, nonemptiness, or finite-dimensional assumptions.
+-- portable call pattern: block-triangular spectral proofs for lifted consensus, push-sum, gradient-tracking, and switched linear systems change the two block index types, coefficient semiring, matrix, eigenvalue, and vector while retaining vanishing upper-right action on the eigenvector's right component and needing the induced top-left eigen-equation.
+-- counterargument checked: Mathlib provides `Matrix.fromBlocks_mulVec`, so the proof is short, but it does not provide the eigen-equation restriction assembled here; this is a reusable block-spectral transition rather than a paper-local alias or caller-side expression.
+-- coverage search: `lean_search_symbols` queries "matrix mulVec first sum component eigen equation upper right zero" and "Matrix toBlocks mulVec upper right zero first block eigenvector" found no covering Mathlib/SOptLib theorem; LeanSearch found the partial primitive `Matrix.fromBlocks_mulVec` in `Mathlib.Data.Matrix.Block` but no result with this conclusion.
+-- minimal hypotheses: `[Fintype I] [Fintype J] [NonUnitalNonAssocSemiring K]` are exactly the assumptions of the finite block `mulVec` decomposition; the sole matrix premise is that the upper-right block annihilates the right component of this vector.
+
+/-- If the upper-right block of a sum-indexed matrix annihilates the right
+component of a vector, the first component of an eigen-equation is the
+corresponding eigen-equation for the top-left block.
+
+Layer: Glue | Gap: Level 1 (top-block restriction of a block-triangular eigen-equation)
+Proof: reconstruct the matrix from its four blocks, apply Mathlib's `Matrix.fromBlocks_mulVec`, and eliminate the upper-right action using the annihilation premise.
+Source: Mathlib sum-indexed block matrices and matrix-vector multiplication, especially `Matrix.fromBlocks_toBlocks` and `Matrix.fromBlocks_mulVec`
+Used in: block-triangular spectral arguments for periodic push-pull, lifted consensus, gradient-tracking, and switched linear systems, where a full-state eigenvector equation must be restricted to the primal block
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/1
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem Matrix.mulVec_inl_eq_smul_of_upperRight_mulVec_eq_zero
+    {I J K : Type*} [Fintype I] [Fintype J]
+    [NonUnitalNonAssocSemiring K]
+    (A : Matrix (Sum I J) (Sum I J) K) (gamma : K)
+    (v : Sum I J → K)
+    (hupper : A.toBlocks₁₂.mulVec (v ∘ Sum.inr) = 0)
+    (hv : A.mulVec v = gamma • v) :
+    A.toBlocks₁₁.mulVec (v ∘ Sum.inl) = gamma • (v ∘ Sum.inl) := by
+  funext i
+  have hi := congrFun hv (Sum.inl i)
+  rw [← Matrix.fromBlocks_toBlocks A] at hi
+  simpa [Matrix.fromBlocks_mulVec, hupper] using hi
+
+/-! Phase 4 batch 9: `abs_inv_card_mul_sum_le_sqrt_sum_sq`. -/
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: absolute normalized selected-coordinate sum bounded by ambient
+--   Euclidean energy; orig was quadraticRestrictedPrimalAverageOutput_abs_le_rowEuclideanNorm
+-- generality used: arbitrary finite nonempty averaging type `I`, arbitrary finite ambient
+--   coordinate type `J`, a real family, and an unrestricted selector `I → J`
+-- portable call pattern: distributed and finite-sum algorithms bound an arithmetic mean
+--   of a chosen node or coordinate block by the full scalar-row Euclidean energy; both
+--   index types, the selector, and the row may change while the conclusion is unchanged
+-- counterargument checked: this is not merely the paper output wrapper; unlike the
+--   existing same-index one-sided RMS bound, it packages an absolute-value bound for a
+--   selected block inside a larger ambient family, and even permits repeated selection
+-- coverage search: `absolute inverse cardinality times finite sum bounded by Euclidean
+--   norm` and `absolute value average finite real numbers square root sum squares` found
+--   Mathlib `sum_div_card_sq_le_sum_sq_div_card`, `Real.sum_mul_le_sqrt_mul_sqrt`, and
+--   `Finset.abs_sum_le_sum_abs`, plus SOptLib
+--   `inv_card_mul_sum_le_sqrt_sum_sq_div_sqrt_card`; all are partial because none has
+--   the selected-block-to-ambient absolute-value contract
+-- minimal hypotheses: `Nonempty I` is needed to cancel the averaging cardinality;
+--   no injectivity of the selector and no finite-dimensional vector-space assumption
+
+/-- The absolute normalized sum of selected coordinates is bounded by the square root
+of the ambient sum of coordinate squares.
+
+The selector need not be injective: averaging any finite nonempty list of coordinates
+cannot exceed the largest coordinate magnitude, hence cannot exceed the ambient
+Euclidean energy.
+
+Layer: Glue | Gap: Level 1 (selected finite average to ambient Euclidean energy)
+Proof: bound every selected coordinate by the ambient root-sum-of-squares, sum these
+  coordinate bounds, and cancel the positive cardinality of the averaging type.
+Source: Mathlib finite big-operator triangle inequalities and real square-root monotonicity
+Used in: distributed finite-network arguments bounding a selected primal-coordinate
+  arithmetic mean by the Euclidean energy of a full primal-tracker state row
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/algorithm_spec/output
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous
+  Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem abs_inv_card_mul_sum_le_sqrt_sum_sq
+    {I J : Type*} [Fintype I] [Nonempty I] [Fintype J]
+    (x : J → ℝ) (select : I → J) :
+    |(Fintype.card I : ℝ)⁻¹ * ∑ i : I, x (select i)| ≤
+      Real.sqrt (∑ j : J, x j ^ 2) := by
+  classical
+  have hcard_pos : 0 < (Fintype.card I : ℝ) := by
+    exact_mod_cast Fintype.card_pos
+  have hcoord : ∀ i : I, |x (select i)| ≤ Real.sqrt (∑ j : J, x j ^ 2) := by
+    intro i
+    have hsquare : |x (select i)| ^ 2 ≤ ∑ j : J, x j ^ 2 := by
+      simpa [sq_abs] using
+        Finset.single_le_sum
+          (fun j _hj ↦ sq_nonneg (x j)) (Finset.mem_univ (select i))
+    calc
+      |x (select i)| = Real.sqrt (|x (select i)| ^ 2) := by
+        rw [Real.sqrt_sq (abs_nonneg _)]
+      _ ≤ Real.sqrt (∑ j : J, x j ^ 2) := Real.sqrt_le_sqrt hsquare
+  calc
+    |(Fintype.card I : ℝ)⁻¹ * ∑ i : I, x (select i)| =
+        |(Fintype.card I : ℝ)⁻¹| * |∑ i : I, x (select i)| := by
+          rw [abs_mul]
+    _ ≤ |(Fintype.card I : ℝ)⁻¹| * ∑ i : I, |x (select i)| := by
+      gcongr
+      simpa using
+        (Finset.abs_sum_le_sum_abs (s := Finset.univ)
+          (f := fun i : I ↦ x (select i)))
+    _ ≤ |(Fintype.card I : ℝ)⁻¹| *
+        ∑ _i : I, Real.sqrt (∑ j : J, x j ^ 2) := by
+      gcongr with i hi
+      exact hcoord i
+    _ = Real.sqrt (∑ j : J, x j ^ 2) := by
+      rw [abs_of_pos (inv_pos.mpr hcard_pos)]
+      simp
+
+/-! Phase 4 batch 9: `sub_geometric_bias_satisfies_affine_recurrence`. -/
+
+-- Generalization plan (G0):
+-- concept/name: subtraction of a geometric homogeneous bias preserves an
+--   affine recurrence; orig was `quadraticScalarBlockBoundaryVariance_recursion`.
+-- generality used: an arbitrary commutative ring, two ring-valued sequences,
+--   and two scalar ring elements; no measure, probability, order, topology,
+--   optimization, convexity, smoothness, oracle, or finite-dimensional
+--   assumptions are used.
+-- portable call pattern: stochastic moment recurrences, linear filters, and
+--   forced scalar dynamics subtract a deterministic geometric orbit while the
+--   moment sequence, recurrence coefficient, bias amplitude, and forcing
+--   sequence vary and the forced affine recurrence remains unchanged.
+-- counterargument checked: although the proof is short algebra, this is not a
+--   paper-local traceability wrapper or a pure rename; it packages the reusable
+--   transition from a full moment recurrence to its centered or variance
+--   recurrence after cancellation of the homogeneous geometric solution.
+-- coverage search: symbol searches for "subtract geometric bias affine
+--   recurrence equality", "sequence subtraction preserves affine recurrence
+--   homogeneous solution", and "geometric power recurrence difference
+--   forcing", plus Mathlib semantic search, found `LinearRecurrence.IsSolution`,
+--   `LinearRecurrence.geom_sol_iff_root_charPoly`, and staged
+--   `SOptLib.affineRecurrence`; these cover homogeneous solutions or the
+--   canonical forced recurrence, but not this bias-subtraction preservation
+--   equality, so coverage is partial rather than full.
+-- minimal hypotheses: the commutative ring laws support subtraction, powers,
+--   and the distributive cancellation; the recurrence hypothesis is exactly
+--   the pointwise equality needed for every index in the conclusion.
+
+/-- Subtracting a geometric homogeneous bias from an affine recurrence preserves
+the recurrence coefficient and forcing sequence.
+
+Layer: Glue | Gap: Level 1 (geometric-bias subtraction for affine recurrences)
+Proof: rewrite the next sequence value by the supplied affine recurrence and the
+  next geometric power by `pow_succ`, then normalize the commutative-ring
+  expression.
+Source: Mathlib commutative-ring power identities and polynomial normalization
+Used in: stochastic second-moment recurrences after removing a deterministic
+  geometric initial-condition bias to obtain the corresponding variance recurrence
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/15/proof/4
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks, Appendix C.2 scalar moment expansion -/
+theorem sub_geometric_bias_satisfies_affine_recurrence
+    {R : Type*} [CommRing R]
+    (v b : ℕ → R) (q c : R)
+    (hrec : ∀ k : ℕ, v (k + 1) = q * v k + b k) :
+    ∀ k : ℕ,
+      v (k + 1) - c * q ^ (k + 1) =
+        q * (v k - c * q ^ k) + b k := by
+  intro k
+  rw [hrec k, pow_succ]
+  ring
+
+/-! Phase 4 batch 9: `Nat_ceilBlock_multiple_facts`. -/
+
+-- Generalization plan (G0):
+-- concept/name: positive ceiling-block multiple bounds; orig was `quadraticScalar_completePeriod_ceiling_facts`
+-- generality used: natural block length `p` and horizon `T`, assuming only `0 < p` and `1 ≤ T`
+-- portable call pattern: periodic, epoch-based, and block stochastic algorithms round a positive horizon up to a complete block; the block length and horizon vary while coverage, block-count, multiplicative, and additive overshoot bounds remain unchanged
+-- counterargument checked: the formula is caller-side arithmetic, but the six bounds form a nontrivial reusable contract used together in complete-block horizon sandwiches; no single Mathlib theorem supplies the full conjunction
+-- coverage search: `lean_search_symbols` queries for next positive block multiples and natural ceiling division found only unrelated project declarations and generic ceiling APIs; `lean_leansearch` found interval-division facts, while Mathlib `le_smul_ceilDiv` and natural division/remainder lemmas cover only components, not this combined statement
+-- minimal hypotheses: `quad.period_pos` was replaced by `0 < p`; the source hypothesis `1 ≤ T` is already minimal for the positive block-count and `K ≤ T` conclusions
+
+/-- Rounding a positive natural horizon up to the next block multiple gives
+simultaneous coverage, block-count, multiplicative, and additive overshoot bounds.
+
+Layer: Glue | Gap: Level 1 (positive ceiling-block multiple bounds)
+Proof: decompose `T - 1` by Euclidean division by the positive block length,
+then combine the remainder bound with natural-number order arithmetic.
+Source: Mathlib natural-number Euclidean division, remainder, and Presburger arithmetic
+Used in: extending a finite stochastic-optimization horizon to the adjacent complete period before applying a complete-block moment estimate
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/algorithm_spec
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem Nat.ceil_block_multiple_bounds
+    (p T : ℕ) (hp : 0 < p) (hT : 1 ≤ T) :
+    let K : ℕ := (T - 1) / p + 1
+    let N : ℕ := K * p
+    1 ≤ K ∧ T ≤ N ∧ K ≤ T ∧
+      N ≤ p * T ∧ N ≤ T + p - 1 ∧ N - T ≤ p - 1 := by
+  dsimp only
+  let q := (T - 1) / p
+  have hqmul : q * p ≤ T - 1 := by
+    exact Nat.div_mul_le_self (T - 1) p
+  have hqle : q ≤ T - 1 := by
+    exact Nat.div_le_self (T - 1) p
+  have hdecomp : q * p + (T - 1) % p = T - 1 := by
+    simpa [q, Nat.mul_comm] using (Nat.div_add_mod (T - 1) p)
+  have hmod : (T - 1) % p < p := Nat.mod_lt _ hp
+  have hcover : T ≤ (q + 1) * p := by
+    rw [Nat.add_mul]
+    omega
+  have hKle : q + 1 ≤ T := by omega
+  have hNle : (q + 1) * p ≤ p * T := by
+    calc
+      (q + 1) * p ≤ T * p := Nat.mul_le_mul_right p hKle
+      _ = p * T := Nat.mul_comm T p
+  have hNnear : (q + 1) * p ≤ T + p - 1 := by
+    rw [Nat.add_mul]
+    omega
+  have hsub : (q + 1) * p - T ≤ p - 1 := by omega
+  exact ⟨Nat.succ_le_succ (Nat.zero_le q), hcover, hKle, hNle, hNnear, hsub⟩
+
+-- Generalization plan (G0):
+-- concept/name: preservation of equality of real matrix fixed spaces under
+--   complexification; orig was complexified_riesz_projection_fixed_iff
+-- generality used: arbitrary finite index type with decidable equality and two real
+--   square matrices; no nonemptiness, spectral, projection, measure, smoothness, or
+--   optimization assumptions are used
+-- portable call pattern: finite-dimensional consensus, spectral splitting, and
+--   stability proofs change the real transition and projection matrices and the real
+--   fixed-space equivalence, then transport that equivalence unchanged to complex
+--   vectors for resolvent or spectral arguments
+-- counterargument checked: although the proof splits vectors into real and imaginary
+--   parts, the theorem is not a paper-local Riesz wrapper or a single existing API
+--   call; it packages both directions of scalar-extension descent for arbitrary real
+--   matrix fixed spaces
+-- coverage search: symbol searches for "real matrix complexification fixed vector
+--   equivalence", "matrix map complex mulVec real imaginary", and "fixed iff matrix
+--   mulVec" found SOptLib.realMatrixComplexification and its coordinate API but no
+--   fixed-space theorem; Mathlib semantic search found real/imaginary linear maps but
+--   no matrix fixed-space scalar-extension result
+-- minimal hypotheses: Fintype is required by Matrix.mulVec finite sums, while
+--   DecidableEq is required by SOptLib.realMatrixComplexification; all other source
+--   assumptions are omitted
+
+namespace Matrix
+
+universe u
+
+/-- An equivalence between the fixed spaces of two real matrices remains true after
+entrywise complexification.
+
+Layer: Glue | Gap: Level 2 (fixed-space equivalence under real-to-complex scalar extension)
+Proof: take real and imaginary parts of each complex fixed-vector equation, apply the supplied real fixed-space equivalence to both parts, and reconstruct the complex equation coordinatewise.
+Source: Mathlib finite matrix-vector multiplication and complex real/imaginary extensionality, together with `SOptLib.realMatrixComplexification_apply`
+Used in: consensus and spectral-stability arguments that pass a real projection/transition fixed-space identity to complex vectors before applying resolvent and Riesz-projection machinery
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/12
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem realMatrixComplexification_fixed_iff
+    {ι : Type u} [Fintype ι] [DecidableEq ι]
+    (A P : Matrix ι ι ℝ)
+    (hfixed : ∀ x : ι → ℝ, P.mulVec x = x ↔ A.mulVec x = x)
+    (v : ι → ℂ) :
+    (SOptLib.realMatrixComplexification P).mulVec v = v ↔
+      (SOptLib.realMatrixComplexification A).mulVec v = v := by
+  constructor
+  · intro hPv
+    have hPv_re : P.mulVec (fun i => (v i).re) = fun i => (v i).re := by
+      funext i
+      have hi := congrArg Complex.re (congrFun hPv i)
+      simpa [Matrix.mulVec, dotProduct] using hi
+    have hPv_im : P.mulVec (fun i => (v i).im) = fun i => (v i).im := by
+      funext i
+      have hi := congrArg Complex.im (congrFun hPv i)
+      simpa [Matrix.mulVec, dotProduct] using hi
+    have hAv_re := (hfixed (fun i => (v i).re)).1 hPv_re
+    have hAv_im := (hfixed (fun i => (v i).im)).1 hPv_im
+    funext i
+    apply Complex.ext
+    · have hi := congrFun hAv_re i
+      simpa [Matrix.mulVec, dotProduct] using hi
+    · have hi := congrFun hAv_im i
+      simpa [Matrix.mulVec, dotProduct] using hi
+  · intro hAv
+    have hAv_re : A.mulVec (fun i => (v i).re) = fun i => (v i).re := by
+      funext i
+      have hi := congrArg Complex.re (congrFun hAv i)
+      simpa [Matrix.mulVec, dotProduct] using hi
+    have hAv_im : A.mulVec (fun i => (v i).im) = fun i => (v i).im := by
+      funext i
+      have hi := congrArg Complex.im (congrFun hAv i)
+      simpa [Matrix.mulVec, dotProduct] using hi
+    have hPv_re := (hfixed (fun i => (v i).re)).2 hAv_re
+    have hPv_im := (hfixed (fun i => (v i).im)).2 hAv_im
+    funext i
+    apply Complex.ext
+    · have hi := congrFun hPv_re i
+      simpa [Matrix.mulVec, dotProduct] using hi
+    · have hi := congrFun hPv_im i
+      simpa [Matrix.mulVec, dotProduct] using hi
+
+end Matrix
+
+-- Generalization plan (G0):
+-- concept/name: strict midpoint upper bound for a positive natural power of a
+--   nonnegative contraction; orig was contractionRate_pow_period_lt_mid
+-- generality used: an arbitrary linearly ordered semifield, one scalar base, and
+--   one natural exponent; only pointwise order hypotheses are used
+-- portable call pattern: stability and spectral-disk arguments vary the
+--   contraction scalar and positive iterate count while choosing the same
+--   separating radius halfway between the contraction and one
+-- counterargument checked: the proof is short, but not a pure rename or a
+--   paper-local wrapper; it combines power antitonicity with a strict affine
+--   separation used repeatedly when constructing stable radii
+-- coverage search: symbol and semantic searches found Mathlib's
+--   pow_le_of_le_one and pow_lt_one₀ as partial ingredients, but no Mathlib,
+--   SOptLib, or staged theorem with this midpoint conclusion
+-- minimal hypotheses: positivity of the exponent and the nonnegative strict
+--   contraction bounds are exactly the pointwise facts used
+
+/-- Every positive natural power of a nonnegative strict contraction is below
+the midpoint between the contraction and one.
+
+Layer: Glue | Gap: Level 1 (strict affine separator for contraction powers)
+Proof: bound the positive power by its base using `pow_le_of_le_one`, then place the base strictly below its midpoint with one by ordered-semifield arithmetic.
+Source: Mathlib ordered natural-power antitonicity in `Algebra.Order.GroupWithZero.Unbundled.Basic` and linear ordered-semifield arithmetic
+Used in: stability and spectral-disk proofs choosing a separating radius above every positive iterate of a contraction factor
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/1
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem pow_lt_midpoint_one_of_nonneg_lt_one
+    {K : Type*} [Semifield K] [LinearOrder K] [IsStrictOrderedRing K]
+    (r : K) (p : ℕ) (hp : 0 < p) (hr_nonneg : 0 ≤ r) (hr_lt_one : r < 1) :
+    r ^ p < (r + 1) / 2 := by
+  have hpow_le_rate : r ^ p ≤ r :=
+    pow_le_of_le_one hr_nonneg hr_lt_one.le (Nat.ne_of_gt hp)
+  have hrate_lt_mid : r < (r + 1) / 2 := by
+    apply (lt_div_iff₀ (zero_lt_two : (0 : K) < 2)).2
+    simpa [mul_two] using add_lt_add_left hr_lt_one r
+  exact hpow_le_rate.trans_lt hrate_lt_mid
+
+-- Generalization plan (G0):
+-- concept/name: applying an endomorphism composition identity at a fixed point;
+--   orig was `eigenvector_of_fixed_vector_of_matrix_mul_projection_eq`
+-- generality used: an arbitrary semiring acting on an additive commutative monoid
+--   as a module, with commuting scalar actions; no field, topology, norm,
+--   finiteness, or projection assumptions
+-- portable call pattern: spectral-projection, consensus, and invariant-subspace
+--   arguments may change the module, endomorphisms, scalar, and fixed vector while
+--   retaining `A.comp P = lambda • P` and `P x = x` to identify an eigendirection
+-- counterargument checked: the proof is short, but it packages a reusable bridge
+--   from an operator identity and fixed-space membership to a pointwise eigenvector
+--   equation; it is neither paper-local traceability nor a pure rename
+-- coverage search: symbol searches for “endomorphism apply scalar multiple from
+--   composition equals scalar multiple and fixed point” and “linear map comp equals
+--   smul fixed vector eigenvector”, plus Mathlib LeanSearch for the full implication,
+--   found `Module.End.mem_eigenspace_iff`, `Module.End.HasEigenvector.apply_eq_smul`,
+--   related staged composition lemmas, and a private matrix-specialized copy in the
+--   complete split bundle, but no public declaration with this generalized contract;
+--   the current round registry has no alpha-equivalent approved declaration
+-- minimal hypotheses: the composition equality and the pointwise fixed-vector
+--   equality are both necessary; commuting scalar actions are exactly what makes
+--   scalar multiplication of a linear endomorphism available
+
+/-- If one endomorphism composed with another is a scalar multiple of the latter,
+then every vector fixed by the latter is an eigenvector of the former.
+
+Layer: Glue | Gap: Level 0 (composition identity evaluated on a fixed vector)
+Proof: evaluate the endomorphism equality at the vector, unfold composition and scalar action, and rewrite with the fixed-vector equation.
+Source: Mathlib linear endomorphism composition and `LinearMap.smul_apply`
+Used in: spectral and consensus projection arguments that turn a projected operator identity into the eigenvector equation on the projection's fixed space
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/12/proof/2
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem Module.End.apply_eq_smul_of_comp_eq_smul_and_fixed
+    {k V : Type*} [Semiring k] [AddCommMonoid V] [Module k V]
+    [SMulCommClass k k V]
+    (A P : Module.End k V) (lambda : k) (x : V)
+    (hcomp : A.comp P = lambda • P) (hfixed : P x = x) :
+    A x = lambda • x := by
+  calc
+    A x = A (P x) := by rw [hfixed]
+    _ = (A.comp P) x := rfl
+    _ = (lambda • P) x := LinearMap.congr_fun hcomp x
+    _ = lambda • P x := rfl
+    _ = lambda • x := by rw [hfixed]
+
+-- Generalization plan (G0):
+-- concept/name: normalized squared absolute affine value exceeds every bound;
+--   orig was `exists_heterogeneity_two_step_exceeds`.
+-- generality used: four linearly ordered field scalars, positivity of the normalization, and a
+--   nonzero affine slope; no measure, topology, convexity, smoothness, oracle,
+--   completeness, finite-dimensional, or real-specific assumptions are used.
+-- portable call pattern: lower-bound and impossibility arguments vary the
+--   affine intercept, nonzero slope, positive normalization, and proposed
+--   bound while choosing a parameter whose normalized affine square
+--   violates that bound.
+-- counterargument checked: this is not paper-local traceability or a pure
+--   rename; it packages the finite-witness construction and normalization
+--   inequality that otherwise must be rederived at each unbounded affine
+--   lower-bound call site.
+-- coverage search: project queries `normalized squared absolute affine value
+--   exceeds any bound positive normalization nonzero slope`, `exists x inverse
+--   multiply absolute c minus a times x squared greater than B`, and `absolute
+--   affine square greater bound` found no complete Mathlib or SOptLib match;
+--   LeanSearch found only polynomial/filter unboundedness and absolute-value
+--   inequalities, while SOptLib coercive quadratic tails have a different
+--   universal eventual-bound conclusion.
+-- minimal hypotheses: all already minimal; positivity makes the inverse
+--   normalization positive, and a nonzero slope permits solving for the
+--   chosen affine value.
+
+/-- For a positive normalization and a nonconstant affine function over a
+linearly ordered field, its normalized squared absolute value exceeds every
+prescribed bound.
+
+Layer: Glue | Gap: Level 1 (finite witness for normalized affine-square unboundedness)
+Proof: choose the affine target `|tau * B| + 1`, solve for its preimage using
+  the nonzero slope, and compare squares after multiplying by the positive
+  normalization.
+Source: Mathlib ordered-field absolute values, inverses, and nonlinear
+  arithmetic
+Used in: lower-bound and impossibility proofs that choose an instance parameter
+  making a normalized finite-time affine residual exceed a proposed uniform bound
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/11/proof/3
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks - TimeVaryingStochasticPushPull -/
+theorem exists_inv_mul_abs_sub_mul_sq_gt_of_pos_of_ne
+    {K : Type*} [Field K] [LinearOrder K] [IsStrictOrderedRing K]
+    (tau c a B : K) (htau : 0 < tau) (ha : a ≠ 0) :
+    ∃ x : K, B < tau⁻¹ * |c - a * x| ^ 2 := by
+  let S : K := |tau * B| + 1
+  let x : K := (c - S) / a
+  refine ⟨x, ?_⟩
+  have htauB_lt : tau * B < S ^ 2 := by
+    dsimp [S]
+    nlinarith [abs_nonneg (tau * B), le_abs_self (tau * B)]
+  have hformula : c - a * x = S := by
+    dsimp [x]
+    field_simp [ha]
+    ring
+  rw [hformula, sq_abs]
+  calc
+    B = tau⁻¹ * (tau * B) := by
+      rw [← mul_assoc, inv_mul_cancel₀ (ne_of_gt htau), one_mul]
+    _ < tau⁻¹ * S ^ 2 :=
+      mul_lt_mul_of_pos_left htauB_lt (inv_pos.mpr htau)
+
+-- Generalization plan (G0):
+-- concept/name: positive-radius sphere disjoint from a finite-dimensional endomorphism spectrum; orig was `exists_local_separating_circle_around_complex_eigenvalue`
+-- generality used: an arbitrary field with a seminormed additive commutative group structure, an additive commutative group with a finite-dimensional module structure, an endomorphism, and a scalar center; no norm, topology, or completeness on the carrier is used
+-- portable call pattern: finite-dimensional spectral decompositions for distributed transition operators, Markov operators, and linear recurrences vary the operator and chosen scalar center while requiring a contour sphere disjoint from the finite spectrum
+-- counterargument checked: this is not merely paper traceability or a rename; Mathlib proves spectrum finiteness but does not package the positive-radius sphere choice and boundary avoidance needed by contour arguments
+-- coverage search: symbol queries `finite dimensional endomorphism positive radius sphere disjoint spectrum`, `exists sphere disjoint finite set center positive radius`, and `finite set sphere disjoint exists radius`, plus LeanSearch queries for a finite-set sphere avoidance theorem, found `Module.End.finite_spectrum`, `Matrix.finite_spectrum`, and metric ball-disjointness lemmas but no theorem with this conclusion
+-- minimal hypotheses: the carrier normed-space and completeness assumptions were removed; finite dimensionality is used only through `Module.End.finite_spectrum`, while the seminormed additive group structure on the field supplies scalar distances
+
+/-- Every scalar center admits a positive-radius sphere disjoint from the spectrum
+of a finite-dimensional endomorphism.
+
+Layer: Glue | Gap: Level 1 (positive sphere avoiding a finite endomorphism spectrum)
+Proof: enumerate the finite spectrum and choose one plus the sum of its distances from the center; every spectral value has distance at most that sum.
+Source: Mathlib `Module.End.finite_spectrum`, finite-set sums, and norm nonnegativity
+Used in: finite-dimensional spectral splittings of distributed transition operators and stable linear recurrences, where a contour centered at a selected multiplier must avoid the spectrum
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/12/proof/0
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem Module.End.exists_sphere_disjoint_spectrum
+    {K V : Type*} [Field K] [SeminormedAddCommGroup K] [AddCommGroup V] [Module K V]
+    [FiniteDimensional K V] (A : Module.End K V) (center : K) :
+    ∃ radius : ℝ, 0 < radius ∧
+      ∀ z : K, ‖z - center‖ = radius → z ∉ spectrum K A := by
+  classical
+  let S : Finset K := (Module.End.finite_spectrum A).toFinset
+  let R : ℝ := S.sum (fun w : K => ‖w - center‖)
+  refine ⟨R + 1, ?_, ?_⟩
+  · exact add_pos_of_nonneg_of_pos
+      (Finset.sum_nonneg (fun w _ => norm_nonneg (w - center))) zero_lt_one
+  · intro z hz hspec
+    have hzS : z ∈ S := by
+      simpa [S] using hspec
+    have hdist_le : ‖z - center‖ ≤ R := by
+      dsimp [R]
+      exact Finset.single_le_sum
+        (fun w _ => norm_nonneg (w - center)) hzS
+    have hR_lt : R < ‖z - center‖ := by
+      rw [hz]
+      exact lt_add_one R
+    exact (not_lt_of_ge hdist_le) hR_lt
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: finite squared mass bound for a scaled geometric response;
+--   the original name already exposes this paper-free mathematical contract
+-- generality used: an arbitrary linearly ordered field, scalar scale and initial
+--   magnitude, a ratio whose square is below one, and a natural horizon;
+--   no measure, convexity, smoothness, oracle, or finite-dimensional assumptions
+-- portable call pattern: stability, linear-filter, and recurrence proofs bound the
+--   finite energy of a homogeneous geometric response while the scale, contraction
+--   ratio, initial magnitude, and horizon vary
+-- counterargument checked: Mathlib already bounds the underlying geometric prefix,
+--   but does not package extraction of both squared response scales or the resulting
+--   finite-energy contract, so this is more than a pure rename or caller-side formula
+-- coverage search: `finite geometric square sum bounded by infinite geometric mass`
+--   and `sum range squared scaled geometric powers`; the closest full signature was
+--   Mathlib `geom_sum_Ico_le_of_lt_one`, which supplies only the unscaled prefix bound,
+--   while SOptLib geometric-history results have different weighted-sum conclusions
+-- minimal hypotheses: the ratio assumptions are reduced to the exact condition
+--   `r ^ 2 < 1`; all other parameters are unrestricted
+
+/-- The finite squared mass of a scaled scalar geometric response is bounded by
+its infinite geometric mass.
+
+Layer: Glue | Gap: Level 0 (scaled squared geometric-response prefix bound)
+Proof: Factor the squared scale and initial magnitude out of the finite sum, then
+apply `geom_sum_Ico_le_of_lt_one` to the nonnegative ratio `r ^ 2`.
+Source: Mathlib ordered-field finite geometric sums, especially
+`geom_sum_Ico_le_of_lt_one`, and commutative-ring power algebra
+Used in: stability and convolution estimates that bound the homogeneous initial
+response before combining it with a forced recurrence response
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/5/proof/1
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem finite_geometric_sq_response_sum_le
+    {K : Type*} [Field K] [LinearOrder K] [IsStrictOrderedRing K]
+    {M r x : K} (hr2_lt : r ^ 2 < 1) (N : ℕ) :
+    Finset.sum (Finset.range (N + 1)) (fun t => (M * r ^ t * x) ^ 2) ≤
+      (M ^ 2 / (1 - r ^ 2)) * x ^ 2 := by
+  have hgeom_le :
+      Finset.sum (Finset.range (N + 1)) (fun t => (r ^ 2) ^ t) ≤
+        1 / (1 - r ^ 2) := by
+    have h := geom_sum_Ico_le_of_lt_one
+      (x := r ^ 2) (m := 0) (n := N + 1) (sq_nonneg r) hr2_lt
+    rw [← Finset.range_eq_Ico] at h
+    simpa only [pow_zero] using h
+  calc
+    Finset.sum (Finset.range (N + 1)) (fun t => (M * r ^ t * x) ^ 2) =
+        M ^ 2 * x ^ 2 *
+          Finset.sum (Finset.range (N + 1)) (fun t => (r ^ 2) ^ t) := by
+      rw [Finset.mul_sum]
+      apply Finset.sum_congr rfl
+      intro t _
+      have hrpow : (r ^ t) ^ 2 = (r ^ 2) ^ t := by
+        rw [← pow_mul, ← pow_mul]
+        congr 1
+        omega
+      rw [← hrpow]
+      ring
+    _ ≤ M ^ 2 * x ^ 2 * (1 / (1 - r ^ 2)) :=
+      mul_le_mul_of_nonneg_left hgeom_le
+        (mul_nonneg (sq_nonneg M) (sq_nonneg x))
+    _ = (M ^ 2 / (1 - r ^ 2)) * x ^ 2 := by ring
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: finite-horizon squared gain of a stable scalar recurrence; the original name `finite_stable_recurrence_sq_sum_le` is already paper-free and concept-derived.
+-- generality used: scalar sequences over an arbitrary linear ordered field, a contraction coefficient in the half-open unit interval, zero initial state, and a pointwise affine recurrence; no measure, filtration, optimization, norm, convexity, smoothness, oracle, or finite-dimensional assumptions are used.
+-- portable call pattern: stability, momentum, filtering, and optimization proofs instantiate the state and forcing sequences and vary the contraction coefficient and horizon while reusing the same finite-horizon squared-output gain bound.
+-- counterargument checked: this is not paper-local traceability or a caller-side expression because it packages the nontrivial energy estimate and finite-horizon isolation for a stable forced recurrence; it is not a pure wrapper around a geometric-series lemma.
+-- coverage search: searched `zero initialized stable scalar recurrence finite horizon square sum bounded forcing square sum`, `finite l2 gain recurrence contraction forcing`, and the exact natural-language recurrence contract; Mathlib hits were geometric-series bounds, while SOptLib hits covered pointwise recurrence nonnegativity and unrelated telescoping energies, not this recurrence-to-square-sum conclusion.
+-- minimal hypotheses: the proof uses exactly zero initialization, the pointwise recurrence, and `0 ≤ r < 1`; the source's real scalars are generalized to a linear ordered field.
+
+/-- A zero-initialized stable scalar recurrence has finite-horizon squared output
+bounded by the forcing energy times the square of its geometric `ℓ¹` gain.
+
+Layer: Glue | Gap: Level 1 (finite-horizon squared gain for a stable recurrence)
+Proof: derive a one-step weighted square-energy inequality by completing a square,
+  sum it over the horizon, and isolate the output energy using `0 < 1 - r`.
+Source: Mathlib finite range sums, linear ordered field arithmetic, and square
+  nonnegativity
+Used in: geometric-convolution estimates for consensus, momentum, and stable
+  filter responses before accumulated forcing energies are bounded
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/algorithm_spec
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem finite_stable_recurrence_sq_sum_le
+    {R : Type*} [Field R] [LinearOrder R] [IsStrictOrderedRing R]
+    {b w : ℕ → R} {r : R}
+    (hr0 : 0 ≤ r) (hr1 : r < 1)
+    (hb0 : b 0 = 0)
+    (hstep : ∀ t : ℕ, b (t + 1) = r * b t + w t)
+    (N : ℕ) :
+    Finset.sum (Finset.range (N + 1)) (fun t => (b t) ^ 2) ≤
+      (1 / (1 - r) ^ 2) *
+        Finset.sum (Finset.range N) (fun t => (w t) ^ 2) := by
+  have hgap : 0 < 1 - r := sub_pos.mpr hr1
+  have hr_nonneg : 0 ≤ r := hr0
+  have henergy : ∀ t : ℕ,
+      (b (t + 1)) ^ 2 ≤ r * (b t) ^ 2 + (w t) ^ 2 / (1 - r) := by
+    intro t
+    rw [hstep]
+    have hid :
+        r * (b t) ^ 2 + (w t) ^ 2 / (1 - r) -
+            (r * b t + w t) ^ 2 =
+          (r / (1 - r)) * ((1 - r) * b t - w t) ^ 2 := by
+      field_simp [ne_of_gt hgap]
+      ring
+    have hnonneg :
+        0 ≤ (r / (1 - r)) * ((1 - r) * b t - w t) ^ 2 :=
+      mul_nonneg (div_nonneg hr_nonneg hgap.le) (sq_nonneg _)
+    nlinarith
+  have hsum := Finset.sum_le_sum fun t (_ : t ∈ Finset.range N) => henergy t
+  have hshift :
+      Finset.sum (Finset.range N) (fun t => (b (t + 1)) ^ 2) =
+        Finset.sum (Finset.range (N + 1)) (fun t => (b t) ^ 2) := by
+    rw [Finset.sum_range_succ']
+    simp [hb0]
+  have hprev :
+      Finset.sum (Finset.range N) (fun t => (b t) ^ 2) ≤
+        Finset.sum (Finset.range (N + 1)) (fun t => (b t) ^ 2) := by
+    rw [Finset.sum_range_succ]
+    exact le_add_of_nonneg_right (sq_nonneg (b N))
+  have hsum' :
+      Finset.sum (Finset.range (N + 1)) (fun t => (b t) ^ 2) ≤
+        r * Finset.sum (Finset.range N) (fun t => (b t) ^ 2) +
+          Finset.sum (Finset.range N) (fun t => (w t) ^ 2) / (1 - r) := by
+    rw [Finset.sum_add_distrib, ← Finset.mul_sum, ← Finset.sum_div] at hsum
+    simpa [hshift] using hsum
+  have hprev_scaled := mul_le_mul_of_nonneg_left hprev hr_nonneg
+  have hisolate :
+      (1 - r) * Finset.sum (Finset.range (N + 1)) (fun t => (b t) ^ 2) ≤
+        Finset.sum (Finset.range N) (fun t => (w t) ^ 2) / (1 - r) := by
+    nlinarith
+  have hisolate_scaled := mul_le_mul_of_nonneg_right hisolate hgap.le
+  have hgap_ne : 1 - r ≠ 0 := ne_of_gt hgap
+  rw [show
+    1 / (1 - r) ^ 2 * Finset.sum (Finset.range N) (fun t => (w t) ^ 2) =
+      Finset.sum (Finset.range N) (fun t => (w t) ^ 2) / (1 - r) ^ 2 by ring]
+  apply (le_div_iff₀ (sq_pos_of_pos hgap)).2
+  rw [div_mul_cancel₀ _ hgap_ne] at hisolate_scaled
+  simpa [pow_two, mul_assoc, mul_left_comm, mul_comm] using hisolate_scaled
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: finite squared-energy bound for a response dominated by a
+--   homogeneous geometric term plus a causal geometric convolution; orig was
+--   `SquareSummableGeometricConvolution`, renamed to the Mathlib-style theorem
+--   name `finite_sq_sum_le_of_le_geometric_initial_add_convolution`
+-- generality used: sequences over an arbitrary linear ordered field, an arbitrary
+--   kernel scale, a contraction rate in the half-open unit interval, and
+--   finite-horizon response nonnegativity and domination; no measure, convexity,
+--   smoothness, oracle, normed-space, or finite-dimensional assumptions are used
+-- portable call pattern: consensus, stable linear-system, scalar AR, momentum,
+--   control, and filtering proofs vary the response, input, kernel scale,
+--   contraction rate, and horizon while reusing the same initial-plus-forcing
+--   finite-energy estimate
+-- counterargument checked: the homogeneous-response and zero-initial convolution
+--   bounds are existing reusable ingredients, but neither covers their nonzero-
+--   initial combination or the pointwise domination transfer; the combined result
+--   is therefore not a duplicate, paper-local wrapper, or caller-side expression
+-- coverage search: queries for `nonnegative response upper bounded homogeneous
+--   geometric term plus causal geometric convolution finite sum squares`,
+--   `geometric convolution initial response finite horizon squared energy upper
+--   bound`, and the corresponding Mathlib semantic contract found only
+--   `finite_geometric_sq_response_sum_le`,
+--   `finite_sq_sum_le_of_le_geometric_convolution`, geometric-series lemmas, and
+--   weighted Cauchy--Schwarz bounds; all are partial rather than full matches
+-- minimal hypotheses: nonnegativity and domination are required only on the
+--   summed horizon; `0 < r` is weakened to `0 ≤ r`, and the unused source
+--   assumptions `0 ≤ M` and `0 ≤ z t` are removed
+
+/-- A nonnegative response dominated by a homogeneous geometric term plus a
+causal geometric convolution has bounded finite-horizon squared energy.
+
+Layer: Glue | Gap: Level 1 (initial-plus-forcing geometric response energy bound)
+Proof: Realize the forced convolution as a zero-initial stable recurrence, apply
+the finite recurrence gain and homogeneous geometric-response bounds, and sum the
+pointwise square splitting inequality `(a + b)^2 ≤ 2*a^2 + 2*b^2`.
+Source: discrete Young convolution inequality, Mathlib finite range sums and
+ordered-field square algebra, and `finite_geometric_sq_response_sum_le`
+Used in: consensus and gradient-tracking energy estimates, stable Duhamel-response
+bounds, and contractive scalar AR recurrences with nonzero initial state
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/5
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem finite_sq_sum_le_of_le_geometric_initial_add_convolution
+    {R : Type*} [Field R] [LinearOrder R] [IsStrictOrderedRing R]
+    {u z : ℕ → R} {M r : R}
+    (N : ℕ)
+    (hu_nonneg : ∀ t ∈ Finset.range (N + 1), 0 ≤ u t)
+    (hr0 : 0 ≤ r) (hr1 : r < 1)
+    (hrec : ∀ t ∈ Finset.range (N + 1),
+      u t ≤ M * r ^ t * u 0 +
+        Finset.sum (Finset.range t) fun j =>
+          M * r ^ (t - 1 - j) * z j) :
+    Finset.sum (Finset.range (N + 1)) (fun t => (u t) ^ 2) ≤
+      (2 * M ^ 2 / (1 - r ^ 2)) * (u 0) ^ 2 +
+        (2 * M ^ 2 / (1 - r) ^ 2) *
+          Finset.sum (Finset.range N) (fun j => (z j) ^ 2) := by
+  let forced : ℕ → R := fun t =>
+    Finset.sum (Finset.range t) fun j =>
+      M * r ^ (t - 1 - j) * z j
+  have hforced_zero : forced 0 = 0 := by
+    simp [forced]
+  have hforced_succ : ∀ t : ℕ,
+      forced (t + 1) = r * forced t + M * z t := by
+    intro t
+    have hprefix :
+        Finset.sum (Finset.range t) (fun j =>
+            M * r ^ ((t + 1) - 1 - j) * z j) =
+          r * Finset.sum (Finset.range t) (fun j =>
+            M * r ^ (t - 1 - j) * z j) := by
+      rw [Finset.mul_sum]
+      apply Finset.sum_congr rfl
+      intro j hj
+      have hj_lt : j < t := Finset.mem_range.mp hj
+      have hexp : (t + 1) - 1 - j = (t - 1 - j) + 1 := by omega
+      rw [hexp, pow_succ]
+      ring
+    simp only [forced]
+    rw [Finset.sum_range_succ, hprefix]
+    simp
+  have hforced_raw :=
+    finite_stable_recurrence_sq_sum_le
+      (b := forced) (w := fun t => M * z t)
+      hr0 hr1 hforced_zero hforced_succ N
+  have hinput_scale :
+      Finset.sum (Finset.range N) (fun t => (M * z t) ^ 2) =
+        M ^ 2 * Finset.sum (Finset.range N) (fun t => (z t) ^ 2) := by
+    rw [Finset.mul_sum]
+    apply Finset.sum_congr rfl
+    intro t _
+    ring
+  have hforced_bound :
+      Finset.sum (Finset.range (N + 1)) (fun t => (forced t) ^ 2) ≤
+        (M ^ 2 / (1 - r) ^ 2) *
+          Finset.sum (Finset.range N) (fun t => (z t) ^ 2) := by
+    rw [hinput_scale] at hforced_raw
+    calc
+      Finset.sum (Finset.range (N + 1)) (fun t => (forced t) ^ 2) ≤
+          1 / (1 - r) ^ 2 *
+            (M ^ 2 * Finset.sum (Finset.range N) (fun t => (z t) ^ 2)) :=
+        hforced_raw
+      _ = (M ^ 2 / (1 - r) ^ 2) *
+            Finset.sum (Finset.range N) (fun t => (z t) ^ 2) := by ring
+  have hr2_lt : r ^ 2 < 1 := by
+    have hfactor : 0 < (1 - r) * (1 + r) :=
+      mul_pos (sub_pos.mpr hr1) (by linarith)
+    nlinarith
+  have hinitial_bound :=
+    finite_geometric_sq_response_sum_le
+      (M := M) (r := r) (x := u 0) hr2_lt N
+  have hpoint : ∀ t ∈ Finset.range (N + 1),
+      (u t) ^ 2 ≤
+        2 * (M * r ^ t * u 0) ^ 2 + 2 * (forced t) ^ 2 := by
+    intro t ht
+    have hupper : u t ≤ M * r ^ t * u 0 + forced t := by
+      simpa [forced] using hrec t ht
+    have htotal_nonneg : 0 ≤ M * r ^ t * u 0 + forced t :=
+      (hu_nonneg t ht).trans hupper
+    have hsquare :
+        (u t) ^ 2 ≤ (M * r ^ t * u 0 + forced t) ^ 2 := by
+      nlinarith [hu_nonneg t ht]
+    have hsplit :
+        (M * r ^ t * u 0 + forced t) ^ 2 ≤
+          2 * (M * r ^ t * u 0) ^ 2 + 2 * (forced t) ^ 2 := by
+      nlinarith [sq_nonneg (M * r ^ t * u 0 - forced t)]
+    exact hsquare.trans hsplit
+  have hsum_point :=
+    Finset.sum_le_sum fun t ht => hpoint t ht
+  have hsum_split :
+      Finset.sum (Finset.range (N + 1)) (fun t => (u t) ^ 2) ≤
+        2 * Finset.sum (Finset.range (N + 1))
+              (fun t => (M * r ^ t * u 0) ^ 2) +
+          2 * Finset.sum (Finset.range (N + 1))
+              (fun t => (forced t) ^ 2) := by
+    rw [Finset.sum_add_distrib, ← Finset.mul_sum, ← Finset.mul_sum] at hsum_point
+    exact hsum_point
+  calc
+    Finset.sum (Finset.range (N + 1)) (fun t => (u t) ^ 2) ≤
+        2 * Finset.sum (Finset.range (N + 1))
+              (fun t => (M * r ^ t * u 0) ^ 2) +
+          2 * Finset.sum (Finset.range (N + 1))
+              (fun t => (forced t) ^ 2) := hsum_split
+    _ ≤ 2 * ((M ^ 2 / (1 - r ^ 2)) * (u 0) ^ 2) +
+          2 * ((M ^ 2 / (1 - r) ^ 2) *
+            Finset.sum (Finset.range N) (fun j => (z j) ^ 2)) :=
+      add_le_add
+        (mul_le_mul_of_nonneg_left hinitial_bound (by norm_num))
+        (mul_le_mul_of_nonneg_left hforced_bound (by norm_num))
+    _ = (2 * M ^ 2 / (1 - r ^ 2)) * (u 0) ^ 2 +
+          (2 * M ^ 2 / (1 - r) ^ 2) *
+            Finset.sum (Finset.range N) (fun j => (z j) ^ 2) := by ring
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: invariance of a finite weighted vector sum under a uniform
+--   coefficient shift when the vector family sums to zero; orig was the local
+--   `hrewrite` block in `columnMinorized_stateL1Norm_contraction`.
+-- generality used: an arbitrary finite index set, a possibly noncommutative
+--   ring of scalars, and an additive commutative monoid carrying a module over
+--   that ring; no topology, norm, inner product, completeness, or
+--   finite-dimensional assumptions are used.
+-- portable call pattern: centering, consensus, covariance, and affine-weight
+--   arguments replace weights `a i` by `a i - c`; the finite set, weights,
+--   common shift, and zero-sum vector family vary while the equality remains
+--   unchanged.
+-- counterargument checked: the proof is short finite-sum algebra, but it is
+--   not a pure rename of one Mathlib theorem: it packages coefficient
+--   subtraction, distribution of scalar multiplication, extraction of the
+--   common scalar, and zero-sum cancellation into the equality used by future
+--   centering arguments.
+-- coverage search: searched SOptLib and Mathlib for `sum smul coefficient
+--   subtract constant sum vectors zero` and the precise shifted-coefficient
+--   equality. Related but partial hits were
+--   `SOptLib.finset_weighted_residual_sum_eq_zero`,
+--   `Finset.weightedVSubOfPoint_eq_of_sum_eq_zero`, and
+--   `Finset.weightedVSub_vadd`; none shifts scalar coefficients under a
+--   zero-sum hypothesis on the vector family.
+-- minimal hypotheses: `[Ring R]`, `[AddCommMonoid E]`, and `[Module R E]` are
+--   sufficient; commutativity of scalar multiplication, additive inverses in
+--   `E`, norms, and finite-dimensionality are unnecessary.
+
+/-- Subtracting one scalar from every coefficient leaves a finite weighted sum
+unchanged when the unweighted vector sum is zero.
+
+Layer: Glue | Gap: Level 0 (uniform coefficient-shift cancellation)
+Proof: expand each coefficient as `(a i - c) + c`, distribute scalar
+  multiplication and the finite sum, then factor the common scalar and cancel
+  it with the zero-sum hypothesis.
+Source: Mathlib finite big-operator and module scalar-distribution APIs
+Used in: column-Dobrushin contraction and consensus-centering arguments that
+  remove a common minorization coefficient from every matrix entry
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/0/proof/1
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on
+  Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem finset_sum_smul_eq_sum_sub_const_smul_of_sum_eq_zero
+    {I R E : Type*} [Ring R] [AddCommMonoid E] [Module R E]
+    (s : Finset I) (a : I → R) (x : I → E) (c : R)
+    (hx : ∑ i ∈ s, x i = 0) :
+    (∑ i ∈ s, a i • x i) = ∑ i ∈ s, (a i - c) • x i := by
+  calc
+    (∑ i ∈ s, a i • x i) =
+        ∑ i ∈ s, ((a i - c) • x i + c • x i) := by
+      apply Finset.sum_congr rfl
+      intro i hi
+      rw [← add_smul]
+      simp
+    _ = (∑ i ∈ s, (a i - c) • x i) +
+        ∑ i ∈ s, c • x i := Finset.sum_add_distrib
+    _ = (∑ i ∈ s, (a i - c) • x i) +
+        c • ∑ i ∈ s, x i := by rw [Finset.smul_sum]
+    _ = ∑ i ∈ s, (a i - c) • x i := by rw [hx]; simp
+
+-- Generalization plan (G0):
+-- concept/name: range-finrank stability of idempotent linear maps under a strictly contracting subtraction; orig was finrank_range_eq_of_idempotent_contracting_difference
+-- generality used: an arbitrary nontrivially normed field, normed vector space, and finite-dimensionality; no measure, convexity, smoothness, or oracle assumptions
+-- portable call pattern: local rank constancy for nearby spectral, consensus, or invariant-subspace projections; the field, space, projections, and pointwise contraction proof may all vary
+-- counterargument checked: not paper-local or a one-line wrapper, because the contract constructs injections between two distinct ranges; the exact prior split-bundle helper is private and Mathlib exposes only component projection and finrank APIs
+-- coverage search: searched “finite dimensional idempotent linear maps equal range finrank contracting difference nonzero vector”, “linear map range finrank equality idempotent contraction subtraction”, and Mathlib semantic projection-rank variants; LinearMap.IsIdempotentElem projection lemmas and LinearMap.finrank_le_finrank_of_injective are partial, with no public theorem covering this contract
+-- minimal hypotheses: one pointwise strict-contraction hypothesis for p - q suffices in both orientations by norm_neg; finite-dimensionality is used to compare range finranks from the two injections
+
+/-- Two idempotent linear endomorphisms have ranges of the same finrank when
+their difference strictly contracts every nonzero vector.
+
+The contraction makes the restriction of either idempotent to the other one's
+range injective. The two resulting range embeddings give opposite finrank
+inequalities.
+
+Layer: Glue | Gap: Level 1 (range-rank stability of contractively close idempotents)
+Proof: restrict each idempotent to the other one's range, prove both restrictions injective using idempotence and the strict contraction, then apply `LinearMap.finrank_le_finrank_of_injective` in both directions.
+Source: Mathlib finite-dimensional linear algebra, especially `LinearMap.codRestrict`, `LinearMap.mem_range_self`, and finrank monotonicity under injective linear maps
+Used in: local rank-constancy steps for continuous families of spectral, consensus, and invariant-subspace projections
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/12/proof/2
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem LinearMap.finrank_range_eq_of_idempotent_contracting_sub
+    {𝕜 V : Type*} [NontriviallyNormedField 𝕜]
+    [NormedAddCommGroup V] [NormedSpace 𝕜 V] [FiniteDimensional 𝕜 V]
+    (p q : V →ₗ[𝕜] V)
+    (hp : p.comp p = p) (hq : q.comp q = q)
+    (hsub : ∀ x : V, x ≠ 0 → ‖(p - q) x‖ < ‖x‖) :
+    Module.finrank 𝕜 (LinearMap.range p) =
+      Module.finrank 𝕜 (LinearMap.range q) := by
+  classical
+  have hfix_p {x : V} (hx : x ∈ LinearMap.range p) : p x = x := by
+    rcases hx with ⟨y, rfl⟩
+    exact congrArg (fun f : V →ₗ[𝕜] V => f y) hp
+  have hfix_q {x : V} (hx : x ∈ LinearMap.range q) : q x = x := by
+    rcases hx with ⟨y, rfl⟩
+    exact congrArg (fun f : V →ₗ[𝕜] V => f y) hq
+  let qp : LinearMap.range p →ₗ[𝕜] LinearMap.range q :=
+    LinearMap.codRestrict
+      (p := LinearMap.range q)
+      (q.comp (LinearMap.range p).subtype)
+      (fun x => LinearMap.mem_range_self q x)
+  have hqp_inj : Function.Injective qp := by
+    intro x y hxy
+    apply Subtype.ext
+    let v : V := (x : V) - (y : V)
+    have hvq : q v = 0 := by
+      have hxy_val : q (x : V) = q (y : V) := by
+        exact congrArg (fun z : LinearMap.range q => (z : V)) hxy
+      simp [v, map_sub, hxy_val]
+    have hvp : p v = v := by
+      exact hfix_p (show v ∈ LinearMap.range p from
+        Submodule.sub_mem _ x.property y.property)
+    by_contra hv_ne
+    have hv_ne_zero : v ≠ 0 := by
+      intro hv_zero
+      exact hv_ne (sub_eq_zero.mp hv_zero)
+    have hlt := hsub v hv_ne_zero
+    have hsub_v : (p - q) v = v := by
+      rw [LinearMap.sub_apply, hvp, hvq]
+      simp
+    rw [hsub_v] at hlt
+    exact (lt_irrefl ‖v‖) hlt
+  let pq : LinearMap.range q →ₗ[𝕜] LinearMap.range p :=
+    LinearMap.codRestrict
+      (p := LinearMap.range p)
+      (p.comp (LinearMap.range q).subtype)
+      (fun x => LinearMap.mem_range_self p x)
+  have hpq_inj : Function.Injective pq := by
+    intro x y hxy
+    apply Subtype.ext
+    let v : V := (x : V) - (y : V)
+    have hvp : p v = 0 := by
+      have hxy_val : p (x : V) = p (y : V) := by
+        exact congrArg (fun z : LinearMap.range p => (z : V)) hxy
+      simp [v, map_sub, hxy_val]
+    have hvq : q v = v := by
+      exact hfix_q (show v ∈ LinearMap.range q from
+        Submodule.sub_mem _ x.property y.property)
+    by_contra hv_ne
+    have hv_ne_zero : v ≠ 0 := by
+      intro hv_zero
+      exact hv_ne (sub_eq_zero.mp hv_zero)
+    have hlt := hsub v hv_ne_zero
+    have hsub_v : (p - q) v = -v := by
+      rw [LinearMap.sub_apply, hvp, hvq]
+      simp
+    rw [hsub_v, norm_neg] at hlt
+    exact (lt_irrefl ‖v‖) hlt
+  exact le_antisymm
+    (LinearMap.finrank_le_finrank_of_injective hqp_inj)
+    (LinearMap.finrank_le_finrank_of_injective hpq_inj)
+
+-- Generalization plan (G0):
+-- concept/name: range-finrank stability of idempotent continuous linear maps at operator-norm distance less than one; orig was finrank_range_eq_of_idempotent_opNorm_lt_one
+-- generality used: an arbitrary nontrivially normed field, normed vector space, and finite-dimensionality; no measure, convexity, smoothness, or oracle assumptions
+-- portable call pattern: local rank constancy for norm-continuous families of spectral, consensus, and invariant-subspace projections; the field, finite-dimensional normed space, projections, and norm bound may vary
+-- counterargument checked: this is not a duplicate of the staged LinearMap theorem, because it bridges the natural operator-norm hypothesis on continuous linear maps to that theorem's pointwise strict-contraction premise
+-- coverage search: symbol searches for “idempotent continuous linear maps operator norm distance less than one equal range finrank” and “finrank range equal of idempotent contracting difference” found the staged LinearMap contraction theorem as a strict premise-level core; Mathlib semantic search found idempotent projection APIs but no operator-norm rank-stability theorem
+-- minimal hypotheses: one norm bound on p - q suffices, since the reverse difference has the same norm; finite-dimensionality is used by the underlying range-finrank comparison theorem
+
+/-- Idempotent continuous linear endomorphisms at operator-norm distance less
+than one have ranges of the same finrank.
+
+The operator-norm bound makes the difference strictly contractive on every
+nonzero vector, reducing the claim to range-rank stability for idempotent
+linear maps.
+
+Layer: Glue | Gap: Level 1 (operator-norm rank stability of nearby idempotents)
+Proof: use the operator-norm estimate to obtain pointwise strict contraction, then apply `LinearMap.finrank_range_eq_of_idempotent_contracting_sub` to the underlying linear maps.
+Source: Mathlib continuous linear maps and finite-dimensional linear algebra, especially `ContinuousLinearMap.le_opNorm` and range finrank comparison
+Used in: local rank-constancy arguments for norm-continuous families of Riesz, consensus, and invariant-subspace projections
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/12/proof/2
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem ContinuousLinearMap.finrank_range_eq_of_idempotent_norm_sub_lt_one
+    {𝕜 V : Type*} [NontriviallyNormedField 𝕜]
+    [NormedAddCommGroup V] [NormedSpace 𝕜 V] [FiniteDimensional 𝕜 V]
+    (p q : V →L[𝕜] V)
+    (hp : p.comp p = p) (hq : q.comp q = q)
+    (hclose : ‖p - q‖ < 1) :
+    Module.finrank 𝕜 (LinearMap.range (p : V →ₗ[𝕜] V)) =
+      Module.finrank 𝕜 (LinearMap.range (q : V →ₗ[𝕜] V)) := by
+  classical
+  have hp_lin :
+      ((p : V →ₗ[𝕜] V).comp (p : V →ₗ[𝕜] V)) =
+        (p : V →ₗ[𝕜] V) := by
+    ext x
+    exact congrArg (fun f : V →L[𝕜] V => f x) hp
+  have hq_lin :
+      ((q : V →ₗ[𝕜] V).comp (q : V →ₗ[𝕜] V)) =
+        (q : V →ₗ[𝕜] V) := by
+    ext x
+    exact congrArg (fun f : V →L[𝕜] V => f x) hq
+  refine LinearMap.finrank_range_eq_of_idempotent_contracting_sub
+    (p : V →ₗ[𝕜] V) (q : V →ₗ[𝕜] V) hp_lin hq_lin ?_
+  intro x hx
+  have hle : ‖(p - q) x‖ ≤ ‖p - q‖ * ‖x‖ := (p - q).le_opNorm x
+  have hlt : ‖p - q‖ * ‖x‖ < 1 * ‖x‖ :=
+    mul_lt_mul_of_pos_right hclose (norm_pos_iff.mpr hx)
+  exact lt_of_le_of_lt (by simpa using hle) (by simpa using hlt)
+
+-- Generalization plan (G0):
+-- concept/name: range-finrank stability of idempotent matrix actions at operator-norm distance
+--   less than one; orig was finrank_range_mulVecLin_eq_of_idempotent_operator_close
+-- generality used: an arbitrary complete nontrivially normed field and arbitrary finite index
+--   type; no measure, inner-product, convexity, smoothness, or oracle assumptions
+-- portable call pattern: finite-matrix perturbation arguments for spectral, consensus, and
+--   invariant-subspace projections can vary the scalar field, index type, idempotent matrices,
+--   and operator-norm bound while retaining equality of the two matrix-action range dimensions
+-- counterargument checked: this is not paper-local traceability or a duplicate of the underlying
+--   continuous-linear-map theorem; it is the reusable bridge from matrix idempotence and the
+--   canonical mulVec action to operator idempotence and the resulting range-finrank equality
+-- coverage search: symbol queries for “idempotent matrices induced mulVec linear maps operator
+--   norm difference less than one equal finrank ranges” and related matrix-action composition
+--   shapes found `Matrix.mulVecLin_mul`, `Matrix.toContinuousLinearMapAlgEquiv`, and
+--   `ContinuousLinearMap.finrank_range_eq_of_idempotent_norm_sub_lt_one`, but no theorem with
+--   this matrix-level contract; Mathlib semantic search returned only partial idempotent APIs
+-- minimal hypotheses: matrix idempotence for each operand and one strict operator-norm bound are
+--   minimal; `CompleteSpace 𝕜` is required by Mathlib's finite-dimensional conversion of a linear
+--   map to a continuous linear map, and finite-dimensionality follows from `Fintype ι`
+
+/-- Idempotent finite square matrices whose induced actions are less than one apart in operator
+norm have ranges of the same finrank.
+
+The operator-norm comparison is made after canonically viewing each `mulVecLin` action as a
+continuous linear endomorphism of the finite coordinate space.
+
+Layer: Glue | Gap: Level 1 (matrix-action rank stability of nearby idempotents)
+Proof: use `Matrix.mulVecLin_mul` to transfer matrix idempotence to the induced continuous endomorphisms, then apply operator-norm range-finrank stability.
+Source: Mathlib finite matrix actions and finite-dimensional continuous linear maps, especially `Matrix.mulVecLin_mul` and `LinearMap.toContinuousLinearMap`
+Used in: spectral-continuation and consensus-projection perturbation steps that preserve the rank of a finite matrix projection under an operator-norm change below one
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/12/proof/2
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem Matrix.finrank_range_mulVecLin_eq_of_idempotent_opNorm_sub_lt_one
+    {𝕜 ι : Type*} [NontriviallyNormedField 𝕜] [CompleteSpace 𝕜] [Fintype ι]
+    (P Q : Matrix ι ι 𝕜)
+    (hP : P * P = P) (hQ : Q * Q = Q)
+    (hclose :
+      ‖LinearMap.toContinuousLinearMap (Matrix.mulVecLin P) -
+          LinearMap.toContinuousLinearMap (Matrix.mulVecLin Q)‖ < 1) :
+    Module.finrank 𝕜
+        (LinearMap.range
+          (Matrix.mulVecLin P : (ι → 𝕜) →ₗ[𝕜] (ι → 𝕜))) =
+      Module.finrank 𝕜
+        (LinearMap.range
+          (Matrix.mulVecLin Q : (ι → 𝕜) →ₗ[𝕜] (ι → 𝕜))) := by
+  let LP : (ι → 𝕜) →L[𝕜] (ι → 𝕜) :=
+    LinearMap.toContinuousLinearMap (Matrix.mulVecLin P)
+  let LQ : (ι → 𝕜) →L[𝕜] (ι → 𝕜) :=
+    LinearMap.toContinuousLinearMap (Matrix.mulVecLin Q)
+  have hP_idem : LP.comp LP = LP := by
+    apply ContinuousLinearMap.coe_injective
+    change (Matrix.mulVecLin P).comp (Matrix.mulVecLin P) = Matrix.mulVecLin P
+    rw [← Matrix.mulVecLin_mul, hP]
+  have hQ_idem : LQ.comp LQ = LQ := by
+    apply ContinuousLinearMap.coe_injective
+    change (Matrix.mulVecLin Q).comp (Matrix.mulVecLin Q) = Matrix.mulVecLin Q
+    rw [← Matrix.mulVecLin_mul, hQ]
+  simpa [LP, LQ] using
+    ContinuousLinearMap.finrank_range_eq_of_idempotent_norm_sub_lt_one
+      LP LQ hP_idem hQ_idem hclose
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: uniform bound for a reversed finite geometric convolution with
+--   constant forcing; orig was `geometric_convolution_const_le_inv_one_sub`.
+-- generality used: an arbitrary field with a compatible strict linear order,
+--   two scalar parameters, and a natural horizon; no measure, optimization,
+--   convexity, smoothness, oracle, or finite-dimensional assumptions are used.
+-- portable call pattern: stable-recursion and exponentially weighted-history
+--   proofs vary the contraction factor, nonnegative forcing bound, and horizon
+--   while reusing the same uniform finite-convolution estimate.
+-- counterargument checked: this is not paper-local traceability or a pure
+--   rename; it packages the reversed natural-index convolution recurrence and
+--   its constant scaling, whereas Mathlib exposes the forward geometric sum.
+-- coverage search: project symbol searches for reversed finite geometric
+--   convolution and geometric sum upper bounds found related SOptLib weighted
+--   square and specialized scaled-ratio estimates; Mathlib
+--   `geom_sum_Ico_le_of_lt_one` covers only the forward unscaled prefix sum, so
+--   coverage is partial rather than duplicate.
+-- minimal hypotheses: nonnegativity of the contraction and forcing constant,
+--   together with strict contraction below one, are exactly what the induction
+--   and ordered-field comparison use.
+
+/-- A reversed finite geometric convolution with nonnegative constant forcing
+is bounded by the corresponding infinite geometric mass.
+
+Layer: Glue | Gap: Level 1 (reversed finite geometric convolution bound)
+Proof: induct on the horizon, split off the newest forcing term with
+  `Finset.sum_range_succ`, and close the affine recurrence using positivity of
+  `1 - theta`.
+Source: Mathlib finite big operators, natural-power algebra, and ordered-field
+  geometric-series bounds
+Used in: stable linear-recursion estimates that uniformly bound accumulated
+  constant forcing under a contractive transition
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/algorithm_spec
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on
+  Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem sum_range_geometric_reverse_mul_le_div_one_sub
+    {K : Type*} [Field K] [LinearOrder K] [IsStrictOrderedRing K]
+    (theta L : K) (t : ℕ)
+    (htheta_nonneg : 0 ≤ theta) (htheta_lt_one : theta < 1)
+    (hL_nonneg : 0 ≤ L) :
+    Finset.sum (Finset.range t) (fun j =>
+      theta ^ (t - 1 - j) * L) ≤ L / (1 - theta) := by
+  have hden_pos : 0 < 1 - theta := by linarith
+  induction t with
+  | zero =>
+      simp [div_nonneg hL_nonneg hden_pos.le]
+  | succ t ih =>
+      have hsum_succ :
+          Finset.sum (Finset.range (t + 1)) (fun j =>
+              theta ^ (t + 1 - 1 - j) * L) =
+            theta * Finset.sum (Finset.range t) (fun j =>
+              theta ^ (t - 1 - j) * L) + L := by
+        have hprefix :
+            Finset.sum (Finset.range t) (fun j =>
+                theta ^ (t + 1 - 1 - j) * L) =
+              theta * Finset.sum (Finset.range t) (fun j =>
+                theta ^ (t - 1 - j) * L) := by
+          rw [Finset.mul_sum]
+          apply Finset.sum_congr rfl
+          intro j hj
+          have hj_lt : j < t := Finset.mem_range.mp hj
+          have hexp : t + 1 - 1 - j = (t - 1 - j) + 1 := by omega
+          rw [hexp, pow_succ]
+          ring
+        rw [Finset.sum_range_succ, hprefix]
+        simp
+      rw [hsum_succ]
+      calc
+        theta * Finset.sum (Finset.range t) (fun j =>
+            theta ^ (t - 1 - j) * L) + L ≤
+            theta * (L / (1 - theta)) + L := by
+              simpa [add_comm] using
+                add_le_add_right
+                  (mul_le_mul_of_nonneg_left ih htheta_nonneg) L
+        _ = L / (1 - theta) := by
+              field_simp [ne_of_gt hden_pos]
+              ring
+
+open scoped BigOperators InnerProductSpace
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: three-summand bound for finite dependent-product squared-norm energy; orig was frobeniusNormSq_add_add_le_three
+-- generality used: a finite index type and dependent coordinate seminormed additive groups; no scalar action, inner product, completeness, finite-dimensionality, measure, convexity, smoothness, or oracle assumptions
+-- portable call pattern: distributed consensus, block-coordinate, and product-state proofs split one finite-family residual into three components while changing the index type, coordinate spaces, and component meanings
+-- counterargument checked: this is not paper-local traceability or a pure wrapper because Mathlib only supplies the pointwise three-term norm bound and the theorem packages the recurring finite-family energy aggregation step
+-- coverage search: queried `dependent product squared norm three term sum upper bound`, `norm squared add add less equal three sum squared norms`, and `finite family energy sum three components inequality`; top partial hits were `norm_add₃_le` and `sq_sum_le_card_mul_sum_sq`, with no declaration covering the complete aggregate contract
+-- minimal hypotheses: `Fintype` is needed for the finite energy sum and each coordinate needs only `SeminormedAddGroup`; all stronger assumptions from the source theorem were removed
+
+/-- The squared-norm energy of a finite dependent-product three-term sum is at
+most three times the sum of the three component energies.
+
+Layer: Glue | Gap: Level 1 (three-component finite-family energy aggregation)
+Proof: unfold the dependent-product energy, apply `norm_add₃_le` coordinatewise, square the nonnegative norm bound, and sum the resulting three-variable quadratic inequality.
+Source: Mathlib seminormed additive-group triangle inequalities and finite-sum ordered-ring algebra
+Used in: periodic directed-network corrected-lift estimates that split a zero-sum joint displacement into two endpoint mean components and one Perron-residual increment
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/2
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem dependentProductNormSq_add_add_le_three
+    {ι : Type*} [Fintype ι]
+    {Block : ι → Type*} [∀ i, SeminormedAddGroup (Block i)]
+    (X Y Z : ∀ i, Block i) :
+    (∑ i, ‖(X + Y + Z) i‖ ^ 2) ≤
+      3 * ∑ i, ‖X i‖ ^ 2 +
+        3 * ∑ i, ‖Y i‖ ^ 2 +
+          3 * ∑ i, ‖Z i‖ ^ 2 := by
+  classical
+  rw [Finset.mul_sum, Finset.mul_sum, Finset.mul_sum,
+    ← Finset.sum_add_distrib, ← Finset.sum_add_distrib]
+  apply Finset.sum_le_sum
+  intro i _hi
+  have hnorm : ‖X i + Y i + Z i‖ ≤ ‖X i‖ + ‖Y i‖ + ‖Z i‖ :=
+    norm_add₃_le
+  have hsq : ‖X i + Y i + Z i‖ ^ 2 ≤
+      (‖X i‖ + ‖Y i‖ + ‖Z i‖) ^ 2 :=
+    (sq_le_sq₀ (norm_nonneg _) (by positivity)).2 hnorm
+  change ‖X i + Y i + Z i‖ ^ 2 ≤
+    3 * ‖X i‖ ^ 2 + 3 * ‖Y i‖ ^ 2 + 3 * ‖Z i‖ ^ 2
+  nlinarith [sq_nonneg (‖X i‖ - ‖Y i‖),
+    sq_nonneg (‖X i‖ - ‖Z i‖), sq_nonneg (‖Y i‖ - ‖Z i‖)]
+
+-- Generalization plan (G0):
+-- concept/name: sum_norm_sq_sub_finiteUniformAverage_le_sum_norm_sq exposes contraction of finite squared-norm energy under centering by the uniform average; orig was frobeniusNormSq_consensusError_le.
+-- generality used: an arbitrary finite nonempty index type and a real inner-product space over a seminormed additive commutative group; no completeness, finite dimension, measure, convexity, smoothness, oracle, or network assumptions are used.
+-- portable call pattern: distributed consensus, block-coordinate, ensemble, and finite-population proofs change the finite index type, Hilbert carrier, and vector family while reusing the same energy contraction after uniform mean centering.
+-- counterargument checked: Mathlib's `Fintype.balance` names function centering and proves only its zero-sum property, while existing finite-average Jensen and orthogonal-perturbation results have different conclusions; this theorem packages the missing finite-family Pythagorean energy comparison.
+-- coverage search: queried `sum squared norm subtract finite uniform average less than sum squared norm`, `finite family centered by mean energy contraction`, `Fintype balance sum norm square`, and LeanSearch for the finite variance inequality; no full-signature match was found.
+-- minimal hypotheses: `[Fintype ι] [Nonempty ι]` make the uniform cardinality normalization cancellable, and the real inner product supplies the norm-square expansion; all stronger source assumptions were removed.
+
+/-- Centering a finite family by its uniform average cannot increase its total
+squared-norm energy.
+
+Layer: Glue | Gap: Level 1 (finite uniform-mean centering energy contraction)
+Proof: expand each squared distance with the real inner-product identity, sum the cross terms, and identify the removed mean energy as a nonnegative cardinality multiple.
+Source: Mathlib real inner-product norm-square identities and finite sums
+Used in: distributed consensus and gradient-tracking estimates that replace a node state by its disagreement from the arithmetic network average
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/assumptions/3
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem sum_norm_sq_sub_finiteUniformAverage_le_sum_norm_sq
+    {ι E : Type*} [Fintype ι] [Nonempty ι]
+    [SeminormedAddCommGroup E] [InnerProductSpace ℝ E]
+    (X : ι → E) :
+    (∑ i : ι, ‖X i - (Fintype.card ι : ℝ)⁻¹ • ∑ j : ι, X j‖ ^ 2) ≤
+      ∑ i : ι, ‖X i‖ ^ 2 := by
+  classical
+  let xbar : E := (Fintype.card ι : ℝ)⁻¹ • ∑ i : ι, X i
+  have hn_pos : 0 < (Fintype.card ι : ℝ) := by
+    exact_mod_cast Fintype.card_pos
+  have hsum : ∑ i : ι, X i = (Fintype.card ι : ℝ) • xbar := by
+    dsimp [xbar]
+    rw [smul_smul, mul_inv_cancel₀ (ne_of_gt hn_pos), one_smul]
+  have hinner :
+      ∑ i : ι, inner ℝ (X i) xbar =
+        (Fintype.card ι : ℝ) * ‖xbar‖ ^ 2 := by
+    rw [← sum_inner, hsum, inner_smul_left, real_inner_self_eq_norm_sq]
+    simp
+  change (∑ i : ι, ‖X i - xbar‖ ^ 2) ≤ ∑ i : ι, ‖X i‖ ^ 2
+  simp_rw [norm_sub_sq_real]
+  rw [Finset.sum_add_distrib, Finset.sum_sub_distrib, Finset.sum_const,
+    Finset.card_univ, nsmul_eq_mul, ← Finset.mul_sum, hinner]
+  nlinarith [sq_nonneg ‖xbar‖]
+
+-- Generalization plan (G0):
+-- concept/name: dependent-product squared energy of scalar multiples of a fixed vector; orig was frobeniusNormSq_rankOne
+-- generality used: a finite coefficient index and a norm-compatible real scalar action; no additive, module, nonempty-index, inner-product, completeness, finite-dimensionality, measure, convexity, smoothness, oracle, or network assumptions are used
+-- portable call pattern: distributed consensus, tensor, ensemble, and finite-family proofs change the coefficient index, scalar family, and normed real vector while reusing the exact rank-one energy factorization
+-- counterargument checked: this is not a pure rename or paper-local wrapper because it composes scalar norm homogeneity with finite summation into a reusable rank-one factorization
+-- coverage search: queried `sum norm squared scalar multiple constant equals sum coefficient squares times norm squared`; no complete declaration was found
+-- minimal hypotheses: `Fintype` forms the finite energy, while `Norm`, `SMul`, and `NormSMulClass` supply exactly norm homogeneity under real scalar multiplication
+
+/-- The squared-norm energy of scalar multiples of one fixed vector factors as
+the coefficient squared energy times the vector's squared norm.
+
+Layer: Glue | Gap: Level 1 (finite rank-one dependent-product energy factorization)
+Proof: distribute the fixed squared norm through the finite sum and use `norm_smul` with the square of an absolute value.
+Source: Mathlib normed real vector-space scalar homogeneity and finite big-operator algebra
+Used in: distributed consensus and gradient-tracking estimates that convert a Perron-coefficient rank-one state into scalar row energy times ambient vector energy
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/algorithm_spec/steps/1
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem dependentProductNormSq_smul_const
+    {ι E : Type*} [Fintype ι]
+    [Norm E] [SMul ℝ E] [NormSMulClass ℝ E]
+    (v : ι → ℝ) (x : E) :
+    (∑ i, ‖v i • x‖ ^ 2) = (∑ i, (v i) ^ 2) * ‖x‖ ^ 2 := by
+  classical
+  rw [Finset.sum_mul]
+  apply Finset.sum_congr rfl
+  intro i _hi
+  simp [norm_smul, Real.norm_eq_abs, mul_pow, sq_abs]
+
+-- Generalization plan (G0):
+-- concept/name: coordinatewise Lipschitz maps contract finite dependent-product squared-norm energy up to the squared common constant; orig was gradientTable_difference_frobeniusSq_le
+-- generality used: a finite index type, dependent families of seminormed additive groups, a real common bound, two dependent-product points, and coordinatewise norm-difference estimates at those points
+-- portable call pattern: distributed gradient tables, block-coordinate residual maps, and finite product operators compare two product states while changing the coordinate spaces and maps
+-- counterargument checked: this packages the common-constant square and finite aggregation absent from pointwise Lipschitz APIs
+-- coverage search: queried `coordinatewise common Lipschitz maps imply dependent product norm squared difference upper bound`; no declaration covered the complete scaled aggregate contract
+-- minimal hypotheses: only Fintype and coordinate SeminormedAddGroup structures remain, and nonnegativity of L is needed to square the pointwise inequalities
+
+/-- Coordinatewise maps satisfying a common pointwise Lipschitz estimate send the
+difference of two finite dependent-product states to squared-norm energy at most
+the squared common constant times the input difference energy.
+
+Layer: Glue | Gap: Level 1 (coordinatewise Lipschitz dependent-product energy aggregation)
+Proof: square each coordinatewise norm estimate using nonnegativity of the common constant, distribute the squared constant across the finite sum, and apply finite-sum monotonicity.
+Source: Mathlib `sq_le_sq₀`, finite-sum order and multiplication APIs
+Used in: distributed gradient tracking and block-coordinate analyses that lift common coordinatewise Lipschitz bounds to a Frobenius-style product-state energy estimate
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/assumptions/4
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem dependent_product_norm_sq_map_sub_le_of_pointwise_lipschitz
+    {ι : Type*} [Fintype ι]
+    {E F : ι → Type*}
+    [∀ i, SeminormedAddGroup (E i)] [∀ i, SeminormedAddGroup (F i)]
+    (f : ∀ i, E i → F i) (L : ℝ) (X Y : ∀ i, E i)
+    (hL : 0 ≤ L)
+    (hf : ∀ i, ‖f i (X i) - f i (Y i)‖ ≤ L * ‖X i - Y i‖) :
+    (∑ i, ‖f i (X i) - f i (Y i)‖ ^ 2) ≤
+      L ^ 2 * ∑ i, ‖X i - Y i‖ ^ 2 := by
+  classical
+  rw [Finset.mul_sum]
+  apply Finset.sum_le_sum
+  intro i _hi
+  have hsq := (sq_le_sq₀ (norm_nonneg _)
+    (mul_nonneg hL (norm_nonneg _))).2 (hf i)
+  simpa [mul_pow] using hsq
+
+-- Generalization plan (G0):
+-- concept/name: squared norm of a finite heterogeneous map sum controlled by the maps' uniform mean at a common reference and the centered input energy; orig was gradientTable_sum_sq_le_average_consensus
+-- generality used: a finite index type, a seminormed additive input group, a real normed output space, an arbitrary real common pointwise bound, and only map-difference estimates at the supplied inputs and reference
+-- portable call pattern: distributed gradient, ensemble residual, and finite-agent operator analyses change the finite agent type, state spaces, reference center, heterogeneous maps, and common Lipschitz constant
+-- counterargument checked: this packages finite Cauchy--Schwarz aggregation, pointwise Lipschitz transport, normalization of the reference-map sum, and binary norm-square splitting
+-- coverage search: queried `finite sum of Lipschitz maps squared norm bounded by reference sum plus centered squared distances`; no declaration covered the complete aggregate-map contract
+-- minimal hypotheses: global Lipschitzness is weakened to the pointwise bounds actually consumed; the empty index case is trivial
+
+/-- The squared norm of a finite sum of heterogeneous map values is bounded by
+the maps' squared uniform-mean norm at a common reference plus the centered
+input energy scaled by their common pointwise Lipschitz bound.
+
+Layer: Glue | Gap: Level 1 (finite heterogeneous-map aggregate bound from pointwise Lipschitz control)
+Proof: split every map value at the reference, bound the deviation sum by finite Cauchy--Schwarz and the pointwise Lipschitz estimates, then apply the binary norm-square Young inequality and normalize the reference sum as a uniform mean.
+Source: Mathlib finite-sum triangle and Chebyshev inequalities and normed real-module scalar laws
+Used in: distributed gradient tracking and ensemble methods that control an aggregate of local maps by the map average at the network center and the agents' disagreement energy
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/6/proof/18
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem norm_sq_sum_map_le_mean_map_add_centered_energy_of_pointwise_lipschitz
+    {I E F : Type*} [Fintype I]
+    [SeminormedAddGroup E] [SeminormedAddCommGroup F] [NormedSpace ℝ F]
+    (g : I → E → F) (x : I → E) (xbar : E) (L : ℝ)
+    (hg : ∀ i, ‖g i (x i) - g i xbar‖ ≤ L * ‖x i - xbar‖) :
+    ‖∑ i : I, g i (x i)‖ ^ 2 ≤
+      2 * (Fintype.card I : ℝ) ^ 2 *
+          ‖(Fintype.card I : ℝ)⁻¹ • ∑ i : I, g i xbar‖ ^ 2 +
+        2 * (Fintype.card I : ℝ) * L ^ 2 *
+          ∑ i : I, ‖x i - xbar‖ ^ 2 := by
+  classical
+  cases isEmpty_or_nonempty I with
+  | inl hI =>
+      letI := hI
+      simp
+  | inr hI =>
+      letI := hI
+      let n : ℝ := Fintype.card I
+      let mean : F := n⁻¹ • ∑ i : I, g i xbar
+      let dev : I → F := fun i ↦ g i (x i) - g i xbar
+      have hn_pos : 0 < n := by
+        dsimp [n]
+        exact_mod_cast Fintype.card_pos
+      have hsplit :
+          (∑ i : I, g i (x i)) = (∑ i : I, dev i) + ∑ i : I, g i xbar := by
+        rw [← Finset.sum_add_distrib]
+        apply Finset.sum_congr rfl
+        intro i _hi
+        dsimp [dev]
+        abel
+      have hmean : (∑ i : I, g i xbar) = n • mean := by
+        dsimp [mean]
+        rw [smul_smul, mul_inv_cancel₀ (ne_of_gt hn_pos), one_smul]
+      have hdev_sum :
+          ‖∑ i : I, dev i‖ ^ 2 ≤ n * ∑ i : I, ‖dev i‖ ^ 2 := by
+        have hnorm : ‖∑ i : I, dev i‖ ≤ ∑ i : I, ‖dev i‖ := by
+          simpa using norm_sum_le (s := (Finset.univ : Finset I)) (f := dev)
+        have hsq :
+            (∑ i : I, ‖dev i‖) ^ 2 ≤ n * ∑ i : I, ‖dev i‖ ^ 2 := by
+          simpa [n] using
+            (sq_sum_le_card_mul_sum_sq (s := (Finset.univ : Finset I))
+              (f := fun i ↦ ‖dev i‖))
+        nlinarith [norm_nonneg (∑ i : I, dev i)]
+      have hdev_point (i : I) :
+          ‖dev i‖ ^ 2 ≤ L ^ 2 * ‖x i - xbar‖ ^ 2 := by
+        dsimp [dev]
+        have hright_nonneg : 0 ≤ L * ‖x i - xbar‖ :=
+          (norm_nonneg _).trans (hg i)
+        simpa [mul_pow] using
+          ((sq_le_sq₀ (norm_nonneg _) hright_nonneg).2 (hg i))
+      have hdev :
+          ‖∑ i : I, dev i‖ ^ 2 ≤
+            n * L ^ 2 * ∑ i : I, ‖x i - xbar‖ ^ 2 := by
+        calc
+          ‖∑ i : I, dev i‖ ^ 2 ≤ n * ∑ i : I, ‖dev i‖ ^ 2 := hdev_sum
+          _ ≤ n * ∑ i : I, (L ^ 2 * ‖x i - xbar‖ ^ 2) := by
+            exact mul_le_mul_of_nonneg_left
+              (Finset.sum_le_sum fun i _hi ↦ hdev_point i) hn_pos.le
+          _ = n * L ^ 2 * ∑ i : I, ‖x i - xbar‖ ^ 2 := by
+            rw [← Finset.mul_sum]
+            ring
+      conv_lhs => rw [hsplit, hmean]
+      calc
+        ‖(∑ i : I, dev i) + n • mean‖ ^ 2 ≤
+            2 * ‖∑ i : I, dev i‖ ^ 2 + 2 * ‖n • mean‖ ^ 2 :=
+          norm_add_sq_le_two_mul_norm_sq_add_two_mul_norm_sq _ _
+        _ = 2 * ‖∑ i : I, dev i‖ ^ 2 +
+            2 * n ^ 2 * ‖mean‖ ^ 2 := by
+          rw [norm_smul, Real.norm_eq_abs, abs_of_pos hn_pos, mul_pow]
+          ring
+        _ ≤ 2 * (n * L ^ 2 * ∑ i : I, ‖x i - xbar‖ ^ 2) +
+            2 * n ^ 2 * ‖mean‖ ^ 2 :=
+          add_le_add (mul_le_mul_of_nonneg_left hdev (by norm_num)) le_rfl
+        _ = 2 * (Fintype.card I : ℝ) ^ 2 *
+              ‖(Fintype.card I : ℝ)⁻¹ • ∑ i : I, g i xbar‖ ^ 2 +
+            2 * (Fintype.card I : ℝ) * L ^ 2 *
+              ∑ i : I, ‖x i - xbar‖ ^ 2 := by
+          dsimp [n, mean]
+          ring
+
+end SOptLib
+
+
+open scoped ContinuousFunctionalCalculus
+
+namespace Matrix
+
+universe u v
+
+-- Generalization plan (G0):
+-- concept/name: naturality of finite real-matrix functional-calculus powers under
+--   coordinate equivalence; orig was `psdMatrixPower_reindexAlgEquiv`, renamed
+--   `Matrix.reindexAlgEquiv_cfc_rpow`
+-- generality used: arbitrary finite index types with decidable equality, an index
+--   equivalence, a real Hermitian matrix, and an arbitrary real exponent; no
+--   positivity, algorithm state, measure, convexity, or stochastic assumptions
+--   are used
+-- portable call pattern: spectral preconditioner, tensor flattening, and block
+--   matrix proofs transport a real functional-calculus power across a changing
+--   finite coordinate equivalence while the matrix and exponent vary
+-- counterargument checked: this is not paper-local traceability or a pure rename;
+--   Mathlib exposes the reindexing star-algebra equivalence and generic `map_cfc`
+--   separately, but not the finite real-matrix power equality with its continuity
+--   and self-adjointness obligations discharged
+-- coverage search: symbol and semantic searches for "finite matrix PSD real power
+--   commutes with reindexing equivalence" and "continuous functional calculus
+--   power preserved by matrix reindex algebra equivalence" found
+--   `CStarMatrix.reindexₐ`, `StarAlgHom.map_cfc`, and
+--   `Matrix.IsHermitian.reindex` as partial proof components, but no declaration
+--   with this conclusion
+-- minimal hypotheses: finite decidable index types support matrix multiplication
+--   and the finite Hermitian spectrum; source Hermitianity is the only matrix
+--   property required, since target Hermitianity follows from reindexing
+
+/-- Simultaneous row-and-column reindexing of a finite real Hermitian matrix
+commutes with applying a real power through the continuous functional calculus.
+
+Layer: Glue | Gap: Level 1 (finite Hermitian matrix power naturality under coordinate equivalence)
+Proof: view matrix reindexing as Mathlib's continuous star-algebra equivalence, derive target Hermitianity from `Matrix.IsHermitian.reindex`, and apply `StarAlgHom.map_cfc`; finiteness of the source spectrum supplies continuity of the scalar power on that spectrum.
+Source: Mathlib `CStarMatrix.reindexₐ`, continuous functional calculus naturality for star-algebra homomorphisms, and finite Hermitian matrix spectral theory
+Used in: spectral adaptive-preconditioner and tensor-flattening proofs that transport fractional matrix powers between equivalent finite coordinate systems
+Book citation: book/research/Source.json#/definitions/0
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithms 1--3 -/
+theorem reindexAlgEquiv_cfc_rpow
+    {iota : Type u} {kappa : Type v}
+    [Fintype iota] [Fintype kappa] [DecidableEq iota] [DecidableEq kappa]
+    (e : iota ≃ kappa) (A : Matrix iota iota ℝ) (s : ℝ)
+    (hA : A.IsHermitian) :
+    Matrix.reindexAlgEquiv ℝ ℝ e
+        (cfc (R := ℝ) (p := IsSelfAdjoint) (fun x : ℝ => x ^ s) A) =
+      cfc (R := ℝ) (p := IsSelfAdjoint) (fun x : ℝ => x ^ s)
+        (Matrix.reindexAlgEquiv ℝ ℝ e A) := by
+  classical
+  let phi : Matrix iota iota ℝ →⋆ₐ[ℝ] Matrix kappa kappa ℝ := by
+    change CStarMatrix iota iota ℝ →⋆ₐ[ℝ] CStarMatrix kappa kappa ℝ
+    exact StarAlgHomClass.toStarAlgHom (CStarMatrix.reindexₐ ℝ ℝ e)
+  have hf : ContinuousOn (fun x : ℝ => x ^ s) (spectrum ℝ A) := by
+    have hfin : (spectrum ℝ A).Finite := by
+      rw [hA.spectrum_real_eq_range_eigenvalues]
+      exact Set.finite_range _
+    exact hfin.continuousOn _
+  have hphiA : (phi A).IsHermitian := by
+    change (Matrix.reindex e e A).IsHermitian
+    exact hA.reindex e
+  have hmap :
+      phi (cfc (R := ℝ) (p := IsSelfAdjoint) (fun x : ℝ => x ^ s) A) =
+        cfc (R := ℝ) (p := IsSelfAdjoint) (fun x : ℝ => x ^ s) (phi A) := by
+    exact
+      (phi : Matrix iota iota ℝ →⋆ₐ[ℝ] Matrix kappa kappa ℝ).map_cfc
+        (fun x : ℝ => x ^ s) A (hf := hf)
+        (hφ := by
+          simpa [phi, CStarMatrix.reindexₐ, CStarMatrix.reindexₗ,
+            Matrix.reindexAlgEquiv_apply] using
+            (Matrix.reindexLinearEquiv ℝ ℝ e e).toLinearMap.continuous_of_finiteDimensional)
+        (ha := hA) (hφa := hphiA)
+  calc
+    Matrix.reindexAlgEquiv ℝ ℝ e
+        (cfc (R := ℝ) (p := IsSelfAdjoint) (fun x : ℝ => x ^ s) A) =
+        phi (cfc (R := ℝ) (p := IsSelfAdjoint) (fun x : ℝ => x ^ s) A) := by
+          rfl
+    _ = cfc (R := ℝ) (p := IsSelfAdjoint) (fun x : ℝ => x ^ s) (phi A) := hmap
+    _ = cfc (R := ℝ) (p := IsSelfAdjoint) (fun x : ℝ => x ^ s)
+        (Matrix.reindexAlgEquiv ℝ ℝ e A) := by
+          rfl
+
+end Matrix
+
+-- Generalization plan (G0):
+-- concept/name: inverse matrix-vector cancellation under positive definiteness;
+--   orig was matrix_inv_mulVec_mulVec_of_posDef
+-- generality used: arbitrary finite index type and square matrix over a partially ordered
+--   star field; no measure, convexity, smoothness, oracle, or algorithm-specific assumptions
+-- portable call pattern: adaptive full-matrix and tensor-preconditioner proofs recover a
+--   vector after applying a changing positive-definite metric and its inverse
+-- counterargument checked: Mathlib has the cancellation under an Invertible instance,
+--   but not the useful PosDef-specialized bridge; this reorganizes a substantive hypothesis
+-- coverage search: queries "inverse matrix mulVec action returns vector positive definite"
+--   and "positive definite matrix inverse times matrix vector equals vector" found
+--   Matrix.inv_mulVec_eq_vec and Matrix.PosDef.isUnit as complementary partial coverage
+-- minimal hypotheses: the scalar assumptions are exactly those used by `Matrix.PosDef.isUnit`
+
+/-- Applying the inverse of a positive-definite finite matrix to its action on a vector
+recovers that vector.
+
+Layer: Glue | Gap: Level 0 (positive-definite matrix-vector inverse cancellation)
+Proof: turn positive definiteness into an invertibility instance with `Matrix.PosDef.isUnit`,
+  then apply Mathlib's `Matrix.inv_mulVec_eq_vec` cancellation theorem.
+Source: Mathlib positive-definite finite matrices and nonsingular matrix-vector inverse API
+Used in: adaptive full-matrix and tensor-preconditioner update algebra, where a
+  positive-definite metric action is cancelled by the corresponding inverse metric
+Book citation: book/research/Source.json#/key_lemmas/0/statement_math
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor
+  Optimization, adaptive online mirror-descent regret step -/
+theorem Matrix.inv_mulVec_mulVec_of_posDef
+    {K ι : Type*} [Field K] [PartialOrder K] [StarRing K]
+    [Fintype ι] [DecidableEq ι]
+    (H : Matrix ι ι K) (hH : H.PosDef) (g : ι → K) :
+    H⁻¹.mulVec (H.mulVec g) = g := by
+  letI : Invertible H := hH.isUnit.invertible
+  exact Matrix.inv_mulVec_eq_vec rfl
+
+-- Generalization plan (G0):
+-- concept/name: matrix-vector right-inverse cancellation under positive definiteness;
+--   orig was matrix_mulVec_inv_mulVec_of_posDef
+-- generality used: arbitrary finite index type and square matrix over a partially ordered
+--   star field; no measure, convexity, smoothness, oracle, or algorithm-specific assumptions
+-- portable call pattern: adaptive full-matrix and tensor-preconditioner proofs recover a
+--   vector after applying a changing positive-definite metric to its inverse action
+-- counterargument checked: Mathlib has cancellation under an `Invertible` instance, and the
+--   staged companion covers the opposite composition order, but neither exposes this useful
+--   `PosDef`-specialized matrix-vector contract
+-- coverage search: queries "matrix times inverse matrix action on vector equals vector positive
+--   definite" and "mulVec inverse mulVec positive definite" found
+--   `Matrix.mul_inv_of_invertible` as partial coverage and
+--   `Matrix.inv_mulVec_mulVec_of_posDef` only for the structurally opposite order
+-- minimal hypotheses: the scalar assumptions are exactly those needed to derive invertibility
+--   from `Matrix.PosDef.isUnit`
+
+/-- Applying a positive-definite finite matrix to its inverse action on a vector recovers that
+vector.
+
+Layer: Glue | Gap: Level 0 (positive-definite matrix-vector right-inverse cancellation)
+Proof: derive an invertibility instance from `Matrix.PosDef.isUnit`, reassociate the two
+  matrix-vector actions, and cancel the matrix with `Matrix.mul_inv_of_invertible`.
+Source: Mathlib positive-definite finite matrices and nonsingular matrix inverse API
+Used in: adaptive full-matrix and tensor-preconditioner update algebra, where a changing
+  positive-definite metric cancels the inverse-metric action on a gradient
+Book citation: book/research/Source.json#/key_lemmas/0/statement_math
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor
+  Optimization, adaptive online mirror-descent regret step -/
+theorem Matrix.mulVec_inv_mulVec_of_posDef
+    {K ι : Type*} [Field K] [PartialOrder K] [StarRing K]
+    [Fintype ι] [DecidableEq ι]
+    (H : Matrix ι ι K) (hH : H.PosDef) (g : ι → K) :
+    H.mulVec (H⁻¹.mulVec g) = g := by
+  letI : Invertible H := hH.isUnit.invertible
+  calc
+    H.mulVec (H⁻¹.mulVec g) = (H * H⁻¹).mulVec g := by
+      rw [Matrix.mulVec_mulVec]
+    _ = g := by
+      rw [Matrix.mul_inv_of_invertible]
+      exact Matrix.one_mulVec g
+
+-- Generalization plan (G0):
+-- concept/name: one-sided order monotonicity for multiplication by a commuting
+--   nonnegative element; orig was matrix_mul_le_mul_left_of_commute
+-- generality used: a nonunital real star-ordered ring with nonnegative-spectrum
+--   continuous functional calculus; no matrix dimensions or finite-dimensionality
+-- portable call pattern: product-order inductions for commuting positive operators,
+--   with the multiplier and ordered endpoints varying while `P * A ≤ P * B` remains
+-- counterargument checked: not paper-local and not a pure wrapper; Mathlib proves
+--   positivity of commuting products but does not package this order consequence
+-- coverage search: queried one-sided multiplication/order/commutation and
+--   `Commute.mul_nonneg`; Mathlib conjugation lemmas are partial hits, while
+--   `Commute.mul_nonneg` supplies the key positivity edge but not this conclusion
+-- minimal hypotheses: `NonUnitalRing` suffices algebraically; the functional-calculus
+--   and spectrum classes are exactly those required by `Commute.mul_nonneg`
+
+/-- Left multiplication by a nonnegative element preserves an inequality when the
+multiplier commutes with both endpoints.
+
+Layer: Glue | Gap: Level 1 (one-sided order multiplication by a commuting nonnegative factor)
+Proof: rewrite the inequality as nonnegativity of `P * (B - A)`, then apply
+  `Commute.mul_nonneg` using endpoint commutation and nonnegativity of `B - A`.
+Source: Mathlib continuous functional calculus positivity for products of commuting nonnegative elements and ordered additive-group subtraction
+Used in: factor-by-factor monotonicity of ordered products of commuting positive operator powers in the Ando geometric-mean step
+Book citation: book/research/Source.json#/key_lemmas/6
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization -/
+theorem mul_le_mul_left_of_nonneg_of_commute
+    {R : Type*} [NonUnitalRing R] [PartialOrder R] [StarRing R] [StarOrderedRing R]
+    [TopologicalSpace R] [Module ℝ R] [IsScalarTower ℝ R R] [SMulCommClass ℝ R R]
+    [NonUnitalContinuousFunctionalCalculus ℝ R IsSelfAdjoint]
+    [NonnegSpectrumClass ℝ R]
+    (P A B : R) (hP : 0 ≤ P) (hAB : A ≤ B)
+    (hPA : Commute P A) (hPB : Commute P B) :
+    P * A ≤ P * B := by
+  rw [← sub_nonneg, ← mul_sub]
+  exact Commute.mul_nonneg hP (sub_nonneg.mpr hAB) (hPB.sub_right hPA)
+
+namespace Matrix
+
+-- Generalization plan (G0):
+-- concept/name: trace domination of a finite positive-semidefinite matrix over
+--   an RCLike scalar
+--   in the Loewner order; orig was `matrix_le_trace_smul_one_of_posSemidef`
+-- generality used: an arbitrary finite index type with decidable equality and
+--   an arbitrary RCLike scalar and positive-semidefinite square matrix; no
+--   optimization, measure, convexity, smoothness, or oracle assumptions are used
+-- portable call pattern: covariance, adaptive-preconditioner, and spectral
+--   proofs bound a changing PSD matrix by a scalar identity matrix while the
+--   finite coordinate type and matrix vary
+-- counterargument checked: this is not paper-local traceability or a one-line
+--   wrapper; it packages spectral decomposition, eigenvalue nonnegativity,
+--   trace identification, and preservation of PSD under unitary conjugation
+-- coverage search: symbol queries for "positive semidefinite matrix bounded
+--   above by trace times identity" and "eigenvalue less than sum eigenvalues",
+--   plus Mathlib semantic search for the precise Loewner bound, found only the
+--   lower-level `Matrix.IsHermitian.spectral_theorem`,
+--   `Matrix.PosSemidef.eigenvalues_nonneg`, and `Matrix.le_iff`; no Mathlib,
+--   SOptLib, or approved round declaration covers the combined statement
+-- minimal hypotheses: `Fintype` and `DecidableEq` are required by the finite
+--   spectral and diagonal APIs; positive semidefiniteness is exactly what
+--   supplies both Hermitian diagonalization and nonnegative eigenvalues
+
+/-- A finite positive-semidefinite matrix over an RCLike scalar is Loewner-bounded by its
+trace times the identity matrix.
+
+Layer: Glue | Gap: Level 1 (trace domination of a positive-semidefinite matrix)
+Proof: diagonalize the matrix in a unitary eigenbasis, bound each nonnegative eigenvalue by their sum, and conjugate the resulting positive-semidefinite diagonal difference back to the original basis.
+Source: Mathlib finite Hermitian spectral theorem, trace-eigenvalue identity, positive-semidefinite eigenvalue nonnegativity, and Loewner order
+Used in: matrix and tensor adaptive-preconditioner regret proofs that charge a PSD metric increment against a comparator-radius bound through the increment's trace
+Book citation: book/research/Source.json#/algorithm_spec
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithms 1--3 -/
+theorem le_trace_smul_one_of_posSemidef
+    {𝕜 ι : Type*} [RCLike 𝕜] [Fintype ι] [DecidableEq ι]
+    (M : Matrix ι ι 𝕜) (hM : M.PosSemidef) :
+    M ≤ Matrix.trace M • (1 : Matrix ι ι 𝕜) := by
+  classical
+  rw [Matrix.le_iff]
+  let U : unitary (Matrix ι ι 𝕜) := hM.1.eigenvectorUnitary
+  let lam : ι → ℝ := hM.1.eigenvalues
+  let D : Matrix ι ι 𝕜 := Matrix.diagonal fun i => (lam i : 𝕜)
+  let Ddiff : Matrix ι ι 𝕜 :=
+    Matrix.diagonal fun i : ι => Matrix.trace M - (lam i : 𝕜)
+  have htrace_eigs : Matrix.trace M = ((∑ i, lam i : ℝ) : 𝕜) := by
+    calc
+      Matrix.trace M = ∑ i, (lam i : 𝕜) := by
+        simpa [lam] using hM.1.trace_eq_sum_eigenvalues
+      _ = ((∑ i, lam i : ℝ) : 𝕜) := by
+        rw [RCLike.ofReal_sum]
+  have hdiff_real_nonneg : ∀ i : ι, 0 ≤ (∑ j, lam j) - lam i := by
+    intro i
+    exact sub_nonneg.mpr
+      (Finset.single_le_sum (fun j _hj => hM.eigenvalues_nonneg j) (Finset.mem_univ i))
+  have hdiff_diag_nonneg : ∀ i : ι, 0 ≤ Matrix.trace M - (lam i : 𝕜) := by
+    intro i
+    rw [htrace_eigs, ← RCLike.ofReal_sub, RCLike.ofReal_nonneg]
+    exact hdiff_real_nonneg i
+  have hDdiff_psd : Ddiff.PosSemidef := by
+    simpa [Ddiff] using
+      (Matrix.PosSemidef.diagonal
+        (d := fun i : ι => Matrix.trace M - (lam i : 𝕜))
+        hdiff_diag_nonneg)
+  have hUunit : IsUnit (U : Matrix ι ι 𝕜) := (Unitary.toUnits U).isUnit
+  have hconj_psd :
+      ((U : Matrix ι ι 𝕜) * Ddiff * star (U : Matrix ι ι 𝕜)).PosSemidef := by
+    exact (Matrix.IsUnit.posSemidef_star_right_conjugate_iff hUunit).mpr hDdiff_psd
+  have hMspec :
+      M = (U : Matrix ι ι 𝕜) * D * star (U : Matrix ι ι 𝕜) := by
+    simpa [U, D, lam, Unitary.conjStarAlgAut_apply, Function.comp_def] using
+      hM.1.spectral_theorem
+  have hdiff :
+      Matrix.trace M • (1 : Matrix ι ι 𝕜) - M =
+        (U : Matrix ι ι 𝕜) * Ddiff * star (U : Matrix ι ι 𝕜) := by
+    let C : Matrix ι ι 𝕜 := Matrix.trace M • (1 : Matrix ι ι 𝕜)
+    have hU_mul_star :
+        (U : Matrix ι ι 𝕜) * star (U : Matrix ι ι 𝕜) = 1 := by
+      simp
+    have hC_conj :
+        (U : Matrix ι ι 𝕜) * C * star (U : Matrix ι ι 𝕜) = C := by
+      simp [C, hU_mul_star]
+    have hfactor :
+        (U : Matrix ι ι 𝕜) * C * star (U : Matrix ι ι 𝕜) -
+            (U : Matrix ι ι 𝕜) * D * star (U : Matrix ι ι 𝕜) =
+          (U : Matrix ι ι 𝕜) * (C - D) * star (U : Matrix ι ι 𝕜) := by
+      noncomm_ring
+    have hC_sub_D : C - D = Ddiff := by
+      ext i j
+      by_cases hij : i = j
+      · subst j
+        simp [C, D, Ddiff]
+      · simp [C, D, Ddiff, hij]
+    calc
+      Matrix.trace M • (1 : Matrix ι ι 𝕜) - M = C - M := by rfl
+      _ = C - ((U : Matrix ι ι 𝕜) * D * star (U : Matrix ι ι 𝕜)) := by
+        rw [hMspec]
+      _ =
+          (U : Matrix ι ι 𝕜) * C * star (U : Matrix ι ι 𝕜) -
+            (U : Matrix ι ι 𝕜) * D * star (U : Matrix ι ι 𝕜) := by
+        rw [hC_conj]
+      _ = (U : Matrix ι ι 𝕜) * (C - D) * star (U : Matrix ι ι 𝕜) := hfactor
+      _ = (U : Matrix ι ι 𝕜) * Ddiff * star (U : Matrix ι ι 𝕜) := by
+        rw [hC_sub_D]
+  simpa [hdiff] using hconj_psd
+
+end Matrix
+
+namespace Matrix
+
+-- Generalization plan (G0):
+-- concept/name: rank-many outer-product decomposition with normalized left
+--   factors; orig was `matrix_rank_column_space_rank_one_expansion`
+-- generality used: arbitrary finite row and column index types for a real
+--   matrix; finite-dimensional Euclidean structure is derived from the row
+--   index, with no measure, convexity, smoothness, oracle, or algorithm data
+-- portable call pattern: low-rank matrix, sketching, factorized-gradient, and
+--   preconditioner proofs change the finite real matrix and dimensions while
+--   reusing a rank-indexed outer-product expansion with normalized left factors
+-- counterargument checked: this is not paper-local traceability or a one-line
+--   wrapper; it constructs factor families by an orthonormal basis of the
+--   column space, while nearby staged Gram lemmas only consume such expansions
+-- coverage search: searches for `matrix rank outer product sum number of terms
+--   rank normalized left factors`, `matrix rank factorization outer product
+--   decomposition`, and `matrix equals a sum of outer products indexed by its
+--   rank` found only Mathlib's coordinate expansion `Matrix.matrix_eq_sum_single`,
+--   rank bounds for `Matrix.vecMulVec`, and staged consumers of orthonormal
+--   expansions; none supplies this rank-many normalized factorization
+-- minimal hypotheses: `Fintype` on both index types is exactly what matrix rank,
+--   finite sums, the column-space finrank, and its orthonormal basis require;
+--   all decidable equality instances are chosen classically inside the proof
+
+/-- Every finite real matrix is a sum of as many outer products as its rank,
+with each left factor having squared Euclidean norm at most one.
+
+Layer: Glue | Gap: Level 2 (normalized rank-many outer-product factorization)
+Proof: choose an orthonormal basis of the matrix column space, expand each
+  column in that basis, and identify the basis norm with its coordinate-square sum.
+Source: Mathlib matrix rank as column-map range finrank and finite-dimensional
+  Euclidean orthonormal-basis expansion APIs.
+Used in: low-rank adaptive-gradient and matrix-preconditioner arguments that
+  dominate vectorized rank-one expansions by row or column Gram matrices.
+Book citation: book/research/Source.json#/key_lemmas/10/proof/0
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic
+  Tensor Optimization, Algorithm 1 matrix Shampoo -/
+theorem exists_rank_one_sum_eq_with_left_norm_le_one
+    {ι κ : Type*} [Fintype ι] [Fintype κ] (G : Matrix ι κ ℝ) :
+    ∃ (u : Fin G.rank → ι → ℝ) (b : Fin G.rank → κ → ℝ),
+      G = ∑ a : Fin G.rank, vecMulVec (u a) (b a) ∧
+        ∀ a : Fin G.rank, ∑ i : ι, u a i ^ 2 ≤ 1 := by
+  classical
+  let L : (κ → ℝ) →ₗ[ℝ] EuclideanSpace ℝ ι :=
+    (((WithLp.linearEquiv 2 ℝ (ι → ℝ)).symm : (ι → ℝ) ≃ₗ[ℝ]
+        EuclideanSpace ℝ ι).toLinearMap.comp (Matrix.toLin' G))
+  let E := LinearMap.range L
+  have hrank : Module.finrank ℝ (LinearMap.range (Matrix.toLin' G)) = G.rank := by
+    change Module.finrank ℝ (LinearMap.range (Matrix.toLin' G)) =
+      Module.finrank ℝ (LinearMap.range G.mulVecLin)
+    rw [Matrix.toLin'_apply']
+  have hfin : Module.finrank ℝ E = G.rank := by
+    let e : (ι → ℝ) ≃ₗ[ℝ] EuclideanSpace ℝ ι :=
+      (WithLp.linearEquiv 2 ℝ (ι → ℝ)).symm
+    calc
+      Module.finrank ℝ E =
+          Module.finrank ℝ (LinearMap.range (e.toLinearMap.comp (Matrix.toLin' G))) := by
+            rfl
+      _ = Module.finrank ℝ ((LinearMap.range (Matrix.toLin' G)).map e.toLinearMap) := by
+            rw [LinearMap.range_comp]
+      _ = Module.finrank ℝ (LinearMap.range (Matrix.toLin' G)) := by
+            exact e.finrank_map_eq (LinearMap.range (Matrix.toLin' G))
+      _ = G.rank := hrank
+  let B : OrthonormalBasis (Fin G.rank) ℝ E :=
+    (stdOrthonormalBasis ℝ E).reindex (finCongr hfin)
+  have hcol (j : κ) :
+      (WithLp.toLp 2 (G.col j) : EuclideanSpace ℝ ι) ∈ LinearMap.range L := by
+    refine ⟨Pi.single j (1 : ℝ), ?_⟩
+    change ((WithLp.linearEquiv 2 ℝ (ι → ℝ)).symm)
+        (Matrix.toLin' G (Pi.single j (1 : ℝ))) =
+      (WithLp.toLp 2 (G.col j) : EuclideanSpace ℝ ι)
+    apply (WithLp.linearEquiv 2 ℝ (ι → ℝ)).injective
+    ext i
+    simp [Matrix.toLin'_apply, Matrix.col_apply]
+  let u : Fin G.rank → ι → ℝ :=
+    fun a i => (B a : EuclideanSpace ℝ ι) i
+  let b : Fin G.rank → κ → ℝ :=
+    fun a j => B.repr ⟨(WithLp.toLp 2 (G.col j) : EuclideanSpace ℝ ι), hcol j⟩ a
+  refine ⟨u, b, ?_, ?_⟩
+  · ext i j
+    let x : E :=
+      ⟨(WithLp.toLp 2 (G.col j) : EuclideanSpace ℝ ι), hcol j⟩
+    have hrepr := congr_arg (fun y : E => (y : EuclideanSpace ℝ ι) i)
+      (B.sum_repr x)
+    simpa [u, b, x, Matrix.sum_apply, Matrix.col_apply, smul_eq_mul, mul_comm,
+      mul_left_comm, mul_assoc] using hrepr.symm
+  · intro a
+    have hnorm : ‖(B a : E)‖ = 1 := by
+      simp
+    have hnorm_ambient : ‖(B a : EuclideanSpace ℝ ι)‖ = 1 := by
+      change ‖(B a : E)‖ = 1
+      exact hnorm
+    have hsq := (EuclideanSpace.real_norm_sq_eq (B a : EuclideanSpace ℝ ι)).symm
+    nlinarith
+
+end Matrix
+
+-- Generalization plan (G0):
+-- concept/name: weighted selected-coordinate Kronecker-delta collapse on a
+--   finite dependent product; orig was `multiIndex_selected_delta_sum`
+-- generality used: an arbitrary finite index type, finite dependent coordinate
+--   types with decidable equality, and an arbitrary non-associative semiring
+--   codomain; no tensor dimensions, order, topology, measure, convexity, oracle,
+--   or algorithm data
+-- portable call pattern: tensor contractions, block-coordinate expansions, and
+--   finite-state kernels sum over a selected coordinate and then collapse its
+--   equality indicator, while changing the dependent family, selected coordinate,
+--   scalar weights, and residual summand
+-- counterargument checked: the result is short after sum interchange, but it is
+--   not a pure rename: Mathlib only supplies the inner singleton-sum collapse,
+--   and the existing tensor-index split theorem does not package the weighted
+--   delta contraction that callers otherwise rederive
+-- coverage search: searches for `finite sum selected coordinate kronecker delta
+--   dependent function equals coordinate weight`, `sum if function coordinate
+--   equals selected value multiply`, and `Fintype sum ite equality selected term
+--   semiring` found Mathlib's `Fintype.sum_ite_eq` and
+--   `Fintype.sum_ite_eq'` as proof ingredients and SOptLib's staged
+--   `sum_tensorIndex_eq_sum_mode_coordinate_complement` as a reindexing result,
+--   but no declaration with this weighted dependent-product conclusion
+-- minimal hypotheses: finiteness and decidable equality on the outer index
+--   construct the finite dependent function space; coordinate decidable equality
+--   forms the indicator; `NonAssocSemiring` supplies zero, one, finite addition,
+--   multiplication, and distributivity, with no use of multiplicative
+--   associativity or commutativity
+
+/-- Summing a weighted selected-coordinate Kronecker delta over a finite dependent
+product weights every dependent index by its selected coordinate.
+
+Layer: Glue | Gap: Level 1 (weighted selected-coordinate delta contraction)
+Proof: distribute the outer weights through the dependent-index sums, interchange
+  the two finite sums, and collapse the selected-coordinate sum with Mathlib's
+  finite singleton-sum simplification.
+Source: Mathlib finite big-operator distributivity, `Finset.sum_comm`, and
+  `Fintype.sum_ite_eq'` for equality-selected finite sums
+Used in: tensor mode-product and block-coordinate expansions where a selected
+  coordinate indicator is contracted before the remaining dependent-index sum
+Book citation: book/research/Source.json#/key_lemmas/12
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic
+  Tensor Optimization, Algorithm 2 -/
+theorem Fintype.sum_selected_pi_kroneckerDelta_mul
+    {ι : Type*} {R : Type*} [Fintype ι] [DecidableEq ι] [NonAssocSemiring R]
+    {dims : ι → Type*} [∀ i, Fintype (dims i)] [∀ i, DecidableEq (dims i)]
+    (i : ι) (c : dims i → R) (B : (∀ j, dims j) → R) :
+    (∑ s : dims i,
+        c s * ∑ j : ∀ j, dims j, (if j i = s then (1 : R) else 0) * B j) =
+      ∑ j : ∀ j, dims j, c (j i) * B j := by
+  classical
+  calc
+    (∑ s : dims i,
+        c s * ∑ j : ∀ j, dims j, (if j i = s then (1 : R) else 0) * B j) =
+        ∑ s : dims i, ∑ j : ∀ j, dims j,
+          c s * ((if j i = s then (1 : R) else 0) * B j) := by
+            simp_rw [Finset.mul_sum]
+    _ = ∑ j : ∀ j, dims j, ∑ s : dims i,
+          c s * ((if j i = s then (1 : R) else 0) * B j) := by
+            rw [Finset.sum_comm]
+    _ = ∑ j : ∀ j, dims j, c (j i) * B j := by
+          apply Finset.sum_congr rfl
+          intro j _hj
+          simp [eq_comm]
+
+-- Generalization plan (G0):
+-- concept/name: ordered `List.ofFn` product after inserting the monoid identity;
+--   orig was `orderedMatrixProduct_insertNth_one`
+-- generality used: arbitrary carrier with a `Monoid` instance; no matrix, order,
+--   topology, measure, convexity, or oracle assumptions
+-- portable call pattern: noncommutative finite-product proofs deleting an identity
+--   factor while changing the monoid, indexed family, and insertion position
+-- counterargument checked: this is not paper-local bookkeeping or a pure wrapper;
+--   it bridges `Fin.insertNth` to order-sensitive `List.ofFn` multiplication
+-- coverage search: searches for "list product of function insert identity preserves
+--   order" and "prod ofFn insertNth one monoid" found `Fin.prod_insertNth` only for
+--   commutative products and `List.prod_insertIdx` for already-materialized lists;
+--   neither states this noncommutative finite-family bridge
+-- minimal hypotheses: `[Monoid M]` is sufficient; all hypotheses are minimal
+
+/-- Inserting the identity into a finite family does not change its ordered list product.
+
+Layer: Glue | Gap: Level 1 (identity insertion in an ordered finite-family product)
+Proof: induct on the family length, split the insertion position into zero or successor,
+  and use `Fin.exists_cons` together with the `Fin.insertNth` cons equations.
+Source: Mathlib finite tuples, `List.ofFn`, and noncommutative list products
+Used in: deleting zero-weight identity factors from ordered operator products without
+  assuming that the remaining preconditioner factors commute
+Book citation: book/research/Source.json#/key_lemmas/4
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor
+  Optimization, finite-family geometric-mean induction -/
+@[simp] theorem List.prod_ofFn_insertNth_one {M : Type*} [Monoid M] {q : Nat}
+    (p : Fin (q + 1)) (A : Fin q → M) :
+    (List.ofFn (Fin.insertNth p (1 : M) A)).prod = (List.ofFn A).prod := by
+  induction q with
+  | zero =>
+      have hp : p = 0 := Fin.eq_zero p
+      subst p
+      simp
+  | succ q ih =>
+      refine Fin.cases ?_ (fun p => ?_) p
+      · rw [Fin.insertNth_zero']
+        simp
+      · obtain ⟨A0, A, rfl⟩ := Fin.exists_cons A
+        rw [Fin.insertNth_succ_cons, List.ofFn_cons, List.ofFn_cons,
+          List.prod_cons, List.prod_cons, ih]
+
+-- Generalization plan (G0):
+-- concept/name: nonnegativity of a product of pairwise-commuting elements; orig was
+--   orderedMatrixProduct_posSemidef_of_pairwise_comm
+-- generality used: ordered real star-algebra with real continuous functional calculus and
+--   nonnegative spectra; an arbitrary list, with pointwise nonnegativity and pairwise commutation
+-- portable call pattern: finite products of commuting positive-semidefinite operator factors;
+--   the carrier, list length, factors, and indexing construction may vary
+-- counterargument checked: the binary closure step is Mathlib's `Commute.mul_nonneg`, but neither
+--   Mathlib nor SOptLib lifts it to noncommutative list products; the reusable induction also
+--   differs from the already-staged strict-positivity result in its weaker factor hypotheses
+-- coverage search: searched "list product nonnegative pairwise commuting factors", "prod nonneg
+--   commute", and Mathlib semantically for "product of pairwise commuting nonnegative elements";
+--   top hits were `Commute.mul_nonneg`, commutative `List.prod_nonneg`, and
+--   `List.prod_isStrictlyPositive_of_pairwise_commute`, so coverage is partial
+-- minimal hypotheses: list membership hypotheses replace the matrix-indexed family assumptions;
+--   pairwise commutation suffices, and no norm, completeness, or finite-dimensionality is used
+
+/-- The product of a pairwise-commuting list of nonnegative elements is nonnegative.
+
+Layer: Glue | Gap: Level 1 (nonnegativity of finite commuting products)
+Proof: induct on the list, commute the head with the tail product using
+  `Commute.list_prod_right`, and apply Mathlib's binary `Commute.mul_nonneg` theorem.
+Source: Mathlib ordered star-algebra nonnegativity, real continuous functional calculus, and
+  noncommutative list-product commutation APIs
+Used in: proving that the ordered product of commuting positive-semidefinite matrix powers is
+  positive semidefinite at the multivariate geometric-mean monotonicity boundary
+Book citation: book/research/Source.json#/key_lemmas/4
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization -/
+theorem List.prod_nonneg_of_pairwise_commute
+    {A : Type*} [Ring A] [PartialOrder A] [StarRing A] [StarOrderedRing A]
+    [TopologicalSpace A] [Module ℝ A] [IsScalarTower ℝ A A] [SMulCommClass ℝ A A]
+    [NonUnitalContinuousFunctionalCalculus ℝ A IsSelfAdjoint] [NonnegSpectrumClass ℝ A]
+    (l : List A) (hnonneg : ∀ a ∈ l, 0 ≤ a) (hcomm : l.Pairwise Commute) :
+    0 ≤ l.prod := by
+  induction l with
+  | nil =>
+      exact zero_le_one
+  | cons a l ih =>
+      rw [List.pairwise_cons] at hcomm
+      rw [List.prod_cons]
+      exact Commute.mul_nonneg (hnonneg a (by simp))
+        (ih (fun b hb => hnonneg b (by simp [hb])) hcomm.2)
+        (Commute.list_prod_right l a hcomm.1)
+
+-- Generalization plan (G0):
+-- concept/name: pointwise order lifts to ordered finite products under within-family and
+--   triangular cross commutation; orig was orderedMatrixProduct_mono_of_cross_commute
+-- generality used: an arbitrary real star-ordered ring with nonnegative-spectrum continuous
+--   functional calculus, two `Fin q` families, pointwise nonnegativity and order, pairwise
+--   commutation within each family, and earlier-lower/later-upper cross commutation
+-- portable call pattern: noncommutative positive-operator product comparisons in adaptive
+--   preconditioning, operator means, and block spectral constructions can vary the carrier,
+--   family length, and factors while retaining the same ordered-product conclusion
+-- counterargument checked: this is not paper-local traceability or a one-line wrapper;
+--   Mathlib's product monotonicity requires global left/right multiplication monotonicity,
+--   while this theorem derives the needed local monotonicity from positivity and commutation
+-- coverage search: queried `ordered product pointwise less equal nonnegative pairwise commute
+--   cross commute`, `List product ofFn less equal product ofFn commute`, and LeanSearch for
+--   noncommutative ordered-ring product inequalities; top hits were Mathlib
+--   `List.Forall₂.prod_le_prod'`, `Commute.mul_nonneg`, staged
+--   `mul_le_mul_left_of_nonneg_of_commute`, and `List.prod_nonneg_of_pairwise_commute`, all
+--   partial rather than the triangular-cross-commutation product comparison
+-- minimal hypotheses: pointwise nonnegativity replaces matrix positive semidefiniteness;
+--   cross commutation is required only from an earlier lower factor to a later upper factor,
+--   and no norm, completeness, finite-dimensionality, or matrix structure is used
+
+/-- Pointwise inequalities between nonnegative finite families lift to their ordered products
+when each family commutes internally and earlier lower factors commute with later upper factors.
+
+Layer: Glue | Gap: Level 1 (ordered noncommutative product monotonicity under triangular commutation)
+Proof: induct over equal-length prefixes, preserving prefix nonnegativity and commutation; at each step replace the new lower factor, commute the new upper factor past the lower prefix, and apply one-sided multiplication monotonicity twice.
+Source: Mathlib noncommutative list products, `Commute.mul_nonneg`, and continuous-functional-calculus positivity for commuting elements
+Used in: comparing ordered products of positive operator powers factor by factor in multivariate geometric-mean and adaptive-preconditioner monotonicity arguments
+Book citation: book/research/Source.json#/key_lemmas/4
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization -/
+theorem List.prod_ofFn_le_prod_ofFn_of_le_of_cross_commute
+    {R : Type*} [Ring R] [PartialOrder R] [StarRing R] [StarOrderedRing R]
+    [TopologicalSpace R] [Module ℝ R] [IsScalarTower ℝ R R] [SMulCommClass ℝ R R]
+    [NonUnitalContinuousFunctionalCalculus ℝ R IsSelfAdjoint]
+    [NonnegSpectrumClass ℝ R]
+    {q : ℕ} (A B : Fin q → R)
+    (hA : ∀ i, 0 ≤ A i) (hAB : ∀ i, A i ≤ B i)
+    (hAcomm : ∀ i j, Commute (A i) (A j))
+    (hBcomm : ∀ i j, Commute (B i) (B j))
+    (hcross : ∀ i j, i < j → Commute (A i) (B j)) :
+    (List.ofFn A).prod ≤ (List.ofFn B).prod := by
+  classical
+  have hB : ∀ i, 0 ≤ B i := fun i => (hA i).trans (hAB i)
+  have hprefixA_comm_A : ∀ a : ℕ, a ≤ q → ∀ j : Fin q,
+      Commute (((List.ofFn A).take a).prod) (A j) := by
+    intro a
+    induction a with
+    | zero =>
+        intro _ha j
+        simp
+    | succ a ih =>
+        intro ha j
+        have hlt : a < q := Nat.lt_of_succ_le ha
+        rw [List.prod_take_succ (List.ofFn A) a (by simpa using hlt)]
+        simp only [List.getElem_ofFn]
+        exact Commute.mul_left (ih (Nat.le_of_succ_le ha) j) (hAcomm ⟨a, hlt⟩ j)
+  have hprefixB_comm_B : ∀ a : ℕ, a ≤ q → ∀ j : Fin q,
+      Commute (((List.ofFn B).take a).prod) (B j) := by
+    intro a
+    induction a with
+    | zero =>
+        intro _ha j
+        simp
+    | succ a ih =>
+        intro ha j
+        have hlt : a < q := Nat.lt_of_succ_le ha
+        rw [List.prod_take_succ (List.ofFn B) a (by simpa using hlt)]
+        simp only [List.getElem_ofFn]
+        exact Commute.mul_left (ih (Nat.le_of_succ_le ha) j) (hBcomm ⟨a, hlt⟩ j)
+  have hprefixA_comm_B : ∀ a : ℕ, a ≤ q → ∀ j : Fin q, a ≤ j.1 →
+      Commute (((List.ofFn A).take a).prod) (B j) := by
+    intro a
+    induction a with
+    | zero =>
+        intro _ha j _haj
+        simp
+    | succ a ih =>
+        intro ha j haj
+        have hlt : a < q := Nat.lt_of_succ_le ha
+        rw [List.prod_take_succ (List.ofFn A) a (by simpa using hlt)]
+        simp only [List.getElem_ofFn]
+        exact Commute.mul_left
+          (ih (Nat.le_of_succ_le ha) j (Nat.le_trans (Nat.le_succ a) haj))
+          (hcross ⟨a, hlt⟩ j (Nat.lt_of_succ_le haj))
+  have hprefixA_nonneg : ∀ a : ℕ, a ≤ q →
+      0 ≤ ((List.ofFn A).take a).prod := by
+    intro a
+    induction a with
+    | zero =>
+        intro _ha
+        simp
+    | succ a ih =>
+        intro ha
+        have hlt : a < q := Nat.lt_of_succ_le ha
+        rw [List.prod_take_succ (List.ofFn A) a (by simpa using hlt)]
+        simp only [List.getElem_ofFn]
+        exact Commute.mul_nonneg (ih (Nat.le_of_succ_le ha)) (hA ⟨a, hlt⟩)
+          (hprefixA_comm_A a (Nat.le_of_succ_le ha) ⟨a, hlt⟩)
+  have hprefix_mono : ∀ a : ℕ, a ≤ q →
+      ((List.ofFn A).take a).prod ≤ ((List.ofFn B).take a).prod := by
+    intro a
+    induction a with
+    | zero =>
+        intro _ha
+        exact le_rfl
+    | succ a ih =>
+        intro ha
+        have hlt : a < q := Nat.lt_of_succ_le ha
+        have hle : a ≤ q := Nat.le_of_succ_le ha
+        rw [List.prod_take_succ (List.ofFn A) a (by simpa using hlt),
+          List.prod_take_succ (List.ofFn B) a (by simpa using hlt)]
+        simp only [List.getElem_ofFn]
+        calc
+          ((List.ofFn A).take a).prod * A ⟨a, hlt⟩ ≤
+              ((List.ofFn A).take a).prod * B ⟨a, hlt⟩ :=
+            mul_le_mul_left_of_nonneg_of_commute _ _ _ (hprefixA_nonneg a hle)
+              (hAB ⟨a, hlt⟩)
+              (hprefixA_comm_A a hle ⟨a, hlt⟩)
+              (hprefixA_comm_B a hle ⟨a, hlt⟩ le_rfl)
+          _ = B ⟨a, hlt⟩ * ((List.ofFn A).take a).prod :=
+            (hprefixA_comm_B a hle ⟨a, hlt⟩ le_rfl).eq
+          _ ≤ B ⟨a, hlt⟩ * ((List.ofFn B).take a).prod :=
+            mul_le_mul_left_of_nonneg_of_commute _ _ _ (hB ⟨a, hlt⟩) (ih hle)
+              (hprefixA_comm_B a hle ⟨a, hlt⟩ le_rfl).symm
+              (hprefixB_comm_B a hle ⟨a, hlt⟩).symm
+          _ = ((List.ofFn B).take a).prod * B ⟨a, hlt⟩ :=
+            (hprefixB_comm_B a hle ⟨a, hlt⟩).eq.symm
+  have htakeA : (List.ofFn A).take q = List.ofFn A :=
+    (List.take_eq_self_iff _).2 (by simp)
+  have htakeB : (List.ofFn B).take q = List.ofFn B :=
+    (List.take_eq_self_iff _).2 (by simp)
+  simpa only [htakeA, htakeB] using hprefix_mono q le_rfl
+
+
+
+namespace Matrix
+
+universe u v w
+
+-- Generalization plan (G0):
+-- concept/name: diagonal projection commutes with the binary matrix Kronecker
+--   product; orig was `diagonal_kronecker_eq_kronecker_diagonal_entries`
+-- generality used: arbitrary index types and scalar type with decidable equality
+--   on each index and `MulZeroClass` on entries; no finiteness, order, topology,
+--   measure, convexity, or optimization assumptions are used
+-- portable call pattern: matrix and tensor adaptive-gradient proofs project a
+--   Kronecker-assembled preconditioner onto its diagonal while changing both
+--   finite index types and both factor matrices
+-- counterargument checked: this is not merely the existing theorem for the
+--   Kronecker product of two already-diagonal matrices; it identifies the
+--   diagonal projection of a product of arbitrary square matrices
+-- coverage search: symbol and semantic searches for "diagonal Kronecker product"
+--   found Mathlib's `Matrix.diagonal_kronecker_diagonal` and
+--   `Matrix.kroneckerMap_diagonal_diagonal`; both cover constructed diagonal
+--   factors, but neither states the arbitrary-factor diagonal projection law
+-- minimal hypotheses: `DecidableEq` is required by `Matrix.diagonal`, and
+--   `MulZeroClass` supplies the two zero-annihilation laws needed off diagonal
+
+/-- The diagonal projection of a Kronecker product is the Kronecker product of
+the diagonal projections of its factors.
+
+Layer: Glue | Gap: Level 0 (diagonal projection of a matrix Kronecker product)
+Proof: rewrite the Kronecker product of the two diagonal matrices with `Matrix.diagonal_kronecker_diagonal`; the remaining diagonal entries agree by the entrywise definition of `Matrix.kroneckerMap`.
+Source: Mathlib matrix Kronecker-product and diagonal-matrix API in `Mathlib.LinearAlgebra.Matrix.Kronecker`
+Used in: diagonal Shampoo preconditioner domination, rewriting the diagonal of a Kronecker-assembled matrix power into factorwise diagonal projections before applying Loewner bounds
+Book citation: book/research/Source.json#/key_lemmas/16/proof/6
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 3 (diagonal matrix case) -/
+theorem diagonal_kroneckerMap_eq_kroneckerMap_diagonal
+    {ι : Type u} {κ : Type v} {R : Type w}
+    [DecidableEq ι] [DecidableEq κ] [MulZeroClass R]
+    (A : Matrix ι ι R) (B : Matrix κ κ R) :
+    diagonal (fun ij : ι × κ => kroneckerMap (· * ·) A B ij ij) =
+      kroneckerMap (· * ·) (diagonal fun i : ι => A i i)
+        (diagonal fun j : κ => B j j) := by
+  rw [diagonal_kronecker_diagonal]
+  rfl
+
+end Matrix
+
+
+
+open scoped MatrixOrder
+
+-- Generalization plan (G0):
+-- concept/name: monotonicity of the matrix trace under Loewner order; orig was
+--   genericTrace_mono_of_matrix_le
+-- generality used: finite index type and real square matrices; no measure,
+--   convexity, smoothness, oracle, or algorithm assumptions
+-- portable call pattern: adaptive-metric and spectral proofs compare two
+--   Loewner-ordered preconditioners or accumulators and pass the order to their traces
+-- counterargument checked: the source wrapper used a paper-local trace alias, but the
+--   generalized theorem packages a standard reusable order-preservation step; it is
+--   not a pure rename of one existing Mathlib or SOptLib declaration
+-- coverage search: queries "matrix trace monotone under Loewner order positive
+--   semidefinite difference", "trace A less than trace B of A less than B matrices",
+--   and "trace positive linear map monotone" found the partial Mathlib ingredients
+--   `Matrix.le_iff`, `Matrix.PosSemidef.trace_nonneg`, `Matrix.trace_sub`, and
+--   `Matrix.tracePositiveLinearMap`, but no declaration with this complete signature
+-- minimal hypotheses: `Fintype` is required by trace; the source's
+--   `DecidableEq` assumption is dropped, and the scalar is specialized to `ℝ`
+--   because the conclusion uses its linear order
+
+/-- The trace of a finite real square matrix is monotone under Loewner order.
+
+Layer: Glue | Gap: Level 0 (finite-matrix trace monotonicity under Loewner order)
+Proof: convert the matrix order to positive semidefiniteness of the difference with `Matrix.le_iff`, apply `Matrix.PosSemidef.trace_nonneg`, and rewrite the trace of the difference.
+Source: Mathlib matrix Loewner order, positive-semidefinite diagonal nonnegativity, and finite-matrix trace linearity
+Used in: spectral and adaptive-metric regret proofs that replace an ordered matrix preconditioner or accumulator by an upper matrix bound inside a trace
+Book citation: book/research/Source.json#/algorithm_spec
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithms 1--3 -/
+theorem Matrix.trace_mono_of_le {ι : Type*} [Fintype ι]
+    {A B : Matrix ι ι ℝ} (hAB : A ≤ B) :
+    Matrix.trace A ≤ Matrix.trace B := by
+  have htrace : 0 ≤ Matrix.trace (B - A) := (Matrix.le_iff.mp hAB).trace_nonneg
+  simpa [Matrix.trace_sub] using htrace
+
+
+
+namespace Matrix
+
+-- Generalization plan (G0):
+-- concept/name: invariance of matrix trace under simultaneous row-and-column
+--   reindexing by an equivalence; orig was `genericTrace_reindexAlgEquiv`
+-- generality used: arbitrary finite index types and matrices over any semiring
+--   that is an algebra over a commutative semiring; no order, topology,
+--   finite-dimensional-space, measure, convexity, smoothness, or oracle
+--   assumptions are used
+-- portable call pattern: matrix and tensor proofs transport a square matrix to
+--   an equivalent finite index type before evaluating its trace; the scalar
+--   algebra, index equivalence, and matrix vary while trace invariance remains
+--   unchanged
+-- counterargument checked: Mathlib's `Matrix.trace_map` covers arbitrary
+--   algebra equivalences only for matrices over a field, while this proof uses
+--   only finite-sum reindexing and therefore gives the missing semiring-level
+--   contract rather than a field-specialized pure rename or paper-local wrapper
+-- coverage search: searches for "trace invariant simultaneous row column
+--   reindex equivalence matrix", "Matrix trace reindexAlgEquiv", and the exact
+--   reindex/trace equality found `Matrix.trace_map` (field-only),
+--   `Matrix.reindexAlgEquiv`, and `Equiv.sum_comp`; no Mathlib or SOptLib theorem
+--   has this semiring-level statement
+-- minimal hypotheses: `CommSemiring S`, `Semiring R`, and `Algebra S R` are
+--   exactly those required by `Matrix.reindexAlgEquiv`; both finite and
+--   decidable-equality instances are required by that algebra equivalence
+
+/-- Simultaneously reindexing the rows and columns of a finite square matrix
+along an equivalence preserves its trace.
+
+Layer: Glue | Gap: Level 0 (semiring matrix-trace invariance under algebraic reindexing)
+Proof: unfold trace and `Matrix.reindexAlgEquiv`, then transport the diagonal finite sum through the inverse index equivalence using `Equiv.sum_comp`.
+Source: Mathlib `Mathlib.LinearAlgebra.Matrix.Reindex`, finite matrix trace, and equivalence-indexed finite sums
+Used in: tensor-preconditioner trace factorization after converting a multi-indexed Kronecker matrix to a head-times-tail product index
+Book citation: book/research/Source.json#/key_lemmas/4
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 2 and Lemma 3 Kronecker calculus -/
+theorem trace_reindexAlgEquiv
+    {S R ι κ : Type*} [CommSemiring S] [Semiring R] [Algebra S R]
+    [Fintype ι] [Fintype κ] [DecidableEq ι] [DecidableEq κ]
+    (e : ι ≃ κ) (A : Matrix ι ι R) :
+    trace (Matrix.reindexAlgEquiv S R e A) = trace A := by
+  classical
+  unfold trace
+  simpa only [Matrix.reindexAlgEquiv_apply, Matrix.reindex_apply] using
+    (Equiv.sum_comp e.symm (fun i : ι => A i i))
+
+end Matrix
+
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: finite orthonormal-coordinate bilinear Parseval collapse; orig
+--   was `finite_orthonormal_coordinate_gram_collapse`
+-- generality used: arbitrary finite coefficient and coordinate index types over
+--   a commutative semiring; no matrix dimensions, finite-dimensional ambient space,
+--   measure, convexity, smoothness, oracle, or algorithm assumptions are used
+-- portable call pattern: low-rank matrix decompositions, orthogonal feature
+--   expansions, and finite-frame calculations collapse the coordinate pairing
+--   of two synthesized vectors while changing the coordinate family and both
+--   coefficient vectors
+-- counterargument checked: Mathlib's `Orthonormal.inner_sum` gives the abstract
+--   inner-product theorem, but does not directly consume a raw coordinate Gram
+--   identity or produce this transposed coordinate-sum form; this bridge avoids
+--   rebuilding an `Orthonormal` family at matrix-coordinate call sites
+-- coverage search: searches for `bilinear coordinate sum synthesis orthonormal
+--   family equals coefficient dot product`, `finite sum product sums orthonormal
+--   kronecker delta collapse`, and the corresponding Mathlib semantic query
+--   found `Orthonormal.inner_sum`, `Orthonormal.inner_finsupp_eq_sum_right`, and
+--   SOptLib's `norm_sq_sum_smul_orthonormalBasis`; these cover abstract or
+--   quadratic Parseval forms, not the raw bilinear coordinate contract here
+-- minimal hypotheses: both `Fintype` instances form the finite sums, and
+--   `DecidableEq ι` is exactly what the Kronecker-delta orthonormality
+--   hypothesis requires; all source-local matrix and rank parameters are absent
+
+/-- The bilinear coordinate sum of two syntheses by a finite orthonormal family
+equals the coefficient dot product.
+
+Layer: Glue | Gap: Level 1 (raw-coordinate bilinear Parseval collapse)
+Proof: distribute the two finite syntheses, commute the three finite sums, and
+  replace the coordinate Gram sum by the supplied Kronecker-delta identity.
+Source: Mathlib finite big-operator distributivity and finite-dimensional
+  orthonormal-family Parseval identities in `Analysis.InnerProductSpace.Orthonormal`.
+Used in: low-rank matrix decompositions, where orthonormal singular-vector
+  coordinates collapse expanded left and right Gram matrix entries.
+Book citation: book/research/Source.json#/key_lemmas/10
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic
+  Tensor Optimization, Algorithm 1 matrix Shampoo -/
+theorem finite_orthonormal_coordinate_bilinear_collapse
+    {R : Type*} [CommSemiring R]
+    {ι κ : Type*} [Fintype ι] [Fintype κ] [DecidableEq ι]
+    (u : ι → κ → R) (x y : ι → R)
+    (horth : ∀ a a' : ι, ∑ k : κ, u a k * u a' k = if a = a' then 1 else 0) :
+    ∑ k : κ, (∑ a : ι, u a k * x a) * (∑ a' : ι, u a' k * y a') =
+      ∑ a : ι, x a * y a := by
+  classical
+  calc
+    ∑ k : κ, (∑ a : ι, u a k * x a) * (∑ a' : ι, u a' k * y a') =
+        ∑ k : κ, ∑ a : ι, ∑ a' : ι, (u a k * x a) * (u a' k * y a') := by
+          simp_rw [Finset.sum_mul, Finset.mul_sum]
+    _ = ∑ a : ι, ∑ a' : ι, ∑ k : κ, (u a k * x a) * (u a' k * y a') := by
+          rw [Finset.sum_comm]
+          congr with a
+          rw [Finset.sum_comm]
+    _ = ∑ a : ι, ∑ a' : ι, x a * y a' * (∑ k : κ, u a k * u a' k) := by
+          refine Finset.sum_congr rfl ?_
+          intro a _ha
+          refine Finset.sum_congr rfl ?_
+          intro a' _ha'
+          simp [Finset.mul_sum, mul_left_comm, mul_comm]
+    _ = ∑ a : ι, ∑ a' : ι, x a * y a' * (if a = a' then 1 else 0) := by
+          simp [horth]
+    _ = ∑ a : ι, x a * y a := by
+          refine Finset.sum_congr rfl ?_
+          intro a _ha
+          calc
+            ∑ a' : ι, x a * y a' * (if a = a' then 1 else 0) =
+                x a * y a * (if a = a then 1 else 0) := by
+                  refine Finset.sum_eq_single a ?_ ?_
+                  · intro b _hb hba
+                    have hab : a ≠ b := fun h => hba h.symm
+                    simp [hab]
+                  · intro hnot
+                    exact (hnot (Finset.mem_univ a)).elim
+            _ = x a * y a := by simp
+
+
+
+open scoped BigOperators
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: terminal-trace control of a changing-matrix quadratic-form
+--   telescope from pointwise increment charges; orig was
+--   `finite_changing_metric_quadratic_telescope_le_trace_of_increment_bound`
+-- generality used: an arbitrary finite coordinate type, a finite path of real
+--   vectors, a finite path of real square matrices, and a real charge constant;
+--   no measure, finite-dimensional-space, convexity, smoothness, oracle, or
+--   positive-semidefinite increment assumptions are used
+-- portable call pattern: adaptive OMD, full or diagonal AdaGrad, and
+--   variable-metric proximal proofs change the path, metric sequence, and
+--   per-increment charge estimate while retaining the same terminal-trace bound
+-- counterargument checked: this is not paper-local bookkeeping or a one-line
+--   wrapper; it packages the reusable interaction of matrix linearity, two
+--   finite-horizon telescopes, and a nonnegative terminal quadratic potential
+-- coverage search: symbol searches for "sum changing matrix quadratic form
+--   bounded by terminal trace from increment bounds" and "finite sum adjacent
+--   quadratic form changing matrix telescope trace", plus Mathlib semantic
+--   search for the precise inequality, found only component results such as
+--   `sum_fin_adjacent_sub_eq_sub`, `Matrix.trace_sub`, and positive-semidefinite
+--   quadratic-form nonnegativity; no declaration covers the combined contract
+-- minimal hypotheses: `Fintype` evaluates matrix bilinear forms and traces,
+--   `DecidableEq` evaluates the trace, the initial matrix is zero, terminal
+--   nonnegativity of the terminal quadratic potential permits discarding that
+--   endpoint, and
+--   the pointwise increment charge is the only bound hypothesis; the unused
+--   positive-semidefinite-increment premise of the source declaration is dropped
+
+/-- A changing-matrix quadratic-form telescope is bounded by a scalar times the
+terminal trace when every metric increment has the corresponding trace charge.
+
+Layer: Glue | Gap: Level 1 (changing-matrix quadratic telescope from increment charges)
+Proof: split each summand into a matrix-increment charge and an adjacent potential drop, sum the supplied charge bounds, telescope traces from the zero initial matrix, and discard the nonpositive terminal potential using its assumed nonnegativity.
+Source: Mathlib finite matrix bilinear forms, trace linearity, and SOptLib finite adjacent-difference telescopes
+Used in: adaptive OMD, full and diagonal adaptive-gradient, and variable-metric proximal regret proofs that charge changing-metric displacement energies to the terminal preconditioner trace
+Book citation: book/research/Source.json#/key_lemmas/8/proof/6
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, matrix and diagonal adaptive online mirror descent -/
+theorem sum_changingMatrixQuadraticForm_le_mul_trace_terminal_of_increment_bound
+    {T : Nat} {ι : Type*} [Fintype ι] [DecidableEq ι]
+    (x : Fin (T + 1) → ι → ℝ) (H : Fin (T + 1) → Matrix ι ι ℝ) (C : ℝ)
+    (hH0 : H 0 = 0)
+    (hFinalNonneg :
+      0 ≤ Matrix.toBilin' (H (Fin.last T)) (x (Fin.last T)) (x (Fin.last T)))
+    (hIncBound : ∀ t : Fin T,
+      Matrix.toBilin' (H (Fin.succ t) - H (Fin.castSucc t))
+          (x (Fin.castSucc t)) (x (Fin.castSucc t)) ≤
+        C * Matrix.trace (H (Fin.succ t) - H (Fin.castSucc t))) :
+    (∑ t : Fin T,
+      (Matrix.toBilin' (H (Fin.succ t)) (x (Fin.castSucc t)) (x (Fin.castSucc t)) -
+        Matrix.toBilin' (H (Fin.succ t)) (x (Fin.succ t)) (x (Fin.succ t)))) ≤
+      C * Matrix.trace (H (Fin.last T)) := by
+  classical
+  let incCharge : Fin T → ℝ := fun t =>
+    Matrix.toBilin' (H (Fin.succ t) - H (Fin.castSucc t))
+      (x (Fin.castSucc t)) (x (Fin.castSucc t))
+  let potentialDrop : Fin T → ℝ := fun t =>
+    Matrix.toBilin' (H (Fin.castSucc t)) (x (Fin.castSucc t)) (x (Fin.castSucc t)) -
+      Matrix.toBilin' (H (Fin.succ t)) (x (Fin.succ t)) (x (Fin.succ t))
+  have hsplit : ∀ t : Fin T,
+      Matrix.toBilin' (H (Fin.succ t)) (x (Fin.castSucc t)) (x (Fin.castSucc t)) -
+          Matrix.toBilin' (H (Fin.succ t)) (x (Fin.succ t)) (x (Fin.succ t)) =
+        incCharge t + potentialDrop t := by
+    intro t
+    simp only [incCharge, potentialDrop]
+    have hsub :
+        Matrix.toBilin' (H (Fin.succ t) - H (Fin.castSucc t))
+            (x (Fin.castSucc t)) (x (Fin.castSucc t)) =
+          Matrix.toBilin' (H (Fin.succ t))
+              (x (Fin.castSucc t)) (x (Fin.castSucc t)) -
+            Matrix.toBilin' (H (Fin.castSucc t))
+              (x (Fin.castSucc t)) (x (Fin.castSucc t)) := by
+      simpa using congrArg
+        (fun B : LinearMap.BilinForm ℝ (ι → ℝ) =>
+          B (x (Fin.castSucc t)) (x (Fin.castSucc t)))
+        ((Matrix.toBilin' : Matrix ι ι ℝ ≃ₗ[ℝ] LinearMap.BilinForm ℝ (ι → ℝ)).map_sub
+          (H (Fin.succ t)) (H (Fin.castSucc t)))
+    rw [hsub]
+    ring
+  have hsum_split :
+      (∑ t : Fin T,
+        (Matrix.toBilin' (H (Fin.succ t)) (x (Fin.castSucc t)) (x (Fin.castSucc t)) -
+          Matrix.toBilin' (H (Fin.succ t)) (x (Fin.succ t)) (x (Fin.succ t)))) =
+        (∑ t : Fin T, incCharge t) + ∑ t : Fin T, potentialDrop t := by
+    calc
+      (∑ t : Fin T,
+        (Matrix.toBilin' (H (Fin.succ t)) (x (Fin.castSucc t)) (x (Fin.castSucc t)) -
+          Matrix.toBilin' (H (Fin.succ t)) (x (Fin.succ t)) (x (Fin.succ t)))) =
+          ∑ t : Fin T, (incCharge t + potentialDrop t) := by
+            refine Finset.sum_congr rfl ?_
+            intro t _ht
+            exact hsplit t
+      _ = (∑ t : Fin T, incCharge t) + ∑ t : Fin T, potentialDrop t := by
+            rw [Finset.sum_add_distrib]
+  have hinc_bound :
+      (∑ t : Fin T, incCharge t) ≤
+        ∑ t : Fin T, C * Matrix.trace (H (Fin.succ t) - H (Fin.castSucc t)) := by
+    refine Finset.sum_le_sum ?_
+    intro t _ht
+    exact hIncBound t
+  let clampIndex : Nat → Fin (T + 1) := fun n =>
+    ⟨min n T, Nat.lt_succ_of_le (Nat.min_le_right n T)⟩
+  have hcur (t : Fin T) : clampIndex t.val = Fin.castSucc t := by
+    ext
+    simp [clampIndex, Nat.min_eq_left (Nat.le_of_lt t.isLt)]
+  have hnxt (t : Fin T) : clampIndex (t.val + 1) = Fin.succ t := by
+    ext
+    simp [clampIndex, Nat.min_eq_left (Nat.succ_le_of_lt t.isLt)]
+  have hfin : clampIndex T = Fin.last T := by
+    ext
+    simp [clampIndex]
+  have hzero : clampIndex 0 = (0 : Fin (T + 1)) := by
+    ext
+    simp [clampIndex]
+  have htrace_sum :
+      (∑ t : Fin T, Matrix.trace (H (Fin.succ t) - H (Fin.castSucc t))) =
+        Matrix.trace (H (Fin.last T)) := by
+    have htel :=
+      sum_fin_adjacent_sub_eq_sub T (fun n : Nat => Matrix.trace (H (clampIndex n)))
+    have hflip :
+        (∑ t : Fin T, (Matrix.trace (H (Fin.succ t)) -
+            Matrix.trace (H (Fin.castSucc t)))) =
+          -∑ t : Fin T, (Matrix.trace (H (Fin.castSucc t)) -
+            Matrix.trace (H (Fin.succ t))) := by
+      rw [← Finset.sum_neg_distrib]
+      refine Finset.sum_congr rfl ?_
+      intro t _ht
+      ring
+    calc
+      (∑ t : Fin T, Matrix.trace (H (Fin.succ t) - H (Fin.castSucc t))) =
+          ∑ t : Fin T, (Matrix.trace (H (Fin.succ t)) -
+            Matrix.trace (H (Fin.castSucc t))) := by
+            refine Finset.sum_congr rfl ?_
+            intro t _ht
+            rw [Matrix.trace_sub]
+      _ = -∑ t : Fin T, (Matrix.trace (H (Fin.castSucc t)) -
+            Matrix.trace (H (Fin.succ t))) := hflip
+      _ = -∑ t : Fin T, (Matrix.trace (H (clampIndex t.val)) -
+            Matrix.trace (H (clampIndex (t.val + 1)))) := by
+            congr 1
+            refine Finset.sum_congr rfl ?_
+            intro t _ht
+            rw [hcur t, hnxt t]
+      _ = Matrix.trace (H (Fin.last T)) := by
+            rw [htel, hzero, hfin, hH0]
+            simp
+  have hinc_trace :
+      (∑ t : Fin T, incCharge t) ≤ C * Matrix.trace (H (Fin.last T)) := by
+    calc
+      (∑ t : Fin T, incCharge t) ≤
+          ∑ t : Fin T, C * Matrix.trace (H (Fin.succ t) - H (Fin.castSucc t)) :=
+            hinc_bound
+      _ = C * ∑ t : Fin T, Matrix.trace (H (Fin.succ t) - H (Fin.castSucc t)) := by
+            rw [Finset.mul_sum]
+      _ = C * Matrix.trace (H (Fin.last T)) := by rw [htrace_sum]
+  have hdrop_sum :
+      (∑ t : Fin T, potentialDrop t) =
+        -Matrix.toBilin' (H (Fin.last T)) (x (Fin.last T)) (x (Fin.last T)) := by
+    have htel :=
+      sum_fin_adjacent_sub_eq_sub T (fun n : Nat =>
+        Matrix.toBilin' (H (clampIndex n)) (x (clampIndex n)) (x (clampIndex n)))
+    calc
+      (∑ t : Fin T, potentialDrop t) =
+          ∑ t : Fin T,
+            (Matrix.toBilin' (H (clampIndex t.val))
+                (x (clampIndex t.val)) (x (clampIndex t.val)) -
+              Matrix.toBilin' (H (clampIndex (t.val + 1)))
+                (x (clampIndex (t.val + 1))) (x (clampIndex (t.val + 1)))) := by
+            refine Finset.sum_congr rfl ?_
+            intro t _ht
+            simp only [potentialDrop]
+            rw [hcur t, hnxt t]
+      _ = Matrix.toBilin' (H (clampIndex 0)) (x (clampIndex 0)) (x (clampIndex 0)) -
+            Matrix.toBilin' (H (clampIndex T)) (x (clampIndex T)) (x (clampIndex T)) :=
+              htel
+      _ = -Matrix.toBilin' (H (Fin.last T)) (x (Fin.last T)) (x (Fin.last T)) := by
+            rw [hzero, hfin, hH0]
+            simp
+  have hdrop_le_zero : (∑ t : Fin T, potentialDrop t) ≤ 0 := by
+    rw [hdrop_sum]
+    exact neg_nonpos.mpr hFinalNonneg
+  calc
+    (∑ t : Fin T,
+      (Matrix.toBilin' (H (Fin.succ t)) (x (Fin.castSucc t)) (x (Fin.castSucc t)) -
+        Matrix.toBilin' (H (Fin.succ t)) (x (Fin.succ t)) (x (Fin.succ t)))) =
+        (∑ t : Fin T, incCharge t) + ∑ t : Fin T, potentialDrop t := hsum_split
+    _ ≤ (∑ t : Fin T, incCharge t) + 0 := by linarith
+    _ ≤ C * Matrix.trace (H (Fin.last T)) := by simpa using hinc_trace
+
+end SOptLib
+
+
+
+open scoped BigOperators
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: squared-radius terminal-trace bound for a changing-matrix
+--   quadratic-form telescope; orig was
+--   `finite_changing_metric_quadratic_telescope_le_trace_nat`
+-- generality used: an arbitrary finite coordinate type with decidable equality,
+--   a natural-number-indexed real-vector path, a real square-matrix path, and a
+--   real radius; no measure, convexity, smoothness, oracle, or optimization
+--   assumptions are used
+-- portable call pattern: adaptive OMD, full and diagonal AdaGrad, and
+--   variable-metric proximal proofs supply a different iterate/comparator path,
+--   PSD metric increments and a per-iterate radius bound while retaining the
+--   squared-radius times terminal-trace conclusion
+-- counterargument checked: the existing increment-charge telescope is more
+--   primitive, but this is not an alpha-duplicate or paper-only wrapper: it
+--   packages terminal positive semidefiniteness from PSD increments together
+--   with the Nat-indexed path interface used by the increment-charge telescope
+-- coverage search: symbol queries for "changing matrix quadratic form sum
+--   bounded by squared radius times terminal trace positive semidefinite
+--   increments", "quadratic form matrix increments terminal trace telescope
+--   positive semidefinite", and "sum changingMatrixQuadraticForm trace terminal
+--   radius", plus Mathlib semantic searches for the precise inequality, found
+--   only `sum_changingMatrixQuadraticForm_le_mul_trace_terminal_of_increment_bound`,
+--   `Matrix.PosSemidef.dotProduct_mulVec_nonneg`, and finite-sum/trace components;
+--   the first is partial coverage because it requires increment charges directly
+-- minimal hypotheses: `Fintype` and `DecidableEq` evaluate finite matrix forms
+--   and traces; zero initialization telescopes the trace, the charge bound is
+--   required only for each actual increment, and PSD increments imply terminal
+--   PSD, which permits discarding the terminal quadratic potential
+
+/-- A changing positive-semidefinite matrix quadratic-form telescope is bounded
+by the squared radius times the terminal matrix trace.
+
+Layer: Glue | Gap: Level 1 (PSD changing-matrix quadratic telescope with radius charge)
+Proof: restrict the Nat-indexed paths to the finite horizon, derive terminal positive semidefiniteness from the positive-semidefinite increments, then apply the changing-matrix telescope with the supplied pointwise increment charges; terminal PSD supplies nonnegativity of the discarded endpoint potential.
+Source: Mathlib positive-semidefinite matrix quadratic forms and finite matrix traces, together with the SOptLib changing-matrix quadratic telescope from increment charges
+Used in: adaptive OMD, full and diagonal adaptive-gradient, and variable-metric proximal regret proofs that convert bounded comparator displacement under PSD metric increments into a terminal preconditioner trace
+Book citation: book/research/Source.json#/key_lemmas/8/proof/6
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, matrix and diagonal adaptive online mirror descent -/
+theorem sum_changingMatrixQuadraticForm_le_sq_mul_trace_terminal
+    {T : Nat} {ι : Type*} [Fintype ι] [DecidableEq ι]
+    (x : Nat → ι → ℝ) (H : Nat → Matrix ι ι ℝ) (D : ℝ)
+    (hH0 : H 0 = 0)
+    (hInc : ∀ t : Fin T, (H (t.val + 1) - H t.val).PosSemidef)
+    (hIncBound : ∀ t : Fin T,
+      Matrix.toBilin' (H (t.val + 1) - H t.val) (x t.val) (x t.val) ≤
+        D ^ 2 * Matrix.trace (H (t.val + 1) - H t.val)) :
+    (∑ t : Fin T,
+      (Matrix.toBilin' (H (t.val + 1)) (x t.val) (x t.val) -
+        Matrix.toBilin' (H (t.val + 1)) (x (t.val + 1)) (x (t.val + 1)))) ≤
+      D ^ 2 * Matrix.trace (H T) := by
+  have hPSD : ∀ n : Nat, n ≤ T → (H n).PosSemidef := by
+    intro n hn
+    induction n with
+    | zero =>
+        rw [hH0]
+        exact .zero
+    | succ n ih =>
+        have hnT : n < T := Nat.lt_of_succ_le hn
+        have hHn : (H n).PosSemidef := ih (Nat.le_trans (Nat.le_succ n) hn)
+        simpa [Nat.succ_eq_add_one] using (hInc ⟨n, hnT⟩).add hHn
+  have hFinalPSD : (H T).PosSemidef := hPSD T le_rfl
+  let xFin : Fin (T + 1) → ι → ℝ := fun t => x t.val
+  let HFin : Fin (T + 1) → Matrix ι ι ℝ := fun t => H t.val
+  simpa [xFin, HFin] using
+    (sum_changingMatrixQuadraticForm_le_mul_trace_terminal_of_increment_bound
+      (x := xFin) (H := HFin) (C := D ^ 2) hH0
+      (by
+        simpa [xFin, HFin, Matrix.toBilin'_apply'] using
+          hFinalPSD.dotProduct_mulVec_nonneg (x T))
+      hIncBound)
+
+end SOptLib
+
+
+
+open scoped BigOperators Kronecker MatrixOrder
+
+namespace Matrix
+
+universe u v
+
+end Matrix
+
+namespace Matrix
+
+universe u v w
+
+-- Generalization plan (G0):
+-- concept/name: self outer product of a product-index vector factorization;
+--   orig was `vectorKronecker_outer_eq_kron_outer`, renamed
+--   `Matrix.vecMulVec_vectorKronecker_self`
+-- generality used: arbitrary index types and coefficients in a commutative semigroup;
+--   no finiteness, decidable equality, additive, topological, measure, convexity,
+--   smoothness, or oracle assumptions are used
+-- portable call pattern: matrix and tensor rank-one decomposition proofs rewrite the
+--   self outer product of a vectorized rank-one factor into the Kronecker product of
+--   factor Gram matrices while changing both index types, scalar type, and factors
+-- counterargument checked: this is not paper-local traceability or a pure wrapper;
+--   it connects `Matrix.vecMulVec`, function uncurrying, and `Matrix.kronecker` in a
+--   reusable representation identity not supplied by either primitive alone
+-- coverage search: project symbol searches for "vector outer product Kronecker product
+--   equality" and "vecMulVec self outer Kronecker" found only the private source lemma;
+--   Mathlib semantic search found `Matrix.kronecker`, `Matrix.kroneckerMap_apply`, and
+--   `Matrix.mul_kronecker_mul`, but no outer-product identity, so coverage is partial
+-- minimal hypotheses: `[CommSemigroup R]` is exactly the associativity and commutativity
+--   needed to reorder the four coordinate factors; all source finiteness and real-scalar
+--   restrictions were removed
+
+/-- The self outer product of an uncurried vector outer product is the Kronecker product
+of the self outer products of its two vector factors.
+
+Layer: Model | Gap: Level 1 (vector outer-product and matrix Kronecker representation bridge)
+Proof: extensionality reduces the matrix identity to four scalar factors; associativity and commutativity put the factors in the Kronecker coordinate order
+Source: Mathlib `Matrix.vecMulVec`, `Matrix.kronecker`, and their coordinate formulas
+Used in: matrix and tensor adaptive-gradient rank-domination proofs that rewrite vectorized rank-one outer products into Kronecker products of factor Gram matrices
+Book citation: book/research/Source.json#/key_lemmas/10/proof/4
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 1 matrix Shampoo -/
+private theorem vecMulVec_vectorKronecker_self
+    {ι : Type u} {κ : Type v} {R : Type w} [CommSemigroup R]
+    (u : ι → R) (v : κ → R) :
+    Matrix.vecMulVec (Function.uncurry (Matrix.vecMulVec u v))
+        (Function.uncurry (Matrix.vecMulVec u v)) =
+      Matrix.kronecker (Matrix.vecMulVec u u) (Matrix.vecMulVec v v) := by
+  ext ⟨i, j⟩ ⟨k, l⟩
+  simp [Function.uncurry, Matrix.vecMulVec_apply, Matrix.kroneckerMap_apply,
+    mul_left_comm, mul_comm]
+
+end Matrix
+
+namespace Matrix
+
+universe u v w
+
+-- Generalization plan (G0):
+-- concept/name: left Gram matrix, named `Matrix.leftGram`; orig was `matrixGramLeft`
+-- generality used: arbitrary row and column index types and arbitrary entries with
+--   multiplication and finite addition; only the contracted column index is finite
+-- portable call pattern: full-matrix adaptive-gradient and tensor-matricization algorithms
+--   form row Gram accumulators while changing matrix shapes, index types, and scalar rings
+-- counterargument checked: the body is a short product, but left Gram matrices are a
+--   recognized recurring object and the entrywise API hides transpose/multiplication plumbing
+-- coverage search: searches for "matrix left Gram matrix product transpose" and
+--   "Matrix.leftGram G * G.transpose" found no Mathlib/SOptLib definition; Mathlib's
+--   `Matrix.gram` is only a partial hit because it uses inner products (and conjugation over
+--   complex scalars), rather than the general transpose product defined here
+-- minimal hypotheses: `Fintype κ`, `Mul R`, and `AddCommMonoid R` are exactly those used
+--   by rectangular matrix multiplication; no finiteness on the uncontracted row index is used
+
+/-- The left Gram matrix of a rectangular matrix, obtained by multiplying the matrix by its
+transpose.
+
+Layer: Model | Concept: left Gram matrix of a rectangular matrix
+Proof: (definitional construction; rectangular matrix multiplication by the transpose)
+Source: Mathlib `Matrix.transpose` and finite matrix multiplication from `Mathlib.Data.Matrix.Mul`
+Used in: row-covariance accumulator updates for full-matrix adaptive-gradient and tensor-matricization preconditioners
+Book citation: book/research/Source.json#/additional_algorithm_specs/0/steps/2
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 1 -/
+private def leftGram {ι : Type u} {κ : Type v} {R : Type w} [Fintype κ] [Mul R]
+    [AddCommMonoid R] (G : Matrix ι κ R) : Matrix ι ι R :=
+  G * G.transpose
+
+/-- The left Gram matrix unfolds to multiplication by the transpose.
+
+Layer: Model | Gap: Level 0 (left Gram matrix unfolding rule)
+Proof: by rfl after unfolding `Matrix.leftGram`.
+Source: Mathlib `Matrix.transpose` and finite matrix multiplication from `Mathlib.Data.Matrix.Mul`
+Used in: rewriting row-Gram accumulator updates into the matrix products used by spectral and positive-semidefinite arguments
+Book citation: book/research/Source.json#/additional_algorithm_specs/0/steps/2
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 1 -/
+@[simp]
+private theorem leftGram_def {ι : Type u} {κ : Type v} {R : Type w} [Fintype κ] [Mul R]
+    [AddCommMonoid R] (G : Matrix ι κ R) :
+    leftGram G = G * G.transpose :=
+  rfl
+
+end Matrix
+
+namespace Matrix
+
+universe u v w
+
+-- Generalization plan (G0):
+-- concept/name: right Gram matrix, named `Matrix.rightGram`; orig was `matrixGramRight`
+-- generality used: arbitrary row and column index types and arbitrary entries with
+--   multiplication and finite addition; only the contracted row index is finite
+-- portable call pattern: full-matrix adaptive-gradient and tensor-matricization algorithms
+--   form column Gram accumulators while changing matrix shapes, index types, and scalar rings
+-- counterargument checked: the body is a short product, but right Gram matrices are a
+--   recognized recurring object and the entrywise API hides transpose/multiplication plumbing
+-- coverage search: searches for "right Gram matrix transpose multiplied by matrix" and
+--   "Matrix rightGram transpose mul" found no Mathlib/SOptLib definition; Mathlib's
+--   `Matrix.gram` is only a partial hit because it uses inner products (and conjugation over
+--   complex scalars), rather than the general transpose product defined here
+-- minimal hypotheses: `Fintype ι`, `Mul R`, and `AddCommMonoid R` are exactly those used
+--   by rectangular matrix multiplication; no finiteness on the uncontracted column index is used
+
+/-- The right Gram matrix of a rectangular matrix, obtained by multiplying its transpose by the
+matrix.
+
+Layer: Model | Concept: right Gram matrix of a rectangular matrix
+Proof: (definitional construction; transpose multiplied by the rectangular matrix)
+Source: Mathlib `Matrix.transpose` and finite matrix multiplication from `Mathlib.Data.Matrix.Mul`
+Used in: column-covariance accumulator updates for full-matrix adaptive-gradient and tensor-matricization preconditioners
+Book citation: book/research/Source.json#/additional_algorithm_specs/0/steps/3
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 1 -/
+private def rightGram {ι : Type u} {κ : Type v} {R : Type w} [Fintype ι] [Mul R]
+    [AddCommMonoid R] (G : Matrix ι κ R) : Matrix κ κ R :=
+  G.transpose * G
+
+/-- The right Gram matrix unfolds to multiplication of the transpose by the matrix.
+
+Layer: Model | Gap: Level 0 (right Gram matrix unfolding rule)
+Proof: by rfl after unfolding `Matrix.rightGram`.
+Source: Mathlib `Matrix.transpose` and finite matrix multiplication from `Mathlib.Data.Matrix.Mul`
+Used in: rewriting column-Gram accumulator updates into the matrix products used by spectral and positive-semidefinite arguments
+Book citation: book/research/Source.json#/additional_algorithm_specs/0/steps/3
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 1 -/
+@[simp]
+private theorem rightGram_def {ι : Type u} {κ : Type v} {R : Type w} [Fintype ι] [Mul R]
+    [AddCommMonoid R] (G : Matrix ι κ R) :
+    rightGram G = G.transpose * G :=
+  rfl
+
+/-- An entry of the right Gram matrix is the finite sum of the products of the
+corresponding column entries.
+
+Layer: Model | Gap: Level 0 (right Gram matrix entrywise specification)
+Proof: unfold `Matrix.rightGram` and matrix multiplication.
+Source: Mathlib `Matrix.mul_apply` and `Matrix.transpose_apply`
+Used in: entrywise calculations for column-covariance accumulators and right Gram matrices
+Book citation: book/research/Source.json#/additional_algorithm_specs/0/steps/3
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 1 -/
+@[simp]
+private theorem rightGram_apply {ι : Type u} {κ : Type v} {R : Type w} [Fintype ι] [Mul R]
+    [AddCommMonoid R] (G : Matrix ι κ R) (j k : κ) :
+    rightGram G j k = ∑ i, G i j * G i k := by
+  simp [rightGram, Matrix.mul_apply]
+
+/-- Over commutative multiplication, the right Gram matrix is invariant under transpose.
+
+Layer: Model | Gap: Level 0 (right Gram matrix symmetry)
+Proof: transpose the defining product, reverse its factors, and cancel the double transpose.
+Source: Mathlib `Matrix.transpose_mul` and `Matrix.transpose_transpose`
+Used in: symmetry and positive-semidefinite arguments for column-covariance accumulators
+Book citation: book/research/Source.json#/additional_algorithm_specs/0/steps/3
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 1 -/
+@[simp]
+private theorem transpose_rightGram {ι : Type u} {κ : Type v} {R : Type w} [Fintype ι]
+    [AddCommMonoid R] [CommMagma R] (G : Matrix ι κ R) :
+    (rightGram G).transpose = rightGram G := by
+  simp [rightGram, Matrix.transpose_mul]
+
+end Matrix
+
+open scoped BigOperators MatrixOrder
+
+namespace Matrix
+
+-- Generalization plan (G0):
+-- concept/name: Loewner domination of a real self outer product by the identity
+--   from a unit squared Euclidean norm bound; orig was
+--   `vectorOuter_le_one_of_sum_sq_le_one`, renamed
+--   `Matrix.vecMulVec_le_one_of_sum_sq_le_one`
+-- generality used: arbitrary finite coordinate type with decidable equality and
+--   a real vector; no concrete dimension, measure, convexity, smoothness,
+--   oracle, or algorithm assumptions are used
+-- portable call pattern: rank-one domination, covariance, normalized-feature,
+--   and orthonormal-factor proofs vary the finite coordinate type and vector
+--   while retaining the unit squared-norm premise and identity Loewner bound
+-- counterargument checked: this is not paper-local traceability or a pure
+--   wrapper; it packages Cauchy--Schwarz with the positive-semidefinite matrix
+--   order characterization to produce a reusable rank-one operator bound
+-- coverage search: symbol searches for `vector self outer product less than
+--   identity of sum squares less than one` and `vecMulVec Loewner bound identity
+--   squared norm` found only the private source theorem and distinct outer-sum
+--   and spectral-support lemmas; Mathlib semantic searches found
+--   `Matrix.posSemidef_vecMulVec_self_star`, `InnerProductSpace.norm_rankOne`,
+--   and scalar Cauchy--Schwarz ingredients, but no matching Loewner upper bound
+-- minimal hypotheses: `[Fintype ι]` is required for the coordinate sums and
+--   matrix quadratic form, and `[DecidableEq ι]` for the identity matrix;
+--   the squared-norm upper bound is the sole data hypothesis
+
+/-- A real vector's self outer product is bounded by the identity matrix when
+its sum of squared coordinates is at most one.
+
+Layer: Glue | Gap: Level 1 (unit-vector rank-one Loewner domination)
+Proof: characterize Loewner order by positive semidefiniteness and test the
+  identity-minus-outer-product quadratic form; finite Cauchy--Schwarz and the
+  unit squared-norm hypothesis make that form nonnegative.
+Source: Mathlib positive-semidefinite matrix order and finite-sum
+  Cauchy--Schwarz inequalities
+Used in: rank-one matrix and tensor decomposition proofs that replace normalized
+  factor self outer products by identity matrices inside monotone constructions
+Book citation: book/research/Source.json#/key_lemmas/10/proof/5
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic
+  Tensor Optimization, Algorithm 1 matrix Shampoo -/
+private theorem vecMulVec_le_one_of_sum_sq_le_one
+    {ι : Type*} [Fintype ι] [DecidableEq ι] (u : ι → ℝ)
+    (hu : ∑ i : ι, u i ^ 2 ≤ 1) :
+    Matrix.vecMulVec u u ≤ (1 : Matrix ι ι ℝ) := by
+  rw [Matrix.le_iff]
+  refine Matrix.PosSemidef.of_dotProduct_mulVec_nonneg ?_ ?_
+  · have houterHerm : (Matrix.vecMulVec u u).IsHermitian := by
+      apply Matrix.IsHermitian.ext
+      intro i j
+      change star (u j * u i) = u i * u j
+      simp [mul_comm]
+    exact Matrix.IsHermitian.sub Matrix.isHermitian_one houterHerm
+  · intro x
+    have hone_mul : ((1 : Matrix ι ι ℝ).mulVec x) = x := by
+      simp
+    have hquad_eq :
+        dotProduct (star x)
+            (((1 : Matrix ι ι ℝ) - Matrix.vecMulVec u u).mulVec x) =
+          (∑ i : ι, x i ^ 2) - (∑ i : ι, x i * u i) ^ 2 := by
+      calc
+        dotProduct (star x)
+            (((1 : Matrix ι ι ℝ) - Matrix.vecMulVec u u).mulVec x) =
+            dotProduct (star x)
+              (((1 : Matrix ι ι ℝ).mulVec x) -
+                (Matrix.vecMulVec u u).mulVec x) := by
+              rw [Matrix.sub_mulVec]
+        _ = dotProduct (star x) ((1 : Matrix ι ι ℝ).mulVec x) -
+              dotProduct (star x) ((Matrix.vecMulVec u u).mulVec x) := by
+              rw [dotProduct_sub]
+        _ = (∑ i : ι, x i ^ 2) - (∑ i : ι, x i * u i) ^ 2 := by
+              rw [hone_mul]
+              simp [dotProduct, Matrix.mulVec, Matrix.vecMulVec_apply, pow_two,
+                Finset.mul_sum, Finset.sum_comm, mul_left_comm, mul_comm]
+    rw [hquad_eq]
+    have hcs := Finset.sum_mul_sq_le_sq_mul_sq
+      (s := (Finset.univ : Finset ι)) (f := x) (g := u)
+    have hx_nonneg : 0 ≤ ∑ i : ι, x i ^ 2 :=
+      Finset.sum_nonneg (by intro i _hi; exact sq_nonneg (x i))
+    have hu_nonneg : 0 ≤ ∑ i : ι, u i ^ 2 :=
+      Finset.sum_nonneg (by intro i _hi; exact sq_nonneg (u i))
+    have hmul_le :
+        (∑ i : ι, x i ^ 2) * (∑ i : ι, u i ^ 2) ≤ ∑ i : ι, x i ^ 2 := by
+      nlinarith
+    nlinarith
+
+end Matrix
+
+open scoped BigOperators MatrixOrder
+
+namespace Matrix
+
+-- Generalization plan (G0):
+-- concept/name: rank-many outer-product decomposition with orthonormal left
+--   factors; orig was `matrix_rank_column_space_orthonormal_rank_one_expansion`
+-- generality used: arbitrary finite row and column index types for a real
+--   matrix, with decidable row equality for the identity-matrix bound; no
+--   measure, convexity, smoothness, oracle, or algorithm assumptions are used
+-- portable call pattern: low-rank covariance, sketching, factorized-gradient,
+--   and preconditioner proofs vary the finite matrix and index types while
+--   reusing a rank-indexed factorization with orthonormal left factors
+-- counterargument checked: the staged normalized-factor decomposition is
+--   weaker because it does not expose pairwise orthonormality, while Mathlib's
+--   orthonormal-basis APIs do not package the matrix factorization or its bound
+-- coverage search: symbol and semantic searches for `finite real matrix equals
+--   sum outer products indexed by rank with orthonormal left vectors` and
+--   `matrix factorization using an orthonormal basis of the column space`
+--   found `OrthonormalBasis.orthogonalProjection_eq_sum_rankOne`,
+--   `InnerProductSpace.toMatrix_rankOne`, and the distinct staged theorem
+--   `Matrix.exists_rank_one_sum_eq_with_left_norm_le_one`; none has this
+--   rank-indexed orthonormal-left matrix-factorization conclusion
+-- minimal hypotheses: finiteness of both index types supports matrix rank,
+--   finite coordinate sums, and the column-space orthonormal basis; decidable
+--   row equality is needed only for the identity matrix in the Loewner bound
+
+/-- Every finite real matrix is a sum of as many outer products as its rank,
+with an orthonormal family of left factors whose self outer products are
+bounded by the identity matrix.
+
+Layer: Glue | Gap: Level 2 (orthonormal rank-many outer-product factorization)
+Proof: choose an orthonormal basis of the Euclidean column space, expand each
+  column in that basis, and derive each rank-one identity bound from the
+  diagonal orthonormality equation.
+Source: Mathlib matrix rank as column-map range finrank, finite-dimensional
+  Euclidean orthonormal-basis expansion, and positive-semidefinite matrix order.
+Used in: low-rank covariance, sketching, and matrix-preconditioner arguments
+  that need both a column-space factorization and orthonormal-factor Gram laws.
+Book citation: book/research/Source.json#/key_lemmas/10/proof/0
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic
+  Tensor Optimization, Algorithm 1 matrix Shampoo -/
+private theorem exists_rank_one_sum_eq_with_orthonormal_left
+    {ι κ : Type*} [Fintype ι] [DecidableEq ι] [Fintype κ]
+    (G : Matrix ι κ ℝ) :
+    ∃ (u : Fin G.rank → ι → ℝ) (b : Fin G.rank → κ → ℝ),
+      G = ∑ a : Fin G.rank, vecMulVec (u a) (b a) ∧
+        (∀ a a' : Fin G.rank,
+          ∑ i : ι, u a i * u a' i = if a = a' then 1 else 0) ∧
+        ∀ a : Fin G.rank, vecMulVec (u a) (u a) ≤ (1 : Matrix ι ι ℝ) := by
+  classical
+  let L : (κ → ℝ) →ₗ[ℝ] EuclideanSpace ℝ ι :=
+    (((WithLp.linearEquiv 2 ℝ (ι → ℝ)).symm : (ι → ℝ) ≃ₗ[ℝ]
+        EuclideanSpace ℝ ι).toLinearMap.comp (Matrix.toLin' G))
+  let E := LinearMap.range L
+  have hrank : Module.finrank ℝ (LinearMap.range (Matrix.toLin' G)) = G.rank := by
+    change Module.finrank ℝ (LinearMap.range (Matrix.toLin' G)) =
+      Module.finrank ℝ (LinearMap.range G.mulVecLin)
+    rw [Matrix.toLin'_apply']
+  have hfin : Module.finrank ℝ E = G.rank := by
+    let e : (ι → ℝ) ≃ₗ[ℝ] EuclideanSpace ℝ ι :=
+      (WithLp.linearEquiv 2 ℝ (ι → ℝ)).symm
+    calc
+      Module.finrank ℝ E =
+          Module.finrank ℝ (LinearMap.range (e.toLinearMap.comp (Matrix.toLin' G))) := by
+            rfl
+      _ = Module.finrank ℝ ((LinearMap.range (Matrix.toLin' G)).map e.toLinearMap) := by
+            rw [LinearMap.range_comp]
+      _ = Module.finrank ℝ (LinearMap.range (Matrix.toLin' G)) := by
+            exact e.finrank_map_eq (LinearMap.range (Matrix.toLin' G))
+      _ = G.rank := hrank
+  let B : OrthonormalBasis (Fin G.rank) ℝ E :=
+    (stdOrthonormalBasis ℝ E).reindex (finCongr hfin)
+  have hcol (j : κ) :
+      (WithLp.toLp 2 (G.col j) : EuclideanSpace ℝ ι) ∈ LinearMap.range L := by
+    refine ⟨Pi.single j (1 : ℝ), ?_⟩
+    change ((WithLp.linearEquiv 2 ℝ (ι → ℝ)).symm)
+        (Matrix.toLin' G (Pi.single j (1 : ℝ))) =
+      (WithLp.toLp 2 (G.col j) : EuclideanSpace ℝ ι)
+    apply (WithLp.linearEquiv 2 ℝ (ι → ℝ)).injective
+    ext i
+    simp [Matrix.toLin'_apply, Matrix.col_apply]
+  let u : Fin G.rank → ι → ℝ :=
+    fun a i => (B a : EuclideanSpace ℝ ι) i
+  let b : Fin G.rank → κ → ℝ :=
+    fun a j => B.repr
+      ⟨(WithLp.toLp 2 (G.col j) : EuclideanSpace ℝ ι), hcol j⟩ a
+  have hG : G = ∑ a : Fin G.rank, vecMulVec (u a) (b a) := by
+    ext i j
+    let x : E :=
+      ⟨(WithLp.toLp 2 (G.col j) : EuclideanSpace ℝ ι), hcol j⟩
+    have hrepr := congr_arg (fun y : E => (y : EuclideanSpace ℝ ι) i)
+      (B.sum_repr x)
+    simpa [u, b, x, Matrix.sum_apply, Matrix.col_apply, smul_eq_mul, mul_comm,
+      mul_left_comm, mul_assoc] using hrepr.symm
+  have horth : ∀ a a' : Fin G.rank,
+      ∑ i : ι, u a i * u a' i = if a = a' then 1 else 0 := by
+    intro a a'
+    have hinnerE :
+        inner ℝ (B a : E) (B a' : E) = if a = a' then (1 : ℝ) else 0 := by
+      simpa using (orthonormal_iff_ite.mp B.orthonormal a a')
+    have hinnerAmbient :
+        inner ℝ (B a : EuclideanSpace ℝ ι)
+          (B a' : EuclideanSpace ℝ ι) = if a = a' then 1 else 0 := by
+      change inner ℝ (B a : E) (B a' : E) = if a = a' then (1 : ℝ) else 0
+      exact hinnerE
+    have hcoords :=
+      EuclideanSpace.inner_eq_star_dotProduct
+        (B a : EuclideanSpace ℝ ι) (B a' : EuclideanSpace ℝ ι)
+    calc
+      (∑ i : ι, u a i * u a' i) =
+          dotProduct (B a : EuclideanSpace ℝ ι)
+            (B a' : EuclideanSpace ℝ ι) := by
+              rfl
+      _ = dotProduct (B a' : EuclideanSpace ℝ ι)
+            (B a : EuclideanSpace ℝ ι) := by
+              rw [dotProduct_comm]
+      _ = dotProduct (B a' : EuclideanSpace ℝ ι)
+            (star (B a : EuclideanSpace ℝ ι)) := by
+              simp
+      _ = inner ℝ (B a : EuclideanSpace ℝ ι)
+            (B a' : EuclideanSpace ℝ ι) := hcoords.symm
+      _ = if a = a' then 1 else 0 := hinnerAmbient
+  refine ⟨u, b, hG, horth, ?_⟩
+  intro a
+  apply Matrix.vecMulVec_le_one_of_sum_sq_le_one
+  have haa := horth a a
+  simpa [pow_two] using haa.le
+
+end Matrix
+
+open scoped BigOperators MatrixOrder
+
+namespace Matrix
+
+-- Generalization plan (G0):
+-- concept/name: rank-many outer-product decomposition with orthonormal right
+--   factors; orig was `matrix_rank_row_space_orthonormal_rank_one_expansion`
+-- generality used: arbitrary finite row and column index types for a real
+--   matrix, with decidable column equality for the identity-matrix bound; no
+--   measure, convexity, smoothness, oracle, or algorithm assumptions are used
+-- portable call pattern: low-rank covariance, sketching, factorized-gradient,
+--   and preconditioner proofs vary the finite matrix and index types while
+--   reusing a rank-indexed factorization with orthonormal right factors
+-- counterargument checked: although symmetric to the orthonormal-left theorem,
+--   this is not a pure rename or caller-side expression; transposition changes
+--   the rank index type, so the reusable result packages a nontrivial reindexing
+-- coverage search: symbol and semantic searches for `finite real matrix equals
+--   sum outer products indexed by rank with orthonormal right vectors` and
+--   `matrix rank row space orthonormal rank one expansion right factor identity
+--   bound` found `OrthonormalBasis.orthogonalProjection_eq_sum_rankOne`,
+--   `InnerProductSpace.toMatrix_rankOne`, and the distinct staged theorem
+--   `Matrix.exists_rank_one_sum_eq_with_orthonormal_left`; none has this
+--   rank-indexed orthonormal-right matrix-factorization conclusion
+-- minimal hypotheses: finiteness of both index types supports matrix rank and
+--   finite coordinate sums; decidable equality on the column index is needed
+--   only for the identity matrix in the right-factor Loewner bound
+
+/-- Every finite real matrix is a sum of as many outer products as its rank,
+with an orthonormal family of right factors whose self outer products are
+bounded by the identity matrix.
+
+Layer: Glue | Gap: Level 2 (right-orthonormal rank-many outer-product factorization)
+Proof: apply the orthonormal-left factorization to the transposed matrix, swap
+  the two factor families, and transport the sum across equality of transpose rank.
+Source: Mathlib matrix transposition and rank invariance, together with the
+  finite-dimensional Euclidean orthonormal-left matrix factorization.
+Used in: low-rank covariance, sketching, and matrix-preconditioner arguments
+  that need both a row-space factorization and orthonormal-factor Gram laws.
+Book citation: book/research/Source.json#/key_lemmas/10/proof/0
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic
+  Tensor Optimization, Algorithm 1 matrix Shampoo -/
+private theorem exists_rank_one_sum_eq_with_orthonormal_right
+    {ι κ : Type*} [Fintype ι] [Fintype κ] [DecidableEq κ]
+    (G : Matrix ι κ ℝ) :
+    ∃ (u : Fin G.rank → ι → ℝ) (b : Fin G.rank → κ → ℝ),
+      G = ∑ a : Fin G.rank, vecMulVec (u a) (b a) ∧
+        (∀ a a' : Fin G.rank,
+          ∑ j : κ, b a j * b a' j = if a = a' then 1 else 0) ∧
+        ∀ a : Fin G.rank, vecMulVec (b a) (b a) ≤ (1 : Matrix κ κ ℝ) := by
+  classical
+  obtain ⟨uT, bT, hGT, horthT, huboundT⟩ :=
+    Matrix.exists_rank_one_sum_eq_with_orthonormal_left G.transpose
+  have hrankT : G.transpose.rank = G.rank := by
+    simpa using Matrix.rank_transpose G
+  let e : Fin G.rank ≃ Fin G.transpose.rank := finCongr hrankT.symm
+  refine ⟨fun a i => bT (e a) i, fun a j => uT (e a) j, ?_, ?_, ?_⟩
+  · ext i j
+    have h := congr_fun (congr_fun hGT j) i
+    calc
+      G i j = ∑ c : Fin G.transpose.rank, uT c j * bT c i := by
+        simpa [Matrix.transpose_apply, Matrix.sum_apply] using h
+      _ = ∑ a : Fin G.rank, uT (e a) j * bT (e a) i := by
+        exact (Fintype.sum_equiv e
+          (fun a => uT (e a) j * bT (e a) i)
+          (fun c => uT c j * bT c i) (by intro a; rfl)).symm
+      _ = (∑ a : Fin G.rank,
+            vecMulVec (fun i => bT (e a) i) (fun j => uT (e a) j)) i j := by
+        simp [Matrix.sum_apply, Matrix.vecMulVec, mul_comm]
+  · intro a a'
+    have h := horthT (e a) (e a')
+    simpa [e.injective.eq_iff] using h
+  · intro a
+    exact huboundT (e a)
+
+end Matrix
+
+open scoped BigOperators
+
+namespace Matrix
+
+-- Generalization plan (G0):
+-- concept/name: Gram matrix of a finite rank-one expansion with orthonormal left
+--   factors; orig was
+--   `matrixGramRight_eq_sum_vectorOuter_of_orthonormal_rank_one_expansion`
+-- generality used: arbitrary finite row and factor index types and arbitrary
+--   column index type over a commutative semiring; no Euclidean dimension,
+--   matrix rank, measure, convexity, smoothness, oracle, or algorithm assumptions
+--   are used
+-- portable call pattern: low-rank matrix factorizations, singular-vector
+--   expansions, and finite feature decompositions compute a column Gram matrix
+--   while changing the matrix, factor family, coefficient semiring, and index types
+-- counterargument checked: this is not merely the source's `matrixGramRight`
+--   notation wrapper or a duplicate of the companion row-Gram theorem; it links
+--   transpose multiplication to an orthonormal-left rank-one expansion and the
+--   resulting sum of right outer products
+-- coverage search: searches for `matrix transpose multiply self equals sum vector
+--   outer products orthonormal left factors rank one expansion`,
+--   `transpose_mul_self sum vecMulVec orthonormal`, and the full semantic statement
+--   found Mathlib's `Matrix.isSymm_transpose_mul_self` and
+--   `Matrix.transpose_mul_self_isDiag_iff_hasOrthogonalCols`, plus the staged dual
+--   `Matrix.mul_transpose_eq_sum_vecMulVec_of_orthonormal_right`; none computes
+--   this column Gram matrix from an orthonormal-left rank-one expansion
+-- minimal hypotheses: `Fintype ι` forms the matrix product, `Fintype ρ` forms
+--   the factor sum, `DecidableEq ρ` states the Kronecker-delta identity, and
+--   `CommSemiring R` supplies exactly the commutative finite-sum algebra used
+
+/-- Multiplying the transpose of a finite rank-one expansion by itself gives the
+sum of the right-factor outer products when the left factors are orthonormal.
+
+Layer: Glue | Gap: Level 1 (orthonormal rank-one expansion column-Gram identity)
+Proof: expand both matrix factors entrywise and apply the raw-coordinate
+  bilinear Parseval collapse to the orthonormal left-factor family.
+Source: Mathlib finite matrix multiplication and `Matrix.vecMulVec`, together
+  with the finite orthonormal-coordinate bilinear Parseval identity.
+Used in: low-rank adaptive-gradient analyses that rewrite column Gram
+  accumulators from orthonormal rank-one or singular-vector decompositions.
+Book citation: book/research/Source.json#/key_lemmas/10/proof/6
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic
+  Tensor Optimization, Algorithm 1 matrix Shampoo -/
+private theorem transpose_mul_self_eq_sum_vecMulVec_of_orthonormal_left
+    {R ι κ ρ : Type*} [CommSemiring R] [Fintype ι] [Fintype ρ]
+    [DecidableEq ρ] (G : Matrix ι κ R) (u : ρ → ι → R) (b : ρ → κ → R)
+    (hG : G = ∑ a : ρ, vecMulVec (u a) (b a))
+    (horth : ∀ a a' : ρ, ∑ i : ι, u a i * u a' i = if a = a' then 1 else 0) :
+    G.transpose * G = ∑ a : ρ, vecMulVec (b a) (b a) := by
+  classical
+  ext j l
+  have hcollapse :=
+    finite_orthonormal_coordinate_bilinear_collapse
+      (u := u) (x := fun a : ρ => b a j) (y := fun a : ρ => b a l) horth
+  have hG_apply : ∀ i j, G i j = ∑ a : ρ, u a i * b a j := by
+    intro i j
+    have h := congrFun (congrFun hG i) j
+    simpa [Matrix.sum_apply, vecMulVec_apply] using h
+  calc
+    (G.transpose * G) j l = ∑ i : ι, G i j * G i l := by
+      simp [Matrix.mul_apply, Matrix.transpose_apply]
+    _ = ∑ i : ι, (∑ a : ρ, u a i * b a j) *
+          (∑ a' : ρ, u a' i * b a' l) := by
+      refine Finset.sum_congr rfl ?_
+      intro i _hi
+      rw [hG_apply i j, hG_apply i l]
+    _ = ∑ a : ρ, b a j * b a l := hcollapse
+    _ = (∑ a : ρ, vecMulVec (b a) (b a)) j l := by
+      simp [Matrix.sum_apply, vecMulVec_apply]
+
+end Matrix
+
+open scoped BigOperators
+
+namespace Matrix
+
+-- Generalization plan (G0):
+-- concept/name: Gram matrix of a finite rank-one expansion with orthonormal right
+--   factors; orig was
+--   `matrixGramLeft_eq_sum_vectorOuter_of_row_orthonormal_rank_one_expansion`
+-- generality used: arbitrary row index type and finite column and factor index
+--   types over a commutative semiring; no Euclidean dimension, matrix rank,
+--   measure, convexity, smoothness, oracle, or algorithm assumptions are used
+-- portable call pattern: low-rank matrix factorizations, singular-vector
+--   expansions, and finite feature decompositions compute a row Gram matrix
+--   while changing the matrix, factor family, coefficient semiring, and index types
+-- counterargument checked: this is not merely the source's `matrixGramLeft`
+--   notation wrapper; it connects matrix multiplication, a rank-one expansion,
+--   right-factor orthonormality, and the resulting sum of left outer products
+-- coverage search: searches for `matrix multiplication transpose equals sum outer
+--   products orthonormal right factors`, `mul transpose sum vecMulVec
+--   orthonormal`, and the full semantic statement found Mathlib's
+--   `Matrix.isSymm_mul_transpose_self` and
+--   `Matrix.mul_transpose_self_isDiag_iff_hasOrthogonalRows`, but neither computes
+--   the Gram matrix of a rank-one expansion; no matching SOptLib theorem was found
+-- minimal hypotheses: `Fintype κ` forms the matrix product, `Fintype ρ` forms
+--   the factor sum, `DecidableEq ρ` states the Kronecker-delta identity, and
+--   `CommSemiring R` supplies exactly the commutative finite-sum algebra used
+
+/-- Multiplying a finite rank-one expansion by its transpose gives the sum of
+the left-factor outer products when the right factors are orthonormal.
+
+Layer: Glue | Gap: Level 1 (orthonormal rank-one expansion Gram identity)
+Proof: expand both matrix factors entrywise and apply the raw-coordinate
+  bilinear Parseval collapse to the orthonormal right-factor family.
+Source: Mathlib finite matrix multiplication and `Matrix.vecMulVec`, together
+  with the finite orthonormal-coordinate bilinear Parseval identity.
+Used in: low-rank adaptive-gradient analyses that rewrite row Gram accumulators
+  from orthonormal rank-one or singular-vector decompositions.
+Book citation: book/research/Source.json#/key_lemmas/10/proof/0
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic
+  Tensor Optimization, Algorithm 1 matrix Shampoo -/
+private theorem mul_transpose_eq_sum_vecMulVec_of_orthonormal_right
+    {R ι κ ρ : Type*} [CommSemiring R] [Fintype κ] [Fintype ρ]
+    [DecidableEq ρ] (G : Matrix ι κ R) (u : ρ → ι → R) (b : ρ → κ → R)
+    (hG : G = ∑ a : ρ, vecMulVec (u a) (b a))
+    (horth : ∀ a a' : ρ, ∑ j : κ, b a j * b a' j = if a = a' then 1 else 0) :
+    G * G.transpose = ∑ a : ρ, vecMulVec (u a) (u a) := by
+  classical
+  ext i k
+  have hcollapse :=
+    finite_orthonormal_coordinate_bilinear_collapse
+      (u := b) (x := fun a : ρ => u a i) (y := fun a : ρ => u a k) horth
+  have hG_apply : ∀ i j, G i j = ∑ a : ρ, u a i * b a j := by
+    intro i j
+    have h := congrFun (congrFun hG i) j
+    simpa [Matrix.sum_apply, vecMulVec_apply] using h
+  calc
+    (G * G.transpose) i k = ∑ j : κ, G i j * G k j := by
+      simp [Matrix.mul_apply, Matrix.transpose_apply]
+    _ = ∑ j : κ, (∑ a : ρ, b a j * u a i) *
+          (∑ a' : ρ, b a' j * u a' k) := by
+      refine Finset.sum_congr rfl ?_
+      intro j _hj
+      rw [hG_apply i j, hG_apply k j]
+      simp [mul_comm]
+    _ = ∑ a : ρ, u a i * u a k := hcollapse
+    _ = (∑ a : ρ, vecMulVec (u a) (u a)) i k := by
+      simp [Matrix.sum_apply, vecMulVec_apply]
+
+end Matrix
+
+open scoped BigOperators MatrixOrder
+
+namespace Matrix
+
+-- Generalization plan (G0):
+-- concept/name: Loewner-order finite-sum Cauchy--Schwarz for self outer products;
+--   orig was `vector_sum_outer_le_card_smul_sum_outer`, renamed
+--   `Matrix.vecMulVec_sum_le_card_smul_sum_vecMulVec`
+-- generality used: arbitrary finite family and coordinate index types over real
+--   scalars; no matrix dimensions, decidable equality, measure, convexity,
+--   smoothness, oracle, or algorithm assumptions are used
+-- portable call pattern: low-rank decomposition, covariance, mini-batch, and
+--   matrix-factorization proofs bound the self outer product of a finite vector
+--   sum while changing the finite family, coordinate type, and vectors
+-- counterargument checked: this is neither paper-local traceability nor a pure
+--   wrapper; it lifts finite-sum Cauchy--Schwarz into matrix Loewner order, a
+--   reusable relation not provided by the scalar inequality or `vecMulVec` alone
+-- coverage search: symbol searches for `vecMulVec sum card smul positive
+--   semidefinite order` found only the private source theorem and scalar/norm
+--   relatives; Mathlib semantic search found `sq_sum_le_card_mul_sum_sq` and
+--   `Matrix.posSemidef_vecMulVec_self_star`, but no matching matrix-order bound,
+--   so existing coverage supplies proof ingredients only
+-- minimal hypotheses: `[Fintype ι]` forms both finite sums and supplies the
+--   cardinality; `[Finite α]` suffices because a `Fintype α` instance is only
+--   needed locally for finite-matrix quadratic forms; all source-local notation
+--   was replaced by `Matrix.vecMulVec`
+
+/-- The self outer product of a finite vector sum is bounded in Loewner order by
+the family cardinality times the sum of the individual self outer products.
+
+Layer: Glue | Gap: Level 1 (finite-sum outer-product Loewner Cauchy--Schwarz bound)
+Proof: test the matrix difference on an arbitrary vector, expand each self outer
+  product into the square of a scalar pairing, and apply Mathlib's finite-sum
+  square Cauchy--Schwarz inequality.
+Source: Mathlib finite-sum Chebyshev inequalities and positive-semidefinite matrix
+  quadratic-form characterization
+Used in: low-rank and matrix-factorization analyses that control the rank-one
+  matrix of a summed decomposition before comparing factor Gram matrices
+Book citation: book/research/Source.json#/key_lemmas/10/proof/3
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic
+  Tensor Optimization, Algorithm 1 matrix Shampoo -/
+private theorem vecMulVec_sum_le_card_smul_sum_vecMulVec
+    {ι α : Type*} [Fintype ι] [Finite α] (w : ι → α → ℝ) :
+    Matrix.vecMulVec (fun a : α => ∑ i : ι, w i a)
+        (fun a : α => ∑ i : ι, w i a) ≤
+      (Fintype.card ι : ℝ) •
+        ∑ i : ι, Matrix.vecMulVec (w i) (w i) := by
+  letI := Fintype.ofFinite α
+  classical
+  have vecMulVec_dotProduct_mulVec (x g : α → ℝ) :
+      dotProduct (star x) ((Matrix.vecMulVec g g).mulVec x) =
+        (∑ a : α, x a * g a) ^ 2 := by
+    simp [dotProduct, Matrix.mulVec, Matrix.vecMulVec_apply, pow_two,
+      Finset.mul_sum, Finset.sum_comm, mul_left_comm, mul_comm]
+  rw [Matrix.le_iff]
+  refine Matrix.PosSemidef.of_dotProduct_mulVec_nonneg ?_ ?_
+  · have hsumHerm :
+        (∑ i : ι, Matrix.vecMulVec (w i) (w i)).IsHermitian := by
+      apply Matrix.IsHermitian.ext
+      intro a b
+      rw [Matrix.sum_apply, Matrix.sum_apply]
+      change star (∑ i : ι, w i b * w i a) = ∑ i : ι, w i a * w i b
+      rw [star_sum]
+      exact Finset.sum_congr rfl (by intro i _hi; simp [mul_comm])
+    have houterHerm :
+        (Matrix.vecMulVec (fun a : α => ∑ i : ι, w i a)
+          (fun a : α => ∑ i : ι, w i a)).IsHermitian := by
+      apply Matrix.IsHermitian.ext
+      intro a b
+      change star ((∑ i : ι, w i b) * (∑ i : ι, w i a)) =
+        (∑ i : ι, w i a) * (∑ i : ι, w i b)
+      simp [mul_comm]
+    exact (hsumHerm.smul (by simp [isSelfAdjoint_iff])).sub houterHerm
+  · intro x
+    let beta : ι → ℝ := fun i => ∑ a : α, x a * w i a
+    have hsum_beta :
+        (∑ a : α, x a * (∑ i : ι, w i a)) = ∑ i : ι, beta i := by
+      calc
+        (∑ a : α, x a * (∑ i : ι, w i a)) =
+            ∑ a : α, ∑ i : ι, x a * w i a := by
+              simp [Finset.mul_sum]
+        _ = ∑ i : ι, ∑ a : α, x a * w i a := by
+              rw [Finset.sum_comm]
+        _ = ∑ i : ι, beta i := by
+              simp [beta]
+    have hsum_quad :
+        dotProduct (star x)
+            (((∑ i : ι, Matrix.vecMulVec (w i) (w i)).mulVec x)) =
+          ∑ i : ι, beta i ^ 2 := by
+      calc
+        dotProduct (star x)
+            (((∑ i : ι, Matrix.vecMulVec (w i) (w i)).mulVec x)) =
+            dotProduct (star x)
+              (∑ i : ι, (Matrix.vecMulVec (w i) (w i)).mulVec x) := by
+                rw [Matrix.sum_mulVec]
+        _ = ∑ i : ι,
+            dotProduct (star x) ((Matrix.vecMulVec (w i) (w i)).mulVec x) := by
+              simpa using
+                (dotProduct_sum (star x) (Finset.univ : Finset ι)
+                  (fun i : ι => (Matrix.vecMulVec (w i) (w i)).mulVec x))
+        _ = ∑ i : ι, beta i ^ 2 := by
+              exact Finset.sum_congr rfl (by
+                intro i _hi
+                simpa [beta] using vecMulVec_dotProduct_mulVec x (w i))
+    have houter_quad :
+        dotProduct (star x)
+            ((Matrix.vecMulVec (fun a : α => ∑ i : ι, w i a)
+              (fun a : α => ∑ i : ι, w i a)).mulVec x) =
+          (∑ i : ι, beta i) ^ 2 := by
+      rw [vecMulVec_dotProduct_mulVec, hsum_beta]
+    have hquad_eq :
+        dotProduct (star x)
+            (((Fintype.card ι : ℝ) •
+                (∑ i : ι, Matrix.vecMulVec (w i) (w i)) -
+              Matrix.vecMulVec (fun a : α => ∑ i : ι, w i a)
+                (fun a : α => ∑ i : ι, w i a)).mulVec x) =
+          (Fintype.card ι : ℝ) * (∑ i : ι, beta i ^ 2) -
+            (∑ i : ι, beta i) ^ 2 := by
+      calc
+        dotProduct (star x)
+            (((Fintype.card ι : ℝ) •
+                (∑ i : ι, Matrix.vecMulVec (w i) (w i)) -
+              Matrix.vecMulVec (fun a : α => ∑ i : ι, w i a)
+                (fun a : α => ∑ i : ι, w i a)).mulVec x) =
+          dotProduct (star x)
+            ((((Fintype.card ι : ℝ) •
+                (∑ i : ι, Matrix.vecMulVec (w i) (w i))).mulVec x) -
+              (Matrix.vecMulVec (fun a : α => ∑ i : ι, w i a)
+                (fun a : α => ∑ i : ι, w i a)).mulVec x) := by
+            rw [Matrix.sub_mulVec]
+        _ = dotProduct (star x)
+              (((Fintype.card ι : ℝ) •
+                (∑ i : ι, Matrix.vecMulVec (w i) (w i))).mulVec x) -
+            dotProduct (star x)
+              ((Matrix.vecMulVec (fun a : α => ∑ i : ι, w i a)
+                (fun a : α => ∑ i : ι, w i a)).mulVec x) := by
+            rw [dotProduct_sub]
+        _ = (Fintype.card ι : ℝ) *
+              dotProduct (star x)
+                (((∑ i : ι, Matrix.vecMulVec (w i) (w i)).mulVec x)) -
+            dotProduct (star x)
+              ((Matrix.vecMulVec (fun a : α => ∑ i : ι, w i a)
+                (fun a : α => ∑ i : ι, w i a)).mulVec x) := by
+            rw [Matrix.smul_mulVec, dotProduct_smul]
+            simp [smul_eq_mul]
+        _ = (Fintype.card ι : ℝ) * (∑ i : ι, beta i ^ 2) -
+            (∑ i : ι, beta i) ^ 2 := by
+              rw [hsum_quad, houter_quad]
+    rw [hquad_eq]
+    have hscalar := sq_sum_le_card_mul_sum_sq
+      (s := (Finset.univ : Finset ι)) (f := beta)
+    simpa using sub_nonneg.mpr hscalar
+
+end Matrix
+
+open scoped BigOperators Kronecker MatrixOrder
+
+namespace Matrix
+
+universe u v w
+
+-- Generalization plan (G0):
+-- concept/name: finite-sum Loewner domination for self outer products of
+--   product-index vectors; orig was
+--   `sum_vectorKronecker_outer_le_one_kron_sum_outer`, renamed
+--   `Matrix.sum_vecMulVec_product_le_one_kronecker_sum_vecMulVec`
+-- generality used: arbitrary finite family, left-coordinate, and right-coordinate
+--   types over real matrices; no fixed dimensions, ranks, measures, convexity,
+--   smoothness, stochastic-oracle assumptions, or algorithm state are used
+-- portable call pattern: covariance and low-rank decomposition proofs vary the
+--   finite family and both vector factors while retaining pointwise domination of
+--   the left self outer products by the identity and the same Kronecker sum bound
+-- counterargument checked: this is not paper-local traceability or a pure wrapper;
+--   it packages a reusable passage from pointwise factor bounds to a product-vector
+--   covariance bound, including the factorization and finite-sum distribution steps
+-- coverage search: symbol searches for "sum outer product of product vectors bounded
+--   by identity Kronecker sum outer products" and "vecMulVec kronecker finite sum
+--   Loewner order" found only the private Shampoo source variants; Mathlib semantic
+--   search found tensor-product sum distribution but no matching matrix-order bound,
+--   while `Matrix.posSemidef_vecMulVec_self_star`,
+--   `Matrix.vecMulVec_vectorKronecker_self`, and
+--   `Matrix.kronecker_mono_of_posSemidef_of_le` cover only proof components
+-- minimal hypotheses: `[Fintype ρ]` is used for the family sum, while `Finite`
+--   suffices for both coordinate-index matrix orders and `[DecidableEq ι]`
+--   constructs the left identity matrix; the pointwise left-factor Loewner bound
+--   is the sole data hypothesis
+
+/-- A finite sum of self outer products of product-index vectors is bounded by the
+identity Kronecker the sum of the right-factor self outer products when every
+left-factor self outer product is bounded by the identity.
+
+Layer: Glue | Gap: Level 1 (finite product-vector covariance Kronecker domination)
+Proof: factor each product-vector self outer product as a matrix Kronecker product, apply binary Kronecker monotonicity using positivity of self outer products, sum the pointwise inequalities, and distribute the fixed identity through the finite sum.
+Source: Mathlib positive-semidefinite matrix order, self outer products, finite sums, and matrix Kronecker products
+Used in: matrix and tensor adaptive-gradient rank-decomposition proofs that bound a vectorized rank-one covariance family by an identity tensored with the corresponding factor Gram sum
+Book citation: book/research/Source.json#/key_lemmas/10/proof/6
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 1 matrix Shampoo -/
+private theorem sum_vecMulVec_product_le_one_kronecker_sum_vecMulVec
+    {ρ : Type u} {ι : Type v} {κ : Type w}
+    [Fintype ρ] [Finite ι] [DecidableEq ι] [Finite κ]
+    (u : ρ → ι → ℝ) (b : ρ → κ → ℝ)
+    (hu : ∀ a : ρ,
+      Matrix.vecMulVec (u a) (u a) ≤ (1 : Matrix ι ι ℝ)) :
+    (∑ a : ρ,
+        Matrix.vecMulVec
+          (Function.uncurry (Matrix.vecMulVec (u a) (b a)))
+          (Function.uncurry (Matrix.vecMulVec (u a) (b a)))) ≤
+      (1 : Matrix ι ι ℝ) ⊗ₖ
+        (∑ a : ρ, Matrix.vecMulVec (b a) (b a)) := by
+  classical
+  have hterm : ∀ a : ρ,
+      Matrix.vecMulVec
+          (Function.uncurry (Matrix.vecMulVec (u a) (b a)))
+          (Function.uncurry (Matrix.vecMulVec (u a) (b a))) ≤
+        (1 : Matrix ι ι ℝ) ⊗ₖ Matrix.vecMulVec (b a) (b a) := by
+    intro a
+    rw [Matrix.vecMulVec_vectorKronecker_self]
+    exact Matrix.kronecker_mono_of_posSemidef_of_le
+      (Matrix.vecMulVec (u a) (u a)) (1 : Matrix ι ι ℝ)
+      (Matrix.vecMulVec (b a) (b a)) (Matrix.vecMulVec (b a) (b a))
+      (by simpa using Matrix.posSemidef_vecMulVec_self_star (u a))
+      (by simpa using Matrix.posSemidef_vecMulVec_self_star (b a))
+      (hu a) le_rfl
+  have hsum :
+      (∑ a : ρ,
+          Matrix.vecMulVec
+            (Function.uncurry (Matrix.vecMulVec (u a) (b a)))
+            (Function.uncurry (Matrix.vecMulVec (u a) (b a)))) ≤
+        ∑ a : ρ, (1 : Matrix ι ι ℝ) ⊗ₖ Matrix.vecMulVec (b a) (b a) :=
+    Finset.sum_le_sum (s := Finset.univ) (fun a _ha => hterm a)
+  calc
+    (∑ a : ρ,
+        Matrix.vecMulVec
+          (Function.uncurry (Matrix.vecMulVec (u a) (b a)))
+          (Function.uncurry (Matrix.vecMulVec (u a) (b a)))) ≤
+        ∑ a : ρ, (1 : Matrix ι ι ℝ) ⊗ₖ Matrix.vecMulVec (b a) (b a) := hsum
+    _ = (1 : Matrix ι ι ℝ) ⊗ₖ
+        (∑ a : ρ, Matrix.vecMulVec (b a) (b a)) := by
+      ext ij kl
+      simp_rw [Matrix.sum_apply, Matrix.kroneckerMap_apply]
+      rw [Matrix.sum_apply, Finset.mul_sum]
+
+end Matrix
+
+open scoped BigOperators Kronecker MatrixOrder
+
+namespace Matrix
+
+universe u v w
+
+-- Generalization plan (G0):
+-- concept/name: finite-sum Loewner domination for self outer products of
+--   product-index vectors; orig was
+--   `sum_vectorKronecker_outer_le_sum_outer_kron_one`, renamed
+--   `Matrix.sum_vecMulVec_product_le_sum_vecMulVec_kronecker_one`
+-- generality used: arbitrary finite family, left-coordinate, and right-coordinate
+--   types over real matrices; no fixed dimensions, ranks, measures, convexity,
+--   smoothness, stochastic-oracle assumptions, or algorithm state are used
+-- portable call pattern: covariance and low-rank decomposition proofs vary the
+--   finite family and both vector factors while retaining pointwise domination of
+--   the right self outer products by the identity and the same Kronecker sum bound
+-- counterargument checked: this is not paper-local traceability or a pure wrapper;
+--   it packages the reusable right-factor counterpart of the existing left-factor
+--   domination theorem, including factorization and finite-sum distribution
+-- coverage search: symbol searches for "sum outer products of product vectors
+--   bounded by sum first-factor outer products Kronecker identity" found only the
+--   private Shampoo theorem and the opposite-orientation staged companion; Mathlib
+--   semantic search found Kronecker sum distribution but no matching matrix-order
+--   bound, while `Matrix.vecMulVec_vectorKronecker_self` and
+--   `Matrix.kronecker_mono_of_posSemidef_of_le` cover only proof components
+-- minimal hypotheses: `[Fintype ρ]` is used for the family sum, while `Finite`
+--   suffices for both coordinate-index matrix orders and `[DecidableEq κ]`
+--   constructs the right identity matrix; the pointwise right-factor Loewner bound
+--   is the sole data hypothesis
+
+/-- A finite sum of self outer products of product-index vectors is bounded by the
+sum of the left-factor self outer products Kronecker the identity when every
+right-factor self outer product is bounded by the identity.
+
+Layer: Glue | Gap: Level 1 (finite product-vector covariance Kronecker domination)
+Proof: factor each product-vector self outer product as a matrix Kronecker product, apply binary Kronecker monotonicity using positivity of self outer products, sum the pointwise inequalities, and distribute the fixed identity through the finite sum.
+Source: Mathlib positive-semidefinite matrix order, self outer products, finite sums, and matrix Kronecker products
+Used in: matrix and tensor adaptive-gradient rank-decomposition proofs that bound a vectorized rank-one covariance family by the corresponding factor Gram sum tensored with an identity
+Book citation: book/research/Source.json#/key_lemmas/10/proof/6
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 1 matrix Shampoo -/
+private theorem sum_vecMulVec_product_le_sum_vecMulVec_kronecker_one
+    {ρ : Type u} {ι : Type v} {κ : Type w}
+    [Fintype ρ] [Finite ι] [Finite κ] [DecidableEq κ]
+    (u : ρ → ι → ℝ) (b : ρ → κ → ℝ)
+    (hb : ∀ a : ρ,
+      Matrix.vecMulVec (b a) (b a) ≤ (1 : Matrix κ κ ℝ)) :
+    (∑ a : ρ,
+        Matrix.vecMulVec
+          (Function.uncurry (Matrix.vecMulVec (u a) (b a)))
+          (Function.uncurry (Matrix.vecMulVec (u a) (b a)))) ≤
+      (∑ a : ρ, Matrix.vecMulVec (u a) (u a)) ⊗ₖ
+        (1 : Matrix κ κ ℝ) := by
+  classical
+  have hterm : ∀ a : ρ,
+      Matrix.vecMulVec
+          (Function.uncurry (Matrix.vecMulVec (u a) (b a)))
+          (Function.uncurry (Matrix.vecMulVec (u a) (b a))) ≤
+        Matrix.vecMulVec (u a) (u a) ⊗ₖ (1 : Matrix κ κ ℝ) := by
+    intro a
+    rw [Matrix.vecMulVec_vectorKronecker_self]
+    exact Matrix.kronecker_mono_of_posSemidef_of_le
+      (Matrix.vecMulVec (u a) (u a)) (Matrix.vecMulVec (u a) (u a))
+      (Matrix.vecMulVec (b a) (b a)) (1 : Matrix κ κ ℝ)
+      (by simpa using Matrix.posSemidef_vecMulVec_self_star (u a))
+      (by simpa using Matrix.posSemidef_vecMulVec_self_star (b a))
+      le_rfl (hb a)
+  have hsum :
+      (∑ a : ρ,
+          Matrix.vecMulVec
+            (Function.uncurry (Matrix.vecMulVec (u a) (b a)))
+            (Function.uncurry (Matrix.vecMulVec (u a) (b a)))) ≤
+        ∑ a : ρ, Matrix.vecMulVec (u a) (u a) ⊗ₖ (1 : Matrix κ κ ℝ) :=
+    Finset.sum_le_sum (s := Finset.univ) (fun a _ha => hterm a)
+  calc
+    (∑ a : ρ,
+        Matrix.vecMulVec
+          (Function.uncurry (Matrix.vecMulVec (u a) (b a)))
+          (Function.uncurry (Matrix.vecMulVec (u a) (b a)))) ≤
+        ∑ a : ρ, Matrix.vecMulVec (u a) (u a) ⊗ₖ (1 : Matrix κ κ ℝ) := hsum
+    _ = (∑ a : ρ, Matrix.vecMulVec (u a) (u a)) ⊗ₖ
+        (1 : Matrix κ κ ℝ) := by
+      ext ij kl
+      simp_rw [Matrix.sum_apply, Matrix.kroneckerMap_apply]
+      rw [Matrix.sum_apply, Finset.sum_mul]
+
+end Matrix
+
+namespace Matrix
+
+universe u v
+
+-- Generalization plan (G0):
+-- concept/name: inverse-rank Loewner domination of a matrix-vectorization outer
+--   product by Kronecker products of its left and right Gram matrices; orig was
+--   `Lemma_9_single_matrix_rank_domination`, renamed
+--   `Matrix.inv_rank_smul_vecMulVec_vectorization_le_kronecker_grams`
+-- generality used: arbitrary finite row and column index types for a real matrix,
+--   decidable equality for the two identity matrices, and a positive natural rank
+--   cap; no fixed dimensions, measure, convexity, smoothness, oracle, or algorithm
+--   assumptions are used
+-- portable call pattern: low-rank matrix-gradient, covariance, sketching, and
+--   structured-preconditioner proofs change the finite matrix and positive rank
+--   cap while reusing the same two Loewner bounds for its vectorized outer product
+-- counterargument checked: the theorem is not paper-local traceability or a pure
+--   wrapper; it composes rank-indexed orthonormal factorizations, a matrix-order
+--   finite-sum Cauchy--Schwarz bound, Gram identities, inverse-rank scaling, and two
+--   distinct Kronecker domination arguments behind one standard matrix contract
+-- coverage search: symbol searches for "inverse rank scaled outer product matrix
+--   vectorization bounded identity Kronecker right Gram left Gram Kronecker
+--   identity", "vecMulVec vectorization rank kronecker gram Loewner bound", and
+--   "matrix rank vectorization outer product gram domination" found only the
+--   private Shampoo theorem and its staged proof components; Mathlib semantic
+--   search returned `Matrix.gram`, vectorization/Kronecker identities, and
+--   `Matrix.rank_vecMulVec_le`, but no theorem with either full Loewner bound
+-- minimal hypotheses: both index types must be finite for rank, Gram products,
+--   and Loewner order; decidable equality constructs both identity matrices; the
+--   positivity of `r` is exactly what permits inverse-rank cancellation
+
+/-- If a finite real matrix has rank at most a positive natural number `r`, then
+`r⁻¹` times the self outer product of its row-column vectorization is bounded
+both by the row identity Kronecker its right Gram matrix and by its left Gram
+matrix Kronecker the column identity.
+
+Layer: Glue | Gap: Level 2 (inverse-rank matrix-vectorization Gram domination)
+Proof: expand the matrix into rank-many outer products with orthonormal left or right factors, bound the outer product of their vectorized sum by rank times the sum of outer products, cancel against the positive rank cap, and apply the corresponding finite-sum Kronecker domination and Gram identity.
+Source: Mathlib finite real matrix rank, positive-semidefinite Loewner order, matrix Gram products, vector outer products, and Kronecker products
+Used in: low-rank matrix-gradient and structured-preconditioner analyses that compare a vectorized gradient covariance with both row- and column-Gram Kronecker preconditioners
+Book citation: book/research/Source.json#/key_lemmas/10
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 1 matrix Shampoo -/
+theorem inv_rank_smul_vecMulVec_vectorization_le_kronecker_grams
+    {ι : Type u} {κ : Type v}
+    [Fintype ι] [DecidableEq ι] [Fintype κ] [DecidableEq κ]
+    (G : Matrix ι κ ℝ) (r : ℕ) (hr : 0 < r) (hrank : G.rank ≤ r) :
+    ((r : ℝ)⁻¹ •
+          Matrix.vecMulVec (Function.uncurry G) (Function.uncurry G) ≤
+        (1 : Matrix ι ι ℝ) ⊗ₖ Matrix.rightGram G) ∧
+      ((r : ℝ)⁻¹ •
+          Matrix.vecMulVec (Function.uncurry G) (Function.uncurry G) ≤
+        Matrix.leftGram G ⊗ₖ (1 : Matrix κ κ ℝ)) := by
+  classical
+  have hrReal : 0 < (r : ℝ) := by
+    exact_mod_cast hr
+  have hcard_le : (Fintype.card (Fin G.rank) : ℝ) ≤ (r : ℝ) := by
+    rw [Fintype.card_fin]
+    exact_mod_cast hrank
+  have hcoef_le_one :
+      (r : ℝ)⁻¹ * (Fintype.card (Fin G.rank) : ℝ) ≤ 1 := by
+    calc
+      (r : ℝ)⁻¹ * (Fintype.card (Fin G.rank) : ℝ) ≤
+          (r : ℝ)⁻¹ * (r : ℝ) :=
+        mul_le_mul_of_nonneg_left hcard_le (inv_nonneg.mpr hrReal.le)
+      _ = 1 := inv_mul_cancel₀ hrReal.ne'
+  have smul_le_self_of_nonneg_le_one_posSemidef
+      (A : Matrix (ι × κ) (ι × κ) ℝ) {c : ℝ}
+      (hA : A.PosSemidef) (hc : c ≤ 1) : c • A ≤ A := by
+    rw [Matrix.le_iff]
+    have hdiff : A - c • A = (1 - c) • A := by
+      ext i j
+      simp [sub_mul]
+    rw [hdiff]
+    exact hA.smul (sub_nonneg.mpr hc)
+  have rank_scaled_outer_le_sum
+      (w : Fin G.rank → (ι × κ) → ℝ)
+      (hsum :
+        Matrix.vecMulVec (Function.uncurry G) (Function.uncurry G) ≤
+          (Fintype.card (Fin G.rank) : ℝ) •
+            ∑ a : Fin G.rank, Matrix.vecMulVec (w a) (w a)) :
+      (r : ℝ)⁻¹ •
+          Matrix.vecMulVec (Function.uncurry G) (Function.uncurry G) ≤
+        ∑ a : Fin G.rank, Matrix.vecMulVec (w a) (w a) := by
+    let S : Matrix (ι × κ) (ι × κ) ℝ :=
+      ∑ a : Fin G.rank, Matrix.vecMulVec (w a) (w a)
+    have hSpsd : S.PosSemidef := by
+      dsimp [S]
+      simpa using Matrix.posSemidef_sum
+        (Finset.univ : Finset (Fin G.rank))
+        (fun a _ha => by
+          simpa using Matrix.posSemidef_vecMulVec_self_star (w a))
+    have hscaled :
+        (r : ℝ)⁻¹ •
+            Matrix.vecMulVec (Function.uncurry G) (Function.uncurry G) ≤
+          (r : ℝ)⁻¹ •
+            ((Fintype.card (Fin G.rank) : ℝ) • S) :=
+      smul_le_smul_of_nonneg_left (by simpa [S] using hsum)
+        (inv_nonneg.mpr hrReal.le)
+    have hcoef :
+        (r : ℝ)⁻¹ • ((Fintype.card (Fin G.rank) : ℝ) • S) ≤ S := by
+      simpa [smul_smul, mul_comm, mul_left_comm, mul_assoc] using
+        smul_le_self_of_nonneg_le_one_posSemidef S hSpsd hcoef_le_one
+    exact hscaled.trans hcoef
+  obtain ⟨u, b, hG, horth, hubound⟩ :=
+    Matrix.exists_rank_one_sum_eq_with_orthonormal_left G
+  have hgramR :
+      Matrix.rightGram G =
+        ∑ a : Fin G.rank, Matrix.vecMulVec (b a) (b a) := by
+    simpa [Matrix.rightGram] using
+      Matrix.transpose_mul_self_eq_sum_vecMulVec_of_orthonormal_left
+        G u b hG horth
+  have hvec :
+      Function.uncurry G = fun ij : ι × κ =>
+        ∑ a : Fin G.rank,
+          Function.uncurry (Matrix.vecMulVec (u a) (b a)) ij := by
+    funext ij
+    rcases ij with ⟨i, j⟩
+    have h := congrFun (congrFun hG i) j
+    simpa [Function.uncurry, Matrix.vecMulVec, Matrix.sum_apply] using h
+  have hsum_vec :
+      Matrix.vecMulVec (Function.uncurry G) (Function.uncurry G) ≤
+        (Fintype.card (Fin G.rank) : ℝ) •
+          ∑ a : Fin G.rank,
+            Matrix.vecMulVec
+              (Function.uncurry (Matrix.vecMulVec (u a) (b a)))
+              (Function.uncurry (Matrix.vecMulVec (u a) (b a))) := by
+    simpa [hvec] using
+      Matrix.vecMulVec_sum_le_card_smul_sum_vecMulVec
+        (fun a : Fin G.rank =>
+          Function.uncurry (Matrix.vecMulVec (u a) (b a)))
+  have hscaled :
+      (r : ℝ)⁻¹ •
+          Matrix.vecMulVec (Function.uncurry G) (Function.uncurry G) ≤
+        ∑ a : Fin G.rank,
+          Matrix.vecMulVec
+            (Function.uncurry (Matrix.vecMulVec (u a) (b a)))
+            (Function.uncurry (Matrix.vecMulVec (u a) (b a))) :=
+    rank_scaled_outer_le_sum
+      (fun a : Fin G.rank =>
+        Function.uncurry (Matrix.vecMulVec (u a) (b a))) hsum_vec
+  constructor
+  · exact hscaled.trans (by
+      rw [hgramR]
+      exact Matrix.sum_vecMulVec_product_le_one_kronecker_sum_vecMulVec
+        u b hubound)
+  · obtain ⟨uL, bL, hGL, horthL, hbbound⟩ :=
+      Matrix.exists_rank_one_sum_eq_with_orthonormal_right G
+    have hgramL :
+        Matrix.leftGram G =
+          ∑ a : Fin G.rank, Matrix.vecMulVec (uL a) (uL a) := by
+      simpa [Matrix.leftGram] using
+        Matrix.mul_transpose_eq_sum_vecMulVec_of_orthonormal_right
+          G uL bL hGL horthL
+    have hvecL :
+        Function.uncurry G = fun ij : ι × κ =>
+          ∑ a : Fin G.rank,
+            Function.uncurry (Matrix.vecMulVec (uL a) (bL a)) ij := by
+      funext ij
+      rcases ij with ⟨i, j⟩
+      have h := congrFun (congrFun hGL i) j
+      simpa [Function.uncurry, Matrix.vecMulVec, Matrix.sum_apply] using h
+    have hsum_vecL :
+        Matrix.vecMulVec (Function.uncurry G) (Function.uncurry G) ≤
+          (Fintype.card (Fin G.rank) : ℝ) •
+            ∑ a : Fin G.rank,
+              Matrix.vecMulVec
+                (Function.uncurry (Matrix.vecMulVec (uL a) (bL a)))
+                (Function.uncurry (Matrix.vecMulVec (uL a) (bL a))) := by
+      simpa [hvecL] using
+        Matrix.vecMulVec_sum_le_card_smul_sum_vecMulVec
+          (fun a : Fin G.rank =>
+            Function.uncurry (Matrix.vecMulVec (uL a) (bL a)))
+    have hscaledL :
+        (r : ℝ)⁻¹ •
+            Matrix.vecMulVec (Function.uncurry G) (Function.uncurry G) ≤
+          ∑ a : Fin G.rank,
+            Matrix.vecMulVec
+              (Function.uncurry (Matrix.vecMulVec (uL a) (bL a)))
+              (Function.uncurry (Matrix.vecMulVec (uL a) (bL a))) :=
+      rank_scaled_outer_le_sum
+        (fun a : Fin G.rank =>
+          Function.uncurry (Matrix.vecMulVec (uL a) (bL a))) hsum_vecL
+    exact hscaledL.trans (by
+      rw [hgramL]
+      exact Matrix.sum_vecMulVec_product_le_sum_vecMulVec_kronecker_one
+        uL bL hbbound)
+
+end Matrix
+
+open scoped BigOperators
+
+namespace Matrix
+
+-- Generalization plan (G0):
+-- concept/name: diagonal-matrix bilinear self-evaluation; orig was the local
+--   quadraticForm_diagonal_eq_sum calculation
+-- generality used: arbitrary finite index type and commutative semiring; no order,
+--   topology, measure, or optimization assumptions
+-- portable call pattern: coordinatewise matrix inequalities and diagonal
+--   preconditioner estimates; the vector, diagonal weights, and scalar semiring vary
+-- counterargument checked: this is not paper-local bookkeeping; the nearby diagonal
+--   congruence theorem has an auxiliary matrix and a nested transformed-coordinate
+--   sum, while this direct diagonal contract is the canonical reusable specialization
+-- coverage search: symbol and semantic searches found `Matrix.toBilin'_apply`,
+--   `QuadraticMap.weightedSumSquares_apply`, and the strictly more elaborate staged
+--   diagonal-congruence expansion, but no direct matrix-to-bilinear diagonal theorem
+-- minimal hypotheses: `CommSemiring` is sufficient; no nonnegativity or nonemptiness
+--   hypothesis is used
+
+/-- Evaluating the bilinear form of a diagonal matrix twice at a vector is the
+sum of its squared coordinates weighted by the diagonal entries.
+
+Layer: Glue | Gap: Level 0 (diagonal matrix bilinear-form coordinate expansion)
+Proof: expand `Matrix.toBilin'`; `Matrix.diagonal_apply` eliminates off-diagonal terms, and commutative-semiring normalization identifies each surviving term.
+Source: Mathlib finite matrix bilinear forms, diagonal matrices, and finite big operators
+Used in: diagonal adaptive-preconditioner bounds that convert a matrix quadratic energy into a coordinatewise weighted sum before applying pointwise estimates
+Book citation: book/research/Source.json#/key_lemmas/16/proof/2
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 3 diagonal matrix Shampoo -/
+theorem toBilin_diagonal_self_eq_sum_sq_mul
+    {ι R : Type*} [Fintype ι] [DecidableEq ι] [CommSemiring R]
+    (x d : ι → R) :
+    Matrix.toBilin' (Matrix.diagonal d) x x = ∑ i : ι, x i ^ 2 * d i := by
+  classical
+  simp [Matrix.toBilin'_apply, Matrix.diagonal_apply, pow_two, mul_comm, mul_left_comm]
+
+-- Generalization plan (G0):
+-- concept/name: diagonal bilinear-form trace bound from a uniform coordinate
+--   bound; orig was quadraticForm_diagonal_le_finiteMax_sq_mul_trace
+-- generality used: arbitrary finite index type and linearly ordered commutative
+--   ring, pointwise nonnegativity of the diagonal weights, and a pointwise
+--   absolute coordinate bound; no optimization, measure, or nonemptiness
+--   assumptions
+-- portable call pattern: diagonal AdaGrad and diagonal Shampoo potential
+--   estimates bound an iterate/comparator displacement energy by an infinity
+--   radius squared times a trace; the coordinates, weights, and radius vary
+-- counterargument checked: although the proof reduces to a weighted finite-sum
+--   comparison, the matrix-level inequality is the reusable call boundary and
+--   is not a paper-local rename or a caller-side expression
+-- coverage search: symbol searches for diagonal bilinear/quadratic trace bounds
+--   and weighted square sums found `Matrix.toBilin_diagonal_self_eq_sum_sq_mul`
+--   and `SOptLib.finset_sum_mul_sq_norm_le_of_norm_le`; Mathlib semantic search
+--   found diagonal PSD and quadratic-map primitives, but no theorem with this
+--   matrix-to-trace conclusion, so these hits provide only component coverage
+-- minimal hypotheses: finiteness and decidable equality construct the matrix
+--   sums; nonnegative diagonal weights and pointwise coordinate bounds are used;
+--   `[Nonempty ι]` and a separate `0 ≤ D` hypothesis are unnecessary
+
+/-- A diagonal matrix bilinear form at a coordinatewise bounded vector is at
+most the squared coordinate bound times the trace of the matrix.
+
+Layer: Glue | Gap: Level 1 (diagonal bilinear-form infinity-radius trace bound)
+Proof: expand the diagonal bilinear form as a weighted sum of coordinate squares, square each absolute coordinate bound, multiply by the nonnegative diagonal weight, and identify the constant weighted sum with the diagonal trace.
+Source: Mathlib finite matrix bilinear forms, diagonal traces, absolute-value order, and finite-sum monotonicity
+Used in: diagonal AdaGrad and diagonal Shampoo regret proofs when a diagonal positive-semidefinite preconditioner increment is charged to an infinity-norm comparator radius
+Book citation: book/research/Source.json#/key_lemmas/16/proof/2
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 3 diagonal matrix Shampoo -/
+theorem toBilin_diagonal_self_le_sq_mul_trace_of_coordinate_bound
+    {ι R : Type*} [Fintype ι] [DecidableEq ι]
+    [CommRing R] [LinearOrder R] [IsStrictOrderedRing R]
+    (x d : ι → R) (D : R)
+    (hd : ∀ i, 0 ≤ d i) (hx : ∀ i, |x i| ≤ D) :
+    Matrix.toBilin' (Matrix.diagonal d) x x ≤
+      D ^ 2 * Matrix.trace (Matrix.diagonal d) := by
+  rw [Matrix.toBilin_diagonal_self_eq_sum_sq_mul]
+  calc
+    (∑ i : ι, x i ^ 2 * d i) ≤ ∑ i : ι, D ^ 2 * d i := by
+      refine Finset.sum_le_sum ?_
+      intro i _hi
+      have hD_nonneg : 0 ≤ D := le_trans (abs_nonneg (x i)) (hx i)
+      have hsq : x i ^ 2 ≤ D ^ 2 := by
+        have hsq_abs : |x i| ^ 2 ≤ D ^ 2 :=
+          sq_le_sq.mpr (by simpa [abs_of_nonneg hD_nonneg] using hx i)
+        simpa [sq_abs] using hsq_abs
+      exact mul_le_mul_of_nonneg_right hsq (hd i)
+    _ = D ^ 2 * Matrix.trace (Matrix.diagonal d) := by
+      simp [Matrix.trace_diagonal, Finset.mul_sum]
+
+-- Generalization plan (G0):
+-- concept/name: bilinear self-evaluation trace bound for a diagonal
+--   positive-semidefinite matrix; orig was
+--   quadraticForm_eq_diagonal_le_finiteMax_sq_mul_trace
+-- generality used: arbitrary finite index type and strictly ordered commutative
+--   ring with a star-ring structure; a pointwise coordinate bound replaces the
+--   paper's finite maximum; no optimization, measure, or nonemptiness assumptions
+-- portable call pattern: diagonal AdaGrad, Shampoo, and coordinatewise adaptive
+--   metric proofs supply a PSD metric increment and its diagonal representation,
+--   while the vector, coordinate radius, and metric change between calls
+-- counterargument checked: this composes a prior diagonal weighted-sum bound with
+--   PSD diagonal-entry nonnegativity, but the PSD-matrix contract is the natural
+--   reusable boundary at callers and is not a paper-local rename or pure duplicate
+-- coverage search: symbol searches for "matrix bilinear self upper bound squared
+--   coordinate maximum times trace diagonal positive semidefinite" and "toBilin
+--   self trace diagonal PosSemidef" found only
+--   `Matrix.toBilin_diagonal_self_le_sq_mul_trace_of_coordinate_bound` and related
+--   diagonal expansions; Mathlib semantic search found
+--   `Matrix.PosSemidef.diag_nonneg` and `Matrix.posSemidef_diagonal_iff`, but no
+--   theorem with this abstract-matrix bilinear-form trace conclusion
+-- minimal hypotheses: finiteness evaluates the matrix bilinear form and trace;
+--   decidable equality constructs the diagonal matrix; PSD is used only for
+--   diagonal-entry nonnegativity, and the diagonal equality plus coordinate bound
+--   are pointwise assumptions already minimal for this contract
+
+/-- A positive-semidefinite matrix known to equal its diagonal has bilinear
+self-evaluation at most a squared uniform coordinate bound times its trace.
+
+Layer: Glue | Gap: Level 1 (diagonal PSD bilinear-form infinity-radius trace bound)
+Proof: obtain nonnegativity of every diagonal entry from `Matrix.PosSemidef.diag_nonneg`, rewrite the matrix through its diagonal representation, and apply the diagonal coordinate-bound trace inequality.
+Source: Mathlib positive-semidefinite matrix diagonal-entry order together with finite matrix bilinear forms and traces
+Used in: diagonal AdaGrad and diagonal Shampoo regret estimates when a PSD diagonal metric increment is charged to a uniform coordinate or infinity-norm comparator radius
+Book citation: book/research/Source.json#/key_lemmas/16/proof/2
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 3 diagonal matrix Shampoo -/
+theorem toBilin_self_le_sq_mul_trace_of_diagonal_posSemidef
+    {ι R : Type*} [Fintype ι] [DecidableEq ι]
+    [CommRing R] [LinearOrder R] [IsStrictOrderedRing R] [StarRing R]
+    (x : ι → R) (M : Matrix ι ι R) (D : R)
+    (hMdiag : M = Matrix.diagonal (fun i : ι => M i i))
+    (hMpsd : M.PosSemidef) (hx : ∀ i, |x i| ≤ D) :
+    Matrix.toBilin' M x x ≤ D ^ 2 * Matrix.trace M := by
+  have hd : ∀ i, 0 ≤ M i i := fun i => hMpsd.diag_nonneg
+  calc
+    Matrix.toBilin' M x x =
+        Matrix.toBilin' (Matrix.diagonal (fun i : ι => M i i)) x x := by
+      rw [← hMdiag]
+    _ ≤ D ^ 2 * Matrix.trace (Matrix.diagonal (fun i : ι => M i i)) :=
+      Matrix.toBilin_diagonal_self_le_sq_mul_trace_of_coordinate_bound
+        x (fun i : ι => M i i) D hd hx
+    _ = D ^ 2 * Matrix.trace M := by rw [← hMdiag]
+
+end Matrix
+
+open scoped BigOperators MatrixOrder
+
+namespace Matrix
+
+-- Generalization plan (G0):
+-- concept/name: monotonicity of a real finite-matrix quadratic form under the
+--   Loewner order; orig was `quadraticForm_mono_of_matrix_le`
+-- generality used: an arbitrary finite index type with decidable equality, a
+--   real coordinate vector, and two real square matrices; no positivity of the
+--   individual matrices, finite-dimensional-space, measure, convexity,
+--   smoothness, or oracle assumptions are needed
+-- portable call pattern: adaptive-metric, matrix-preconditioned, and tensor-
+--   preconditioned analyses evaluate a changing Loewner matrix bound at a
+--   vector while the index type, vector, and lower and upper matrices vary
+-- counterargument checked: the proof composes Mathlib's characterization of
+--   Loewner order with positive-semidefinite quadratic-form nonnegativity, but
+--   Mathlib does not package the resulting pointwise monotonicity theorem, so
+--   this is a reusable bridge rather than a pure rename or paper-local wrapper
+-- coverage search: `lean_search_symbols` queries for "matrix toBilin self
+--   monotone Loewner order positive semidefinite difference", "quadratic form
+--   inequality of matrix le", and the precise `toBilin' A x x` inequality
+--   found only quadratic-form expansions and the local source theorem;
+--   Mathlib provides `Matrix.le_iff` and
+--   `Matrix.PosSemidef.dotProduct_mulVec_nonneg`, which are partial coverage
+-- minimal hypotheses: `Fintype` and `DecidableEq` are required by `toBilin'`
+--   and the finite positive-semidefinite matrix API; the scalar is restricted
+--   to `ℝ` because `toBilin' A x x` is the PSD quadratic evaluation without a
+--   conjugated first vector precisely in the real case
+
+/-- Evaluating a finite real matrix bilinear form twice at the same vector is
+monotone in the matrix's Loewner order.
+
+Layer: Glue | Gap: Level 0 (pointwise quadratic-form monotonicity for Loewner-ordered real matrices)
+Proof: rewrite the matrix inequality as positive semidefiniteness of the difference, apply `Matrix.PosSemidef.dotProduct_mulVec_nonneg`, and use linearity of `Matrix.toBilin'` in its matrix argument.
+Source: Mathlib `Mathlib.Analysis.Matrix.Order` and `Mathlib.LinearAlgebra.Matrix.PosDef` APIs for Loewner order and positive-semidefinite quadratic forms
+Used in: adaptive mirror-descent and Shampoo energy estimates that evaluate accumulator, matrix-root, or trace-scaled identity bounds at the current displacement vector
+Book citation: book/research/Source.json#/key_lemmas/0/statement_math
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithms 1--3 -/
+theorem toBilin_self_mono_of_le
+    {ι : Type*} [Fintype ι] [DecidableEq ι]
+    (x : ι → ℝ) {A B : Matrix ι ι ℝ} (hAB : A ≤ B) :
+    Matrix.toBilin' A x x ≤ Matrix.toBilin' B x x := by
+  have hdiff : (B - A).PosSemidef := Matrix.le_iff.mp hAB
+  have hnonneg : 0 ≤ Matrix.toBilin' (B - A) x x := by
+    rw [Matrix.toBilin'_apply']
+    simpa only [star_trivial] using hdiff.dotProduct_mulVec_nonneg x
+  have hsub :
+      Matrix.toBilin' (B - A) x x =
+        Matrix.toBilin' B x x - Matrix.toBilin' A x x := by
+    simp
+  linarith
+
+-- Generalization plan (G0):
+-- concept/name: Euclidean-energy-times-trace upper bound for the self-evaluation
+--   of a positive-semidefinite matrix bilinear form; orig was
+--   `quadraticForm_le_sq_sum_mul_trace_of_posSemidef`
+-- generality used: arbitrary finite coordinate type with decidable equality,
+--   a real vector, and a real positive-semidefinite square matrix; no measure,
+--   optimization, convexity, smoothness, oracle, or nonemptiness assumptions
+-- portable call pattern: covariance, full-matrix adaptive-gradient, and
+--   tensor-preconditioner analyses change the displacement vector and PSD metric
+--   while retaining the same squared Euclidean energy times trace conclusion
+-- counterargument checked: this composes trace domination with quadratic-form
+--   monotonicity, but the resulting standard PSD quadratic trace bound is the
+--   direct contract repeatedly needed by metric-energy callers rather than a
+--   paper-local name, caller-side expression, or pure rename
+-- coverage search: symbol queries for "positive semidefinite quadratic form
+--   upper bound sum squares times trace" and "Matrix toBilin self less equal
+--   trace scalar identity positive semidefinite", plus Mathlib semantic search
+--   for the precise inequality, found partial coverage in
+--   `Matrix.le_trace_smul_one_of_posSemidef` and
+--   `Matrix.toBilin_self_mono_of_le`, but no Mathlib, SOptLib, or approved-round
+--   declaration with the combined conclusion
+-- minimal hypotheses: `Fintype` evaluates the finite bilinear form and trace;
+--   `DecidableEq` supplies the identity matrix; positive semidefiniteness is
+--   exactly the premise needed for trace domination
+
+/-- The self-evaluation of a finite real positive-semidefinite matrix bilinear form
+is at most the vector's sum of squared coordinates times the matrix trace.
+
+Layer: Glue | Gap: Level 1 (positive-semidefinite quadratic-form trace bound)
+Proof: bound the matrix in Loewner order by its trace times the identity, evaluate that order with bilinear-form monotonicity, and expand the scalar identity quadratic form.
+Source: Mathlib finite real matrix bilinear forms and Loewner order, together with the finite positive-semidefinite spectral trace bound
+Used in: matrix and tensor adaptive-preconditioner regret proofs that charge each PSD metric increment against the squared Euclidean comparator radius times its trace
+Book citation: book/research/Source.json#/key_lemmas/8/proof/6
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithms 1--3 -/
+theorem toBilin_self_le_sum_sq_mul_trace_of_posSemidef
+    {ι : Type*} [Fintype ι] [DecidableEq ι]
+    (x : ι → ℝ) (M : Matrix ι ι ℝ) (hM : M.PosSemidef) :
+    Matrix.toBilin' M x x ≤ (∑ i, x i ^ 2) * Matrix.trace M := by
+  classical
+  calc
+    Matrix.toBilin' M x x ≤
+        Matrix.toBilin' (Matrix.trace M • (1 : Matrix ι ι ℝ)) x x :=
+      Matrix.toBilin_self_mono_of_le x
+        (Matrix.le_trace_smul_one_of_posSemidef M hM)
+    _ = (∑ i, x i ^ 2) * Matrix.trace M := by
+      simp [Matrix.toBilin'_apply, Matrix.one_apply, pow_two, mul_comm]
+
+-- Generalization plan (G0):
+-- concept/name: cancellation of an inverse-preconditioned right argument in a
+--   matrix bilinear form; orig was `toBilin_inv_mulVec_right_eq_vectorDot`
+-- generality used: arbitrary finite index type and square matrix over a partially
+--   ordered star field; no measure, convexity, smoothness, oracle, or
+--   algorithm-specific assumptions
+-- portable call pattern: preconditioned-gradient and online mirror-descent proofs
+--   reduce a metric cross-term to the coordinate dot product while the vectors,
+--   positive-definite metric, and finite coordinate type vary
+-- counterargument checked: Mathlib exposes the bilinear-form/matrix-vector identity
+--   and inverse cancellation separately, while the staged positive-definite
+--   cancellation theorem covers only the inner matrix-vector expression; neither
+--   packages this reusable cross-term bridge
+-- coverage search: queries "bilinear form matrix inverse action right vector equals
+--   dot product positive definite" and "toBilin inverse mulVec dotProduct" found
+--   `Matrix.toBilin'_apply'` and `Matrix.mulVec_inv_mulVec_of_posDef` as partial
+--   coverage, but no theorem with the full conclusion
+-- minimal hypotheses: `Fintype` and `DecidableEq` support finite matrix bilinear
+--   forms, and the scalar assumptions are exactly those used to obtain inverse
+--   cancellation from positive definiteness
+
+/-- A positive-definite matrix bilinear form paired with an inverse-preconditioned
+right argument equals the coordinate dot product in the opposite order.
+
+Layer: Glue | Gap: Level 0 (positive-definite bilinear cross-term cancellation)
+Proof: rewrite the bilinear form as a dot product with a matrix-vector action, cancel the positive-definite matrix against its inverse action, and commute the dot product.
+Source: Mathlib finite-matrix bilinear forms, dot products, and positive-definite nonsingular inverse API
+Used in: preconditioned-gradient and online mirror-descent quadratic expansions that reduce a metric cross-term against an inverse-metric gradient to the Euclidean pairing with a comparator displacement
+Book citation: book/research/Source.json#/key_lemmas/0/statement_math
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, adaptive online mirror-descent regret step -/
+theorem toBilin_inv_mulVec_right_eq_dotProduct_of_posDef
+    {K ι : Type*} [Field K] [PartialOrder K] [StarRing K]
+    [Fintype ι] [DecidableEq ι]
+    (a g : ι → K) (H : Matrix ι ι K) (hH : H.PosDef) :
+    Matrix.toBilin' H a (H⁻¹.mulVec g) = dotProduct g a := by
+  calc
+    Matrix.toBilin' H a (H⁻¹.mulVec g) = dotProduct a (H.mulVec (H⁻¹.mulVec g)) :=
+      Matrix.toBilin'_apply' H a (H⁻¹.mulVec g)
+    _ = dotProduct a g := by rw [Matrix.mulVec_inv_mulVec_of_posDef H hH g]
+    _ = dotProduct g a := dotProduct_comm a g
+
+end Matrix
+
+open scoped BigOperators
+
+namespace Matrix
+
+/-- Evaluating the bilinear form associated to `M * diagonal d * Mᵀ` twice at
+`x` gives the weighted sum of the squares of the coordinates of `x` transformed
+by `M`.
+
+Layer: Glue | Gap: Level 1 (diagonal congruence quadratic-form expansion)
+Proof: expand `Matrix.toBilin'`, matrix multiplication, and the diagonal matrix;
+normalize products and commute the three finite sums so the two coordinate sums
+factor into a square.
+Source: Mathlib finite-matrix bilinear forms, diagonal matrices, transpose, and finite big-operator commutation
+Used in: finite-matrix covariance and preconditioner proofs that rewrite quadratic energies as weighted coordinate squares
+Book citation: book/research/Source.json#/source_outline/required_theorem_endpoints
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithms 1--3 -/
+theorem toBilin_mul_diagonal_mul_transpose_self_eq_sum_sq_mul
+    {ι R : Type*} [Fintype ι] [DecidableEq ι] [CommSemiring R]
+    (x d : ι → R) (M : Matrix ι ι R) :
+    Matrix.toBilin' (M * Matrix.diagonal d * M.transpose) x x =
+      ∑ k : ι, (∑ i : ι, x i * M i k) ^ 2 * d k := by
+  classical
+  simp [Matrix.toBilin'_apply, Matrix.mul_apply, Matrix.diagonal_apply,
+    Finset.mul_sum, pow_two, mul_assoc, mul_left_comm, mul_comm]
+  ring_nf
+  let F : ι → ι → ι → R :=
+    fun i j k => x i * x j * d k * M i k * M j k
+  change (∑ i : ι, ∑ j : ι, ∑ k : ι, F i j k) =
+    ∑ k : ι, ∑ i : ι, ∑ j : ι, F i j k
+  calc
+    (∑ i : ι, ∑ j : ι, ∑ k : ι, F i j k) =
+        ∑ i : ι, ∑ k : ι, ∑ j : ι, F i j k := by
+      apply Finset.sum_congr rfl
+      intro i _hi
+      rw [Finset.sum_comm]
+    _ = ∑ k : ι, ∑ i : ι, ∑ j : ι, F i j k := by
+      rw [Finset.sum_comm]
+
+end Matrix
+
+-- Generalization plan (G0):
+-- concept/name: predecessor reindexing from a one-based closed natural interval
+--   to `Fin T`; orig was `sum_Icc_one_matrix_fin_reindex`.
+-- generality used: arbitrary carrier `α` with `[AddCommMonoid α]`, a finite
+--   horizon `T` with `[Nonempty (Fin T)]`, and an arbitrary family `F : Fin T → α`;
+--   no measure, convexity, smoothness, oracle, or finite-dimensional assumptions.
+-- portable call pattern: finite-horizon regret, recurrence, and accumulator proofs
+--   whose one-based paper indices use predecessors while their Lean data use `Fin T`;
+--   the horizon, additive codomain, and summand family may all change.
+-- counterargument checked: although the proof composes two short reindexing APIs,
+--   it is not a pure rename: `sum_Icc_one_eq_sum_range_succ` ends at `range T`,
+--   while `Finset.sum_fin_eq_sum_range` starts from a zero-based range, and this
+--   theorem packages the dependent predecessor coercion needed at call sites.
+-- coverage search: searched `sum closed interval one predecessor equals Fin sum`
+--   and `one based closed interval predecessor indexed sum equals sum over Fin type`;
+--   Mathlib hits `Finset.sum_range`, `Fin.sum_univ_eq_sum_range`, and
+--   `Finset.sum_Ico_eq_sum_range`, while SOptLib has
+--   `sum_Icc_one_eq_sum_range_succ`; all are partial, with no exact theorem found.
+-- minimal hypotheses: `[AddCommMonoid α]` is the finite-sum requirement, and
+--   `[Nonempty (Fin T)]` supplies the total fallback value in the displayed index.
+
+/-- Reindex a one-based closed natural interval sum by predecessors into `Fin T`.
+
+For a nonempty finite horizon, summing a `Fin T`-indexed family at the predecessor
+of every natural index in `Finset.Icc 1 T` equals its sum over all of `Fin T`.
+
+Layer: Glue | Gap: Level 0 (one-based predecessor interval to finite-type sum)
+Proof: rewrite the closed interval as a zero-based successor range with
+  `sum_Icc_one_eq_sum_range_succ`, rewrite the `Fin T` sum as the same range with
+  `Finset.sum_fin_eq_sum_range`, and simplify the dependent predecessor indices.
+Source: Mathlib finite big operators on natural intervals and `Fin`, together with
+  SOptLib's closed one-based interval-to-range reindexing theorem
+Used in: matrix, tensor, and diagonal Shampoo regret proofs when converting
+  one-based loss and gradient-inner-product sums to their native `Fin T` horizon
+Book citation: book/research/Source.json#/additional_algorithm_specs
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic
+  Tensor Optimization, Algorithms 1, 2, and 3 -/
+theorem sum_Icc_one_pred_fin_eq_sum {T : ℕ} [Nonempty (Fin T)]
+    {α : Type*} [AddCommMonoid α] (F : Fin T → α) :
+    (Finset.Icc 1 T).sum
+        (fun s => F (if h : s - 1 < T then ⟨s - 1, h⟩
+          else Classical.choice (inferInstance : Nonempty (Fin T)))) =
+      ∑ t : Fin T, F t := by
+  rw [sum_Icc_one_eq_sum_range_succ]
+  rw [Finset.sum_fin_eq_sum_range]
+  apply Finset.sum_congr rfl
+  intro j hj
+  have hjlt : j < T := by
+    simpa using hj
+  simp [hjlt]
+
+-- Generalization plan (G0):
+-- concept/name: closed form of a finite additive state recurrence; orig was
+--   tensor_corrected_run_accumulator_eq_prefix_sum, renamed
+--   fin_state_eq_base_add_sum_lt_of_succ_eq_add
+-- generality used: an arbitrary finite horizon and additive commutative monoid,
+--   with an initial state and an exact successor-addition recurrence; no order,
+--   topology, measure, optimization, scalar-action, or finite-dimensional assumptions
+-- portable call pattern: finite-horizon AdaGrad, Shampoo, online mirror-descent,
+--   and stochastic-gradient accumulator proofs change the state carrier, base,
+--   increment stream, and horizon while using the same strict-prefix closed form
+-- counterargument checked: Mathlib's `Finset.sum_range_induction` and
+--   `Fin.partialSum_succ` expose supporting range-sum or partial-sum recurrences,
+--   but neither states this fixed-horizon `Fin (T + 1)` state equality with a
+--   masked `Fin T` strict-prefix sum; this is not paper-local traceability
+-- coverage search: queries "finite state equals base plus strict prefix sum
+--   successor recurrence", "additive recurrence closed form finite prefix sum",
+--   and "finite state sequence with successor recurrence equals initial value plus
+--   sum of increments" found `Finset.sum_range_induction`, `Fin.partialSum_succ`,
+--   and `sum_fin_lt_succ_eq_sum_fin_lt_add`; the first two use different
+--   representations and the last supplies only the endpoint decomposition
+-- minimal hypotheses: `AddCommMonoid` supports the unordered masked finite sum;
+--   the initial equation and exact successor recurrence are precisely the data used
+
+/-- A finite additive state recurrence equals its base plus the strict-prefix sum
+of its increments.
+
+Layer: Glue | Gap: Level 1 (finite-state additive recurrence closed form)
+Proof: induct on the `Fin (T + 1)` endpoint, use the initial-state equation at zero, and split the successor masked prefix with `sum_fin_lt_succ_eq_sum_fin_lt_add` before applying the recurrence.
+Source: Mathlib induction on `Fin` and finite big operators, together with the fixed-horizon masked-prefix successor decomposition
+Used in: finite-horizon tensor, full-matrix, diagonal, and coordinatewise adaptive-gradient proofs that rewrite a recursively updated accumulator as its regularized prefix sum
+Book citation: book/research/Source.json#/algorithm_spec/steps/3
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, Algorithm 2 -/
+theorem fin_state_eq_base_add_sum_lt_of_succ_eq_add
+    {T : Nat} {M : Type*} [AddCommMonoid M]
+    (state : Fin (T + 1) → M) (increment : Fin T → M) (base : M)
+    (hzero : state 0 = base)
+    (hsucc : ∀ t : Fin T, state t.succ = state t.castSucc + increment t)
+    (N : Fin (T + 1)) :
+    state N = base + ∑ s : Fin T, if s.1 < N.1 then increment s else 0 := by
+  classical
+  induction N using Fin.induction with
+  | zero => simpa using hzero
+  | succ t ih =>
+      rw [hsucc t]
+      change state t.castSucc + increment t =
+        base + ∑ s : Fin T, if s.1 < t.1 + 1 then increment s else 0
+      rw [sum_fin_lt_succ_eq_sum_fin_lt_add increment t.2]
+      have ih' : state t.castSucc =
+          base + ∑ s : Fin T, if s.1 < t.1 then increment s else 0 := by
+        simpa using ih
+      rw [ih']
+      exact add_assoc base _ _
+
+-- Generalization plan (G0):
+-- concept/name: support-aware finite weighted Cauchy--Schwarz with reciprocal
+--   square-root weights; orig was `spectral_support_weighted_cauchy`.
+-- generality used: an arbitrary finite index type and three real families; only
+--   pointwise nonnegativity of the weights and vanishing of the coefficient on
+--   the zero-weight support are used, with no matrix, spectral, measure,
+--   convexity, smoothness, oracle, or finite-dimensional vector-space data.
+-- portable call pattern: singular-metric, pseudoinverse, and adaptive
+--   preconditioner proofs use this to bound a coordinate pairing while the
+--   finite spectrum, coefficient family, and comparison vector change.
+-- counterargument checked: this is not paper-local traceability or a pure
+--   wrapper because it packages the quarter-power factorization and the
+--   zero-weight support case needed to specialize ordinary Cauchy--Schwarz.
+-- coverage search: searched `finite sum product squared bounded by inverse
+--   square root weight sum times square root weight sum support zero`,
+--   `weighted Cauchy Schwarz finite sum zero weights coefficients vanish`, and
+--   LeanSearch for the full support-aware rpow inequality; Mathlib's
+--   `Finset.sum_mul_sq_le_sq_mul_sq` and `Finset.sq_sum_div_le_sum_sq_div`, and
+--   SOptLib's two-term weighted Cauchy theorem, cover only proof ingredients or
+--   strictly positive/specialized variants, not this complete contract.
+-- minimal hypotheses: `[DecidableEq ι]` from the source is unnecessary under
+--   a local classical choice; nonnegative weights and coefficient vanishing at
+--   zero weights are exactly what handles negative powers at singular weights.
+
+/-- A finite pairing satisfies Cauchy--Schwarz for square-root weights and
+reciprocal square-root weights when coefficients vanish at zero weights.
+
+The support condition permits nonnegative, rather than strictly positive,
+weights and makes the inverse-weighted energy well behaved at singular
+coordinates.
+
+Layer: Glue | Gap: Level 1 (support-aware singular weighted Cauchy--Schwarz)
+Proof: split each summand using reciprocal and direct quarter powers, treating
+  zero weights with the support hypothesis, then apply Mathlib's finite
+  sum-of-products square inequality and identify the two squared energies.
+Source: Mathlib finite-sum Cauchy--Schwarz and real-power addition and
+  multiplication identities
+Used in: singular adaptive-preconditioner and pseudoinverse energy estimates
+  that bound a spectral-coordinate pairing without assuming a positive-definite
+  metric
+Book citation: book/research/Source.json#/algorithm_spec
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic
+  Tensor Optimization, Shampoo tensor online optimization -/
+theorem Finset.sum_mul_sq_le_inverse_sqrt_weight_mul_sqrt_weight
+    {ι : Type*} [Fintype ι]
+    (weight coeff z : ι → ℝ)
+    (hweight_nonneg : ∀ i : ι, 0 ≤ weight i)
+    (hcoeff_zero : ∀ i : ι, weight i = 0 → coeff i = 0) :
+    (∑ i : ι, coeff i * z i) ^ 2 ≤
+      (∑ i : ι, coeff i ^ 2 * (weight i) ^ (-(1 / 2 : ℝ))) *
+        (∑ i : ι, z i ^ 2 * (weight i) ^ (1 / 2 : ℝ)) := by
+  classical
+  let a : ι → ℝ := fun i =>
+    if weight i = 0 then 0 else coeff i * (weight i) ^ (-(1 / 4 : ℝ))
+  let b : ι → ℝ := fun i => z i * (weight i) ^ (1 / 4 : ℝ)
+  have hprod : ∀ i : ι, a i * b i = coeff i * z i := by
+    intro i
+    by_cases hzero : weight i = 0
+    · have hc : coeff i = 0 := hcoeff_zero i hzero
+      simp [a, b, hzero, hc]
+    · have hpos : 0 < weight i :=
+        lt_of_le_of_ne (hweight_nonneg i) (Ne.symm hzero)
+      have hpow :
+          (weight i) ^ (-(1 / 4 : ℝ)) * (weight i) ^ (1 / 4 : ℝ) = 1 := by
+        calc
+          (weight i) ^ (-(1 / 4 : ℝ)) * (weight i) ^ (1 / 4 : ℝ) =
+              (weight i) ^ (-(1 / 4 : ℝ) + (1 / 4 : ℝ)) := by
+                rw [Real.rpow_add hpos]
+          _ = 1 := by norm_num [Real.rpow_zero]
+      calc
+        a i * b i =
+            (coeff i * (weight i) ^ (-(1 / 4 : ℝ))) *
+              (z i * (weight i) ^ (1 / 4 : ℝ)) := by
+            simp [a, b, hzero]
+        _ = coeff i * z i *
+              ((weight i) ^ (-(1 / 4 : ℝ)) * (weight i) ^ (1 / 4 : ℝ)) := by
+            ring
+        _ = coeff i * z i := by
+            rw [hpow]
+            ring
+  have ha_sq : ∀ i : ι,
+      a i ^ 2 = coeff i ^ 2 * (weight i) ^ (-(1 / 2 : ℝ)) := by
+    intro i
+    by_cases hzero : weight i = 0
+    · have hc : coeff i = 0 := hcoeff_zero i hzero
+      simp [a, hzero, hc]
+    · have hpos : 0 < weight i :=
+        lt_of_le_of_ne (hweight_nonneg i) (Ne.symm hzero)
+      have hpow :
+          ((weight i) ^ (-(1 / 4 : ℝ))) ^ 2 =
+            (weight i) ^ (-(1 / 2 : ℝ)) := by
+        calc
+          ((weight i) ^ (-(1 / 4 : ℝ))) ^ 2 =
+              ((weight i) ^ (-(1 / 4 : ℝ))) ^ (2 : ℝ) := by
+                rw [Real.rpow_two]
+          _ = (weight i) ^ (-(1 / 4 : ℝ) * (2 : ℝ)) := by
+                rw [← Real.rpow_mul (le_of_lt hpos)]
+          _ = (weight i) ^ (-(1 / 2 : ℝ)) := by norm_num
+      calc
+        a i ^ 2 = (coeff i * (weight i) ^ (-(1 / 4 : ℝ))) ^ 2 := by
+          simp [a, hzero]
+        _ = coeff i ^ 2 * ((weight i) ^ (-(1 / 4 : ℝ))) ^ 2 := by
+          ring
+        _ = coeff i ^ 2 * (weight i) ^ (-(1 / 2 : ℝ)) := by
+          rw [hpow]
+  have hb_sq : ∀ i : ι,
+      b i ^ 2 = z i ^ 2 * (weight i) ^ (1 / 2 : ℝ) := by
+    intro i
+    by_cases hzero : weight i = 0
+    · simp [b, hzero]
+    · have hpos : 0 < weight i :=
+        lt_of_le_of_ne (hweight_nonneg i) (Ne.symm hzero)
+      have hpow :
+          ((weight i) ^ (1 / 4 : ℝ)) ^ 2 =
+            (weight i) ^ (1 / 2 : ℝ) := by
+        calc
+          ((weight i) ^ (1 / 4 : ℝ)) ^ 2 =
+              ((weight i) ^ (1 / 4 : ℝ)) ^ (2 : ℝ) := by
+                rw [Real.rpow_two]
+          _ = (weight i) ^ ((1 / 4 : ℝ) * (2 : ℝ)) := by
+                rw [← Real.rpow_mul (le_of_lt hpos)]
+          _ = (weight i) ^ (1 / 2 : ℝ) := by norm_num
+      calc
+        b i ^ 2 = (z i * (weight i) ^ (1 / 4 : ℝ)) ^ 2 := by
+          simp [b]
+        _ = z i ^ 2 * ((weight i) ^ (1 / 4 : ℝ)) ^ 2 := by
+          ring
+        _ = z i ^ 2 * (weight i) ^ (1 / 2 : ℝ) := by
+          rw [hpow]
+  have hcs := Finset.sum_mul_sq_le_sq_mul_sq
+    (s := (Finset.univ : Finset ι)) (f := a) (g := b)
+  have hleft :
+      (∑ i : ι, a i * b i) ^ 2 = (∑ i : ι, coeff i * z i) ^ 2 := by
+    congr 1
+    exact Finset.sum_congr rfl (by intro i _hi; exact hprod i)
+  have hright₁ :
+      (∑ x : ι, a x ^ 2) =
+        ∑ i : ι, coeff i ^ 2 * (weight i) ^ (-(1 / 2 : ℝ)) :=
+    Finset.sum_congr rfl (by intro i _hi; exact ha_sq i)
+  have hright₂ :
+      (∑ x : ι, b x ^ 2) =
+        ∑ i : ι, z i ^ 2 * (weight i) ^ (1 / 2 : ℝ) :=
+    Finset.sum_congr rfl (by intro i _hi; exact hb_sq i)
+  simpa [hleft, hright₁, hright₂] using hcs
+
+namespace Matrix
+
+-- Generalization plan (G0):
+-- concept/name: inverse-metric shift expansion of a matrix bilinear form;
+--   orig was `quadraticForm_omd_shift_expansion`
+-- generality used: arbitrary finite coordinate type, real step scalar and
+--   vectors, and a positive-definite real square matrix; no measure,
+--   convexity, smoothness, oracle, or algorithm-specific assumptions
+-- portable call pattern: preconditioned gradient, online Newton, and
+--   variable-metric mirror analyses expand the metric energy after an
+--   inverse-metric direction step while the point, direction, step size,
+--   metric, and coordinate type vary
+-- counterargument checked: the generic symmetric affine-line expansion is
+--   existing SOptLib coverage, but it does not cancel the inverse-metric cross
+--   term or identify the inverse-metric self term; this theorem packages both
+--   nontrivial bridges in the recurring shifted-energy contract
+-- coverage search: queries "quadratic form inverse matrix gradient shift
+--   expansion positive definite", "toBilin inverse mulVec shift self", and
+--   "finite matrix quadratic form subtraction expansion symmetric" found
+--   `SOptLib.matrix_toBilin_add_smul_self_of_symm`,
+--   `SOptLib.finiteMatrixQuadraticForm_sub_expansion`, and
+--   `Matrix.toBilin_inv_mulVec_right_eq_dotProduct_of_posDef` as partial
+--   coverage; Mathlib semantic search found `Matrix.toQuadraticMap'` but no
+--   declaration with this inverse-shift conclusion
+-- minimal hypotheses: positive definiteness supplies both symmetry and inverse
+--   cancellation; `Fintype` and `DecidableEq` are required by finite matrix
+--   bilinear forms and matrix inversion, and all remaining data are explicit
+
+/-- Expanding a positive-definite matrix bilinear form after an inverse-metric
+shift gives the original energy, the Euclidean cross term, and the
+inverse-metric energy of the shift direction.
+
+Layer: Glue | Gap: Level 1 (inverse-metric quadratic shift expansion)
+Proof: apply the symmetric bilinear affine-line expansion supplied by positive definiteness, then use positive-definite matrix inverse cancellation on the cross and self terms and normalize the scalar polynomial.
+Source: Mathlib finite-matrix bilinear forms and positive-definite nonsingular inversion, together with SOptLib symmetric bilinear affine-line expansion
+Used in: preconditioned-gradient, online Newton, and adaptive online mirror-descent one-step potential identities after substituting an inverse-metric gradient update
+Book citation: book/research/Source.json#/key_lemmas/0/statement_math
+Origin algorithm: Gupta, Koren, and Singer, Shampoo: Preconditioned Stochastic Tensor Optimization, adaptive online mirror-descent regret step -/
+theorem toBilin_inv_mulVec_shift_self
+    {ι : Type*} [Fintype ι] [DecidableEq ι]
+    (eta : ℝ) (a g : ι → ℝ) (H : Matrix ι ι ℝ) (hH : H.PosDef) :
+    Matrix.toBilin' H (a - eta • H⁻¹.mulVec g) (a - eta • H⁻¹.mulVec g) =
+      Matrix.toBilin' H a a - 2 * eta * dotProduct g a +
+        eta ^ 2 * Matrix.toBilin' H⁻¹ g g := by
+  let v : ι → ℝ := H⁻¹.mulVec g
+  have hsym : ∀ i j : ι, H i j = H j i := by
+    intro i j
+    have h := hH.isHermitian.apply i j
+    simpa using h.symm
+  have hB : ∀ x y : ι → ℝ,
+      Matrix.toBilin' H x y = Matrix.toBilin' H y x := by
+    intro x y
+    rw [Matrix.toBilin'_apply, Matrix.toBilin'_apply]
+    calc
+      (∑ i, ∑ j, x i * H i j * y j) =
+          ∑ j, ∑ i, x i * H i j * y j := by
+            rw [Finset.sum_comm]
+      _ = ∑ j, ∑ i, y j * H j i * x i := by
+            refine Finset.sum_congr rfl ?_
+            intro j _hj
+            refine Finset.sum_congr rfl ?_
+            intro i _hi
+            rw [hsym i j]
+            ring
+      _ = ∑ i, ∑ j, y i * H i j * x j := rfl
+  have hcross : Matrix.toBilin' H a v = dotProduct g a := by
+    simpa [v] using
+      Matrix.toBilin_inv_mulVec_right_eq_dotProduct_of_posDef a g H hH
+  have hself : Matrix.toBilin' H v v = Matrix.toBilin' H⁻¹ g g := by
+    calc
+      Matrix.toBilin' H v v = dotProduct g v := by
+        simpa [v] using
+          Matrix.toBilin_inv_mulVec_right_eq_dotProduct_of_posDef v g H hH
+      _ = Matrix.toBilin' H⁻¹ g g := by
+        simpa [v] using (Matrix.toBilin'_apply' H⁻¹ g g).symm
+  have hexpand :
+      Matrix.toBilin' H (a + (-eta) • v) (a + (-eta) • v) =
+        Matrix.toBilin' H a a + 2 * (-eta) * Matrix.toBilin' H a v +
+          (-eta) ^ 2 * Matrix.toBilin' H v v := by
+    have hcomm : Matrix.toBilin' H v a = Matrix.toBilin' H a v := hB v a
+    rw [LinearMap.BilinForm.add_left, LinearMap.BilinForm.add_right,
+      LinearMap.BilinForm.add_right, LinearMap.BilinForm.smul_right,
+      LinearMap.BilinForm.smul_left, LinearMap.BilinForm.smul_right,
+      LinearMap.BilinForm.smul_left, hcomm]
+    ring
+  rw [hcross, hself] at hexpand
+  simpa [v, sub_eq_add_neg] using hexpand
+
+end Matrix
+
+/-! Phase 4 batch 6: `le_abs_of_abs_sub_le_of_add_le_abs`. -/
+
+-- Generalization plan (G0):
+-- concept/name: absolute-value lower bound transferred across a bounded perturbation;
+--   orig was `abs_integral_lower_of_close_to_deterministic_signal`
+-- generality used: four elements of a lattice-ordered additive commutative group, with
+--   only a bound on their absolute difference and a target-margin inequality; the source
+--   measure, function, and integral are incidental
+-- portable call pattern: perturbation and persistence arguments that approximate a
+--   deterministic signal and transfer its absolute margin to the approximating scalar,
+--   varying the approximation, target, error allowance, and desired floor
+-- counterargument checked: this is not paper-local traceability or a pure rename; it
+--   composes reverse triangle with an error-budget inequality into a directly callable
+--   margin-transfer contract, while removing the source's incidental integral wrapper
+-- coverage search: queried absolute-value lower bounds from bounded differences, target
+--   margins, and reverse triangle; Mathlib hits `abs_abs_sub_abs_le` and
+--   `abs_sub_abs_le_abs_sub` provide only the reverse-triangle ingredient, and no SOptLib
+--   or approved round entry states the complete two-hypothesis implication
+-- minimal hypotheses: all hypotheses are pointwise scalar inequalities and already minimal;
+--   no nonnegativity, measure, measurability, integrability, or optimization assumptions
+
+/-- Closeness to a target transfers an absolute target margin to the approximating scalar.
+
+Layer: Glue | Gap: Level 1 (absolute lower bound under a bounded scalar perturbation)
+Proof: use the absolute-value triangle inequality to bound the target by the approximation plus their absolute difference, then absorb that difference with the supplied error budget.
+Source: Mathlib lattice-ordered additive-group absolute-value triangle inequality `abs_add_le`, subtraction symmetry `abs_sub_comm`, and ordered subtraction
+Used in: slow-mode persistence and perturbation arguments that turn closeness of a stochastic mean to a deterministic signal into a uniform absolute mean floor
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/16/proof/2
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem le_abs_of_abs_sub_le_of_add_le_abs
+    {α : Type*} [Lattice α] [AddCommGroup α] [AddLeftMono α]
+    (A target c err : α)
+    (hclose : |A - target| ≤ err)
+    (hmargin : c + err ≤ |target|) :
+    c ≤ |A| := by
+  have htarget_le : |target| ≤ |A| + |A - target| := by
+    calc
+      |target| = |(target - A) + A| := by rw [sub_add_cancel]
+      _ ≤ |target - A| + |A| := abs_add_le (target - A) A
+      _ = |A| + |A - target| := by rw [abs_sub_comm, add_comm]
+  calc
+    c ≤ |target| - err := (le_sub_iff_add_le).2 hmargin
+    _ ≤ |target| - |A - target| := sub_le_sub_left hclose |target|
+    _ ≤ |A| := (sub_le_iff_le_add).2 htarget_le
+
+/-! Phase 4 batch 6: `ContinuousLinearEquiv_exists_prod_shear_equiv`. -/
+
+-- Generalization plan (G0):
+-- concept/name: continuous-linear product shear equivalence; orig was
+--   augmented_bordered_unit_eigenpair_jacobian_equiv
+-- generality used: an arbitrary semiring, topological modules, a continuous linear equivalence
+--   between the second factors, and a continuous linear off-diagonal map; only the shear codomain
+--   needs an additive group with continuous subtraction
+-- portable call pattern: implicit-function and block-Jacobian proofs whose parameter coordinate
+--   is fixed while an invertible state block receives a linear parameter perturbation
+-- counterargument checked: this is not paper-local traceability or a pure wrapper;
+--   `ContinuousLinearEquiv.prodCongr` covers only the block-diagonal part and does not package
+--   the off-diagonal shear or its inverse
+-- coverage search: searched "continuous linear equivalence product shear invertible diagonal
+--   off diagonal map", "continuous linear equivalence product triangular map identity first
+--   coordinate", and "LinearEquiv prod shear"; Mathlib's `prodCongr` is partial coverage and
+--   its block-triangular matrix results are restricted to finite matrices, while SOptLib has no hit
+-- minimal hypotheses: no norm, scalar-topology, completeness, or finite-dimensional assumption is
+--   used; continuity of addition on the shear codomain follows from continuous subtraction
+
+/-- An invertible continuous-linear block on the second factor remains invertible after adding a
+continuous-linear shear from the first factor.
+
+Layer: Glue | Gap: Level 1 (continuous-linear block-triangular shear equivalence)
+Proof: construct the inverse explicitly by subtracting the shear and applying the inverse of the
+  second-factor equivalence; continuity follows from the continuous-linear map operations.
+Source: Mathlib continuous linear equivalences and continuous linear maps on product spaces
+Used in: analytic implicit-function and block-Jacobian arguments that augment an invertible state
+  derivative with an identity parameter coordinate and an off-diagonal parameter derivative
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/12
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem ContinuousLinearEquiv.exists_prod_shear_equiv
+    {K V W Z : Type*} [Semiring K]
+    [TopologicalSpace V] [AddCommMonoid V] [Module K V]
+    [TopologicalSpace W] [AddCommMonoid W] [Module K W]
+    [TopologicalSpace Z] [AddCommGroup Z] [Module K Z] [ContinuousSub Z]
+    (E : W ≃L[K] Z) (b : V →L[K] Z) :
+    ∃ e : (V × W) ≃L[K] (V × Z),
+      ∀ x : V × W, e x = (x.1, E x.2 + b x.1) := by
+  have hneg : Continuous fun z : Z => -z := by
+    have hzero : Continuous fun _ : Z => (0 : Z) := continuous_const
+    simpa only [zero_sub] using hzero.sub continuous_id
+  have hadd : Continuous fun z : Z × Z => z.1 + z.2 := by
+    have hsub : Continuous fun z : Z × Z => z.1 - -z.2 :=
+      continuous_fst.sub (hneg.comp continuous_snd)
+    simpa only [sub_neg_eq_add] using hsub
+  let e : (V × W) ≃L[K] (V × Z) :=
+    { (LinearEquiv.refl K V).skewProd E.toLinearEquiv b.toLinearMap with
+      continuous_toFun :=
+        continuous_fst.prodMk <|
+          hadd.comp <| (E.continuous.comp continuous_snd).prodMk <|
+            b.continuous.comp continuous_fst
+      continuous_invFun :=
+        continuous_fst.prodMk <|
+          E.symm.continuous.comp <| continuous_snd.sub <|
+            b.continuous.comp continuous_fst }
+  exact ⟨e, fun _ => rfl⟩
+
+/-! Phase 4 batch 6: `normalized_sum_sq_ge_of_positive_density_abs_lower`. -/
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: normalized squared-sum lower bound from an absolute floor on a
+--   positive-density subset; orig was
+--   average_iterate_mean_square_floor_of_positive_density_abs_lower_source
+-- generality used: an ordered-field-valued natural-time signal, an ordered-field
+--   weight, lower floor, and density, a positive finite horizon, and a subset/cardinality
+--   certificate; no measure, convexity, smoothness, oracle, normed-space, or
+--   finite-dimensional assumptions are used
+-- portable call pattern: persistence and lower-bound arguments for stochastic
+--   approximation, distributed optimization, and sampled dynamical systems vary
+--   the signal, weight, horizon, subset, pointwise floor, and density while the
+--   normalized full squared-sum conclusion stays fixed
+-- counterargument checked: this is not paper-local traceability or a pure rename;
+--   it packages the recurring passage from pointwise persistence on a dense
+--   subset through subset-sum monotonicity and horizon normalization
+-- coverage search: searched `normalized finite sum squares lower bound positive
+--   density subset pointwise absolute lower` and `sum over subset lower bound from
+--   pointwise lower bound cardinality`; Mathlib supplies Finset.sum_le_sum and
+--   Finset.sum_le_sum_of_subset_of_nonneg as components, while neither Mathlib nor
+--   SOptLib contains the combined normalized positive-density conclusion
+-- minimal hypotheses: density nonnegativity from the source theorem is unused and
+--   removed; positivity of the horizon, nonnegativity of the floor, subset
+--   containment, the cardinality lower bound, and the pointwise floor are used
+
+/-- A pointwise absolute floor on a positive-density subset lower-bounds the
+normalized weighted sum of squares over the whole horizon.
+
+Layer: Glue | Gap: Level 1 (positive-density normalized squared-sum lower bound)
+Proof: square the pointwise absolute floor, sum it over the certified subset, enlarge to the nonnegative full-horizon sum, and normalize using the cardinality-density bound.
+Source: Mathlib finite ordered sums, subset-sum monotonicity, absolute values, and ordered-field inverse arithmetic
+Used in: persistence arguments for stochastic and distributed iterates that turn a lower bound on a positive-density selection of times into a nonvanishing mean-square horizon average
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/16/proof/2
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem normalized_sum_sq_ge_of_positive_density_abs_lower
+    {K : Type*} [Field K] [LinearOrder K] [IsStrictOrderedRing K]
+    (signal : ℕ → K) (weight lower density : K) (T : ℕ) (S : Finset ℕ)
+    (hT_pos : 0 < T)
+    (hlower_nonneg : 0 ≤ lower)
+    (hS_subset : S ⊆ Finset.range T)
+    (hcard_lower : density * (T : K) ≤ (S.card : K))
+    (hpoint : ∀ t ∈ S, lower ≤ |signal t|) :
+    weight ^ 2 * lower ^ 2 * density ≤
+      ((T : K)⁻¹) *
+        Finset.sum (Finset.range T) (fun t =>
+          weight ^ 2 * |signal t| ^ 2) := by
+  classical
+  let A : K := weight ^ 2 * lower ^ 2
+  have hA_nonneg : 0 ≤ A := by
+    dsimp [A]
+    exact mul_nonneg (sq_nonneg weight) (sq_nonneg lower)
+  have hterm_nonneg :
+      ∀ t ∈ Finset.range T, 0 ≤ weight ^ 2 * |signal t| ^ 2 := by
+    intro t _ht
+    exact mul_nonneg (sq_nonneg weight) (sq_nonneg |signal t|)
+  have hS_point :
+      ∀ t ∈ S, A ≤ weight ^ 2 * |signal t| ^ 2 := by
+    intro t ht
+    have hsquare : lower ^ 2 ≤ |signal t| ^ 2 := by
+      nlinarith [hlower_nonneg, abs_nonneg (signal t), hpoint t ht]
+    dsimp [A]
+    exact mul_le_mul_of_nonneg_left hsquare (sq_nonneg weight)
+  have hS_sum_lower :
+      (S.card : K) * A ≤
+        Finset.sum S (fun t => weight ^ 2 * |signal t| ^ 2) := by
+    have hconst :
+        Finset.sum S (fun _t => A) ≤
+          Finset.sum S (fun t => weight ^ 2 * |signal t| ^ 2) :=
+      Finset.sum_le_sum hS_point
+    simpa [Finset.sum_const, nsmul_eq_mul, mul_comm] using hconst
+  have hS_sum_le_total :
+      Finset.sum S (fun t => weight ^ 2 * |signal t| ^ 2) ≤
+        Finset.sum (Finset.range T) (fun t => weight ^ 2 * |signal t| ^ 2) :=
+    Finset.sum_le_sum_of_subset_of_nonneg hS_subset
+      (by
+        intro t ht_range _ht_not_S
+        exact hterm_nonneg t ht_range)
+  have hT_scalar_pos : 0 < (T : K) := by
+    exact_mod_cast hT_pos
+  have hT_ne : (T : K) ≠ 0 := ne_of_gt hT_scalar_pos
+  have hdensity_le_ratio :
+      density ≤ (T : K)⁻¹ * (S.card : K) := by
+    calc
+      density = (T : K)⁻¹ * (density * (T : K)) := by
+        field_simp [hT_ne]
+      _ ≤ (T : K)⁻¹ * (S.card : K) :=
+        mul_le_mul_of_nonneg_left hcard_lower
+          (inv_nonneg.mpr (le_of_lt hT_scalar_pos))
+  have hfloor_to_subset :
+      A * density ≤ (T : K)⁻¹ * ((S.card : K) * A) := by
+    calc
+      A * density ≤ A * ((T : K)⁻¹ * (S.card : K)) :=
+        mul_le_mul_of_nonneg_left hdensity_le_ratio hA_nonneg
+      _ = (T : K)⁻¹ * ((S.card : K) * A) := by ring
+  calc
+    weight ^ 2 * lower ^ 2 * density = A * density := by rfl
+    _ ≤ (T : K)⁻¹ * ((S.card : K) * A) := hfloor_to_subset
+    _ ≤ (T : K)⁻¹ *
+          Finset.sum S (fun t => weight ^ 2 * |signal t| ^ 2) :=
+        mul_le_mul_of_nonneg_left hS_sum_lower
+          (inv_nonneg.mpr (le_of_lt hT_scalar_pos))
+    _ ≤ (T : K)⁻¹ *
+          Finset.sum (Finset.range T) (fun t =>
+            weight ^ 2 * |signal t| ^ 2) :=
+        mul_le_mul_of_nonneg_left hS_sum_le_total
+          (inv_nonneg.mpr (le_of_lt hT_scalar_pos))
+
+
+
+-- Generalization plan (G0):
+-- concept/name: existence of a positive-density finite selection of multiples
+--   below a horizon; orig was block_boundary_positive_density_subset_source
+-- generality used: natural stride and horizon with positivity of the stride and
+--   the lower-horizon condition `p ≤ T`, with the density inequality valued in
+--   any linearly ordered field; no measure, optimization, convexity,
+--   normed-space, or finite-dimensional assumptions are used
+-- portable call pattern: block, epoch, periodic, and deterministic subsampling
+--   arguments vary the positive stride and horizon while retaining range
+--   membership, a half-density cardinality bound, and a multiple witness
+-- counterargument checked: although the construction composes standard finite-set
+--   and natural-division facts, it is not a pure rename or paper-local wrapper;
+--   callers otherwise must repeatedly package the same subset, density, and
+--   representation contract
+-- coverage search: searched `multiples of positive natural stride subset range
+--   cardinality lower bound half horizon divided by stride`, `finite image
+--   multiples range injective cardinality density lower bound`, and the semantic
+--   Mathlib query `finite set of multiples of positive p below T with cardinality
+--   at least T divided by 2 p`; Mathlib's `Nat.card_multiples` and
+--   `Nat.Ioc_filter_dvd_card_eq_div` give related exact cardinalities but not the
+--   zero-based subset/range/density/witness package, and SOptLib has no full match
+-- minimal hypotheses: positivity of `p` is used for injectivity and strict range
+--   membership; `p ≤ T` is used to obtain the half-density estimate
+
+/-- Multiples of a positive stride below a sufficiently large horizon contain a
+finite subset whose cardinality in any linearly ordered field is at least half
+the horizon-to-stride ratio.
+
+Layer: Glue | Gap: Level 1 (positive-density selection of bounded multiples)
+Proof: take the image of `range (T / p)` under multiplication by `p`, use positivity for injectivity and strict range membership, and derive the ordered-field half-density estimate from Euclidean division bounds.
+Source: Mathlib finite-set images, natural-number Euclidean division, cast arithmetic, and ordered-field inequalities
+Used in: block, epoch, periodic, and deterministic subsampling arguments selecting a positive-density family of complete stride boundaries inside a finite horizon
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/16/proof/2
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem exists_multiples_subset_range_with_half_density
+    {K : Type*} [Field K] [LinearOrder K] [IsStrictOrderedRing K]
+    (p T : ℕ) (hp : 0 < p) (hT : p ≤ T) :
+    ∃ S : Finset ℕ,
+      S ⊆ Finset.range T ∧
+        ((1 : K) / (2 * (p : K))) * (T : K) ≤ (S.card : K) ∧
+          ∀ t ∈ S, ∃ k : ℕ, k < T / p ∧ t = k * p := by
+  classical
+  let S : Finset ℕ := (Finset.range (T / p)).image (fun k : ℕ => k * p)
+  refine ⟨S, ?_, ?_, ?_⟩
+  · intro t ht
+    dsimp [S] at ht
+    rcases Finset.mem_image.mp ht with ⟨k, hk, rfl⟩
+    simp at hk ⊢
+    have hk_succ : k + 1 ≤ T / p := Nat.succ_le_of_lt hk
+    have hmul_le : (k + 1) * p ≤ (T / p) * p :=
+      Nat.mul_le_mul_right p hk_succ
+    have hdiv_mul_le : (T / p) * p ≤ T := Nat.div_mul_le_self T p
+    have hk_mul_lt : k * p < (k + 1) * p :=
+      Nat.mul_lt_mul_of_pos_right (Nat.lt_succ_self k) hp
+    exact lt_of_lt_of_le hk_mul_lt (le_trans hmul_le hdiv_mul_le)
+  · have hcard : S.card = T / p := by
+      dsimp [S]
+      rw [Finset.card_image_of_injective]
+      · simp
+      · intro a b h
+        exact Nat.mul_right_cancel hp h
+    have hp_K_pos : 0 < (p : K) := by exact_mod_cast hp
+    let qK : K := ((T / p : ℕ) : K)
+    have hq_ge_one_nat : 1 ≤ T / p := by
+      rw [Nat.le_div_iff_mul_le hp]
+      simpa using hT
+    have hq_ge_one : 1 ≤ qK := by
+      dsimp [qK]
+      exact_mod_cast hq_ge_one_nat
+    have hT_le_succ_nat : T ≤ p * (T / p + 1) :=
+      le_of_lt (Nat.lt_mul_div_succ T hp)
+    have hT_K_le : (T : K) ≤ (qK + 1) * (p : K) := by
+      have hcast : (T : K) ≤ (p * (T / p + 1) : ℕ) := by
+        exact_mod_cast hT_le_succ_nat
+      dsimp [qK]
+      simpa [Nat.cast_mul, Nat.cast_add, Nat.cast_one, mul_comm,
+        mul_left_comm, mul_assoc] using hcast
+    have hq_succ_le_two_q : qK + 1 ≤ 2 * qK := by
+      linarith
+    have hT_over_bound : (T : K) / (2 * (p : K)) ≤ qK := by
+      have hden_pos : 0 < 2 * (p : K) := by positivity
+      calc
+        (T : K) / (2 * (p : K)) ≤
+            ((qK + 1) * (p : K)) / (2 * (p : K)) := by
+          exact div_le_div_of_nonneg_right hT_K_le (le_of_lt hden_pos)
+        _ = (qK + 1) / 2 := by
+          field_simp [ne_of_gt hp_K_pos]
+        _ ≤ qK := by linarith
+    rw [hcard]
+    dsimp [qK] at hT_over_bound
+    simpa [div_eq_mul_inv, mul_comm, mul_left_comm, mul_assoc] using
+      hT_over_bound
+  · intro t ht
+    dsimp [S] at ht
+    rcases Finset.mem_image.mp ht with ⟨k, hk, hkt⟩
+    refine ⟨k, ?_, ?_⟩
+    · simpa using hk
+    · exact hkt.symm
+
+
+
+-- Generalization plan (G0):
+-- concept/name: normalized squared-sum lower bound from an absolute floor at
+--   positive-stride multiples; orig was
+--   average_iterate_mean_square_floor_of_block_boundary_abs_lower
+-- generality used: a natural-time signal valued in any linearly ordered field,
+--   an arbitrary field-valued weight and lower floor, and natural period and
+--   horizon; no measure, optimization, normed-space, convexity, oracle, or
+--   finite-dimensional assumptions are used
+-- portable call pattern: periodic, block, epoch, and deterministic-subsampling
+--   analyses vary the diagnostic signal, scalar weight, floor, stride, and
+--   horizon while retaining the same full-horizon normalized energy conclusion
+-- counterargument checked: although this composes the positive-density subset
+--   constructor with the positive-density energy bound, it is not a pure rename
+--   or caller-side expression; it packages the reusable bridge from a hypothesis
+--   stated only at block multiples to a bound over every time in the horizon
+-- coverage search: searched `normalized sum squares lower bound block multiples
+--   absolute lower bound` and `multiples subset range half density normalized
+--   squared sum lower bound`; the nearest SOptLib/project hits are
+--   `exists_multiples_subset_range_with_half_density` and
+--   `normalized_sum_sq_ge_of_positive_density_abs_lower`, which provide the two
+--   strict components but not their combined conclusion, and Mathlib LeanSearch
+--   returned no theorem with the block-multiple-to-normalized-sum contract
+-- minimal hypotheses: positivity of the period, `period <= T`, nonnegativity of
+--   the floor, and the block-multiple pointwise bound are all used; the source's
+--   stronger `2 * period <= T` assumption is weakened to `period <= T`
+
+/-- An absolute lower bound at every complete positive-stride multiple yields an
+explicit normalized weighted squared-signal floor over the full horizon.
+
+Layer: Glue | Gap: Level 1 (block-multiple normalized squared-sum lower bound)
+Proof: select a half-density finite subset of positive-stride multiples, transfer the block-multiple floor to that subset, and apply the positive-density normalized squared-sum bound.
+Source: Mathlib finite-set images and ordered-field finite sums, via `exists_multiples_subset_range_with_half_density` and `normalized_sum_sq_ge_of_positive_density_abs_lower`
+Used in: periodic and block stochastic-optimization lower bounds that turn persistent signal magnitude at complete block starts into a nonvanishing full-horizon mean-square energy
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/16/proof/2
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem normalized_sum_sq_ge_of_block_multiples_abs_lower
+    {K : Type*} [Field K] [LinearOrder K] [IsStrictOrderedRing K]
+    (signal : ℕ → K) (weight lower : K) (period T : ℕ)
+    (hperiod_pos : 0 < period)
+    (hperiod_le : period ≤ T)
+    (hlower_nonneg : 0 ≤ lower)
+    (hpoint : ∀ k : ℕ, k < T / period → lower ≤ |signal (k * period)|) :
+    weight ^ 2 * lower ^ 2 * ((1 : K) / (2 * (period : K))) ≤
+      ((T : K)⁻¹) *
+        Finset.sum (Finset.range T) (fun t =>
+          weight ^ 2 * |signal t| ^ 2) := by
+  classical
+  rcases
+      exists_multiples_subset_range_with_half_density
+        (K := K) period T hperiod_pos hperiod_le with
+    ⟨S, hS_subset, hcard_lower, hS_mem⟩
+  have hT_pos : 0 < T := lt_of_lt_of_le hperiod_pos hperiod_le
+  exact
+    normalized_sum_sq_ge_of_positive_density_abs_lower
+      signal weight lower ((1 : K) / (2 * (period : K))) T S
+      hT_pos hlower_nonneg hS_subset hcard_lower
+      (by
+        intro t ht
+        rcases hS_mem t ht with ⟨k, hk, rfl⟩
+        exact hpoint k hk)
+
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: positive-stride range-sum domination; orig was
+--   block_start_stride_sum_le_full_range
+-- generality used: an additive commutative monoid with a preorder and
+--   left-monotone addition; no measure, convexity, smoothness, or oracle data
+-- portable call pattern: epoch and periodic analyses compare a nonnegative
+--   cost sampled at block starts with its dense-horizon cost while changing
+--   the sequence, block count, and positive block length
+-- counterargument checked: this is not merely paper traceability or a pure
+--   rename; it packages the reusable arithmetic partition of a horizon into
+--   positive-length blocks, while the closest subset-sum API still requires
+--   callers to construct and reindex the stride image
+-- coverage search: "nonnegative sum at stride multiples bounded by full
+--   range" and "sum over multiples in range bounded by sum over all natural
+--   numbers" found Mathlib `Finset.sum_le_sum_of_subset_of_nonneg` and SOptLib
+--   `Finset.sum_subset_mul_nonneg_right_le`; both are partial because neither
+--   states the positive-stride range comparison
+-- minimal hypotheses: pointwise nonnegativity and positivity of the stride;
+--   all algebraic typeclasses are used by finite sums and order monotonicity
+
+/-- Sampling a nonnegative sequence at positive-stride multiples gives no more
+mass than summing the sequence over the complete covered range.
+
+Layer: Glue | Gap: Level 1 (positive-stride sparse-to-dense range-sum comparison)
+Proof: induct on the number of blocks, bound each new block-start term by its
+  nonnegative phase sum, and split the dense range at the preceding horizon.
+Source: Mathlib finite sums over natural ranges and ordered additive monoids
+Used in: periodic and epoch-based optimization analyses that charge block-start
+  state energies to the dense energy over the corresponding complete horizon
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/6/proof/15
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem sum_range_stride_mul_le_sum_range_mul_of_nonneg
+    {A : Type*} [AddCommMonoid A] [Preorder A] [AddLeftMono A]
+    (q : ℕ → A) (M p : ℕ) (hq : ∀ t, 0 ≤ q t) (hp : 0 < p) :
+    (∑ k ∈ Finset.range M, q (k * p)) ≤
+      ∑ t ∈ Finset.range (M * p), q t := by
+  induction M with
+  | zero => simp
+  | succ M ih =>
+      have hphase : q (M * p) ≤ ∑ r ∈ Finset.range p, q (M * p + r) := by
+        have hsingle := Finset.single_le_sum
+          (s := Finset.range p)
+          (f := fun r => q (M * p + r))
+          (fun r _hr => hq (M * p + r))
+          (Finset.mem_range.mpr hp)
+        simpa using hsingle
+      rw [Finset.sum_range_succ, Nat.succ_mul, Finset.sum_range_add]
+      exact add_le_add ih hphase
+
+
+
+-- Generalization plan (G0):
+-- concept/name: point eigenvalues of an idempotent endomorphism; orig was `boolUnitStableMatrix_eigenvalue_eq_zero_or_one`.
+-- generality used: an arbitrary field, additive commutative group, and module, with an endomorphism satisfying only `P * P = P`; no topology, norm, finite-dimensionality, matrix coordinates, measure, convexity, smoothness, oracle, or algorithm setup assumptions are used.
+-- portable call pattern: projection, consensus, invariant-subspace decomposition, and spectral proofs vary the scalar field, carrier module, idempotent operator, and eigenvalue while retaining the conclusion that the eigenvalue is zero or one.
+-- counterargument checked: Mathlib's `IsIdempotentElem.spectrum_subset` is close, but it is an algebra-spectrum statement; this theorem reorganizes that result with `HasEigenvalue.mem_spectrum` into the direct point-eigenvalue API used by operator proofs, rather than preserving the paper's Boolean matrix calculation.
+-- coverage search: `lean_search_symbols` query "endomorphism eigenvalue zero or one of idempotent mul self" found no SOptLib theorem; LeanSearch query "An eigenvalue of an idempotent linear endomorphism is zero or one" found `IsIdempotentElem.spectrum_subset` and `Module.End.HasEigenvalue`, whose composition supplies the proof but no declaration with this direct contract.
+-- minimal hypotheses: the source's finite Boolean coordinate matrix is replaced by an arbitrary module endomorphism; finite-dimensionality is unnecessary because every point eigenvalue belongs to the algebra spectrum.
+
+/-- Every eigenvalue of an idempotent module endomorphism is zero or one.
+
+Layer: Glue | Gap: Level 0 (point spectrum of an idempotent endomorphism)
+Proof: view `P * P = P` as `IsIdempotentElem P`, place the point eigenvalue in the algebra spectrum, and apply Mathlib's spectrum bound for idempotents.
+Source: Mathlib `Module.End.HasEigenvalue.mem_spectrum` and `IsIdempotentElem.spectrum_subset` from linear eigenspace and algebra-spectrum theory
+Used in: projection, consensus, and stable-complement arguments that classify the eigenvalues of an idempotent spectral or invariant-subspace operator
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/12/proof/4
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem Module.End.eigenvalue_eq_zero_or_one_of_mul_self_eq
+    {K V : Type*} [Field K] [AddCommGroup V] [Module K V]
+    (P : Module.End K V) (lambda : K)
+    (hP : P * P = P) (hlambda : P.HasEigenvalue lambda) :
+    lambda = 0 ∨ lambda = 1 := by
+  have hlambda_mem : lambda ∈ spectrum K P := hlambda.mem_spectrum
+  have hlambda_pair : lambda ∈ ({0, 1} : Set K) :=
+    (show IsIdempotentElem P from hP).spectrum_subset K hlambda_mem
+  simpa only [Set.mem_insert_iff, Set.mem_singleton_iff] using hlambda_pair
+
+
+
+namespace ContinuousLinearMap
+
+-- Generalization plan (G0):
+-- concept/name: bordered eigenpair operator equivalence from a normalized simple
+--   eigenpair; orig was bordered_unit_eigenpair_jacobian_equiv
+-- generality used: an arbitrary complete nontrivially normed field, a finite-dimensional
+--   normed space, a continuous endomorphism, an eigenvalue, a right vector, and a
+--   continuous left functional; no coordinates, matrices, or inner product are used
+-- portable call pattern: eigenvalue continuation and nonlinear eigenproblem proofs vary
+--   the finite-dimensional operator, eigenvalue, normalized right vector, and left
+--   functional while requiring the same invertible bordered Jacobian
+-- counterargument checked: this is not a paper-local notation wrapper or a one-line
+--   alias; it packages the kernel argument and the finite-dimensional passage from
+--   injectivity to a continuous linear equivalence, and no Mathlib/SOptLib declaration
+--   has this bordered-operator contract
+-- coverage search: queries “bordered eigenpair linear equivalence normalized left
+--   eigenvector simple eigenspace”, “finite dimensional linear endomorphism injective
+--   continuous linear equivalence”, and “eigenspace equals span eigenvector” found
+--   LinearEquiv.ofInjectiveEndo and LinearEquiv.toContinuousLinearEquiv as proof
+--   components, but no theorem combining them with the bordered eigenpair map
+-- minimal hypotheses: only spanning of the ordinary eigenspace is used from algebraic
+--   simplicity; the generalized-eigenvector-chain clause of the source assumption is
+--   unnecessary, and finite dimensionality is retained to infer surjectivity
+
+/-- A normalized left eigenfunctional and a vector spanning the corresponding eigenspace
+make the bordered eigenpair operator a continuous linear equivalence.
+
+Layer: Glue | Gap: Level 2 (bordered eigenpair operator invertibility)
+Proof: prove that the bordered endomorphism has trivial kernel by applying the left
+  eigenfunctional, then use finite-dimensional injectivity to construct a linear
+  equivalence and continuity of finite-dimensional linear maps.
+Source: Mathlib eigenspaces and finite-dimensional topological vector spaces
+Used in: the base-point Jacobian invertibility step for analytic continuation of a normalized Perron eigenpair, and analogous continuation arguments for parameterized transition, preconditioner, and Hessian operators
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/12/proof/2
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem exists_borderedEigenpairEquiv_of_simpleEigenpair
+    {K V : Type*} [NontriviallyNormedField K] [CompleteSpace K]
+    [NormedAddCommGroup V] [NormedSpace K V] [FiniteDimensional K V]
+    (A : V →L[K] V) (lambda : K) (right : V) (left : V →L[K] K)
+    (hleft : ∀ v : V, left (A v) = lambda * left v)
+    (hnormalized : left right = 1)
+    (hspan : ∀ v : V, A v = lambda • v → ∃ c : K, v = c • right) :
+    ∃ e : (K × V) ≃L[K] (K × V), ∀ x : K × V,
+      e x = (left x.2, A x.2 - lambda • x.2 - x.1 • right) := by
+  let first : K × V →L[K] K :=
+    left.comp (ContinuousLinearMap.snd K K V)
+  let residual : K × V →L[K] V :=
+    A.comp (ContinuousLinearMap.snd K K V) -
+      lambda • ContinuousLinearMap.snd K K V -
+        ContinuousLinearMap.smulRight (ContinuousLinearMap.fst K K V) right
+  let B : K × V →L[K] K × V := first.prod residual
+  have hker : ∀ x : K × V, B x = 0 → x = 0 := by
+    rintro ⟨dlambda, dv⟩ hx
+    have hnormal : left dv = 0 := by
+      simpa [B, first] using congrArg Prod.fst hx
+    have hresidual : A dv - lambda • dv - dlambda • right = 0 := by
+      simpa [B, residual] using congrArg Prod.snd hx
+    have hdlambda : dlambda = 0 := by
+      have h := congrArg left hresidual
+      simpa [hleft dv, hnormal, hnormalized] using h
+    have heigen : A dv = lambda • dv := by
+      exact sub_eq_zero.mp (by simpa [hdlambda] using hresidual)
+    obtain ⟨c, hc⟩ := hspan dv heigen
+    have hc_zero : c = 0 := by
+      rw [hc, map_smul, hnormalized] at hnormal
+      simpa using hnormal
+    simp [hdlambda, hc, hc_zero]
+  have hB_injective : Function.Injective B := by
+    intro x y hxy
+    rw [← sub_eq_zero]
+    apply hker (x - y)
+    rw [map_sub, hxy, sub_self]
+  let e : (K × V) ≃L[K] (K × V) :=
+    (LinearEquiv.ofInjectiveEndo B.toLinearMap hB_injective).toContinuousLinearEquiv
+  refine ⟨e, ?_⟩
+  intro x
+  rfl
+
+end ContinuousLinearMap
+
+
+
+-- Generalization plan (G0):
+-- concept/name: symmetric two-point absolute-deviation radius bound; orig was the
+--   local `htwoPoint` block in `canonical_expected_abs_disagreement_ge`
+-- generality used: arbitrary ordered-field center and radius; only nonnegativity of
+--   the radius
+-- portable call pattern: randomized-sign noise and symmetric two-point quadrature
+--   lower bounds, varying the center and nonnegative perturbation radius
+-- counterargument checked: although the proof composes the triangle inequality with
+--   scalar algebra, Mathlib has no declaration packaging this recurring symmetric
+--   two-point average bound, so it is not a pure rename or paper-local wrapper
+-- coverage search: searched `abs radius half abs add sub`, the displayed inequality,
+--   and a LeanSearch natural-language rendering; hits were `abs_sub_le` and generic
+--   absolute-value triangle inequalities, with no full match in Mathlib or SOptLib
+-- minimal hypotheses: the center is unrestricted and radius nonnegativity is the only
+--   hypothesis; no measure, finite-dimensional, or optimization assumptions are used
+
+/-- A nonnegative radius is at most the average absolute deviation of two points
+symmetrically placed about any center in an ordered field.
+
+Layer: Glue | Gap: Level 1 (symmetric two-point absolute-deviation lower bound)
+Proof: apply the ordered-field absolute-value triangle inequality to `a + r`, `0`,
+  and `a - r`; their endpoint difference is `2 * r`, which is nonnegative.
+Source: Mathlib ordered-ring absolute-value triangle inequality `abs_sub_le`
+Used in: fresh randomized-sign noise and symmetric two-point quadrature steps that
+  lower-bound expected absolute deviation independently of the predictable center
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/10/proof/3
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks - predictable-feedback counterexample -/
+theorem abs_radius_le_half_abs_add_sub
+    {K : Type*} [Field K] [LinearOrder K] [IsStrictOrderedRing K]
+    (a r : K) (hr : 0 ≤ r) :
+    r ≤ (|a + r| + |a - r|) / 2 := by
+  have htri := abs_sub_le (a + r) 0 (a - r)
+  simp only [sub_zero, zero_sub, abs_neg] at htri
+  rw [show (a + r) - (a - r) = 2 * r by ring,
+    abs_of_nonneg (mul_nonneg (by norm_num) hr)] at htri
+  linarith
+
+
+
+-- Generalization plan (G0):
+-- concept/name: symmetric two-point squared-radius lower bound; orig was the
+--   local `hpoint` block in `canonical_large_stepsize_second_moment_lower`
+-- generality used: arbitrary linearly ordered field, with unrestricted center
+--   and radius; no measure, independence, integrability, or sign hypotheses
+-- portable call pattern: symmetric-noise variance floors and antithetic
+--   two-point second-moment estimates, varying the center and perturbation radius
+-- counterargument checked: although ring normalization and square nonnegativity
+--   make the proof short, neither Mathlib nor SOptLib packages the recurring
+--   center-independent symmetric two-point square-average bound
+-- coverage search: searched `square radius lower bound average squares symmetric
+--   points` and the displayed inequality with `lean_search_symbols`, plus a
+--   natural-language `lean_leansearch`; `sum_div_card_sq_le_sum_sq_div_card`,
+--   `two_mul_le_add_sq`, and `sq_nonneg` were partial hits, with no full match
+-- minimal hypotheses: all already minimal for the division-based conclusion;
+--   the source's real parameters generalize to a linearly ordered field
+
+/-- The square of a radius is at most the average squared value at two points
+symmetrically placed about any center.
+
+Layer: Glue | Gap: Level 1 (symmetric two-point second-moment lower bound)
+Proof: expand both endpoint squares by nonlinear ring normalization; the excess
+  over the squared radius is the nonnegative square of the center.
+Source: Mathlib ordered-field square nonnegativity `sq_nonneg` and nonlinear ring arithmetic
+Used in: fresh symmetric-sign noise variance floors and antithetic two-point
+  second-moment estimates that must eliminate an arbitrary predictable center
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/10/proof/7
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks - predictable-feedback counterexample -/
+theorem sq_radius_le_half_sq_add_sub
+    {K : Type*} [Field K] [LinearOrder K] [IsStrictOrderedRing K]
+    (a r : K) :
+    r ^ 2 ≤ ((a + r) ^ 2 + (a - r) ^ 2) / 2 := by
+  nlinarith [sq_nonneg a]
+
+
+
+-- Generalization plan (G0):
+-- concept/name: geometric lower bound for an affine recurrence; orig was canonical_small_stepsize_expected_mean_lower, renamed away from the paper's canonical-instance and stepsize vocabulary
+-- generality used: scalar sequences over an arbitrary linearly ordered field, a nonnegative recurrence coefficient, an initial one-step lower bound, and a pointwise affine step inequality at positive times below the fixed horizon; no measure, probability, filtration, norm, inner product, convexity, smoothness, oracle, or finite-dimensional assumptions are used
+-- portable call pattern: stochastic mean recurrences, deterministic perturbed contractions, and delayed-forcing stability estimates establish the same affine step inequality while varying the contraction coefficient, initial value, forcing floor, and horizon; the explicit geometric lower expansion is unchanged
+-- counterargument checked: this is not paper-local traceability or a caller-side expression because it packages a finite-horizon comparison induction with delayed forcing; Mathlib's `geom_le` handles only homogeneous recurrences and `arithGeom_eq` computes the exact canonical arithmetic-geometric sequence rather than comparing an arbitrary forced sequence
+-- coverage search: `nonnegative affine recurrence uniform forcing lower bound explicit geometric lower expansion`, `sequence lower bound of recurrence m succ greater equal q times m plus b geometric sum`, and LeanSearch for the same contract found Mathlib `geom_le`, `arithGeom_eq_add_sum`, and `arithGeom_eq`; these cover homogeneous propagation or exact sequences, not the forced lower comparison proved here
+-- minimal hypotheses: the recurrence contract is localized to the positive indices below the fixed horizon where it is used; the time-zero behavior is reduced to the one-step lower bound actually used, and `q ≠ 1` is exactly what the displayed quotient requires
+
+/-- A nonnegative affine step inequality at positive times below a fixed horizon has the
+corresponding explicit geometric lower expansion.
+
+The separate bound at time one permits a delayed forcing floor: no lower bound
+on the time-zero forcing is assumed.
+
+Layer: Glue | Gap: Level 1 (delayed-forcing affine recurrence lower comparison)
+Proof: induct from time one, multiply the preceding comparison by the nonnegative recurrence coefficient, add the forcing floor, and normalize the resulting geometric expression using the nonunit coefficient hypothesis.
+Source: Mathlib ordered-field arithmetic and natural-number induction, complementing `geom_le` and the exact arithmetic-geometric formulas `arithGeom_eq_add_sum` and `arithGeom_eq`
+Used in: stochastic expected-state recurrences and deterministic perturbed contractions where a fresh forcing term has a uniform floor only after initialization
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/10/proof/4
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks - TimeVaryingStochasticPushPull -/
+theorem geometric_lower_bound_of_affine_recurrence
+    {K : Type*} [Field K] [LinearOrder K] [IsStrictOrderedRing K]
+    (m : ℕ → K) (q b m0 : K) (t : ℕ)
+    (hq_nonneg : 0 ≤ q) (hq_ne_one : q ≠ 1) (ht : 1 ≤ t)
+    (hinitial : q * m0 ≤ m 1)
+    (hstep : ∀ n, 1 ≤ n → n < t → q * m n + b ≤ m (n + 1)) :
+    q ^ t * m0 + b * (1 - q ^ (t - 1)) / (1 - q) ≤ m t := by
+  have hcomparison : ∀ k, 1 ≤ k → k ≤ t →
+      q ^ k * m0 + b * (1 - q ^ (k - 1)) / (1 - q) ≤ m k := by
+    intro k hk
+    induction k, hk using Nat.le_induction with
+    | base =>
+      intro _
+      simpa using hinitial
+    | succ k hk ih =>
+      intro hkt
+      have hk_le_t : k ≤ t := (Nat.le_succ k).trans hkt
+      have hscaled := mul_le_mul_of_nonneg_left (ih hk_le_t) hq_nonneg
+      have hbound :
+          q * (q ^ k * m0 + b * (1 - q ^ (k - 1)) / (1 - q)) + b ≤
+            m (k + 1) :=
+        (add_le_add hscaled le_rfl).trans
+          (hstep k hk ((Nat.lt_succ_self k).trans_le hkt))
+      calc
+        q ^ (k + 1) * m0 + b * (1 - q ^ (k + 1 - 1)) / (1 - q) =
+            q * (q ^ k * m0 + b * (1 - q ^ (k - 1)) / (1 - q)) + b := by
+          have hpow : q ^ k = q * q ^ (k - 1) := by
+            calc
+              q ^ k = q ^ (k - 1 + 1) := by rw [Nat.sub_add_cancel hk]
+              _ = q * q ^ (k - 1) := by rw [pow_succ]; ring
+          rw [Nat.add_sub_cancel, pow_succ, hpow]
+          field_simp [sub_ne_zero.mpr hq_ne_one.symm]
+          ring
+        _ ≤ m (k + 1) := hbound
+  exact hcomparison t ht le_rfl
+
+
+
+-- Generalization plan (G0):
+-- concept/name: clipped square-root balancing power budgets; orig was the local
+--   `beta` through `hN_budget` block in `horizon_stepsize_leading_and_transient_bounds`
+-- generality used: real scalar parameters only; no measure, space, convexity, or
+--   finite-dimensional assumptions are used
+-- portable call pattern: finite-time stochastic optimization proofs using a step
+--   below a variance-balancing square root and a cap; the gap, variance coefficient,
+--   noise scale, base horizon, subhorizon, enlarged horizon, and enlargement factor vary
+-- counterargument checked: this is not paper-local bookkeeping or a pure wrapper;
+--   it packages one square-root calculation and two reusable power-budget transports
+-- coverage search: symbol searches for square/cubic/enlarged-horizon power budgets
+--   found only unrelated SOptLib budget lemmas; Mathlib semantic search found the
+--   component `Real.sq_sqrt`, but no theorem with this compound conclusion
+-- minimal hypotheses: nonnegativity is used for the gap and step, strict positivity
+--   clears the variance and horizon denominators, while noise nonzeroness makes its
+--   square positive; the cap is
+--   constrained only through the step bound, and horizon assumptions are pointwise
+
+/-- A step below a variance-balancing square root and a cap satisfies the square,
+cubic subhorizon, and square enlarged-horizon power budgets.
+
+Layer: Glue | Gap: Level 1 (clipped square-root power-budget propagation)
+Proof: square the balancing bound using `Real.sq_sqrt`, clear the positive
+  denominator, then propagate the resulting square budget through the cap and
+  the two horizon comparisons by monotone multiplication.
+Source: Mathlib real square-root identities and linear ordered-field inequality APIs
+Used in: finite-time stochastic convergence bounds that absorb quadratic and cubic
+  noise terms after choosing a capped variance-balancing constant stepsize
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/main_theorem/proof/15
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem clipped_sqrt_balancing_power_budgets
+    {alpha cap gap varianceCoeff noise T K N p : ℝ}
+    (hgap : 0 ≤ gap) (hvarianceCoeff : 0 < varianceCoeff)
+    (hnoise : noise ≠ 0) (hT : 0 < T)
+    (halpha_nonneg : 0 ≤ alpha) (halpha_cap : alpha ≤ cap)
+    (halpha_sqrt :
+      alpha ≤ Real.sqrt (gap / (varianceCoeff * noise ^ 2 * T)))
+    (hK : K ≤ T) (hN : N ≤ p * T) (hp : 0 ≤ p) :
+    alpha ^ 2 * noise ^ 2 * T ≤ gap / varianceCoeff ∧
+      alpha ^ 3 * noise ^ 2 * K ≤ cap * gap / varianceCoeff ∧
+      alpha ^ 2 * noise ^ 2 * N ≤ p * gap / varianceCoeff := by
+  have hnoise_sq : 0 < noise ^ 2 := sq_pos_of_ne_zero hnoise
+  have hden : 0 < varianceCoeff * noise ^ 2 * T :=
+    mul_pos (mul_pos hvarianceCoeff hnoise_sq) hT
+  have hquot_nonneg :
+      0 ≤ gap / (varianceCoeff * noise ^ 2 * T) :=
+    div_nonneg hgap hden.le
+  have halpha_sq :
+      alpha ^ 2 ≤ gap / (varianceCoeff * noise ^ 2 * T) := by
+    have hsqrt_sq := Real.sq_sqrt hquot_nonneg
+    nlinarith [Real.sqrt_nonneg (gap / (varianceCoeff * noise ^ 2 * T))]
+  have hbalance :
+      alpha ^ 2 * noise ^ 2 * T ≤ gap / varianceCoeff := by
+    calc
+      alpha ^ 2 * noise ^ 2 * T ≤
+          (gap / (varianceCoeff * noise ^ 2 * T)) * noise ^ 2 * T := by
+        gcongr
+      _ = gap / varianceCoeff := by
+        field_simp [ne_of_gt hvarianceCoeff, ne_of_gt hnoise_sq, ne_of_gt hT]
+  refine ⟨hbalance, ?_, ?_⟩
+  · calc
+      alpha ^ 3 * noise ^ 2 * K =
+          alpha * (alpha ^ 2 * noise ^ 2 * K) := by ring
+      _ ≤ alpha * (alpha ^ 2 * noise ^ 2 * T) := by gcongr
+      _ ≤ alpha * (gap / varianceCoeff) := by gcongr
+      _ ≤ cap * (gap / varianceCoeff) := by
+        exact mul_le_mul_of_nonneg_right halpha_cap
+          (div_nonneg hgap hvarianceCoeff.le)
+      _ = cap * gap / varianceCoeff := by ring
+  · calc
+      alpha ^ 2 * noise ^ 2 * N ≤
+          alpha ^ 2 * noise ^ 2 * (p * T) := by gcongr
+      _ = p * (alpha ^ 2 * noise ^ 2 * T) := by ring
+      _ ≤ p * (gap / varianceCoeff) := by gcongr
+      _ = p * gap / varianceCoeff := by ring
+
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: positive-stride block endpoint-pair sum domination; orig was
+--   completeBlockEndpoint_pair_sum_le
+-- generality used: a nonnegative sequence in an ordered additive commutative
+--   monoid, a natural block count, and a positive natural block length; no
+--   measure, convexity, smoothness, oracle, completeness, or finite-dimensional
+--   assumptions are used
+-- portable call pattern: periodic, epoch, and block analyses charge energies
+--   at both endpoints of every complete block to one dense full-horizon energy
+--   sum while changing the sequence, block count, and positive block length
+-- counterargument checked: this is not paper-local traceability or a pure
+--   wrapper; it packages the endpoint multiplicity-two argument. The staged
+--   stride-start theorem covers only the unshifted endpoint family and does
+--   not imply the combined call without reconstructing the shifted bound
+-- coverage search: queried "sum range block endpoint pairs less than twice
+--   full nonnegative sum positive block length" and "nonnegative sum shifted
+--   stride multiples bounded by range horizon endpoint", plus LeanSearch for
+--   consecutive equal-block endpoints; the top relevant hit was
+--   `sum_range_stride_mul_le_sum_range_mul_of_nonneg`, which is partial because
+--   it controls block starts only, while Mathlib returned only generic finite
+--   sum and variation lemmas
+-- minimal hypotheses: pointwise nonnegativity and positivity of the block
+--   length are exactly what select each endpoint from a nonnegative block sum
+
+/-- The sum of both endpoints of every positive-length block is at most twice
+the nonnegative sum over the complete horizon containing those endpoints.
+
+Layer: Glue | Gap: Level 1 (positive-stride block endpoint multiplicity bound)
+Proof: inductively embed the block-start and shifted block-end families into
+  dense range sums, extend the shorter start horizon by nonnegativity, and add
+  the two estimates.
+Source: Mathlib finite sums over natural ranges, `Finset.single_le_sum`, and
+  ordered additive arithmetic
+Used in: periodic, epoch, and block stochastic-optimization energy estimates
+  that charge consecutive block-boundary states to a dense trajectory horizon
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/6/proof/8
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem sum_range_block_endpoint_pairs_le_two_mul_full_sum
+    {A : Type*} [AddCommMonoid A] [Preorder A] [AddLeftMono A]
+    (q : ℕ → A) (K p : ℕ) (hq : ∀ t, 0 ≤ q t) (hp : 0 < p) :
+    ∑ k ∈ Finset.range K, (q ((k + 1) * p) + q (k * p)) ≤
+      2 • ∑ t ∈ Finset.range (K * p + 1), q t := by
+  have hstart : ∀ M : ℕ,
+      (∑ k ∈ Finset.range M, q (k * p)) ≤
+        ∑ t ∈ Finset.range (M * p), q t := by
+    intro M
+    induction M with
+    | zero => simp
+    | succ M ih =>
+        have hphase : q (M * p) ≤
+            ∑ r ∈ Finset.range p, q (M * p + r) := by
+          have hsingle := Finset.single_le_sum
+            (s := Finset.range p)
+            (f := fun r => q (M * p + r))
+            (fun r _hr => hq (M * p + r))
+            (Finset.mem_range.mpr hp)
+          simpa using hsingle
+        rw [Finset.sum_range_succ, Nat.succ_mul, Finset.sum_range_add]
+        exact add_le_add ih hphase
+  have hend : ∀ M : ℕ,
+      (∑ k ∈ Finset.range M, q ((k + 1) * p)) ≤
+        ∑ t ∈ Finset.range (M * p + 1), q t := by
+    intro M
+    induction M with
+    | zero =>
+        simpa using hq 0
+    | succ M ih =>
+        have hp_pred : p - 1 < p := by omega
+        have hphase : q ((M + 1) * p) ≤
+            ∑ r ∈ Finset.range p, q (M * p + 1 + r) := by
+          have hsingle := Finset.single_le_sum
+            (s := Finset.range p)
+            (f := fun r => q (M * p + 1 + r))
+            (fun r _hr => hq (M * p + 1 + r))
+            (Finset.mem_range.mpr hp_pred)
+          have hindex : M * p + 1 + (p - 1) = (M + 1) * p := by
+            rw [Nat.add_mul]
+            omega
+          change q (M * p + 1 + (p - 1)) ≤
+            ∑ r ∈ Finset.range p, q (M * p + 1 + r) at hsingle
+          rw [hindex] at hsingle
+          exact hsingle
+        rw [Finset.sum_range_succ, Nat.succ_mul]
+        rw [show M * p + p + 1 = (M * p + 1) + p by omega,
+          Finset.sum_range_add]
+        exact add_le_add ih (by simpa [Nat.add_mul] using hphase)
+  rw [Finset.sum_add_distrib]
+  have hs := hstart K
+  have he := hend K
+  have hprefix :
+      (∑ t ∈ Finset.range (K * p), q t) ≤
+        ∑ t ∈ Finset.range (K * p + 1), q t := by
+    rw [Finset.sum_range_succ]
+    exact le_add_of_nonneg_right (hq (K * p))
+  simpa [two_nsmul] using add_le_add he (hs.trans hprefix)
+
+
+
+-- Generalization plan (G0):
+-- concept/name: canonical algebra equivalence from finite square matrices to continuous
+--   coordinate-space endomorphisms; orig was `complexMatrixOperatorAlgEquiv`, renamed
+--   `Matrix.toContinuousLinearMapAlgEquiv`
+-- generality used: an arbitrary complete nontrivially normed field and an arbitrary finite
+--   decidable index type; no inner product, nonempty-index, or paper setup assumptions
+-- portable call pattern: finite-dimensional spectral and analytic arguments can transport
+--   matrix products, inverses, resolvents, and parameterized families to continuous
+--   endomorphisms while changing the scalar field and coordinate index type
+-- counterargument checked: the construction is a short composition, but Mathlib exposes only
+--   its matrix-to-linear-map and linear-map-to-continuous-map factors; the combined algebra
+--   equivalence is a stable reusable object, and the action theorem supplies its basic API
+-- coverage search: queries "finite matrix algebra equivalence continuous linear endomorphisms
+--   complete normed field" and "Matrix to linear endomorphism algebra equivalence" found
+--   `Matrix.toLinAlgEquiv'` and `Module.End.toContinuousLinearMap`, but no combined Mathlib or
+--   SOptLib declaration
+-- minimal hypotheses: `CompleteSpace K` is needed for finite-dimensional linear-map continuity;
+--   `Fintype ι` and `DecidableEq ι` are needed for the matrix/endomorphism equivalence
+
+namespace Matrix
+
+/-- Finite square matrices are algebra-equivalent to continuous endomorphisms of their
+coordinate space.
+
+Layer: Glue | Concept: finite-matrix continuous-endomorphism algebra equivalence
+Proof: (definitional construction; compose `Matrix.toLinAlgEquiv'` with the finite-dimensional `Module.End.toContinuousLinearMap` equivalence)
+Source: Mathlib finite matrix-to-linear-map equivalence and finite-dimensional continuity of linear maps
+Used in: finite-dimensional spectral and resolvent arguments that transfer matrix multiplication, inverses, and analytic operator families to continuous endomorphisms
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/algorithm_spec
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+noncomputable def toContinuousLinearMapAlgEquiv
+    {K ι : Type*} [NontriviallyNormedField K] [CompleteSpace K]
+    [Fintype ι] [DecidableEq ι] :
+    Matrix ι ι K ≃ₐ[K] ((ι → K) →L[K] (ι → K)) :=
+  (Matrix.toLinAlgEquiv' :
+      Matrix ι ι K ≃ₐ[K] ((ι → K) →ₗ[K] (ι → K))).trans
+    (Module.End.toContinuousLinearMap (𝕜 := K) (ι → K))
+
+/-- The matrix-to-continuous-endomorphism equivalence is the composite of the
+matrix-to-linear-endomorphism equivalence and finite-dimensional continuity.
+
+Layer: Glue | Concept: finite-matrix continuous-endomorphism algebra equivalence
+Proof: definitional unfolding
+Source: Mathlib `Matrix.toLinAlgEquiv'` and `Module.End.toContinuousLinearMap`
+Used in: rewriting the combined equivalence to its two canonical Mathlib factors
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/algorithm_spec
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+@[simp]
+theorem toContinuousLinearMapAlgEquiv_def
+    {K ι : Type*} [NontriviallyNormedField K] [CompleteSpace K]
+    [Fintype ι] [DecidableEq ι] :
+    toContinuousLinearMapAlgEquiv (K := K) (ι := ι) =
+      (Matrix.toLinAlgEquiv' :
+          Matrix ι ι K ≃ₐ[K] ((ι → K) →ₗ[K] (ι → K))).trans
+        (Module.End.toContinuousLinearMap (𝕜 := K) (ι → K)) := by
+  rfl
+
+/-- The canonical map from finite square matrices to continuous coordinate-space
+endomorphisms is continuous.
+
+Layer: Glue | Gap: Level 0 (continuity of the finite-matrix continuous-endomorphism equivalence)
+Proof: the forward equivalence is linear on a finite-dimensional domain
+Source: Mathlib `LinearMap.continuous_of_finiteDimensional`
+Used in: transporting limits and parameter continuity from finite matrices to continuous operators
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/algorithm_spec
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem continuous_toContinuousLinearMapAlgEquiv
+    {K ι : Type*} [NontriviallyNormedField K] [CompleteSpace K]
+    [Fintype ι] [DecidableEq ι] :
+    Continuous (toContinuousLinearMapAlgEquiv (K := K) (ι := ι)) := by
+  exact
+    (toContinuousLinearMapAlgEquiv (K := K) (ι := ι)).toLinearEquiv.toLinearMap.continuous_of_finiteDimensional
+
+/-- The continuous endomorphism corresponding to a matrix acts by matrix-vector
+multiplication.
+
+Layer: Glue | Gap: Level 0 (action formula for the finite-matrix continuous-endomorphism equivalence)
+Proof: by rfl after unfolding `Matrix.toContinuousLinearMapAlgEquiv`
+Source: Mathlib `Matrix.toLinAlgEquiv'_apply` and `Module.End.toContinuousLinearMap`
+Used in: spectral and resolvent calculations that rewrite an abstract continuous-operator action back to matrix-vector multiplication
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/algorithm_spec
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+@[simp]
+theorem toContinuousLinearMapAlgEquiv_apply
+    {K ι : Type*} [NontriviallyNormedField K] [CompleteSpace K]
+    [Fintype ι] [DecidableEq ι] (A : Matrix ι ι K) (x : ι → K) :
+    toContinuousLinearMapAlgEquiv (K := K) (ι := ι) A x = A *ᵥ x := by
+  rfl
+
+end Matrix
+
+
+
+-- Generalization plan (G0):
+-- concept/name: preservation of the totalized ring inverse by a ring equivalence;
+--   orig was complexMatrixOperatorAlgEquiv_map_ringInverse
+-- generality used: arbitrary source and target semirings, a ring equivalence, and one element;
+--   no commutativity, topology, norm, matrix structure, or finite-dimensionality
+-- portable call pattern: algebraic, spectral, or matrix proofs transport a totalized inverse
+--   across an equivalence while changing both semirings, the equivalence, and the element
+-- counterargument checked: this is not paper-local or a pure rename; Mathlib exposes the
+--   unit and nonunit branches separately but no theorem packages their preservation by an equivalence
+-- coverage search: queries "ring equivalence maps totalized ring inverse nonunit zero",
+--   "RingEquiv map inverse invOf nonunit", and "map_ringInverse RingEquiv" found only
+--   Ring.inverse branch laws, MulEquiv.isUnit_map, and the paper-local matrix specialization
+-- minimal hypotheses: all already minimal; Semiring supplies precisely the zero and monoid structure
+--   required by Ring.inverse together with the additive and multiplicative structure of RingEquiv
+
+/-- A ring equivalence commutes with the totalized ring inverse, including its
+nonunit-to-zero branch.
+
+Layer: Glue | Gap: Level 0 (ring-equivalence transport of totalized inverses)
+Proof: split on whether the source element is a unit; characterize the mapped inverse by
+  inverse cancellation in the unit branch and use equivalence-reflection of units in the other.
+Source: Mathlib totalized inverses in `Algebra.GroupWithZero.Units.Basic` and ring equivalences
+Used in: spectral and resolvent arguments transporting matrix inverses to equivalent operator algebras
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/12/proof/1
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem RingEquiv.map_ringInverse
+    {R S : Type*} [Semiring R] [Semiring S]
+    (e : R ≃+* S) (a : R) :
+    e (Ring.inverse a) = Ring.inverse (e a) := by
+  by_cases ha : IsUnit a
+  · have hea : IsUnit (e a) := ha.map e.toRingHom
+    have hright : e (Ring.inverse a) * e a = 1 := by
+      rw [← map_mul, Ring.inverse_mul_cancel a ha, map_one]
+    have h :=
+      (Ring.eq_mul_inverse_iff_mul_eq
+        (e (Ring.inverse a)) 1 (e a) hea).2 hright
+    simpa using h
+  · have hea : ¬ IsUnit (e a) := by
+      intro h
+      have h' : IsUnit (e.symm (e a)) := h.map e.symm.toRingHom
+      exact ha (by simpa using h')
+    rw [Ring.inverse_non_unit a ha, Ring.inverse_non_unit (e a) hea, map_zero]
+
+
+
+-- Generalization plan (G0):
+-- concept/name: an entry of a finite matrix is bounded by its induced
+--   `L∞` operator norm; orig was `complexMatrix_entry_norm_le_operatorNorm`,
+--   renamed `Matrix.norm_entry_le_linfty_opNorm`
+-- generality used: arbitrary finite row and column index types and entries in a
+--   seminormed additive commutative group; no scalar field, square-matrix,
+--   completeness, decidable-equality, or finite-dimensional assumptions
+-- portable call pattern: spectral resolvent, network stability, and finite-matrix
+--   perturbation proofs can change the entry space, matrix dimensions, matrix,
+--   and selected coordinate while retaining the entry-to-operator-norm bound
+-- counterargument checked: Mathlib has the analogous entrywise-supremum theorem,
+--   but that theorem uses a different matrix norm; deriving this bound from the
+--   maximum-row-sum norm formula supplies the missing norm-specific bridge
+-- coverage search: queries "matrix entry bounded by linfinity operator norm",
+--   "linfty opNorm entry", and the semantic query "finite matrix entry bounded by
+--   induced infinity operator norm" found `Matrix.norm_entry_le_entrywise_sup_norm`,
+--   `Matrix.linfty_opNorm_def`, and `Matrix.linfty_opNorm_eq_opNorm`, but no
+--   Mathlib or SOptLib theorem with this conclusion under the operator-norm scope
+-- minimal hypotheses: `SeminormedAddCommGroup` is enough for entry norms and row
+--   sums, while `Fintype` on both index types is exactly what the finite sup and
+--   sum formula requires
+
+open scoped Matrix.Norms.Operator
+
+namespace Matrix
+
+/-- Every entry norm of a finite matrix is bounded by its induced `L∞` matrix
+operator norm (the maximum absolute row sum).
+
+Layer: Glue | Gap: Level 0 (matrix entry bound for the induced L-infinity norm)
+Proof: bound the selected entry's nonnegative norm by its row sum, then bound that row sum by the finite supremum in `Matrix.linfty_opNorm_def`.
+Source: Mathlib `Matrix.linfty_opNorm_def`, finite nonnegative sums, and finite suprema
+Used in: spectral-resolvent and network-stability estimates that turn a uniform finite-matrix operator-norm bound into a bound on a selected matrix coordinate
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/12/proof/3
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem norm_entry_le_linfty_opNorm
+    {m n α : Type*} [Fintype m] [Fintype n] [SeminormedAddCommGroup α]
+    (A : Matrix m n α) (i : m) (j : n) :
+    ‖A i j‖ ≤ ‖A‖ := by
+  rw [Matrix.linfty_opNorm_def]
+  exact_mod_cast
+    (Finset.single_le_sum (fun k _ => zero_le ‖A i k‖₊) (Finset.mem_univ j)).trans
+      (Finset.le_sup (f := fun r : m => ∑ k : n, ‖A r k‖₊) (Finset.mem_univ i))
+
+end Matrix
+
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: finite geometric expansion with an explicit right remainder;
+--   orig was complexMatrix_finite_neumann_remainder_of_right_recurrence
+-- generality used: a commutative scalar semiring, a semiring algebra, two algebra
+--   elements, one scalar, and the pointwise affine recurrence equality
+-- portable call pattern: resolvent, transfer-operator, and linear-filter proofs
+--   iterate a right affine recurrence while changing the algebra, scalar, elements,
+--   and truncation index but retaining the same prefix-plus-remainder conclusion
+-- counterargument checked: this is not paper-local matrix bookkeeping or a pure
+--   wrapper; it packages the noncommutative right-remainder induction absent from
+--   the ordinary scalar geometric-sum API
+-- coverage search: searches for finite geometric right remainders and affine
+--   recurrences found Mathlib geom_sum_succ/geom_sum_succ' and SOptLib recurrence
+--   bounds only; those results do not state this algebra-valued equality
+-- minimal hypotheses: all already minimal; the proof uses only CommSemiring K,
+--   Semiring A, Algebra K A, and the displayed recurrence
+
+/-- A right affine recurrence expands into a finite geometric prefix and an explicit
+right-multiplication remainder.
+
+If `R = a • 1 + a • (R * B)` in a semiring algebra, then truncating after degree
+`N` leaves exactly `a ^ (N + 1) • (R * B ^ (N + 1))`.
+
+Layer: Glue | Gap: Level 1 (finite right affine-recurrence expansion)
+Proof: Induct on the truncation index, substitute the recurrence into the current
+  tail, distribute scalar multiplication and multiplication, and append the exposed
+  power with `Finset.sum_range_succ`.
+Source: Mathlib semiring algebras, natural powers, and finite sums over ranges
+Used in: resolvent and transfer-operator arguments that truncate a right Neumann
+  expansion while retaining an exact algebra-valued remainder
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/12/proof/3
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem eq_sum_smul_pow_add_right_remainder_of_affine_recurrence
+    {K A : Type*} [CommSemiring K] [Semiring A] [Algebra K A]
+    (R B : A) (a : K)
+    (hrec : R = a • (1 : A) + a • (R * B)) (N : ℕ) :
+    R =
+      Finset.sum (Finset.range (N + 1))
+        (fun n => a ^ (n + 1) • B ^ n) +
+      a ^ (N + 1) • (R * B ^ (N + 1)) := by
+  induction N with
+  | zero =>
+      simpa using hrec
+  | succ N ih =>
+      have htail :
+          a ^ (N + 1) • (R * B ^ (N + 1)) =
+            a ^ (N + 2) • B ^ (N + 1) +
+              a ^ (N + 2) • (R * B ^ (N + 2)) := by
+        conv_lhs => rw [hrec]
+        rw [add_mul, smul_add]
+        congr 1
+        · calc
+            a ^ (N + 1) • ((a • (1 : A)) * B ^ (N + 1)) =
+                a ^ (N + 1) • (a • ((1 : A) * B ^ (N + 1))) := by
+                  rw [Algebra.smul_mul_assoc]
+            _ = (a ^ (N + 1) * a) • ((1 : A) * B ^ (N + 1)) := by
+                  rw [smul_smul]
+            _ = a ^ (N + 2) • B ^ (N + 1) := by
+                  rw [← pow_succ]
+                  simp
+        · calc
+            a ^ (N + 1) • ((a • (R * B)) * B ^ (N + 1)) =
+                a ^ (N + 1) • (a • ((R * B) * B ^ (N + 1))) := by
+                  rw [Algebra.smul_mul_assoc]
+            _ = (a ^ (N + 1) * a) • ((R * B) * B ^ (N + 1)) := by
+                  rw [smul_smul]
+            _ = a ^ (N + 2) • ((R * B) * B ^ (N + 1)) := by
+                  rw [← pow_succ]
+            _ = a ^ (N + 2) • (R * B ^ (N + 2)) := by
+                  congr 1
+                  rw [mul_assoc, ← pow_succ']
+      calc
+        R =
+            Finset.sum (Finset.range (N + 1))
+              (fun n => a ^ (n + 1) • B ^ n) +
+              a ^ (N + 1) • (R * B ^ (N + 1)) := ih
+        _ =
+            Finset.sum (Finset.range (N + 2))
+              (fun n => a ^ (n + 1) • B ^ n) +
+              a ^ (N + 2) • (R * B ^ (N + 2)) := by
+          rw [htail]
+          conv_rhs => rw [show N + 2 = (N + 1) + 1 by omega,
+            Finset.sum_range_succ]
+          ac_rfl
+
+
+
+-- Generalization plan (G0):
+-- concept/name: kernel equation for a scalar shift of a square matrix;
+--   orig was `complexResolventMatrix_mulVec_eq_zero_iff_eigen`
+-- generality used: an arbitrary ring, finite index type with decidable equality,
+--   a square matrix, a scalar, and a scalar-valued vector; no field, topology,
+--   norm, finite-dimensionality, or spectral assumptions are used
+-- portable call pattern: finite-dimensional spectral, stability, and linear-recurrence
+--   proofs vary the coefficient ring, square matrix, scalar, and vector while converting
+--   the kernel equation for `z I - A` into the eigenvector equation `A v = z v`
+-- counterargument checked: although the proof is short, this is not a pure rename or
+--   paper-local wrapper; it packages the recurring resolvent-kernel/eigenvector bridge,
+--   while Mathlib exposes only the separate matrix-action and subtraction identities
+-- coverage search: symbol searches for "matrix scalar identity minus matrix mulVec equals
+--   zero iff matrix mulVec equals scalar times vector" and "scalar sub matrix mulVec zero
+--   iff eigenvector equation" found only the paper-local source theorem and unrelated
+--   matrix-action results; Mathlib semantic search found `Matrix.one_mulVec` but no exact iff
+-- minimal hypotheses: `[Ring R]` is weaker than the proposed commutative-ring assumption;
+--   `[Fintype ι] [DecidableEq ι]` are exactly those needed for finite `mulVec` and identity
+
+namespace Matrix
+
+/-- A scalar shift of a square matrix annihilates a vector exactly when the
+matrix sends that vector to its scalar multiple.
+
+Layer: Glue | Gap: Level 0 (scalar-shift kernel and eigenvector equation equivalence)
+Proof: distribute `mulVec` over matrix subtraction, move the scalar through the identity-matrix action, and rewrite a difference being zero as equality.
+Source: Mathlib finite matrix-vector algebra through `Matrix.sub_mulVec`, `Matrix.smul_mulVec`, and `Matrix.one_mulVec`
+Used in: finite-dimensional resolvent and stability arguments that turn a kernel witness for `z I - A` into a right eigenvector equation, and conversely
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/12
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem scalar_sub_mulVec_eq_zero_iff
+    {R ι : Type*} [Ring R] [Fintype ι] [DecidableEq ι]
+    (A : Matrix ι ι R) (z : R) (v : ι → R) :
+    (z • (1 : Matrix ι ι R) - A).mulVec v = 0 ↔
+      A.mulVec v = z • v := by
+  rw [Matrix.sub_mulVec, Matrix.smul_mulVec, Matrix.one_mulVec]
+  exact sub_eq_zero.trans eq_comm
+
+end Matrix
+
+
+
+-- Generalization plan (G0):
+-- concept/name: inverse resolvent action on an eigenvector;
+--   orig was complexResolvent_inv_mulVec_eq_inv_smul_of_eigen
+-- generality used: arbitrary field and finite decidable index type; no topology, norm,
+--   measure, convexity, smoothness, oracle, or algorithm-specific assumptions
+-- portable call pattern: finite-dimensional spectral and contour arguments change the
+--   matrix, eigenvalue, resolvent point, and eigenvector while retaining resolvent
+--   invertibility and the eigenvector equation
+-- counterargument checked: although the proof composes short matrix identities, it is not a
+--   pure rename: it packages the reusable inverse-resolvent eigenvector action, including the
+--   zero spectral-gap case forced by resolvent invertibility
+-- coverage search: queries "nonsing inverse mulVec eigenvalue scalar inverse" and "inverse
+--   matrix eigenvector inverse eigenvalue" found Mathlib `Matrix.inv_mulVec_eq_vec` and
+--   `Matrix.nonsing_inv_mul` plus SOptLib positive-definite cancellation lemmas, but no theorem
+--   for the shifted resolvent action
+-- minimal hypotheses: resolvent determinant invertibility and the pointwise eigenvector
+--   equation suffice; the source hypothesis `z != lambda` is unnecessary
+
+/-- The inverse resolvent sends an eigenvector to the inverse spectral-gap multiple.
+
+If `v` is a `lambda`-eigenvector of `A` and `z * I - A` is invertible, then its
+nonsingular inverse acts on `v` by the scalar `(z - lambda)⁻¹`.
+
+Layer: Glue | Gap: Level 1 (inverse resolvent action on an eigenvector)
+Proof: rewrite the shifted matrix action using the eigenvector equation, install the
+  invertibility instance supplied by the determinant, and apply Mathlib's matrix-vector
+  inverse cancellation; when the spectral gap is zero, invertibility forces the vector to vanish.
+Source: Mathlib finite-matrix nonsingular inverse and matrix-vector multiplication APIs;
+  standard finite-dimensional resolvent calculus
+Used in: contour spectral-projection proofs, where the resolvent action on an enclosed
+  eigenvector is reduced to the scalar Cauchy kernel before circle integration
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/12/proof/1
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous
+  Periodic Directed Networks, periodic spectral decomposition -/
+theorem Matrix.nonsing_inv_mulVec_eq_inv_smul_of_mulVec_eq_smul
+    {K ι : Type*} [Field K] [Fintype ι] [DecidableEq ι]
+    (A : Matrix ι ι K) (lambda z : K) (v : ι → K)
+    (hunit : IsUnit (Matrix.det (z • (1 : Matrix ι ι K) - A)))
+    (hAv : Matrix.mulVec A v = lambda • v) :
+    Matrix.mulVec (z • (1 : Matrix ι ι K) - A)⁻¹ v =
+      (z - lambda)⁻¹ • v := by
+  let M : Matrix ι ι K := z • (1 : Matrix ι ι K) - A
+  let s : K := z - lambda
+  have hMunit : IsUnit M :=
+    M.isUnit_iff_isUnit_det.mpr (by simpa [M] using hunit)
+  letI : Invertible M := hMunit.invertible
+  have hMv : Matrix.mulVec M v = s • v := by
+    simp only [M, s, Matrix.sub_mulVec, Matrix.smul_mulVec, Matrix.one_mulVec, hAv]
+    ext i
+    simp [Pi.smul_apply]
+    ring
+  change Matrix.mulVec M⁻¹ v = s⁻¹ • v
+  by_cases hs : s = 0
+  · have hMv_zero : Matrix.mulVec M v = 0 := by
+      simpa [hs] using hMv
+    have hv : v = 0 := by
+      have hrecover : Matrix.mulVec M⁻¹ (0 : ι → K) = v :=
+        Matrix.inv_mulVec_eq_vec hMv_zero.symm
+      simpa using hrecover.symm
+    simp [hv]
+  · apply Matrix.inv_mulVec_eq_vec
+    rw [Matrix.mulVec_smul, hMv]
+    ext i
+    simp [hs, Pi.smul_apply]
+
+
+
+-- Generalization plan (G0):
+-- concept/name: right resolvent multiplication identity for a nonsingular scalar shift;
+--   orig was complexResolvent_inv_mul_complexOfRealMatrix_eq_z_smul_sub_one
+-- generality used: arbitrary commutative ring and finite decidable matrix index type;
+--   no field, topology, norm, measure, convexity, smoothness, oracle, or algorithm data
+-- portable call pattern: matrix resolvent, Laurent-expansion, and finite Neumann-remainder
+--   proofs change the scalar ring, finite index type, matrix, and spectral parameter while
+--   reusing the same right-multiplication identity
+-- counterargument checked: this is not paper-local traceability or a pure rename; it combines
+--   scalar-shift rearrangement, multiplication over subtraction, central scalar multiplication,
+--   and nonsingular-inverse cancellation into the standard one-point resolvent recurrence
+-- coverage search: `lean_search_symbols` and Mathlib LeanSearch queries for a nonsingular
+--   scalar-shift inverse multiplied by the unshifted matrix found `Matrix.nonsing_inv_mul`,
+--   `Matrix.inv_mul_of_invertible`, and scalar-inverse lemmas, but no theorem with this contract
+-- minimal hypotheses: `CommRing K` suffices for determinants, total nonsingular inversion,
+--   subtraction, and central scalar multiplication; only the shifted determinant is a unit
+
+/-- Multiplying the inverse of a nonsingular scalar shift by the unshifted matrix gives
+the scalar multiple of that inverse minus the identity.
+
+Layer: Glue | Gap: Level 1 (right resolvent multiplication for a nonsingular scalar shift)
+Proof: rewrite the matrix as the scalar identity shift minus its shifted matrix, distribute
+  multiplication over subtraction, and cancel the shifted matrix with `Matrix.nonsing_inv_mul`.
+Source: Mathlib finite-matrix nonsingular inverse, determinant, and scalar-action APIs;
+  standard finite-dimensional resolvent algebra
+Used in: matrix Laurent and finite Neumann-expansion arguments that derive a right affine
+  recurrence for the resolvent before estimating or integrating its powers
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/12/proof/3
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous
+  Periodic Directed Networks, periodic spectral decomposition -/
+theorem Matrix.nonsing_inv_mul_eq_smul_inv_sub_one_of_scalar_sub
+    {K ι : Type*} [CommRing K] [Fintype ι] [DecidableEq ι]
+    (A : Matrix ι ι K) (z : K)
+    (hunit : IsUnit (Matrix.det (z • (1 : Matrix ι ι K) - A))) :
+    (z • (1 : Matrix ι ι K) - A)⁻¹ * A =
+      z • (z • (1 : Matrix ι ι K) - A)⁻¹ - 1 := by
+  let M : Matrix ι ι K := z • (1 : Matrix ι ι K) - A
+  have hA : A = z • (1 : Matrix ι ι K) - M := by
+    dsimp [M]
+    abel
+  have hcancel : M⁻¹ * M = (1 : Matrix ι ι K) := by
+    exact Matrix.nonsing_inv_mul M (by simpa [M] using hunit)
+  change M⁻¹ * A = z • M⁻¹ - 1
+  rw [hA, mul_sub, hcancel]
+  simp
+
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: finite Neumann expansion with an exact remainder for the inverse
+--   of a nonsingular scalar matrix shift; orig was
+--   `complexResolvent_inverse_finite_neumann_remainder`
+-- generality used: an arbitrary field, finite decidable square-matrix index type,
+--   a nonzero scalar, and nonvanishing determinant of the scalar shift; no norm,
+--   topology, measure, convexity, smoothness, oracle, or algorithm data
+-- portable call pattern: spectral-contour, transfer-matrix, and linear-stability
+--   proofs change the field, matrix, spectral parameter, and truncation index while
+--   retaining the same finite Laurent prefix plus exact right remainder
+-- counterargument checked: this is not paper-local traceability or a pure wrapper;
+--   it composes nonsingular resolvent algebra with a noncommutative finite recurrence
+--   into the canonical scalar-shift inverse formula used directly by future callers
+-- coverage search: `lean_search_symbols` queries "matrix scalar identity minus matrix
+--   inverse finite Neumann sum explicit remainder determinant nonzero" and "inverse
+--   scalar sub matrix equals finite geometric prefix plus right remainder" found only
+--   the source theorem and the two component staging lemmas; LeanSearch found
+--   `NormedRing.inverse_one_sub_nth_order`, which requires a small-norm neighborhood
+--   and does not provide this arbitrary nonsingular finite-matrix Laurent identity
+-- minimal hypotheses: `Field K`, `z != 0`, and nonvanishing determinant are exactly
+--   what scalar inversion and nonsingular matrix cancellation use
+
+/-- The inverse of a nonsingular scalar shift is a finite Laurent--Neumann prefix
+plus an exact right-multiplication remainder.
+
+For nonzero `z`, truncating the inverse of `z I - A` after degree `N` leaves
+`z^-(N+1)` times the inverse resolvent multiplied on the right by `A^(N+1)`.
+
+Layer: Glue | Gap: Level 1 (finite scalar-shift resolvent expansion with exact remainder)
+Proof: derive the right resolvent recurrence from nonsingular-inverse cancellation,
+  divide it by the nonzero scalar, and apply the finite affine-recurrence expansion.
+Source: Mathlib finite-matrix nonsingular inverse and finite sums over ranges; the
+  standard finite Neumann-series remainder identity from resolvent algebra
+Used in: spectral-contour power formulas and stable linear-dynamics estimates that
+  truncate a matrix resolvent before bounding or integrating its explicit tail
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/12/proof/3
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem Matrix.scalar_sub_inv_eq_finite_neumann_add_remainder
+    {K ι : Type*} [Field K] [Fintype ι] [DecidableEq ι]
+    (A : Matrix ι ι K) (z : K) (hz : z ≠ 0)
+    (hdet : Matrix.det (z • (1 : Matrix ι ι K) - A) ≠ 0) (N : ℕ) :
+    (z • (1 : Matrix ι ι K) - A)⁻¹ =
+      Finset.sum (Finset.range (N + 1))
+        (fun n => (z⁻¹) ^ (n + 1) • A ^ n) +
+      (z⁻¹) ^ (N + 1) •
+        ((z • (1 : Matrix ι ι K) - A)⁻¹ * A ^ (N + 1)) := by
+  let R : Matrix ι ι K := (z • (1 : Matrix ι ι K) - A)⁻¹
+  have hright : R * A = z • R - (1 : Matrix ι ι K) := by
+    simpa [R] using
+      Matrix.nonsing_inv_mul_eq_smul_inv_sub_one_of_scalar_sub A z
+        (isUnit_iff_ne_zero.mpr hdet)
+  have hzR_eq : z • R = R * A + (1 : Matrix ι ι K) := by
+    rw [hright]
+    abel
+  have hrec :
+      R = z⁻¹ • (1 : Matrix ι ι K) + z⁻¹ • (R * A) := by
+    calc
+      R = z⁻¹ • (z • R) := by
+        ext i j
+        simp [hz]
+      _ = z⁻¹ • (R * A + (1 : Matrix ι ι K)) := by rw [hzR_eq]
+      _ = z⁻¹ • (1 : Matrix ι ι K) + z⁻¹ • (R * A) := by
+        rw [smul_add]
+        abel
+  simpa [R] using
+    eq_sum_smul_pow_add_right_remainder_of_affine_recurrence R A z⁻¹ hrec N
+
+
+
+-- Generalization plan (G0):
+-- concept/name: reduced inverse obtained by subtracting the scalar pole on an
+--   idempotent projection; orig was
+--   complex_resolvent_pole_subtracted_eq_shifted_complement
+-- generality used: arbitrary field, finite index type, two square matrices, a
+--   nonzero pole factor, determinant nonvanishing, idempotence, and the two
+--   undivided scalar-pole product identities used by the proof
+-- portable call pattern: spectral perturbation and consensus proofs vary the
+--   matrix family, pole scalar, and commuting spectral projection while using
+--   the same shifted inverse identity on the complementary subspace
+-- counterargument checked: the source theorem is resolvent-specific, but its
+--   algebraic core is neither paper-local nor a pure inverse-difference wrapper;
+--   it combines idempotence, two pole identities, and two nonsingularity facts
+-- coverage search: symbol searches for "nonsingular inverse subtract scalar
+--   multiple idempotent projection shifted inverse complement" and "matrix
+--   inverse pole projection shifted inverse complementary projection" found no
+--   matching SOptLib theorem; Mathlib semantic search found `Matrix.inv_sub_inv`
+--   and Sherman--Morrison--Woodbury lemmas, none with this projection contract
+-- minimal hypotheses: a field is used to divide the two pole identities by the
+--   nonzero factor; determinant nonvanishing is precisely what makes both
+--   nonsingular inverses cancellable, and both left and right identities are used
+
+namespace Matrix
+
+/-- Subtracting the scalar part of a nonsingular inverse on an idempotent
+projection gives the shifted inverse acting on the complementary projection.
+
+Layer: Glue | Gap: Level 2 (projection-pole reduced inverse identity)
+Proof: decompose the inverse with the complementary idempotent, use the right pole identity to show the shifted matrix acts identically there, and cancel both nonsingular matrices via their unit determinants.
+Source: Mathlib finite matrices and `Matrix.mul_nonsing_inv`/`Matrix.nonsing_inv_mul` from `Mathlib.LinearAlgebra.Matrix.NonsingularInverse`, together with the standard reduced-resolvent projection decomposition
+Used in: spectral perturbation and distributed-consensus proofs that remove a simple projected pole from a resolvent before extending the stable complementary inverse
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/12/proof/1
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem nonsing_inv_sub_smul_projection_eq_shifted_inv_mul_compl
+    {K ι : Type*} [Field K] [Fintype ι] [DecidableEq ι]
+    (M P : Matrix ι ι K) (a : K)
+    (hMdet : det M ≠ 0)
+    (hshiftDet : det (M + P) ≠ 0)
+    (ha : a ≠ 0)
+    (hP_idem : P * P = P)
+    (hleft_smul : a • (M⁻¹ * P) = P)
+    (hright_smul : a • (P * M⁻¹) = P) :
+    M⁻¹ - a⁻¹ • P = (M + P)⁻¹ * (1 - P) := by
+  have hMunit : IsUnit (det M) := isUnit_iff_ne_zero.mpr hMdet
+  have hshiftUnit : IsUnit (det (M + P)) :=
+    isUnit_iff_ne_zero.mpr hshiftDet
+  have hleft_pole : M⁻¹ * P = a⁻¹ • P := by
+    calc
+      M⁻¹ * P = 1 • (M⁻¹ * P) := (one_smul K _).symm
+      _ = (a⁻¹ * a) • (M⁻¹ * P) := by rw [inv_mul_cancel₀ ha]
+      _ = a⁻¹ • (a • (M⁻¹ * P)) := by rw [smul_smul]
+      _ = a⁻¹ • P := by rw [hleft_smul]
+  have hright_pole : P * M⁻¹ = a⁻¹ • P := by
+    calc
+      P * M⁻¹ = 1 • (P * M⁻¹) := (one_smul K _).symm
+      _ = (a⁻¹ * a) • (P * M⁻¹) := by rw [inv_mul_cancel₀ ha]
+      _ = a⁻¹ • (a • (P * M⁻¹)) := by rw [smul_smul]
+      _ = a⁻¹ • P := by rw [hright_smul]
+  let Q : Matrix ι ι K := 1 - P
+  have hPQ : P * Q = 0 := by
+    calc
+      P * Q = P * (1 - P) := rfl
+      _ = P * 1 - P * P := by rw [mul_sub]
+      _ = P - P := by rw [Matrix.mul_one, hP_idem]
+      _ = 0 := sub_self P
+  have hsPQ : (a⁻¹ • P) * Q = 0 := by
+    rw [smul_mul_assoc, hPQ, smul_zero]
+  have hshifted_mul : (M + P) * (M⁻¹ * Q) = Q := by
+    calc
+      (M + P) * (M⁻¹ * Q) =
+          (M * M⁻¹) * Q + (P * M⁻¹) * Q := by
+            rw [add_mul, Matrix.mul_assoc, Matrix.mul_assoc]
+      _ = (1 : Matrix ι ι K) * Q + (P * M⁻¹) * Q := by
+            rw [Matrix.mul_nonsing_inv M hMunit]
+      _ = Q + (P * M⁻¹) * Q := by simp
+      _ = Q + (a⁻¹ • P) * Q := by rw [hright_pole]
+      _ = Q := by rw [hsPQ]; simp
+  have hshift : M⁻¹ * Q = (M + P)⁻¹ * Q := by
+    calc
+      M⁻¹ * Q = ((M + P)⁻¹ * (M + P)) * (M⁻¹ * Q) := by
+        rw [Matrix.nonsing_inv_mul (M + P) hshiftUnit]
+        simp
+      _ = (M + P)⁻¹ * ((M + P) * (M⁻¹ * Q)) := by
+        rw [Matrix.mul_assoc]
+      _ = (M + P)⁻¹ * Q := by rw [hshifted_mul]
+  have hdecomp : M⁻¹ - a⁻¹ • P = M⁻¹ * Q := by
+    calc
+      M⁻¹ - a⁻¹ • P = M⁻¹ - M⁻¹ * P := by rw [hleft_pole]
+      _ = M⁻¹ * (1 - P) := by rw [mul_sub, Matrix.mul_one]
+      _ = M⁻¹ * Q := rfl
+  simpa [Q] using hdecomp.trans hshift
+
+end Matrix
+
+
+
+-- Generalization plan (G0):
+-- concept/name: nonsingularity of a scalar-shifted matrix after adding its
+--   invariant eigenspace projection; orig was
+--   complex_resolvent_shifted_projection_invertible_at_unit
+-- generality used: arbitrary commutative integral domain and finite index type;
+--   two square matrices, one scalar, idempotence, a fixed-space/eigenspace
+--   equivalence, and the one-sided intertwining identity actually used by the proof
+-- portable call pattern: finite-dimensional spectral decompositions and consensus
+--   splittings vary the field, matrix, eigenvalue, and idempotent eigenprojection,
+--   while the shifted-resolvent nonsingularity conclusion has the same shape
+-- counterargument checked: this is not a paper-local contour or complexification
+--   wrapper; it packages a nontrivial kernel argument for arbitrary finite matrices,
+--   and the source's opposite intertwining hypothesis is deliberately omitted because
+--   the proof does not use it
+-- coverage search: symbol searches for "fixed eigenspace projection scalar matrix
+--   sub matrix add projection determinant nonzero", "scalar sub add projection det
+--   ne zero of fixed iff", and "idempotent projection shifted resolvent
+--   nonsingular" found only the paper-local source theorem; Mathlib semantic search
+--   found projection structure lemmas and Matrix.exists_mulVec_eq_zero_iff, but no
+--   theorem combining them into this shifted-matrix nonsingularity result
+-- minimal hypotheses: CommRing plus IsDomain suffices for the determinant/kernel
+--   criterion; Fintype and DecidableEq support finite matrix multiplication and the
+--   determinant; only P * A = lambda • P is used, not A * P = lambda • P
+
+namespace Matrix
+
+/-- Adding an idempotent projection onto a scalar eigenspace makes the corresponding
+scalar-shifted matrix have nonzero determinant.
+
+Layer: Glue | Gap: Level 2 (shifted eigenspace projection nonsingularity)
+Proof: left-multiply a hypothetical kernel equation by the projection to force the projected component to vanish, then use the fixed-space characterization to force the whole kernel vector to vanish and contradict the determinant kernel criterion.
+Source: Mathlib finite matrix multiplication and `Matrix.exists_mulVec_eq_zero_iff` from `Mathlib.LinearAlgebra.Matrix.ToLinearEquiv`
+Used in: finite-dimensional spectral and consensus decompositions that regularize a resolvent at an isolated eigenvalue by adding its invariant projection
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/12
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem scalar_sub_add_projection_det_ne_zero_of_fixed_iff
+    {K ι : Type*} [CommRing K] [IsDomain K] [Fintype ι] [DecidableEq ι]
+    (A P : Matrix ι ι K) (lambda : K)
+    (hfixed : ∀ v : ι → K, P.mulVec v = v ↔ A.mulVec v = lambda • v)
+    (hP_idem : P * P = P)
+    (hPA : P * A = lambda • P) :
+    det (lambda • (1 : Matrix ι ι K) - A + P) ≠ 0 := by
+  let M : Matrix ι ι K := lambda • (1 : Matrix ι ι K) - A + P
+  have hPM : P * M = P := by
+    calc
+      P * M = P * (lambda • (1 : Matrix ι ι K) - A + P) := rfl
+      _ = P * (lambda • (1 : Matrix ι ι K) - A) + P * P := by
+        rw [mul_add]
+      _ = (P * (lambda • (1 : Matrix ι ι K)) - P * A) + P := by
+        rw [hP_idem, mul_sub]
+      _ = P := by simp [hPA]
+  change det M ≠ 0
+  intro hdet
+  obtain ⟨v, hvne, hvker⟩ := (Matrix.exists_mulVec_eq_zero_iff (M := M)).2 hdet
+  have hP_kernel : P.mulVec v = 0 := by
+    have hleft : (P * M).mulVec v = 0 := by
+      rw [← Matrix.mulVec_mulVec, hvker]
+      simp
+    simpa [hPM] using hleft
+  have hshift_kernel :
+      (lambda • (1 : Matrix ι ι K) - A).mulVec v = 0 := by
+    simpa [M, Matrix.add_mulVec, hP_kernel] using hvker
+  have hAv : A.mulVec v = lambda • v := by
+    have hsub : lambda • v - A.mulVec v = 0 := by
+      simpa [Matrix.sub_mulVec, Matrix.smul_mulVec] using hshift_kernel
+    exact (sub_eq_zero.mp hsub).symm
+  have hPv : P.mulVec v = v := (hfixed v).2 hAv
+  have hvzero : v = 0 := by
+    rw [← hPv]
+    exact hP_kernel
+  exact hvne hvzero
+
+end Matrix
+
+-- Generalization plan (G0):
+-- concept/name: lower adjacent block-multiple bounds; orig was `quadraticScalar_completePeriod_floor_facts`
+-- generality used: natural block length `p` and horizon `T`, assuming only `0 < p` and `p ≤ T`
+-- portable call pattern: periodic, epoch-based, and block stochastic algorithms round a horizon down to a complete block before applying a complete-block estimate; the block length and horizon vary while positivity, sandwich, factor-two, and remainder bounds remain unchanged
+-- counterargument checked: the individual bounds are elementary caller-side arithmetic, but their conjunction is a reusable adjacent-block contract and no single Mathlib declaration supplies it
+-- coverage search: `lean_search_symbols` queries for a positive lower block multiple with factor-two and remainder bounds found no matching SOptLib theorem; `lean_leansearch` found the component APIs `Nat.galoisConnection_mul_div`, `Nat.div_mul_le_self`, and remainder lemmas, but no full contract
+-- minimal hypotheses: `quad.period_pos` was replaced by `0 < p`; `p ≤ T` is required for the positive quotient and factor-two conclusions, and no algorithm-specific assumptions remain
+
+/-- Rounding a natural horizon down to a block multiple gives a positive block
+count, a lower adjacent multiple within a factor of two, and a short remainder.
+
+Layer: Glue | Gap: Level 1 (positive floor-block multiple bounds)
+Proof: decompose the horizon by Euclidean division by the positive block length, then combine quotient positivity and the strict remainder bound with natural-number arithmetic.
+Source: Mathlib natural-number Euclidean division, remainder, and Presburger arithmetic
+Used in: shortening a stochastic-optimization horizon to the adjacent complete period before applying a complete-block moment estimate and lower sandwich
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/algorithm_spec
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem Nat.floor_block_multiple_facts
+    (p T : ℕ) (hp : 0 < p) (hpT : p ≤ T) :
+    let K : ℕ := T / p
+    let N : ℕ := K * p
+    1 ≤ K ∧ N ≤ T ∧ T ≤ 2 * N ∧ T - N ≤ p - 1 := by
+  dsimp only
+  let q := T / p
+  have hq_pos : 1 ≤ q := Nat.succ_le_iff.mpr (Nat.div_pos hpT hp)
+  have hN_le : q * p ≤ T := Nat.div_mul_le_self T p
+  have hdecomp : q * p + T % p = T := by
+    simpa [q, Nat.mul_comm] using (Nat.div_add_mod T p)
+  have hmod : T % p < p := Nat.mod_lt _ hp
+  have htail : T - q * p ≤ p - 1 := by
+    omega
+  have hT_le_two : T ≤ 2 * (q * p) := by
+    have hq_mul_pos : 0 < q * p :=
+      Nat.mul_pos (lt_of_lt_of_le Nat.zero_lt_one hq_pos) hp
+    nlinarith
+  exact ⟨hq_pos, hN_le, hT_le_two, htail⟩
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: existence of a uniform squared-parameter average bound from
+--   finite-horizon sum domination and a linear state-energy budget; orig was
+--   `quadratic_restricted_stable_output_average_l2_bound`
+-- generality used: arbitrary real-like scalars given by a field, linear order,
+--   and strict ordered-ring structure, with abstract parameter-indexed output
+--   and state energy sequences; no measure, probability, norm, inner product,
+--   convexity, smoothness, completeness, or finite-dimensional assumptions
+-- portable call pattern: stable-output, tracking-error, and perturbation proofs
+--   may change both energy sequences, the admissible parameter radius, and the
+--   domination and state-budget constants while retaining the same uniform
+--   squared-parameter averaged-energy conclusion
+-- counterargument checked: although the terminal cancellation is elementary,
+--   this is not a paper-local rename or caller-side expression; it packages the
+--   recurring composition of two independently established horizon-sum bounds,
+--   normalization by a positive horizon, and strict-positive constant selection
+-- coverage search: queried `exists uniform average squared bound from sum
+--   domination and linear horizon sum bound` and `average output energy alpha
+--   squared sum domination linear state energy horizon`; SOptLib hits concerned
+--   descent normalization or norm-square estimates, while Mathlib semantic search
+--   returned asymptotic finite-sum closure and unrelated average inequalities,
+--   none with this two-premise finite-horizon contract, so coverage is partial
+-- minimal hypotheses: positivity of the admissible radius is needed for the
+--   positive output radius; horizon positivity follows from `1 <= T`; no sign
+--   condition on the state-budget constant or either energy sequence is needed
+--   because the squared domination coefficient is nonnegative and the final
+--   coefficient is enlarged with a maximum
+
+/-- A finite-horizon output-energy domination and a linear state-energy budget
+give a uniform squared-parameter bound on average output energy.
+
+The final coefficient is chosen strictly positive even when the product of the
+two supplied constants is nonpositive.
+
+Layer: Glue | Gap: Level 1 (summed energy domination to uniform average bound)
+Proof: compose the two sum inequalities using nonnegativity of the squared domination coefficient, multiply by the nonnegative inverse horizon, cancel the positive horizon, and enlarge the resulting coefficient with a maximum plus one.
+Source: Mathlib finite sums, strictly ordered-field inverse arithmetic, lattice maxima, and square nonnegativity
+Used in: stable-output, tracking-error, and perturbation estimates that normalize a dominated finite-horizon energy sum after proving a linear state-energy budget
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/4
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem exists_average_sq_bound_of_sum_dom_and_linear_sum_bound
+    {K : Type*} [Field K] [LinearOrder K] [IsStrictOrderedRing K]
+    (outputEnergy stateEnergy : K -> Nat -> K)
+    (alpha0 Lout Cstate : K)
+    (halpha0_pos : 0 < alpha0)
+    (hsum_dom :
+      forall alpha, 0 < alpha -> alpha <= alpha0 ->
+        forall T : Nat, 1 <= T ->
+          Finset.sum (Finset.range T) (fun t => outputEnergy alpha t) <=
+            (Lout ^ 2 * alpha ^ 2) *
+              Finset.sum (Finset.range T) (fun t => stateEnergy alpha t))
+    (hstate_sum :
+      forall alpha, 0 < alpha -> alpha <= alpha0 ->
+        forall T : Nat, 1 <= T ->
+          Finset.sum (Finset.range T) (fun t => stateEnergy alpha t) <=
+            Cstate * (T : K)) :
+    exists C alphaStable : K,
+      0 < C /\ 0 < alphaStable /\
+        forall alpha, 0 < alpha -> alpha <= alphaStable ->
+          forall T : Nat, 1 <= T ->
+            (T : K)⁻¹ *
+                Finset.sum (Finset.range T) (fun t => outputEnergy alpha t) <=
+              C * alpha ^ 2 := by
+  let C : K := max (Lout ^ 2 * Cstate) 0 + 1
+  refine ⟨C, alpha0, ?_, halpha0_pos, ?_⟩
+  · have hmax_nonneg : 0 <= max (Lout ^ 2 * Cstate) 0 := le_max_right _ _
+    dsimp [C]
+    linarith
+  intro alpha halpha_pos halpha_le T hT
+  have hT_pos_nat : 0 < T := Nat.lt_of_lt_of_le Nat.zero_lt_one hT
+  have hT_pos : 0 < (T : K) := by
+    exact_mod_cast hT_pos_nat
+  have hT_ne : (T : K) ≠ 0 := ne_of_gt hT_pos
+  have hcoeff_nonneg : 0 <= Lout ^ 2 * alpha ^ 2 :=
+    mul_nonneg (sq_nonneg Lout) (sq_nonneg alpha)
+  have hscaled_sum :
+      Finset.sum (Finset.range T) (fun t => outputEnergy alpha t) <=
+        (Lout ^ 2 * alpha ^ 2) * (Cstate * (T : K)) :=
+    (hsum_dom alpha halpha_pos halpha_le T hT).trans
+      (mul_le_mul_of_nonneg_left
+        (hstate_sum alpha halpha_pos halpha_le T hT) hcoeff_nonneg)
+  calc
+    (T : K)⁻¹ * Finset.sum (Finset.range T) (fun t => outputEnergy alpha t) <=
+        (T : K)⁻¹ * ((Lout ^ 2 * alpha ^ 2) * (Cstate * (T : K))) :=
+      mul_le_mul_of_nonneg_left hscaled_sum (inv_nonneg.mpr hT_pos.le)
+    _ = (Lout ^ 2 * Cstate) * alpha ^ 2 := by
+      field_simp [hT_ne]
+    _ <= C * alpha ^ 2 := by
+      apply mul_le_mul_of_nonneg_right _ (sq_nonneg alpha)
+      exact (le_max_left (Lout ^ 2 * Cstate) 0).trans (by
+        dsimp [C]
+        linarith)
+
+
+-- Generalization plan (G0):
+-- concept/name: inverse-weight constant domination of a nonnegative two-term
+--   sum; orig was `quadratic_scalar_scale_le_const_twoTerm_eventually`.
+-- generality used: an arbitrary linear ordered semifield, two positive weights,
+--   and two nonnegative terms; no measure, filter, convexity, smoothness,
+--   oracle, topology, completeness, or finite-dimensional assumptions are used.
+-- portable call pattern: two-term stochastic-rate and Lyapunov estimates call
+--   this after identifying positive leading coefficients; the coefficients and
+--   nonnegative inverse/linear terms vary while the domination is unchanged.
+-- counterargument checked: the result is not paper-local and not a pure rename;
+--   it packages the explicit uniform inverse-weight constant needed to pass
+--   from an unweighted error scale to a positive weighted leading expression.
+-- coverage search: queried `positive coefficients weighted inverse linear sum
+--   dominates unweighted inverse linear sum`, `add_le inv weighted add pos`,
+--   and LeanSearch for the exact positive-real inequality; the closest SOptLib
+--   hit was `mul_add_mul_le_sqrt_weighted_sq_mul_sqrt_inv_weighted_sq`, while
+--   Mathlib returned harmonic/geometric/arithmetic mean inequalities, all with
+--   different conclusions and hypotheses.
+-- minimal hypotheses: positivity of both weights is needed for their inverses;
+--   nonnegativity of both terms is exactly what permits coefficientwise
+--   multiplication, and all source-specific eventual assumptions are omitted.
+
+/-- Positive weights make their weighted two-term sum dominate the unweighted
+sum after multiplication by the sum of the inverse weights.
+
+Layer: Glue | Gap: Level 0 (positive two-term weighted-sum domination)
+Proof: expand each inverse-weight product into one plus a nonnegative ratio,
+  multiply the resulting coefficient bounds by the nonnegative terms, and add.
+Source: Mathlib linear ordered semifield inverse, division, and ordered-ring APIs
+Used in: two-term stochastic convergence-rate estimates when an inverse-horizon
+  component and a linear-stepsize component have different positive coefficients
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/16/proof/3
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem add_le_inv_add_inv_mul_weighted_add_of_pos
+    {K : Type*} [Semifield K] [LinearOrder K] [IsStrictOrderedRing K]
+    (A B x y : K) (hA : 0 < A) (hB : 0 < B) (hx : 0 ≤ x) (hy : 0 ≤ y) :
+    x + y ≤ (A⁻¹ + B⁻¹) * (A * x + B * y) := by
+  have hA_ne : A ≠ 0 := ne_of_gt hA
+  have hB_ne : B ≠ 0 := ne_of_gt hB
+  have hCA : 1 ≤ (A⁻¹ + B⁻¹) * A := by
+    have heq : (A⁻¹ + B⁻¹) * A = 1 + A / B := by
+      field_simp [hA_ne, hB_ne]
+    rw [heq]
+    exact le_add_of_nonneg_right (div_nonneg hA.le hB.le)
+  have hCB : 1 ≤ (A⁻¹ + B⁻¹) * B := by
+    have heq : (A⁻¹ + B⁻¹) * B = B / A + 1 := by
+      field_simp [hA_ne, hB_ne]
+    rw [heq]
+    exact le_add_of_nonneg_left (div_nonneg hB.le hA.le)
+  have hx_le : x ≤ (A⁻¹ + B⁻¹) * (A * x) := by
+    simpa [mul_assoc] using mul_le_mul_of_nonneg_right hCA hx
+  have hy_le : y ≤ (A⁻¹ + B⁻¹) * (B * y) := by
+    simpa [mul_assoc] using mul_le_mul_of_nonneg_right hCB hy
+  calc
+    x + y ≤ (A⁻¹ + B⁻¹) * (A * x) +
+        (A⁻¹ + B⁻¹) * (B * y) := add_le_add hx_le hy_le
+    _ = (A⁻¹ + B⁻¹) * (A * x + B * y) := by ring
+
+
+-- Generalization plan (G1):
+-- concept/name: absolute bound for rescaling an inverse-horizon-plus-linear
+--   center between adjacent horizons; orig was
+--   `real_adjacent_complete_scaled_center_shift_bound`
+-- generality used: linearly ordered fields, with nonzero gain, stepsize, and
+--   source horizon, a positive target horizon, a unit absolute stepsize bound,
+--   and an absolute horizon-gap bound; no completeness, Archimedean, measure,
+--   probability, normed-space, convexity, smoothness, oracle, or
+--   finite-dimensional assumptions are used
+-- portable call pattern: complete-block, epoch-extension, and horizon-rounding
+--   arguments vary the numerator, gain, stepsize, linear coefficient, two
+--   horizons, and overshoot while reusing exact cancellation of the inverse
+--   term and the same coefficient-times-gap-over-target remainder
+-- counterargument checked: although the proof is scalar algebra, the theorem
+--   is not paper-local traceability or a pure rename; it packages the exact
+--   inverse-horizon cancellation together with the absolute perturbation bound
+--   used whenever an estimate is transported between nearby horizons
+-- coverage search: project queries `absolute value bound scaled adjacent
+--   horizon inverse center cancellation linear shift`, `rescaling inverse
+--   horizon plus linear center difference bounded by coefficient times horizon
+--   gap`, and `abs scaled inverse linear expression sub bound of abs horizon
+--   difference` found only the source declaration; Mathlib LeanSearch returned
+--   generic absolute-value bounds and no theorem with this cancellation and
+--   rescaling contract
+-- minimal hypotheses: `p ≥ 0` was removed because it follows from
+--   `|N - T| ≤ p`; every remaining nonzero, positivity, and bound hypothesis
+--   is used by cancellation or ordered multiplication
+
+/-- Rescaling an inverse-horizon-plus-linear center from a nonzero horizon `N`
+to a positive horizon `T` cancels its inverse term, leaving a linear shift
+controlled by the absolute horizon gap.
+
+Layer: Glue | Gap: Level 1 (adjacent-horizon inverse-center cancellation bound)
+Proof: clear the nonzero denominators to identify the difference with `B * alpha * (N - T) / T`, then use multiplicativity of absolute value, the unit stepsize bound, and the supplied horizon-gap bound.
+Source: Mathlib ordered-field absolute-value identities and field normalization tactics
+Used in: complete-block, epoch-extension, and horizon-rounding estimates that transfer an inverse-horizon leading center from a nearby full block to the requested horizon
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/15/proof/7
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem abs_rescale_inv_add_mul_sub_le_of_abs_sub_le
+    {K : Type*} [Field K] [LinearOrder K] [IsStrictOrderedRing K]
+    {Delta gain alpha B T N p : K}
+    (hgain_ne : gain ≠ 0) (halpha_ne : alpha ≠ 0)
+    (hT_pos : 0 < T) (hN_ne : N ≠ 0)
+    (halpha_abs_le_one : |alpha| ≤ 1)
+    (hNT_abs : |N - T| ≤ p) :
+    |T⁻¹ * (N * (Delta / (gain * alpha * N) + B * alpha)) -
+        (Delta / (gain * alpha * T) + B * alpha)| ≤
+      |B| * p * T⁻¹ := by
+  have hT_ne : T ≠ 0 := ne_of_gt hT_pos
+  have hmain_eq :
+      T⁻¹ * (N * (Delta / (gain * alpha * N) + B * alpha)) -
+          (Delta / (gain * alpha * T) + B * alpha) =
+        B * alpha * ((N - T) * T⁻¹) := by
+    field_simp [hgain_ne, halpha_ne, hT_ne, hN_ne]
+    ring
+  rw [hmain_eq]
+  calc
+    |B * alpha * ((N - T) * T⁻¹)| =
+        |B| * |alpha| * |N - T| * T⁻¹ := by
+      rw [abs_mul, abs_mul, abs_mul, abs_inv, abs_of_pos hT_pos]
+      ring
+    _ ≤ |B| * 1 * p * T⁻¹ := by
+      gcongr
+    _ = |B| * p * T⁻¹ := by ring
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: finite absolute transient mass of a zero-initial constant affine
+--   recurrence; orig was `real_ar_const_zero_transient_sum_abs_le`, renamed to
+--   expose the recurrence and conclusion rather than the paper's `AR` shorthand.
+-- generality used: an arbitrary linearly ordered field, a nonnegative
+--   contraction `q`, constant forcing `N`, and natural horizon `K`; no measure,
+--   convexity, smoothness, finite-dimensional, or stochastic assumptions are
+--   used.
+-- portable call pattern: stable scalar moment, variance, and filter recurrences
+--   change the nonnegative contraction, constant forcing, and finite horizon
+--   while reusing the same total deviation bound from the steady value.
+-- counterargument checked: this is not paper-local traceability or a pure rename;
+--   it packages the algebraic reduction of every absolute transient term and its
+--   finite geometric aggregation, rather than merely restating one Mathlib lemma.
+-- coverage search: project symbol searches for finite absolute affine-recursion
+--   transients found only the source theorem and related squared-energy or
+--   reverse-convolution bounds; Mathlib LeanSearch found contraction iterate and
+--   geometric-tail bounds, while the exact supporting hit was
+--   `geom_sum_Ico_le_of_lt_one`, which covers only the inner geometric prefix.
+-- minimal hypotheses: `0 <= q` controls powers and `q < 1` makes the steady
+--   denominator positive; `N` is unrestricted and all hypotheses are minimal.
+
+/-- The finite absolute transient mass of a zero-initial constant affine response
+is bounded by the corresponding infinite geometric mass.
+
+For a nonnegative contraction `q < 1`, the zero-initial response to constant
+forcing `N` at time `k` is `N * (1 - q ^ k) / (1 - q)`, while its steady value
+is `N / (1 - q)`.
+
+Layer: Glue | Gap: Level 1 (constant affine recurrence transient mass)
+Proof: rewrite each absolute deviation as `(|N| / (1 - q)) * q ^ k`, factor
+  the constant through the finite sum, and apply `geom_sum_Ico_le_of_lt_one`.
+Source: Mathlib ordered-field finite geometric sums and absolute-value algebra
+Used in: stable scalar moment and variance recurrences when replacing a
+  zero-initial finite-horizon response by its constant-forcing steady value
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/15/proof/6
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem sum_abs_const_affine_zero_transient_le
+    {R : Type*} [Field R] [LinearOrder R] [IsStrictOrderedRing R]
+    {q N : R} (K : ℕ) (hq_nonneg : 0 ≤ q) (hq_lt_one : q < 1) :
+    (Finset.range K).sum (fun k =>
+        |N * ((1 - q ^ k) / (1 - q)) - N / (1 - q)|) ≤
+      |N| / (1 - q) ^ 2 := by
+  classical
+  have hD_pos : 0 < 1 - q := sub_pos.mpr hq_lt_one
+  have hD_nonneg : 0 ≤ 1 - q := le_of_lt hD_pos
+  have hD_ne : 1 - q ≠ 0 := ne_of_gt hD_pos
+  have hgeom :
+      (Finset.range K).sum (fun k => q ^ k) ≤ (1 - q)⁻¹ := by
+    have hrange_eq : Finset.range K = Finset.Ico 0 K := by
+      ext j
+      simp
+    calc
+      (Finset.range K).sum (fun k => q ^ k)
+          = (Finset.Ico 0 K).sum (fun k => q ^ k) := by rw [hrange_eq]
+      _ ≤ q ^ 0 / (1 - q) :=
+          geom_sum_Ico_le_of_lt_one (x := q) (m := 0) (n := K)
+            hq_nonneg hq_lt_one
+      _ = (1 - q)⁻¹ := by simp [one_div]
+  have hterm (k : ℕ) :
+      |N * ((1 - q ^ k) / (1 - q)) - N / (1 - q)| =
+        (|N| / (1 - q)) * q ^ k := by
+    have hqpow_nonneg : 0 ≤ q ^ k := pow_nonneg hq_nonneg k
+    have halg :
+        N * ((1 - q ^ k) / (1 - q)) - N / (1 - q) =
+          -(N / (1 - q)) * q ^ k := by
+      field_simp [hD_ne]
+      ring
+    rw [halg, abs_mul, abs_neg, abs_div, abs_of_pos hD_pos,
+      abs_of_nonneg hqpow_nonneg]
+  calc
+    (Finset.range K).sum (fun k =>
+        |N * ((1 - q ^ k) / (1 - q)) - N / (1 - q)|)
+        = (|N| / (1 - q)) *
+            (Finset.range K).sum (fun k => q ^ k) := by
+          rw [Finset.mul_sum]
+          apply Finset.sum_congr rfl
+          intro k _hk
+          rw [hterm k]
+    _ ≤ (|N| / (1 - q)) * (1 - q)⁻¹ := by
+      exact mul_le_mul_of_nonneg_left hgeom
+        (div_nonneg (abs_nonneg N) hD_nonneg)
+    _ = |N| / (1 - q) ^ 2 := by
+      field_simp [hD_ne]
+
+
+-- Generalization plan (G0):
+-- concept/name: common-scale quotient error bound; orig was
+--   `real_common_scale_quotient_error_bound`
+-- generality used: linearly ordered field algebra only; no carrier, measure, convexity,
+--   smoothness, or oracle assumptions
+-- portable call pattern: normalization and ratio-estimator proofs in which a
+--   nonnegative scale and phase baseline, denominator, error constants, and tail vary
+-- counterargument checked: not paper-local or a one-line wrapper; it packages two
+--   first-order approximation errors, a denominator lower bound, and a tail estimate
+-- coverage search: searched normalized quotient error, denominator approximation,
+--   phase approximation, and nonnegative tail; Mathlib `abs_div` is only a primitive
+--   component and no Mathlib/SOptLib theorem covers the combined conclusion
+-- minimal hypotheses: the common scale and phase baseline are nonnegative; the
+--   approximation hypotheses themselves force the error right-hand sides to be
+--   nonnegative, so separate sign assumptions on their coefficients are unnecessary
+
+/-- A common-scale numerator and denominator approximation bounds the normalized
+quotient error, including a nonnegative multiplicative tail.
+
+Layer: Glue | Gap: Level 1 (common-scale quotient stability with a tail remainder)
+Proof: Bound the normalized quotient and its distance from one using the phase and denominator approximation errors, divide through the positive linear denominator lower bound, then apply the triangle inequality to the tail decomposition.
+Source: Mathlib ordered-field absolute-value, division-monotonicity, and nonlinear ordered-field arithmetic APIs
+Used in: periodic scalar bias normalization and ratio-estimator proofs after first-order phase and denominator expansions, before converting a geometric tail to an exponential remainder
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/15/proof/3
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem common_scale_quotient_error_le
+    {K : Type*} [Field K] [LinearOrder K] [IsStrictOrderedRing K]
+    {lambda h p alpha den S tail dlow Cd Cs : K}
+    (hscale_nonneg : 0 ≤ 2 * lambda * h) (hp_nonneg : 0 ≤ p)
+    (halpha_pos : 0 < alpha) (hdlow_pos : 0 < dlow)
+    (hden_lower : dlow * alpha ≤ den)
+    (hden_close : |den - alpha * (2 * lambda * p * h)| ≤ Cd * alpha ^ 2)
+    (hphase_close : |S - p| ≤ Cs * alpha)
+    (htail_nonneg : 0 ≤ tail) :
+    |2 * lambda * h * alpha * S * ((1 - tail) / den) - 1| ≤
+      ((2 * lambda * h * Cs + Cd) / dlow) * alpha +
+        ((2 * lambda * h * (p + Cs * alpha)) / dlow) * tail := by
+  let A : K := 2 * lambda * h * alpha * S / den
+  let d : K := 2 * lambda * p * h
+  have halpha_nonneg : 0 ≤ alpha := le_of_lt halpha_pos
+  have hden_pos : 0 < den := by
+    exact lt_of_lt_of_le (mul_pos hdlow_pos halpha_pos) hden_lower
+  have hphase_abs :
+      |S| ≤ p + Cs * alpha := by
+    rw [abs_le]
+    have htwo := abs_le.mp hphase_close
+    constructor <;> nlinarith
+  have hA_abs :
+      |A| ≤ (2 * lambda * h * (p + Cs * alpha)) / dlow := by
+    have hnum_nonneg :
+        0 ≤ (2 * lambda * h * alpha) * |S| := by positivity
+    have hnum_le :
+        (2 * lambda * h * alpha) * |S| ≤
+          (2 * lambda * h * alpha) * (p + Cs * alpha) := by
+      exact mul_le_mul_of_nonneg_left hphase_abs
+        (mul_nonneg hscale_nonneg halpha_nonneg)
+    have hdiv_den :
+        ((2 * lambda * h * alpha) * |S|) / den ≤
+          ((2 * lambda * h * alpha) * |S|) / (dlow * alpha) := by
+      exact div_le_div_of_nonneg_left hnum_nonneg
+        (mul_pos hdlow_pos halpha_pos) hden_lower
+    have hdiv_num :
+        ((2 * lambda * h * alpha) * |S|) / (dlow * alpha) ≤
+          ((2 * lambda * h * alpha) * (p + Cs * alpha)) /
+            (dlow * alpha) := by
+      exact div_le_div_of_nonneg_right hnum_le
+        (mul_nonneg hdlow_pos.le halpha_nonneg)
+    have hcancel :
+        ((2 * lambda * h * alpha) * (p + Cs * alpha)) /
+            (dlow * alpha) =
+          (2 * lambda * h * (p + Cs * alpha)) / dlow := by
+      field_simp [ne_of_gt hdlow_pos, ne_of_gt halpha_pos]
+    have hA_eq :
+        |A| = ((2 * lambda * h * alpha) * |S|) / den := by
+      dsimp [A]
+      rw [abs_div, abs_mul, abs_mul, abs_of_nonneg hscale_nonneg,
+        abs_of_pos halpha_pos, abs_of_pos hden_pos]
+    calc
+      |A| = ((2 * lambda * h * alpha) * |S|) / den := hA_eq
+      _ ≤ ((2 * lambda * h * alpha) * |S|) / (dlow * alpha) := hdiv_den
+      _ ≤ ((2 * lambda * h * alpha) * (p + Cs * alpha)) /
+            (dlow * alpha) := hdiv_num
+      _ = (2 * lambda * h * (p + Cs * alpha)) / dlow := hcancel
+  have hA_minus_abs :
+      |A - 1| ≤ ((2 * lambda * h * Cs + Cd) / dlow) * alpha := by
+    have hnum_identity :
+        2 * lambda * h * alpha * S - den =
+          2 * lambda * h * alpha * (S - p) -
+            (den - alpha * d) := by
+      dsimp [d]
+      ring
+    have hnum_abs :
+        |2 * lambda * h * alpha * S - den| ≤
+          (2 * lambda * h * Cs + Cd) * alpha ^ 2 := by
+      calc
+        |2 * lambda * h * alpha * S - den| =
+            |2 * lambda * h * alpha * (S - p) -
+              (den - alpha * d)| := by rw [hnum_identity]
+        _ ≤ |2 * lambda * h * alpha * (S - p)| +
+              |den - alpha * d| := abs_sub _ _
+        _ ≤ (2 * lambda * h * alpha) * (Cs * alpha) +
+              Cd * alpha ^ 2 := by
+          refine add_le_add ?_ hden_close
+          rw [abs_mul, abs_mul, abs_of_nonneg hscale_nonneg,
+            abs_of_pos halpha_pos]
+          exact mul_le_mul_of_nonneg_left hphase_close
+            (mul_nonneg hscale_nonneg halpha_nonneg)
+        _ = (2 * lambda * h * Cs + Cd) * alpha ^ 2 := by ring
+    have hdiv_den :
+        |2 * lambda * h * alpha * S - den| / den ≤
+          |2 * lambda * h * alpha * S - den| / (dlow * alpha) := by
+      exact div_le_div_of_nonneg_left (abs_nonneg _)
+        (mul_pos hdlow_pos halpha_pos) hden_lower
+    have hdiv_num :
+        |2 * lambda * h * alpha * S - den| / (dlow * alpha) ≤
+          ((2 * lambda * h * Cs + Cd) * alpha ^ 2) /
+            (dlow * alpha) := by
+      exact div_le_div_of_nonneg_right hnum_abs
+        (mul_nonneg hdlow_pos.le halpha_nonneg)
+    have hcancel :
+        ((2 * lambda * h * Cs + Cd) * alpha ^ 2) / (dlow * alpha) =
+          ((2 * lambda * h * Cs + Cd) / dlow) * alpha := by
+      field_simp [ne_of_gt hdlow_pos, ne_of_gt halpha_pos]
+    have hA_minus_eq :
+        |A - 1| = |2 * lambda * h * alpha * S - den| / den := by
+      dsimp [A]
+      have hquot :
+          2 * lambda * h * alpha * S / den - 1 =
+            (2 * lambda * h * alpha * S - den) / den := by
+        field_simp [ne_of_gt hden_pos]
+      rw [hquot, abs_div, abs_of_pos hden_pos]
+    calc
+      |A - 1| = |2 * lambda * h * alpha * S - den| / den := hA_minus_eq
+      _ ≤ |2 * lambda * h * alpha * S - den| / (dlow * alpha) := hdiv_den
+      _ ≤ ((2 * lambda * h * Cs + Cd) * alpha ^ 2) /
+            (dlow * alpha) := hdiv_num
+      _ = ((2 * lambda * h * Cs + Cd) / dlow) * alpha := hcancel
+  have htail_abs : |A * tail| = |A| * tail := by
+    rw [abs_mul, abs_of_nonneg htail_nonneg]
+  have htail_bound :
+      |A * tail| ≤
+        ((2 * lambda * h * (p + Cs * alpha)) / dlow) * tail := by
+    rw [htail_abs]
+    exact mul_le_mul_of_nonneg_right hA_abs htail_nonneg
+  calc
+    |2 * lambda * h * alpha * S * ((1 - tail) / den) - 1| =
+        |A * (1 - tail) - 1| := by
+      dsimp [A]
+      field_simp [ne_of_gt hden_pos]
+    _ = |(A - 1) - A * tail| := by ring_nf
+    _ ≤ |A - 1| + |A * tail| := abs_sub _ _
+    _ ≤ ((2 * lambda * h * Cs + Cd) / dlow) * alpha +
+        ((2 * lambda * h * (p + Cs * alpha)) / dlow) * tail :=
+      add_le_add hA_minus_abs htail_bound
+
+
+-- Generalization plan (G0):
+-- concept/name: normalized complete-period phase decomposition into boundary,
+--   geometric-bias, phase-correction, and fresh-forcing terms; orig was
+--   `real_complete_period_phase_bias_fresh_algebra`
+-- generality used: natural block and phase counts and arbitrary field-valued phase,
+--   boundary, and fresh-forcing families; no measure, convexity, smoothness, oracle,
+--   finite-dimensional, or algorithm-specific assumptions are used
+-- portable call pattern: periodic stochastic recurrences can split a normalized
+--   block-phase second-moment sum after changing the period, horizon, phase
+--   multipliers, boundary moments, fresh forcing, and geometric factor
+-- counterargument checked: the statement is not paper-local bookkeeping or a
+--   one-line wrapper; it packages normalization, a rectangular-product sum,
+--   geometric-bias subtraction, and the surviving phase correction in one identity
+-- coverage search: searches for normalized nested finite sums, phase/boundary/bias
+--   decomposition, and separate finite-sum products found only Mathlib distributivity
+--   primitives such as `Fintype.sum_mul_sum`, not this compound contract
+-- minimal hypotheses: nonvanishing casts of both natural counts justify the
+--   two denominators; the supplied geometric-sum equality is the sole hypothesis
+--   about the geometric factor, and all function arguments are otherwise arbitrary
+
+open scoped BigOperators
+
+/-- A normalized complete block-phase sum splits, after subtracting its geometric
+bias and boundary average, into a phase-factor correction and the fresh average.
+
+Layer: Glue | Gap: Level 1 (normalized finite block-phase bias decomposition)
+Proof: Distribute both finite sums, factor the phase-only and block-only terms,
+identify the range phase sum with the corresponding `Fin p` sum, substitute the
+geometric-sum hypothesis, and normalize by the positive block and phase counts.
+Source: Mathlib finite big-operator distributivity, `Finset.sum_fin_eq_sum_range`,
+and real field normalization
+Used in: periodic stochastic recurrence second-moment proofs after splitting each
+complete block into a propagated boundary moment, deterministic geometric bias,
+and fresh within-block forcing
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/15/proof/3
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem complete_period_phase_bias_fresh_decomposition
+    {R : Type*} [Field R] {K p : ℕ}
+    (hK_ne : (K : R) ≠ 0) (hp_ne : (p : R) ≠ 0)
+    (lambda x0 Gamma : R) (A V : ℕ → R) (F : ℕ → ℕ → R)
+    (hgeom :
+      (Finset.range K).sum (fun k => Gamma ^ (2 * k)) =
+        (1 - Gamma ^ (2 * K)) / (1 - Gamma ^ 2)) :
+    let phaseSumFin : R := ∑ r : Fin p, A r.1 ^ 2
+    let boundaryAverage : R :=
+      lambda ^ 2 * (K : R)⁻¹ * ((Finset.range K).sum fun k => V k)
+    let freshAverage : R :=
+      lambda ^ 2 * (((K * p : ℕ) : R)⁻¹) *
+        ((Finset.range K).sum fun k =>
+          (Finset.range p).sum fun r => F k r)
+    let biasAverage : R :=
+      (lambda ^ 2 * x0 ^ 2 / ((K : R) * (p : R))) *
+        phaseSumFin *
+          ((1 - Gamma ^ (2 * K)) / (1 - Gamma ^ 2))
+    let phaseFactor : R := phaseSumFin / (p : R) - 1
+    (((K * p : ℕ) : R)⁻¹) *
+        ((Finset.range K).sum fun k =>
+          (Finset.range p).sum fun r =>
+            lambda ^ 2 *
+              (A r ^ 2 * (V k + x0 ^ 2 * Gamma ^ (2 * k)) +
+                F k r)) -
+      biasAverage - boundaryAverage =
+    phaseFactor * boundaryAverage + freshAverage := by
+  classical
+  have hphase :
+      (Finset.range p).sum (fun r => A r ^ 2) =
+        ∑ r : Fin p, A r.1 ^ 2 := by
+    trans
+      (Finset.range p).sum fun r =>
+        if h : r < p then A (⟨r, h⟩ : Fin p).1 ^ 2 else 0
+    · apply Finset.sum_congr rfl
+      intro r hr
+      simp [Finset.mem_range.mp hr]
+    · exact (Finset.sum_fin_eq_sum_range
+        (fun r : Fin p => A r.1 ^ 2)).symm
+  have hsum_split :
+      ((Finset.range K).sum fun k =>
+          (Finset.range p).sum fun r =>
+            lambda ^ 2 *
+              (A r ^ 2 * (V k + x0 ^ 2 * Gamma ^ (2 * k)) +
+                F k r)) =
+        lambda ^ 2 *
+            ((Finset.range p).sum (fun r => A r ^ 2)) *
+              ((Finset.range K).sum fun k => V k) +
+          lambda ^ 2 * x0 ^ 2 *
+            ((Finset.range p).sum (fun r => A r ^ 2)) *
+              ((Finset.range K).sum fun k => Gamma ^ (2 * k)) +
+          lambda ^ 2 *
+            ((Finset.range K).sum fun k =>
+              (Finset.range p).sum fun r => F k r) := by
+    simp only [mul_add, Finset.sum_add_distrib, Finset.mul_sum,
+      Finset.sum_mul]
+    have hbias_comm :
+        (∑ x ∈ Finset.range K, ∑ x_1 ∈ Finset.range p,
+          lambda ^ 2 * (A x_1 ^ 2 * (x0 ^ 2 * Gamma ^ (2 * x)))) =
+        (∑ x ∈ Finset.range K, ∑ x_1 ∈ Finset.range p,
+          lambda ^ 2 * x0 ^ 2 * A x_1 ^ 2 * Gamma ^ (2 * x)) := by
+      apply Finset.sum_congr rfl
+      intro x _hx
+      apply Finset.sum_congr rfl
+      intro x_1 _hr
+      ring
+    rw [hbias_comm]
+    have hbias_comm' :
+        (∑ x ∈ Finset.range K, ∑ x_1 ∈ Finset.range p,
+          lambda ^ 2 * x0 ^ 2 * A x_1 ^ 2 * Gamma ^ (2 * x)) =
+        (∑ x ∈ Finset.range K, ∑ x_1 ∈ Finset.range p,
+          lambda ^ 2 * x0 ^ 2 * Gamma ^ (2 * x) * A x_1 ^ 2) := by
+      apply Finset.sum_congr rfl
+      intro x _hx
+      apply Finset.sum_congr rfl
+      intro x_1 _hr
+      ring
+    rw [hbias_comm']
+    ring
+  dsimp
+  rw [hsum_split, hphase, hgeom, Nat.cast_mul]
+  field_simp [hK_ne, hp_ne]
+  ring
+
+
+-- Generalization plan (G0):
+-- concept/name: scaled complete-horizon remainder transport; orig was
+--   `real_scaled_complete_period_remainder_le_tail`
+-- generality used: linear-ordered-field algebra only, with positive stepsize
+--   and target horizon, a nonnegative coefficient and target tail, a block factor at
+--   least one, a completed-horizon ratio bound, and monotonicity of the tail;
+--   no measure, probability, convexity, smoothness, oracle, or vector-space
+--   assumptions are used
+-- portable call pattern: complete-block, epoch-rounding, and restarted rate
+--   proofs vary the nonnegative coefficient, stepsize, requested and completed
+--   horizons, block factor, and monotone tail pair while reusing the same
+--   inverse/quadratic/tail remainder transport
+-- counterargument checked: this is not paper-local traceability or a pure
+--   rename; it packages simultaneous cancellation of the completed inverse and
+--   tail denominators with horizon-ratio control of the quadratic term and
+--   block-factor absorption of every nonnegative target component
+-- coverage search: project queries `nonnegative coefficient scaled complete
+--   horizon inverse quadratic exponential remainder upper bound`, `inverse
+--   plus square plus quotient scaled by horizon upper bound factor`, and
+--   `scaled remainder bound of horizon ratio and monotone tail` found only the
+--   source theorem and unrelated tail lemmas; Mathlib LeanSearch returned
+--   generic exponential and division inequalities, with no matching combined
+--   horizon-transport contract
+-- minimal hypotheses: target-horizon and stepsize positivity preserve the tail
+--   denominator, `p >= 1` absorbs the inverse and tail terms, `N <= p*T`
+--   controls the quadratic term, and the two tail hypotheses provide ordered
+--   division and nonnegative block absorption; no sign condition on `N` is
+--   needed because the zero case is trivial and the nonzero case cancels it
+
+/-- A nonnegative inverse/quadratic/tail remainder at a nonzero completed
+horizon remains bounded by the block factor times the corresponding remainder
+at a positive target horizon; the same bound is trivial at a zero completed
+horizon.
+
+Layer: Glue | Gap: Level 1 (complete-horizon three-term remainder transport)
+Proof: Cancel the completed horizon in the inverse and tail terms, use `N <= p * T` for the quadratic term, and absorb the nonnegative target components with `1 <= p` before restoring the common coefficient.
+Source: Mathlib linearly ordered field division, inverse monotonicity, and polynomial normalization APIs
+Used in: periodic-block, epoch-extension, and horizon-rounding rate proofs that transfer an inverse/quadratic/exponential remainder from a nearby completed horizon to an arbitrary requested horizon
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/15/proof/6
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem scaled_complete_horizon_remainder_le
+    {K : Type*} [Field K] [LinearOrder K] [IsStrictOrderedRing K]
+    {Cc alpha T N p expN expT : K}
+    (hCc_nonneg : 0 ≤ Cc) (halpha_pos : 0 < alpha)
+    (hT_pos : 0 < T)
+    (hp_ge_one : 1 ≤ p) (hN_le_pT : N ≤ p * T)
+    (hexp_le : expN ≤ expT) (hexpT_nonneg : 0 ≤ expT) :
+    T⁻¹ * (N * (Cc * (N⁻¹ + alpha ^ 2 + expN / (alpha * N)))) ≤
+      Cc * p * (T⁻¹ + alpha ^ 2 + expT / (alpha * T)) := by
+  by_cases hN : N = 0
+  · subst N
+    have hp_nonneg : 0 ≤ p := le_trans zero_le_one hp_ge_one
+    have hden_nonneg : 0 ≤ alpha * T := (mul_pos halpha_pos hT_pos).le
+    have htail_nonneg : 0 ≤ expT / (alpha * T) :=
+      div_nonneg hexpT_nonneg hden_nonneg
+    have hsum_nonneg : 0 ≤ T⁻¹ + alpha ^ 2 + expT / (alpha * T) :=
+      add_nonneg (add_nonneg (inv_nonneg.mpr hT_pos.le) (sq_nonneg alpha))
+        htail_nonneg
+    simpa using mul_nonneg (mul_nonneg hCc_nonneg hp_nonneg) hsum_nonneg
+  have hT_ne : T ≠ 0 := ne_of_gt hT_pos
+  have hN_ne : N ≠ 0 := hN
+  have halpha_ne : alpha ≠ 0 := ne_of_gt halpha_pos
+  have hden_pos : 0 < alpha * T := mul_pos halpha_pos hT_pos
+  have hTinv_nonneg : 0 ≤ T⁻¹ := inv_nonneg.mpr hT_pos.le
+  have htail_exp_nonneg : 0 ≤ expT / (alpha * T) :=
+    div_nonneg hexpT_nonneg hden_pos.le
+  have hratio_le : N * T⁻¹ ≤ p := by
+    have h := div_le_iff₀ hT_pos |>.mpr hN_le_pT
+    simpa [div_eq_mul_inv, mul_comm, mul_left_comm, mul_assoc] using h
+  have hinner_le :
+      T⁻¹ * (N * (N⁻¹ + alpha ^ 2 + expN / (alpha * N))) ≤
+        p * (T⁻¹ + alpha ^ 2 + expT / (alpha * T)) := by
+    have hterm_exp :
+        T⁻¹ * (N * (expN / (alpha * N))) ≤ expT / (alpha * T) := by
+      calc
+        T⁻¹ * (N * (expN / (alpha * N))) = expN / (alpha * T) := by
+          field_simp [hT_ne, hN_ne, halpha_ne]
+        _ ≤ expT / (alpha * T) :=
+          div_le_div_of_nonneg_right hexp_le hden_pos.le
+    have hterm_inv :
+        T⁻¹ * (N * N⁻¹) = T⁻¹ := by
+      field_simp [hN_ne]
+    have hterm_alpha :
+        T⁻¹ * (N * alpha ^ 2) ≤ p * alpha ^ 2 := by
+      calc
+        T⁻¹ * (N * alpha ^ 2) = (N * T⁻¹) * alpha ^ 2 := by ring
+        _ ≤ p * alpha ^ 2 :=
+          mul_le_mul_of_nonneg_right hratio_le (sq_nonneg alpha)
+    have hcomponents :
+        T⁻¹ * (N * (N⁻¹ + alpha ^ 2 + expN / (alpha * N))) ≤
+          T⁻¹ + p * alpha ^ 2 + expT / (alpha * T) := by
+      calc
+        T⁻¹ * (N * (N⁻¹ + alpha ^ 2 + expN / (alpha * N))) =
+            T⁻¹ * (N * N⁻¹) + T⁻¹ * (N * alpha ^ 2) +
+              T⁻¹ * (N * (expN / (alpha * N))) := by ring
+        _ ≤ T⁻¹ + p * alpha ^ 2 + expT / (alpha * T) := by
+          nlinarith
+    have htail_scale :
+        T⁻¹ + p * alpha ^ 2 + expT / (alpha * T) ≤
+          p * (T⁻¹ + alpha ^ 2 + expT / (alpha * T)) := by
+      have hpinv : T⁻¹ ≤ p * T⁻¹ := by
+        calc
+          T⁻¹ = 1 * T⁻¹ := by ring
+          _ ≤ p * T⁻¹ :=
+            mul_le_mul_of_nonneg_right hp_ge_one hTinv_nonneg
+      have hpexp : expT / (alpha * T) ≤ p * (expT / (alpha * T)) := by
+        calc
+          expT / (alpha * T) = 1 * (expT / (alpha * T)) := by ring
+          _ ≤ p * (expT / (alpha * T)) :=
+            mul_le_mul_of_nonneg_right hp_ge_one htail_exp_nonneg
+      nlinarith
+    exact hcomponents.trans htail_scale
+  calc
+    T⁻¹ * (N * (Cc * (N⁻¹ + alpha ^ 2 + expN / (alpha * N)))) =
+        Cc * (T⁻¹ * (N * (N⁻¹ + alpha ^ 2 + expN / (alpha * N)))) := by
+      ring
+    _ ≤ Cc * (p * (T⁻¹ + alpha ^ 2 + expT / (alpha * T))) :=
+      mul_le_mul_of_nonneg_left hinner_le hCc_nonneg
+    _ = Cc * p * (T⁻¹ + alpha ^ 2 + expT / (alpha * T)) := by ring
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: squared displacement to a positive-period floor-block start controlled by the full block's adjacent-increment energy; orig was `real_sq_floor_block_mismatch_le_period_increment_sum`
+-- generality used: an arbitrary seminormed additive commutative group, a positive natural period, a trajectory, and a time; no scalar action, inner product, completeness, finite-dimensionality, measure, convexity, smoothness, oracle, or optimization assumptions
+-- portable call pattern: periodic, block-coordinate, and epoch analyses change the normed trajectory, observation time, and positive block length while reusing the same control of within-block displacement by the block's adjacent-increment energy
+-- counterargument checked: this is not paper-local traceability or a pure wrapper because it combines Euclidean division at an arbitrary time, path telescoping to the within-block remainder, finite-sum Cauchy--Schwarz, and monotone enlargement to the full period; the staged dependent-product operator endpoint theorem has additional operator and Lipschitz structure and fixes the endpoint at the full path length rather than a floor-block remainder
+-- coverage search: queried `squared norm endpoint difference bounded by path length times sum squared norms adjacent increments`, `floor block squared norm difference period sum increment squared norm`, and `norm square finite sum at most cardinality times sum norm squares`; Mathlib's `dist_le_range_sum_dist`, `norm_sum_le`, and `sq_sum_le_card_mul_sum_sq` cover constituents only, while SOptLib's `finite_path_sq_distance_integrable_of_increment_energy_bound` and the staged `dependent_product_operator_map_endpoint_sq_le_length_mul_path_energy` have materially different conclusions and hypotheses
+-- minimal hypotheses: positivity of the natural period is necessary for Euclidean remainder control; a seminormed additive commutative group is sufficient for telescoping and norm inequalities, and all source Hilbert-space, completeness, finite-dimensional, and probabilistic context is absent
+
+/-- The squared norm of a trajectory's displacement from the start of its
+positive-period floor block is at most the period times the sum of squared
+adjacent-increment norms over the whole block.
+
+Layer: Glue | Gap: Level 1 (floor-block displacement from adjacent-increment path energy)
+Proof: telescope from the floor-block start through the Euclidean remainder, apply the norm triangle inequality and finite-sum Cauchy--Schwarz, then enlarge the nonnegative partial energy to the full period.
+Source: Mathlib natural-number Euclidean division, finite range-sum telescoping, normed additive groups, and `sq_sum_le_card_mul_sum_sq` from ordered Chebyshev inequalities
+Used in: periodic and epoch-based trajectory analyses that charge a within-block iterate mismatch to the complete block's adjacent-step energy before expectation or horizon aggregation
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/6
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem norm_sq_sub_floor_block_le_period_mul_sum_increment_norm_sq
+    {E : Type*} [SeminormedAddCommGroup E]
+    (p : ℕ) (hp : 0 < p) (out : ℕ → E) (t : ℕ) :
+    ‖out t - out ((t / p) * p)‖ ^ 2 ≤
+      (p : ℝ) *
+        Finset.sum (Finset.range p) (fun j =>
+          ‖out ((t / p) * p + j + 1) -
+            out ((t / p) * p + j)‖ ^ 2) := by
+  classical
+  let b : ℕ := (t / p) * p
+  let r : ℕ := t % p
+  have ht_eq : t = b + r := by
+    simpa [b, r, Nat.mul_comm] using (Nat.div_add_mod t p).symm
+  have hr_le_p_nat : r ≤ p := Nat.le_of_lt (Nat.mod_lt t hp)
+  have hcoord :
+      out t - out b =
+        ∑ j ∈ Finset.range r, (out (b + j + 1) - out (b + j)) := by
+    have htel :=
+      (Finset.sum_range_sub (fun j => out (b + j)) r).symm
+    simpa [ht_eq, Nat.add_assoc] using htel
+  have hnorm :
+      ‖out t - out b‖ ≤
+        ∑ j ∈ Finset.range r, ‖out (b + j + 1) - out (b + j)‖ := by
+    rw [hcoord]
+    exact norm_sum_le _ _
+  have hsquares :=
+    sq_sum_le_card_mul_sum_sq
+      (s := Finset.range r)
+      (f := fun j : ℕ => ‖out (b + j + 1) - out (b + j)‖)
+  have hsum_r_le_p :
+      Finset.sum (Finset.range r) (fun j =>
+          ‖out (b + j + 1) - out (b + j)‖ ^ 2) ≤
+        Finset.sum (Finset.range p) (fun j =>
+          ‖out (b + j + 1) - out (b + j)‖ ^ 2) := by
+    apply Finset.sum_le_sum_of_subset_of_nonneg
+      (Finset.range_mono hr_le_p_nat)
+    intro j _hj_p _hj_r
+    exact sq_nonneg _
+  have hr_cast_le_p : (r : ℝ) ≤ p := by
+    exact_mod_cast hr_le_p_nat
+  calc
+    ‖out t - out b‖ ^ 2 ≤
+        (∑ j ∈ Finset.range r,
+          ‖out (b + j + 1) - out (b + j)‖) ^ 2 := by
+        nlinarith [norm_nonneg (out t - out b)]
+    _ ≤ (r : ℝ) *
+        Finset.sum (Finset.range r) (fun j =>
+          ‖out (b + j + 1) - out (b + j)‖ ^ 2) := by
+        simpa [Finset.card_range] using hsquares
+    _ ≤ (p : ℝ) *
+        Finset.sum (Finset.range p) (fun j =>
+          ‖out (b + j + 1) - out (b + j)‖ ^ 2) := by
+        exact mul_le_mul hr_cast_le_p hsum_r_le_p
+          (Finset.sum_nonneg fun j _hj => sq_nonneg _) (Nat.cast_nonneg p)
+    _ =
+        (p : ℝ) *
+          Finset.sum (Finset.range p) (fun j =>
+            ‖out ((t / p) * p + j + 1) -
+              out ((t / p) * p + j)‖ ^ 2) := by
+        simp [b]
+
+
+open scoped BigOperators
+
+namespace Matrix
+
+-- Generalization plan (G0):
+-- concept/name: complement-coordinate matrix action after eliminating one coordinate of a zero-sum vector; orig was `restrictedTrackerPullFreeCoord_sum_apply`.
+-- generality used: arbitrary finite column index type, arbitrary row index type, and an arbitrary non-unital non-associative ring; no square-matrix, commutativity, order, topology, norm, inner product, completeness, finite-dimensionality, measure, convexity, smoothness, or oracle assumptions.
+-- portable call pattern: consensus, Laplacian, constrained-coordinate, gradient-tracking, and finite linear-system proofs change the matrix, finite coordinate type, coefficient ring, eliminated base coordinate, and output row while reusing the same reduced-coordinate row-action equality.
+-- counterargument checked: this is not paper-local traceability or a pure wrapper; it packages the recurring bridge from a full matrix-vector action on the zero-sum hyperplane to its base-column-subtracted complement-coordinate representation, while existing APIs provide only the separate finite-sum and zero-sum reconstruction ingredients.
+-- coverage search: symbol queries `matrix mulVec complement coordinate subtract base column zero sum vector equality`, `sum complement singleton sub base coefficient mul equals full sum of zero sum`, and `Matrix mulVec sum_eq_zero` found only unrelated matrix-action and stochastic-matrix lemmas; Mathlib LeanSearch found `Finset.weightedVSubOfPoint_eq_of_sum_eq_zero` and `Matrix.mulVec_eq_sum`, whose affine-space and raw-expansion contracts do not imply this complement-coordinate equality directly.
+-- minimal hypotheses: `[Fintype ι]` supplies the full finite sum, `[DecidableEq ι]` supplies the finite complement subtype appearing in the statement, and `NonUnitalNonAssocRing R` supplies additive inverses and both distributive laws.
+
+/-- On the zero-sum hyperplane, a matrix row acts through the coordinates away
+from any chosen base index after subtracting the base column coefficient.
+
+Layer: Glue | Gap: Level 1 (complement-coordinate matrix action on a zero-sum vector)
+Proof: split both the weighted row sum and the zero-sum identity into the base coordinate and its complement, distribute the base coefficient over the complement sum, and cancel the reconstructed base coordinate.
+Source: Mathlib finite big operators over complementary subtypes and `Matrix.mulVec`
+Used in: restricted-coordinate representations of consensus, Laplacian, and gradient-tracking dynamics, where one zero-sum tracker coordinate is eliminated before forming a finite matrix recurrence
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/0
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem sum_compl_sub_base_mul_eq_mulVec_of_sum_eq_zero
+    {ι κ R : Type*} [Fintype ι] [DecidableEq ι]
+    [NonUnitalNonAssocRing R]
+    (A : Matrix κ ι R) (w : ι → R) (i0 : ι) (i : κ)
+    (hw : ∑ j : ι, w j = 0) :
+    (∑ j : {j : ι // j ≠ i0}, (A i j.1 - A i i0) * w j.1) =
+      A.mulVec w i := by
+  classical
+  have hsplit_w :
+      w i0 + ∑ j : {j : ι // j ≠ i0}, w j.1 = ∑ j : ι, w j := by
+    simpa using
+      (Fintype.sum_subtype_add_sum_subtype (fun j : ι => j = i0) w)
+  have hbase : w i0 = -∑ j : {j : ι // j ≠ i0}, w j.1 := by
+    apply eq_neg_of_add_eq_zero_left
+    rw [hsplit_w, hw]
+  have hsplit_A :
+      A i i0 * w i0 +
+          ∑ j : {j : ι // j ≠ i0}, A i j.1 * w j.1 =
+        ∑ j : ι, A i j * w j := by
+    simpa using
+      (Fintype.sum_subtype_add_sum_subtype (fun j : ι => j = i0)
+        (fun j => A i j * w j))
+  calc
+    (∑ j : {j : ι // j ≠ i0}, (A i j.1 - A i i0) * w j.1) =
+        (∑ j : {j : ι // j ≠ i0}, A i j.1 * w j.1) -
+          A i i0 * (∑ j : {j : ι // j ≠ i0}, w j.1) := by
+            simp only [sub_mul, Finset.sum_sub_distrib, Finset.mul_sum]
+    _ = (∑ j : {j : ι // j ≠ i0}, A i j.1 * w j.1) +
+          A i i0 * w i0 := by
+            rw [hbase]
+            simp only [mul_neg, sub_eq_add_neg]
+    _ = A i i0 * w i0 +
+          ∑ j : {j : ι // j ≠ i0}, A i j.1 * w j.1 := add_comm _ _
+    _ = ∑ j : ι, A i j * w j := hsplit_A
+    _ = A.mulVec w i := rfl
+
+end Matrix
+
+
+-- Generalization plan (G0):
+-- concept/name: an endomorphism fixed by right composition annihilates nonunit
+--   eigendirections; orig was `riesz_projection_apply_eq_zero_of_nonunit_eigenvector`
+-- generality used: an arbitrary cancellation ring and torsion-free module;
+--   no topology, norm, measure, spectral projection, or finite-dimensional structure
+-- portable call pattern: spectral projection and invariant-observable proofs for
+--   consensus, push-pull, Markov, and linear recurrences may change the field,
+--   module, operator, fixed map, scalar, and vector while using the same
+--   annihilation conclusion
+-- counterargument checked: although the application concerns a Riesz projection,
+--   the composition/eigenvector argument is a reusable algebraic invariant and is
+--   not merely paper traceability or a rename of an existing declaration
+-- coverage search: symbol and semantic searches for "endomorphism composition fixed
+--   projection annihilates nonunit eigenvector" found Mathlib projection/idempotence
+--   lemmas such as `LinearMap.IsIdempotentElem.comp_eq_left_iff`, but no result with
+--   this composition-plus-eigenvector contract; SOptLib and this round's registry
+--   likewise contain no alpha-equivalent declaration
+-- minimal hypotheses: `P.comp A = P`, one pointwise eigenvector equation, and
+--   `mu ≠ 1` are all already minimal; no nonzero-eigenvector hypothesis is needed
+
+/-- If an endomorphism is unchanged by right composition with another endomorphism,
+then it annihilates every vector on which the latter acts by a scalar other than one.
+
+Layer: Glue | Gap: Level 1 (annihilation of nonunit eigendirections by a composition-fixed map)
+Proof: evaluate the composition identity at the vector, use linearity to obtain
+  `mu • P x = P x`, and cancel the nonzero scalar `mu - 1`.
+Source: Mathlib linear endomorphism composition, scalar linearity, and torsion-free modules
+Used in: the base-period spectral split for stochastic push-pull, where the slow Riesz projection must kill the tracker-only stable eigenmode
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/13/proof/7
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem Module.End.apply_eq_zero_of_comp_eq_self_of_apply_eq_smul
+    {k V : Type*} [Ring k] [IsCancelMulZero k] [AddCommGroup V] [Module k V]
+    [Module.IsTorsionFree k V]
+    (A P : Module.End k V) (mu : k) (x : V)
+    (hcomp : P.comp A = P) (hx : A x = mu • x) (hmu : mu ≠ 1) :
+    P x = 0 := by
+  have hfixed : mu • P x = P x := by
+    calc
+      mu • P x = P (mu • x) := (P.map_smul mu x).symm
+      _ = P (A x) := by rw [hx]
+      _ = (P.comp A) x := rfl
+      _ = P x := by rw [hcomp]
+  have hfactor : (mu - 1) • P x = 0 := by
+    rw [sub_smul, one_smul, hfixed, sub_self]
+  exact
+    (IsRegular.of_ne_zero (sub_ne_zero.mpr hmu)).smul_right_injective V
+      (by simpa using hfactor)
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: invariance of the standard simplex under a row-stochastic matrix right action; orig was `rowMulMatrix_mem_stdSimplex`.
+-- generality used: arbitrary finite decidable index type and ordered semiring of coefficients; no real-specific field, topology, measure, finite-dimensionality, convexity, smoothness, or oracle assumptions are used.
+-- portable call pattern: finite-state Markov-chain, consensus, push-sum, and distributed-optimization proofs change the state type, row-stochastic transition matrix, and probability row while retaining standard-simplex membership after `Matrix.vecMul`.
+-- counterargument checked: although the proof composes two short Mathlib facts, it is not a pure rename or paper-local wrapper; it packages preservation of coordinatewise nonnegativity and total mass into the canonical `stdSimplex` invariant for the native row-vector action.
+-- coverage search: symbol queries "matrix vector multiplication preserves standard simplex of row stochastic matrix" and "vecMul standard simplex row stochastic nonnegative row sums one", plus LeanSearch for the full contract, found Mathlib's component lemmas `Matrix.nonneg_vecMul_of_mem_rowStochastic` and `Matrix.vecMul_dotProduct_one_eq_one_rowStochastic` and the distinct staged column-action analogue, but no theorem with this row-action simplex conclusion.
+-- minimal hypotheses: `[Fintype Node] [DecidableEq Node] [Semiring R] [PartialOrder R] [IsOrderedRing R]` are exactly the common assumptions of Mathlib's `Matrix.rowStochastic`, matrix-vector action, and `stdSimplex` APIs.
+
+namespace Matrix
+
+/-- A row-stochastic matrix maps every row vector in the standard simplex back
+into the standard simplex under right matrix multiplication.
+
+Layer: Glue | Gap: Level 1 (row-stochastic standard-simplex invariance)
+Proof: use row-stochasticity to preserve coordinatewise nonnegativity and the dot product with the all-ones vector, then rewrite that dot product as the total coordinate sum required by `stdSimplex`.
+Source: Mathlib standard simplex membership and row-stochastic matrix-vector action lemmas `Matrix.nonneg_vecMul_of_mem_rowStochastic` and `Matrix.vecMul_dotProduct_one_eq_one_rowStochastic`
+Used in: finite-state Markov evolution and push-pull consensus proofs that propagate normalized nonnegative left Perron rows through row-stochastic communication matrices
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/assumptions/9
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem vecMul_mem_stdSimplex_of_mem_rowStochastic
+    {R Node : Type*} [Fintype Node] [DecidableEq Node]
+    [Semiring R] [PartialOrder R] [IsOrderedRing R]
+    {A : Matrix Node Node R} (hA : A ∈ rowStochastic R Node)
+    {w : Node → R} (hw : w ∈ stdSimplex R Node) :
+    w ᵥ* A ∈ stdSimplex R Node := by
+  refine ⟨nonneg_vecMul_of_mem_rowStochastic hA hw.1, ?_⟩
+  have hmass : (w ᵥ* A) ⬝ᵥ (1 : Node → R) = 1 :=
+    vecMul_dotProduct_one_eq_one_rowStochastic hA (by
+      simpa [dotProduct] using hw.2)
+  simpa [dotProduct] using hmass
+
+end Matrix
+
+
+open Filter
+open scoped BigOperators Topology
+
+-- Generalization plan (G0):
+-- concept/name: existence of a stationary probability row for a finite row-stochastic matrix; orig was `rowStochastic_exists_normalized_nonnegative_stationary`.
+-- generality used: arbitrary nonempty finite decidable state type and a real row-stochastic matrix; no algorithm setup, measure, convexity, smoothness, oracle, or ambient finite-dimensional-space assumptions are used.
+-- portable call pattern: finite Markov-chain and distributed-consensus proofs change the finite state type and transition matrix while obtaining a normalized nonnegative stationary row for the same `Matrix.vecMul` conclusion.
+-- counterargument checked: this is not paper-local traceability or a one-line wrapper; it packages the nontrivial compactness and Cesàro-average existence argument, while the previously staged simplex-invariance theorem supplies only closure of one transition step.
+-- coverage search: symbol queries "finite row stochastic matrix stationary row vector standard simplex exists vecMul fixed point", "rowStochastic exists stationary vecMul fixed point", and "compact convex invariant continuous map fixed point simplex", plus LeanSearch queries for stochastic stationary distributions and compact-convex fixed points, found `Matrix.vecMul_mem_stdSimplex_of_mem_rowStochastic` and Mathlib component APIs but no theorem with this existence conclusion.
+-- minimal hypotheses: `[Fintype Node] [Nonempty Node] [DecidableEq Node]` provide a nonempty finite simplex and native finite-matrix operations; real scalars provide the compact Euclidean simplex and the normed-space Cesàro convergence argument used by the proof.
+
+namespace Matrix
+
+/-- Every finite real row-stochastic matrix has a stationary row vector in the
+standard simplex.
+
+Layer: Glue | Gap: Level 2 (stationary probability row existence for finite stochastic matrices)
+Proof: iterate the matrix action from a simplex vertex, extract a convergent subsequence of Cesàro averages using compactness of the standard simplex, and identify its limit as a fixed point from the vanishing shifted-average residual.
+Source: Mathlib standard-simplex compactness and convexity, row-stochastic matrix-vector action, and normed-space Birkhoff-sum Cesàro residual convergence
+Used in: finite-state Markov-chain and push-pull consensus constructions that choose a normalized nonnegative left stationary distribution before proving positivity or uniqueness from network connectivity
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/assumptions/9
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem exists_mem_stdSimplex_vecMul_eq_self_of_mem_rowStochastic
+    {Node : Type*} [Fintype Node] [Nonempty Node] [DecidableEq Node]
+    (A : Matrix Node Node ℝ) (hA : A ∈ rowStochastic ℝ Node) :
+    ∃ w : Node → ℝ, w ∈ stdSimplex ℝ Node ∧ w ᵥ* A = w := by
+  let T : (Node → ℝ) → (Node → ℝ) := fun w => w ᵥ* A
+  let w0 : Node → ℝ := Pi.single (Classical.arbitrary Node) 1
+  have hw0 : w0 ∈ stdSimplex ℝ Node := by
+    simpa [w0] using single_mem_stdSimplex ℝ (Classical.arbitrary Node)
+  have hT_mem : ∀ {w : Node → ℝ}, w ∈ stdSimplex ℝ Node → T w ∈ stdSimplex ℝ Node := by
+    intro w hw
+    exact vecMul_mem_stdSimplex_of_mem_rowStochastic hA hw
+  have horbit : ∀ n : ℕ, T^[n] w0 ∈ stdSimplex ℝ Node := by
+    intro n
+    induction n with
+    | zero => simpa using hw0
+    | succ n ih =>
+        rw [Function.iterate_succ_apply']
+        exact hT_mem ih
+  let avg : ℕ → (Node → ℝ) :=
+    fun n => birkhoffAverage ℝ T id (n + 1) w0
+  have havg : ∀ n : ℕ, avg n ∈ stdSimplex ℝ Node := by
+    intro n
+    have hmem := (convex_stdSimplex ℝ Node).sum_mem
+      (t := Finset.range (n + 1)) (w := fun _ : ℕ => ((n + 1 : ℕ) : ℝ)⁻¹)
+      (z := fun k => T^[k] w0) (by
+        intro k hk
+        positivity) (by
+        simp only [Finset.sum_const, Finset.card_range, nsmul_eq_mul]
+        exact mul_inv_cancel₀ (by positivity)) (by
+        intro k hk
+        exact horbit k)
+    simpa [avg, birkhoffAverage, birkhoffSum, Finset.smul_sum] using hmem
+  obtain ⟨w, hw, φ, hφ, hφlim⟩ :=
+    (isCompact_stdSimplex ℝ Node).isSeqCompact havg
+  refine ⟨w, hw, ?_⟩
+  have hT_cont : Continuous T := by
+    unfold T
+    fun_prop
+  have horbit_bdd : Bornology.IsBounded (Set.range (fun n => T^[n] w0)) :=
+    (isCompact_stdSimplex ℝ Node).isBounded.subset (Set.range_subset_iff.mpr horbit)
+  have hresidual :
+      Tendsto
+        (fun n => birkhoffAverage ℝ T id n (T w0) -
+          birkhoffAverage ℝ T id n w0) atTop (𝓝 0) := by
+    simpa using
+      (tendsto_birkhoffAverage_apply_sub_birkhoffAverage (𝕜 := ℝ)
+        (f := T) (g := id) (x := w0) horbit_bdd)
+  have hT_avg : ∀ n : ℕ,
+      T (birkhoffAverage ℝ T id n w0) =
+        birkhoffAverage ℝ T id n (T w0) := by
+    intro n
+    funext j
+    simp only [T, Matrix.vecMul, dotProduct, birkhoffAverage, birkhoffSum, id_eq,
+      Pi.smul_apply, Finset.sum_apply, smul_eq_mul]
+    change (∑ i : Node,
+        ((n : ℝ)⁻¹ * ∑ k ∈ Finset.range n, (T^[k] w0) i) * A i j) =
+      (n : ℝ)⁻¹ * ∑ k ∈ Finset.range n, (T^[k] (T w0)) j
+    simp_rw [Finset.mul_sum]
+    simp_rw [Finset.sum_mul]
+    rw [Finset.sum_comm]
+    apply Finset.sum_congr rfl
+    intro k hk
+    simp_rw [mul_assoc]
+    rw [← Finset.mul_sum]
+    congr 1
+    change T (T^[k] w0) j = (T^[k] (T w0)) j
+    calc
+      T (T^[k] w0) j = (T^[k.succ] w0) j :=
+        congrFun (Function.iterate_succ_apply' (f := T) k w0).symm j
+      _ = (T^[k] (T w0)) j :=
+        congrFun (Function.iterate_succ_apply (f := T) k w0) j
+  have hsubseq_tendsto : Tendsto φ atTop atTop := hφ.tendsto_atTop
+  have hresidual_sub :
+      Tendsto
+        (fun n => birkhoffAverage ℝ T id (φ n + 1) (T w0) -
+          birkhoffAverage ℝ T id (φ n + 1) w0) atTop (𝓝 0) := by
+    exact hresidual.comp ((tendsto_add_atTop_nat 1).comp hsubseq_tendsto)
+  have havg_lim : Tendsto (fun n => avg (φ n)) atTop (𝓝 w) := by
+    simpa [Function.comp_def] using hφlim
+  have hTavg_lim : Tendsto (fun n => T (avg (φ n))) atTop (𝓝 (T w)) :=
+    hT_cont.tendsto w |>.comp havg_lim
+  have hdiff_lim : Tendsto (fun n => T (avg (φ n)) - avg (φ n)) atTop
+      (𝓝 (T w - w)) := hTavg_lim.sub havg_lim
+  have hdiff_zero : Tendsto (fun n => T (avg (φ n)) - avg (φ n)) atTop (𝓝 0) := by
+    simpa [avg, hT_avg] using hresidual_sub
+  have : T w - w = 0 := tendsto_nhds_unique hdiff_lim hdiff_zero
+  exact sub_eq_zero.mp this
+
+end Matrix
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: normalized positive-stride sum bounded by the period times the
+--   normalized dense sum; orig was
+--   `sampled_multiples_average_bound_of_average_bound`
+-- generality used: an ordered semifield, a positive natural stride, and a
+--   nonnegative natural-indexed sequence; no measure, norm, convexity,
+--   smoothness, oracle, stochastic, or finite-dimensional assumptions are used
+-- portable call pattern: periodic, epoch, and mini-batch analyses change the
+--   nonnegative error or energy sequence, stride, horizon, and supplied dense
+--   normalized bound while reusing the same stride-factor conclusion
+-- counterargument checked: this is not paper-local traceability or a pure
+--   wrapper; `sum_range_stride_mul_le_sum_range_mul_of_nonneg` supplies only
+--   the unnormalized sparse-to-dense comparison, while this theorem packages
+--   the nontrivial change between the `T` and `T * p` normalizers
+-- coverage search: symbol queries for "normalized sum stride multiples upper
+--   bound nonnegative sequence enlarged range period", "sum sampled multiples
+--   less than full range sum nonnegative", and the precise inverse-horizon
+--   inequality found `sum_range_stride_mul_le_sum_range_mul_of_nonneg` as a
+--   partial component and no Mathlib or SOptLib theorem with this normalized
+--   contract; LeanSearch returned only unrelated finite-average infrastructure
+-- minimal hypotheses: positivity of the stride, pointwise nonnegativity, and
+--   the normalized dense-horizon bound are all used; the source's `alpha`,
+--   threshold condition, and particular bound `C * alpha ^ 2` are caller-side
+--   machinery and have been replaced by an arbitrary bound `B`
+
+/-- The normalized sum of a nonnegative sequence sampled at positive-stride
+multiples is at most the stride times its normalized sum over the complete
+covered range.
+
+Layer: Glue | Gap: Level 1 (normalized positive-stride sparse-to-dense bound)
+Proof: apply `sum_range_stride_mul_le_sum_range_mul_of_nonneg`, scale by the nonnegative inverse horizon, and rewrite the `T` normalizer as the stride times the `T * p` normalizer.
+Source: Mathlib ordered-semifield inverse arithmetic and finite ordered sums, together with `sum_range_stride_mul_le_sum_range_mul_of_nonneg`
+Used in: periodic and epoch stochastic-optimization estimates that transfer a dense all-iteration error or energy average to the subsequence of block-start iterates
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/3
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem normalized_sum_stride_mul_le_period_mul_normalized_sum
+    {K : Type*} [Semifield K] [LinearOrder K] [IsStrictOrderedRing K]
+    (p T : ℕ) (e : ℕ → K) (B : K)
+    (hp : 0 < p)
+    (he_nonneg : ∀ t : ℕ, 0 ≤ e t)
+    (hfull :
+      ((T * p : ℕ) : K)⁻¹ * Finset.sum (Finset.range (T * p)) e ≤ B) :
+    ((T : K)⁻¹) *
+        Finset.sum (Finset.range T) (fun k => e (k * p)) ≤
+      (p : K) * B := by
+  have hsparse :=
+    sum_range_stride_mul_le_sum_range_mul_of_nonneg e T p he_nonneg hp
+  have hTinv_nonneg : 0 ≤ (T : K)⁻¹ :=
+    inv_nonneg.mpr (Nat.cast_nonneg' T)
+  calc
+    ((T : K)⁻¹) *
+        Finset.sum (Finset.range T) (fun k => e (k * p)) ≤
+        ((T : K)⁻¹) * Finset.sum (Finset.range (T * p)) e :=
+      mul_le_mul_of_nonneg_left hsparse hTinv_nonneg
+    _ = (p : K) *
+        ((((T * p : ℕ) : K)⁻¹) * Finset.sum (Finset.range (T * p)) e) := by
+      by_cases hT : T = 0
+      · subst T
+        simp
+      · have hT_ne : (T : K) ≠ 0 := by
+          exact_mod_cast hT
+        have hp_ne : (p : K) ≠ 0 := by
+          exact_mod_cast (Nat.ne_of_gt hp)
+        rw [Nat.cast_mul]
+        field_simp
+    _ ≤ (p : K) * B :=
+      mul_le_mul_of_nonneg_left hfull (Nat.cast_nonneg' p)
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: normalized mismatch sum controlled by raw and positive-stride
+--   average budgets; orig was
+--   `average_l2_index_mismatch_bound_of_average_bound`
+-- generality used: an arbitrary strictly ordered semifield, a positive natural
+--   period, two scalar sequences, and pointwise order bounds; no measure,
+--   probability, norm, convexity, smoothness, oracle, stochastic, or
+--   finite-dimensional assumptions are used
+-- portable call pattern: delayed, subsampled, periodic, and epoch-based process
+--   proofs change the mismatch and error sequences, period, horizon, and common
+--   dense-average budget while retaining the same normalized mismatch estimate
+-- counterargument checked: this is not paper-local traceability or a pure
+--   wrapper; the existing normalized positive-stride theorem controls only the
+--   sampled error average, while this theorem also aggregates an independently
+--   supplied pointwise two-term mismatch majorant with the raw average
+-- coverage search: symbol queries for "normalized sum mismatch upper bound
+--   pointwise two raw plus two period sample average bound" and "normalized
+--   sum stride multiplication period nonnegative sequence" found
+--   `normalized_sum_stride_mul_le_period_mul_normalized_sum` as a strict
+--   component and no Mathlib or SOptLib declaration with the compound mismatch
+--   contract; semantic Mathlib search found no full-signature match
+-- minimal hypotheses: positivity of the period, nonnegativity of the error
+--   sequence only below `T * p`, the pointwise mismatch bound only below `T`,
+--   and dense normalized bounds only at `T` and `T * p`; the source threshold,
+--   scale, and factorization `C * alpha ^ 2` are caller-side machinery
+
+/-- A pointwise two-term mismatch majorant and common raw average bounds at a
+horizon and its period enlargement control the normalized mismatch sum.
+
+Layer: Glue | Gap: Level 1 (normalized positive-stride mismatch aggregation)
+Proof: sum the pointwise mismatch majorant, truncate the error sequence outside the covered range before using `normalized_sum_stride_mul_le_period_mul_normalized_sum` for the sampled term, and combine it with the raw normalized bound by ordered-semifield arithmetic.
+Source: Mathlib finite ordered sums and ordered-semifield arithmetic, together with the normalized positive-stride sparse-to-dense bound
+Used in: delayed, subsampled, periodic, and epoch stochastic-process estimates that bound an average index-mismatch energy by raw and stride-sampled error budgets
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/6
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem normalized_sum_mismatch_le_two_add_two_period_mul_of_average_bound
+    {K : Type*} [Semifield K] [LinearOrder K] [IsStrictOrderedRing K]
+    (p T : Nat) (d e : Nat -> K) (B : K)
+    (hp : 0 < p)
+    (he_nonneg : forall t, t < T * p -> 0 <= e t)
+    (hd : forall k, k < T -> d k <= 2 * e k + 2 * e (k * p))
+    (havg_T :
+      (T : K)⁻¹ * Finset.sum (Finset.range T) e <= B)
+    (havg_mul :
+      ((T * p : Nat) : K)⁻¹ *
+          Finset.sum (Finset.range (T * p)) e <= B) :
+    (T : K)⁻¹ * Finset.sum (Finset.range T) d <=
+      2 * B + 2 * ((p : K) * B) := by
+  have hTinv_nonneg : 0 <= (T : K)⁻¹ :=
+    inv_nonneg.mpr (Nat.cast_nonneg' T)
+  have hsum :
+      Finset.sum (Finset.range T) d <=
+        2 * Finset.sum (Finset.range T) e +
+          2 * Finset.sum (Finset.range T) (fun k => e (k * p)) := by
+    calc
+      Finset.sum (Finset.range T) d <=
+          Finset.sum (Finset.range T) (fun k =>
+            2 * e k + 2 * e (k * p)) :=
+        Finset.sum_le_sum fun k hk => hd k (by simpa using hk)
+      _ =
+          2 * Finset.sum (Finset.range T) e +
+            2 * Finset.sum (Finset.range T) (fun k => e (k * p)) := by
+        rw [Finset.sum_add_distrib, <- Finset.mul_sum, <- Finset.mul_sum]
+  have hsample :
+      (T : K)⁻¹ *
+          Finset.sum (Finset.range T) (fun k => e (k * p)) <=
+        (p : K) * B := by
+    have hsample_truncated :=
+      normalized_sum_stride_mul_le_period_mul_normalized_sum
+        p T (fun t => if t < T * p then e t else 0) B hp
+        (by
+          intro t
+          dsimp
+          split_ifs with ht
+          · exact he_nonneg t ht
+          · exact le_rfl)
+        (by
+          have hsum_truncated :
+              Finset.sum (Finset.range (T * p))
+                  (fun t => if t < T * p then e t else 0) =
+                Finset.sum (Finset.range (T * p)) e := by
+            apply Finset.sum_congr rfl
+            intro t ht
+            rw [if_pos]
+            simpa using ht
+          rwa [hsum_truncated])
+    have hsum_truncated :
+        Finset.sum (Finset.range T)
+            (fun k => if k * p < T * p then e (k * p) else 0) =
+          Finset.sum (Finset.range T) (fun k => e (k * p)) := by
+      apply Finset.sum_congr rfl
+      intro k hk
+      rw [if_pos]
+      exact (Nat.mul_lt_mul_right hp).2 (by simpa using hk)
+    rwa [hsum_truncated] at hsample_truncated
+  calc
+    (T : K)⁻¹ * Finset.sum (Finset.range T) d <=
+        (T : K)⁻¹ *
+          (2 * Finset.sum (Finset.range T) e +
+            2 * Finset.sum (Finset.range T) (fun k => e (k * p))) :=
+      mul_le_mul_of_nonneg_left hsum hTinv_nonneg
+    _ =
+        2 * ((T : K)⁻¹ * Finset.sum (Finset.range T) e) +
+          2 * ((T : K)⁻¹ *
+            Finset.sum (Finset.range T) (fun k => e (k * p))) := by
+      ring
+    _ <= 2 * B + 2 * ((p : K) * B) :=
+      add_le_add
+        (mul_le_mul_of_nonneg_left havg_T (by norm_num))
+        (mul_le_mul_of_nonneg_left hsample (by norm_num))
+
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: closed bounds for two coupled nonnegative scalar energies under
+--   half-sized self and cross feedback; orig was
+--   `sectionSix_coupled_energy_absorption`
+-- generality used: linearly ordered fields; no measure, convexity, smoothness,
+--   oracle, vector-space, or finite-dimensional assumptions are used
+-- portable call pattern: distributed and stochastic convergence proofs supply
+--   different nonnegative aggregate source budgets and feedback coefficients
+--   to close the same pair of coupled scalar energy inequalities
+-- counterargument checked: this is not paper-local coefficient expansion or a
+--   one-line wrapper; it performs three successive absorptions and closes a
+--   mixed feedback loop before returning both energy bounds
+-- coverage search: symbol searches for "coupled scalar upper bounds of half
+--   feedback" and "coupled nonnegative scalar recurrences upper bounds
+--   absorption" found `bounds_of_coupled_sum_absorption_q_six`, whose fixed
+--   rational two-sum contract does not cover self feedback or mixed feedback;
+--   Mathlib semantic search returned only elementary half-order facts
+-- minimal hypotheses: aggregate budgets replace the three paper source terms;
+--   unused nonnegativity assumptions on the stepsize, scale, direct coupling,
+--   and already-capped feedback coefficients are removed
+
+set_option maxHeartbeats 800000 in
+
+/-- Two coupled nonnegative scalar energies have explicit source-budget bounds
+when both self-feedback terms and the remaining cross-feedback term are at most
+one half.
+
+Layer: Glue | Gap: Level 1 (coupled nonnegative scalar energy absorption)
+Proof: absorb the consensus and displacement self-feedback terms, substitute the resulting consensus bound into the displacement recurrence, absorb the mixed feedback, and substitute the closed displacement bound back into the consensus estimate.
+Source: Mathlib ordered-field multiplication inequalities together with `linarith`, `nlinarith`, and commutative-ring normalization
+Used in: distributed stochastic convergence proofs that close displacement and consensus energy recurrences after collecting algorithm-specific terms into two nonnegative source budgets
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/7/proof/13
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem coupled_nonnegative_energy_bounds_of_half_feedback
+    {R : Type*} [Field R] [LinearOrder R] [IsStrictOrderedRing R]
+    {alpha L LambdaQ GR kappa dQL aD aQ dD UQ UD D Q : R}
+    (hLambdaQ : 0 ≤ LambdaQ) (hGR : 0 ≤ GR)
+    (hdQL : 0 ≤ dQL) (haD : 0 ≤ aD)
+    (hUQ : 0 ≤ UQ) (hUD : 0 ≤ UD)
+    (hD : 0 ≤ D) (hQ : 0 ≤ Q)
+    (hLambdaQ_eq : LambdaQ = kappa + dQL)
+    (hbase : alpha ^ 2 * L ^ 2 ≤ 1)
+    (hQfeedback : alpha ^ 2 * L ^ 2 * GR * aQ ≤ 1 / 2)
+    (hDfeedback : alpha ^ 2 * L ^ 2 * dD ≤ 1 / 2)
+    (hcross : 4 * LambdaQ * alpha ^ 2 * GR * aD * L ^ 2 ≤ 1 / 2)
+    (hrawQ :
+      Q ≤ alpha ^ 2 * GR *
+        (UQ + aD * L ^ 2 * D + aQ * L ^ 2 * Q))
+    (hrawD :
+      D ≤ kappa * Q + alpha ^ 2 *
+        (UD + dD * L ^ 2 * D + dQL * L ^ 2 * Q)) :
+    D ≤ alpha ^ 2 * (8 * LambdaQ * GR * UQ + 4 * UD) ∧
+      Q ≤ alpha ^ 2 *
+        (2 * GR * (UQ + aD * (8 * LambdaQ * GR * UQ + 4 * UD))) := by
+  let DH : R := 8 * LambdaQ * GR * UQ + 4 * UD
+  have hDH : 0 ≤ DH := by
+    dsimp [DH]
+    positivity
+  have hQfeedback_mul :
+      alpha ^ 2 * L ^ 2 * GR * aQ * Q ≤ (1 / 2) * Q :=
+    mul_le_mul_of_nonneg_right hQfeedback hQ
+  have hQabs : Q ≤ 2 * alpha ^ 2 * GR * (UQ + aD * L ^ 2 * D) := by
+    nlinarith [hrawQ, hQfeedback_mul]
+  have hdQL_scaled :
+      alpha ^ 2 * dQL * L ^ 2 * Q ≤ dQL * Q := by
+    have hscaled := mul_le_mul_of_nonneg_right hbase (mul_nonneg hdQL hQ)
+    nlinarith
+  have hDfeedback_mul :
+      alpha ^ 2 * dD * L ^ 2 * D ≤ (1 / 2) * D := by
+    have hscaled := mul_le_mul_of_nonneg_right hDfeedback hD
+    nlinarith
+  have hrawD' :
+      D ≤ kappa * Q + alpha ^ 2 * UD +
+        alpha ^ 2 * dD * L ^ 2 * D + alpha ^ 2 * dQL * L ^ 2 * Q := by
+    calc
+      D ≤ kappa * Q + alpha ^ 2 *
+          (UD + dD * L ^ 2 * D + dQL * L ^ 2 * Q) := hrawD
+      _ = kappa * Q + alpha ^ 2 * UD +
+          alpha ^ 2 * dD * L ^ 2 * D +
+            alpha ^ 2 * dQL * L ^ 2 * Q := by ring
+  have hDraw_absorbed :
+      D ≤ kappa * Q + alpha ^ 2 * UD + (1 / 2) * D + dQL * Q :=
+    hrawD'.trans
+      (add_le_add (add_le_add le_rfl hDfeedback_mul) hdQL_scaled)
+  have hDabs : D ≤ 2 * LambdaQ * Q + 2 * alpha ^ 2 * UD := by
+    rw [hLambdaQ_eq]
+    linarith
+  have hQabs_scaled :
+      2 * LambdaQ * Q ≤
+        2 * LambdaQ * (2 * alpha ^ 2 * GR * (UQ + aD * L ^ 2 * D)) := by
+    exact mul_le_mul_of_nonneg_left hQabs
+      (mul_nonneg (by norm_num) hLambdaQ)
+  have hDpre :
+      D ≤ 4 * LambdaQ * alpha ^ 2 * GR * UQ + 2 * alpha ^ 2 * UD +
+        4 * LambdaQ * alpha ^ 2 * GR * aD * L ^ 2 * D := by
+    calc
+      D ≤ 2 * LambdaQ * Q + 2 * alpha ^ 2 * UD := hDabs
+      _ ≤ 2 * LambdaQ *
+            (2 * alpha ^ 2 * GR * (UQ + aD * L ^ 2 * D)) +
+          2 * alpha ^ 2 * UD := add_le_add hQabs_scaled le_rfl
+      _ = 4 * LambdaQ * alpha ^ 2 * GR * UQ + 2 * alpha ^ 2 * UD +
+            4 * LambdaQ * alpha ^ 2 * GR * aD * L ^ 2 * D := by ring
+  have hcross_mul :
+      4 * LambdaQ * alpha ^ 2 * GR * aD * L ^ 2 * D ≤ (1 / 2) * D :=
+    mul_le_mul_of_nonneg_right hcross hD
+  have hDclosed : D ≤ alpha ^ 2 * DH := by
+    calc
+      D ≤ 2 * (4 * LambdaQ * alpha ^ 2 * GR * UQ +
+          2 * alpha ^ 2 * UD) := by linarith [hDpre, hcross_mul]
+      _ = alpha ^ 2 * DH := by
+        dsimp [DH]
+        ring
+  have hL2D : L ^ 2 * D ≤ DH := by
+    calc
+      L ^ 2 * D ≤ L ^ 2 * (alpha ^ 2 * DH) :=
+        mul_le_mul_of_nonneg_left hDclosed (sq_nonneg L)
+      _ = (alpha ^ 2 * L ^ 2) * DH := by ring
+      _ ≤ 1 * DH := mul_le_mul_of_nonneg_right hbase hDH
+      _ = DH := one_mul DH
+  have hQclosed : Q ≤ alpha ^ 2 * (2 * GR * (UQ + aD * DH)) := by
+    have haD_scaled : aD * L ^ 2 * D ≤ aD * DH := by
+      calc
+        aD * L ^ 2 * D = aD * (L ^ 2 * D) := by ring
+        _ ≤ aD * DH := mul_le_mul_of_nonneg_left hL2D haD
+    have hinside : UQ + aD * L ^ 2 * D ≤ UQ + aD * DH :=
+      add_le_add le_rfl haD_scaled
+    have hscale : 0 ≤ 2 * alpha ^ 2 * GR := by positivity
+    calc
+      Q ≤ 2 * alpha ^ 2 * GR * (UQ + aD * L ^ 2 * D) := hQabs
+      _ ≤ 2 * alpha ^ 2 * GR * (UQ + aD * DH) :=
+        mul_le_mul_of_nonneg_left hinside hscale
+      _ = alpha ^ 2 * (2 * GR * (UQ + aD * DH)) := by ring
+  constructor
+  · simpa [DH] using hDclosed
+  · simpa [DH] using hQclosed
+
+end SOptLib
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: equality case of the finite scalar Cauchy bound; orig was
+--   `sq_sum_eq_card_mul_sum_sq_iff_pairwise_eq`, already concept-derived.
+-- generality used: an arbitrary linearly ordered commutative ring, any finite index type,
+--   and a scalar family; no measure, convexity, smoothness, or optimization assumptions are used.
+-- portable call pattern: effective-sample-size and averaging proofs identify when the squared
+--   total reaches cardinality times squared energy; the index type and scalar family vary while
+--   the conclusion remains pairwise equality of all entries.
+-- counterargument checked: this is not paper-local traceability or a pure rename; Mathlib exposes
+--   Cauchy--Schwarz inequalities and abstract inner-product equality criteria, but no declaration
+--   packages this cardinality-specialized equality as pairwise constancy of a finite family.
+-- coverage search: queried `square sum equals cardinality times sum squares iff pairwise equal
+--   finite family` and `equality in finite Cauchy Schwarz sum real values iff constant function`;
+--   top partial hits were `Finset.sum_mul_sq_le_sq_mul_sq`,
+--   `Real.sum_mul_le_sqrt_mul_sqrt`, and `inner_eq_norm_mul_iff_real`, with no full match in
+--   Mathlib, SOptLib, the staging registry, or the project outside the source declaration.
+-- minimal hypotheses: generalized `Real` to a linearly ordered commutative ring and removed the
+--   source's unnecessary nonemptiness assumption by splitting off the empty-index case; the
+--   remaining hypotheses support subtraction, finite-sum ring algebra, and square nonnegativity.
+
+/-- Equality in the finite scalar bound
+`(sum f)^2 <= card * sum (f^2)` holds exactly when all entries of `f` are equal.
+
+Layer: Glue | Gap: Level 1 (finite scalar Cauchy equality characterization)
+Proof: expand the sum of all pairwise squared differences into twice the Cauchy deficit. If the
+  deficit vanishes, nonnegativity forces each difference to vanish; conversely, split off the
+  empty case, then rewrite a nonempty family by one chosen common value and normalize the sums.
+Source: Mathlib ordered commutative-ring square nonnegativity, finite big-operator algebra, and `Finset.sum_eq_zero_iff_of_nonneg`
+Used in: effective-sample-size and averaging arguments that characterize maximal effective count by uniform influence weights, with the same step also serving consensus equality cases
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/assumptions/12
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem sq_sum_eq_card_mul_sum_sq_iff_pairwise_eq
+    {ι R : Type*} [Fintype ι]
+    [CommRing R] [LinearOrder R] [IsStrictOrderedRing R] (f : ι → R) :
+    (∑ i : ι, f i) ^ 2 =
+        (Fintype.card ι : R) * ∑ i : ι, (f i) ^ 2 ↔
+      ∀ i j : ι, f i = f j := by
+  classical
+  have hpairwiseIdentity :
+      (∑ i : ι, ∑ j : ι, (f i - f j) ^ 2) =
+        2 * ((Fintype.card ι : R) * ∑ i : ι, (f i) ^ 2 -
+          (∑ i : ι, f i) ^ 2) := by
+    simp only [sub_sq, Finset.sum_sub_distrib, Finset.sum_add_distrib,
+      Finset.sum_const, Finset.card_univ, nsmul_eq_mul]
+    rw [Finset.sum_comm]
+    simp only [← Finset.mul_sum, ← Finset.sum_mul]
+    ring
+  constructor
+  · intro heq i j
+    have hdouble : ∑ i : ι, ∑ j : ι, (f i - f j) ^ 2 = 0 := by
+      rw [hpairwiseIdentity, heq]
+      ring
+    have houter_nonneg : ∀ a ∈ (Finset.univ : Finset ι),
+        0 ≤ ∑ b : ι, (f a - f b) ^ 2 := by
+      intro a ha
+      exact Finset.sum_nonneg fun b hb => sq_nonneg _
+    have hinner : ∑ b : ι, (f i - f b) ^ 2 = 0 :=
+      (Finset.sum_eq_zero_iff_of_nonneg houter_nonneg).mp hdouble i
+        (Finset.mem_univ i)
+    have hterm : (f i - f j) ^ 2 = 0 :=
+      (Finset.sum_eq_zero_iff_of_nonneg
+        (fun b (_ : b ∈ (Finset.univ : Finset ι)) => sq_nonneg (f i - f b))).mp
+        hinner j (Finset.mem_univ j)
+    exact sub_eq_zero.mp (sq_eq_zero_iff.mp hterm)
+  · intro heq
+    cases isEmpty_or_nonempty ι with
+    | inl _ => simp
+    | inr hι =>
+        letI := hι
+        let i₀ : ι := Classical.choice hι
+        simp_rw [heq _ i₀]
+        simp
+        ring
+
+
+-- Generalization plan (G0):
+-- concept/name: Euclidean two-component bound under a common nonnegative scale;
+--   orig was `sqrt_sq_add_sq_le_mul_sqrt_sq_add_sq`.
+-- generality used: five real scalars and pointwise order hypotheses only; no
+--   measure, probability, convexity, smoothness, oracle, topology, vector-space,
+--   completeness, or finite-dimensional assumptions are used.
+-- portable call pattern: real/imaginary, primal/dual, and two-block contraction
+--   proofs call this after bounding two nonnegative component magnitudes by the
+--   same nonnegative scale; all five magnitudes and the two component bounds vary.
+-- counterargument checked: although this is elementary scalar algebra, it is not
+--   paper-local traceability or a pure rename: it packages the recurring passage
+--   from two componentwise bounds to one Euclidean bound, and no single searched
+--   Mathlib or SOptLib declaration supplies that contract.
+-- coverage search: symbol searches for `componentwise inequalities imply
+--   Euclidean norm inequality under nonnegative scalar multiplication` and
+--   `sqrt sum squares monotone each coordinate nonnegative`, plus LeanSearch for
+--   `componentwise bounds imply Euclidean norm bound for two real coordinates`,
+--   found only product sup-norm lemmas, `WithLp.prod_nnnorm_eq_of_L2`, finite
+--   Cauchy--Schwarz lemmas, and unrelated square-root bounds; coverage is partial.
+-- minimal hypotheses: `K`, `x`, and `y` must be nonnegative; nonnegativity of
+--   `a` and `b` is derivable where needed from the componentwise inequalities.
+
+/-- Two nonnegative componentwise bounds with a common nonnegative scale combine
+into the corresponding Euclidean two-component bound.
+
+Layer: Glue | Gap: Level 0 (two-component Euclidean bound composition)
+Proof: compare the nonnegative sides by squaring, rewrite both square roots with
+  `Real.sq_sqrt`, and combine the two squared componentwise inequalities.
+Source: Mathlib real square-root order API (`Real.sq_sqrt`, `sq_le_sq₀`) and
+  ordered real arithmetic
+Used in: periodic push--pull spectral contraction arguments that combine the
+  real and imaginary pull-tracker or push-consensus component estimates
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/0
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem sqrt_sq_add_sq_le_mul_of_componentwise_le
+    {K a b x y : ℝ}
+    (hK : 0 ≤ K) (hx_nonneg : 0 ≤ x) (hy_nonneg : 0 ≤ y)
+    (hx : x ≤ K * a) (hy : y ≤ K * b) :
+    Real.sqrt (x ^ 2 + y ^ 2) ≤
+      K * Real.sqrt (a ^ 2 + b ^ 2) := by
+  have hKa_nonneg : 0 ≤ K * a := hx_nonneg.trans hx
+  have hKb_nonneg : 0 ≤ K * b := hy_nonneg.trans hy
+  have hright_nonneg : 0 ≤ K * Real.sqrt (a ^ 2 + b ^ 2) :=
+    mul_nonneg hK (Real.sqrt_nonneg _)
+  apply (sq_le_sq₀ (Real.sqrt_nonneg _) hright_nonneg).mp
+  rw [Real.sq_sqrt (add_nonneg (sq_nonneg _) (sq_nonneg _))]
+  rw [mul_pow, Real.sq_sqrt (add_nonneg (sq_nonneg _) (sq_nonneg _))]
+  have hxa : x ^ 2 ≤ (K * a) ^ 2 := (sq_le_sq₀ hx_nonneg hKa_nonneg).2 hx
+  have hyb : y ^ 2 ≤ (K * b) ^ 2 := (sq_le_sq₀ hy_nonneg hKb_nonneg).2 hy
+  nlinarith
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: finite-horizon squared-sum bound for a nonnegative response dominated by a geometric convolution; `finite_sq_sum_le_of_le_geometric_convolution` states the conclusion and decisive premise in Mathlib style.
+-- generality used: sequences over an arbitrary linear ordered field, an arbitrary kernel scale, a contraction rate in the half-open unit interval, and response nonnegativity plus convolution domination on the finite horizon; no measure, filtration, optimization, norm, convexity, smoothness, oracle, or finite-dimensional assumptions are used.
+-- portable call pattern: consensus, momentum, and stable-filter proofs vary the response and input sequences, kernel scale, contraction rate, and horizon while reusing the same zero-initial convolution energy estimate.
+-- counterargument checked: the stable-recurrence energy theorem is a proper ingredient rather than a duplicate, since this result constructs the geometric convolution recurrence and transfers a response domination inequality; the result is therefore neither paper-local traceability nor a caller-side expression.
+-- coverage search: searches for `nonnegative sequence upper bounded by zero initial geometric convolution finite horizon sum squares input sum squares`, `geometric convolution squared sum upper bound stable kernel`, and the finite-sequence Young inequality found only `finite_stable_recurrence_sq_sum_le`, a pointwise weighted Cauchy--Schwarz theorem, and Mathlib infinite-convolution summability results; none states this sharp finite-horizon domination bound.
+-- minimal hypotheses: `0 < r` is weakened to the proof-minimal `0 ≤ r`; response nonnegativity and convolution domination are needed only on the summed finite horizon, while `r < 1` is used by the stable-recurrence energy estimate. No separate sign assumptions on the input or kernel scale are needed because the response lower bound and domination imply convolution nonnegativity.
+
+/-- A nonnegative sequence dominated by a zero-initial geometric convolution has
+finite-horizon squared mass bounded by the input mass times the squared geometric
+`l¹` gain.
+
+Layer: Glue | Gap: Level 1 (sharp finite-horizon geometric convolution energy bound)
+Proof: realize the convolution as a zero-initial stable scalar recurrence, apply
+  `finite_stable_recurrence_sq_sum_le`, and transfer the pointwise domination
+  through squaring using nonnegativity.
+Source: discrete Young convolution inequality, Mathlib finite range sums, and
+  ordered-field arithmetic
+Used in: consensus, momentum, and stable-filter response estimates that convert
+  pathwise geometric convolution bounds into accumulated squared-energy bounds
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/algorithm_spec
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem finite_sq_sum_le_of_le_geometric_convolution
+    {R : Type*} [Field R] [LinearOrder R] [IsStrictOrderedRing R]
+    {u z : ℕ → R} {M r : R}
+    (N : ℕ)
+    (hu_nonneg : ∀ t ∈ Finset.range (N + 1), 0 ≤ u t)
+    (hr0 : 0 ≤ r) (hr1 : r < 1)
+    (hrec : ∀ t ∈ Finset.range (N + 1),
+      u t ≤ Finset.sum (Finset.range t) fun j =>
+        M * r ^ (t - 1 - j) * z j) :
+    Finset.sum (Finset.range (N + 1)) (fun t => (u t) ^ 2) ≤
+      (M ^ 2 / (1 - r) ^ 2) *
+        Finset.sum (Finset.range N) (fun j => (z j) ^ 2) := by
+  let forced : ℕ → R := fun t =>
+    Finset.sum (Finset.range t) fun j =>
+      M * r ^ (t - 1 - j) * z j
+  have hforced_zero : forced 0 = 0 := by
+    simp [forced]
+  have hforced_succ : ∀ t : ℕ,
+      forced (t + 1) = r * forced t + M * z t := by
+    intro t
+    have hprefix :
+        Finset.sum (Finset.range t) (fun j =>
+            M * r ^ ((t + 1) - 1 - j) * z j) =
+          r * Finset.sum (Finset.range t) (fun j =>
+            M * r ^ (t - 1 - j) * z j) := by
+      rw [Finset.mul_sum]
+      apply Finset.sum_congr rfl
+      intro j hj
+      have hj_lt : j < t := Finset.mem_range.mp hj
+      have hexp : (t + 1) - 1 - j = (t - 1 - j) + 1 := by omega
+      rw [hexp, pow_succ]
+      ring
+    simp only [forced]
+    rw [Finset.sum_range_succ, hprefix]
+    simp
+  have hforced_raw :=
+    finite_stable_recurrence_sq_sum_le
+      (b := forced) (w := fun t => M * z t)
+      hr0 hr1 hforced_zero hforced_succ N
+  have hinput_scale :
+      Finset.sum (Finset.range N) (fun t => (M * z t) ^ 2) =
+        M ^ 2 * Finset.sum (Finset.range N) (fun t => (z t) ^ 2) := by
+    rw [Finset.mul_sum]
+    apply Finset.sum_congr rfl
+    intro t _
+    ring
+  rw [hinput_scale] at hforced_raw
+  have hpoint : ∀ t ∈ Finset.range (N + 1),
+      (u t) ^ 2 ≤ (forced t) ^ 2 := by
+    intro t ht
+    have hupper : u t ≤ forced t := by
+      simpa [forced] using hrec t ht
+    have hforced_nonneg : 0 ≤ forced t :=
+      (hu_nonneg t ht).trans hupper
+    nlinarith [hu_nonneg t ht, hforced_nonneg]
+  calc
+    Finset.sum (Finset.range (N + 1)) (fun t => (u t) ^ 2) ≤
+        Finset.sum (Finset.range (N + 1)) (fun t => (forced t) ^ 2) :=
+      Finset.sum_le_sum fun t ht => hpoint t ht
+    _ ≤ 1 / (1 - r) ^ 2 *
+        (M ^ 2 * Finset.sum (Finset.range N) (fun t => (z t) ^ 2)) :=
+      hforced_raw
+    _ = (M ^ 2 / (1 - r) ^ 2) *
+        Finset.sum (Finset.range N) (fun t => (z t) ^ 2) := by ring
+
+/-! Phase 4 batch 11: stable power, dependent-product, irreducible stationary-vector, and block-sum bridges. -/
+
+
+namespace SOptLib
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: shifted-orbit scalar Duhamel majorant; orig was
+--   shifted_orbit_duhamel_majorant
+-- generality used: an arbitrary semiring, four scalar coefficients, and a natural-indexed
+--   orbit envelope; no order, norm, topology, measure, convexity, smoothness, probability,
+--   or finite-dimensional assumptions are used by the definitional construction
+-- portable call pattern: perturbation bounds for stable operator powers and linear
+--   recursions call the same shifted-orbit majorant while changing the power constant,
+--   decay factor, perturbation scale, stepsize, orbit envelope, and horizon
+-- counterargument checked: although recursively definitional, this is not a caller-side
+--   expression: it is the shared majorant consumed by the action-difference induction,
+--   geometric-orbit estimate, and input-absorption bound, with its shift encoding the
+--   right-recursive Duhamel route
+-- coverage search: symbol searches for "Duhamel shifted orbit scalar budget recursive
+--   action difference bound" and "finite convolution geometric powers indexed sequence
+--   recurrence" found SOptLib's vector-valued `linearDuhamelResponse`, Mathlib geometric
+--   sums, and infinite convolution identities; none defines this shifted scalar majorant
+-- minimal hypotheses: `[Semiring R]` supplies exactly the coherent zero, addition,
+--   multiplication, and natural powers used by the recurrence
+
+/-- The shifted-orbit scalar majorant for a right-recursive Duhamel action
+telescope.
+
+At every successor horizon, the newest perturbation acts on the current head of
+the orbit envelope and the remaining budget is evaluated on the shifted orbit.
+
+Layer: Glue | Concept: shifted-orbit scalar Duhamel majorant
+Proof: (definitional construction; primitive recursion adds the newest geometrically propagated perturbation to the budget on the shifted orbit envelope)
+Source: discrete Duhamel variation-of-constants bounds, using Mathlib semiring powers and natural-number primitive recursion
+Used in: stable operator-power perturbation estimates whose base-vector orbit has a caller-supplied time-indexed envelope, before specializing that envelope to geometric decay
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/13/proof/7
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, Appendix A.1 stable impulse estimate -/
+def shifted_orbit_duhamel_majorant
+    {R : Type*} [Semiring R]
+    (K theta L alpha : R) (N : ℕ → R) : ℕ → R
+  | 0 => 0
+  | j + 1 =>
+      (K * theta ^ j) * ((L * alpha) * N 0) +
+        shifted_orbit_duhamel_majorant K theta L alpha (fun k => N (k + 1)) j
+
+/-- The shifted-orbit scalar Duhamel majorant vanishes at horizon zero.
+
+Layer: Glue | Gap: Level 0 (shifted-orbit Duhamel majorant initialization)
+Proof: by rfl after unfolding `shifted_orbit_duhamel_majorant` at zero.
+Source: Mathlib natural-number primitive-recursion reduction
+Used in: base cases of stable operator-power action-difference inductions with a caller-supplied orbit envelope
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/13/proof/7
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, Appendix A.1 stable impulse estimate -/
+@[simp]
+theorem shifted_orbit_duhamel_majorant_zero
+    {R : Type*} [Semiring R]
+    (K theta L alpha : R) (N : ℕ → R) :
+    shifted_orbit_duhamel_majorant K theta L alpha N 0 = 0 := by
+  rfl
+
+/-- At a successor horizon, the shifted-orbit scalar Duhamel majorant splits
+into the newest propagated perturbation and the tail budget on the shifted orbit.
+
+Layer: Glue | Gap: Level 0 (shifted-orbit Duhamel majorant successor equation)
+Proof: by rfl after unfolding `shifted_orbit_duhamel_majorant` at a successor.
+Source: Mathlib natural-number primitive-recursion reduction and semiring powers
+Used in: induction steps for stable operator-power action differences and geometric specialization of orbit envelopes
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/13/proof/7
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, Appendix A.1 stable impulse estimate -/
+theorem shifted_orbit_duhamel_majorant_succ
+    {R : Type*} [Semiring R]
+    (K theta L alpha : R) (N : ℕ → R) (j : ℕ) :
+    shifted_orbit_duhamel_majorant K theta L alpha N (j + 1) =
+      (K * theta ^ j) * ((L * alpha) * N 0) +
+        shifted_orbit_duhamel_majorant K theta L alpha (fun k => N (k + 1)) j := by
+  rfl
+
+/-- The shifted-orbit Duhamel budget is the finite convolution in which the
+oldest orbit bound receives the largest geometric power.
+
+This is the public finite-sum characterization of
+`shifted_orbit_duhamel_majorant`; it allows callers to use the budget with the
+finite-sum API without reproducing the recursion-to-convolution argument.
+
+Layer: Glue | Gap: Level 1 (shifted recursion to reversed geometric convolution)
+Proof: induction on the horizon, splitting the successor range at its first index
+Source: Mathlib finite sums over natural ranges and semiring powers
+Used in: finite-horizon perturbation aggregation and geometric-orbit estimates -/
+@[simp]
+theorem shifted_orbit_duhamel_majorant_def
+    {R : Type*} [Semiring R]
+    (K theta L alpha : R) (N : ℕ → R) (j : ℕ) :
+    shifted_orbit_duhamel_majorant K theta L alpha N j =
+      ∑ k ∈ Finset.range j,
+        (K * theta ^ (j - (k + 1))) * ((L * alpha) * N k) := by
+  induction j generalizing N with
+  | zero => simp
+  | succ j ih =>
+      rw [shifted_orbit_duhamel_majorant_succ, ih, Finset.sum_range_succ']
+      rw [add_comm]
+      congr 1
+      · apply Finset.sum_congr rfl
+        intro k _hk
+        rw [show j + 1 - (k + 1 + 1) = j - (k + 1) from
+          Nat.succ_sub_succ_eq_sub j (k + 1)]
+
+/-- A shifted-orbit Duhamel budget is nonnegative when all coefficients and
+orbit-envelope values are nonnegative.
+
+Layer: Glue | Gap: Level 0 (ordered interaction for shifted Duhamel budgets)
+Proof: induction on the horizon using closure of nonnegativity under powers,
+products, and sums
+Source: Mathlib ordered-semiring nonnegativity API
+Used in: monotone finite-horizon perturbation estimates and scalar majorization -/
+theorem shifted_orbit_duhamel_majorant_nonneg
+    {R : Type*} [Semiring R] [PartialOrder R] [IsOrderedRing R]
+    (K theta L alpha : R) (N : ℕ → R)
+    (hK : 0 ≤ K) (htheta : 0 ≤ theta) (hL : 0 ≤ L)
+    (halpha : 0 ≤ alpha) (hN : ∀ k, 0 ≤ N k) (j : ℕ) :
+    0 ≤ shifted_orbit_duhamel_majorant K theta L alpha N j := by
+  induction j generalizing N with
+  | zero => simp
+  | succ j ih =>
+      rw [shifted_orbit_duhamel_majorant_succ]
+      exact add_nonneg
+        (mul_nonneg
+          (mul_nonneg hK (pow_nonneg htheta j))
+          (mul_nonneg (mul_nonneg hL halpha) (hN 0)))
+        (ih (N := fun k => N (k + 1)) (fun k => hN (k + 1)))
+
+end SOptLib
+
+
+-- Generalization plan (G0):
+-- concept/name: stable-power action perturbation bounded by a shifted-orbit
+--   Duhamel majorant; orig was matrixPower_stable_power_action_duhamel_budget_bound
+-- generality used: an arbitrary seminormed space over a nontrivially normed
+--   field and two continuous linear endomorphisms; no completeness,
+--   finite-dimensionality, measure, probability, convexity, smoothness, or
+--   oracle assumptions are used
+-- portable call pattern: consensus, filtering, and optimization stability proofs
+--   substitute their operators, geometric power estimate, perturbation bound,
+--   base vector, and orbit envelope while retaining the same power-action bound
+-- counterargument checked: this is not paper-local traceability or a one-line
+--   wrapper; it packages the noncommutative right-recursive Duhamel induction and
+--   links operator-norm bounds to a caller-supplied orbit envelope
+-- coverage search: symbol searches for "continuous linear map powers action
+--   difference upper bound operator perturbation Duhamel orbit budget" and
+--   "power subtraction telescope noncommutative ring" found only the source
+--   theorem, SOptLib's scalar shifted-orbit majorant, and generic operator-norm
+--   action bounds; Mathlib semantic search found norm-of-power facts but no
+--   action-difference theorem with an indexed orbit envelope
+-- minimal hypotheses: the power, perturbation, and orbit bounds themselves imply
+--   all scalar nonnegativity needed in the proof, so the source's separate
+--   nonnegativity hypotheses on K, theta, L, and alpha are omitted
+
+namespace ContinuousLinearMap
+
+/-- Stable powers of one operator and a small operator perturbation bound the
+difference of two power actions by the shifted-orbit Duhamel majorant.
+
+The orbit envelope is imposed on `B ^ n y`, rather than estimated recursively,
+so callers need no compatibility condition between the power-decay rate and an
+additional growth factor for `B`.
+
+Layer: Glue | Gap: Level 2 (operator power-action Duhamel bound with indexed orbit envelope)
+Proof: induct on the power, split the successor difference into the newest perturbation propagated by `A ^ j` and the previous difference acting on `B y`, then use operator-norm bounds and shift the orbit envelope.
+Source: discrete Duhamel variation-of-constants identity and Mathlib continuous-linear-map operator norm inequalities
+Used in: stable impulse estimates for consensus, filtering, and optimization recursions when a reference operator orbit has an externally supplied time-indexed envelope
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/13/proof/7
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, Appendix A.1 stable impulse estimate -/
+theorem norm_pow_apply_sub_pow_apply_le_shifted_orbit_duhamel_majorant
+    {𝕜 E : Type*} [NontriviallyNormedField 𝕜] [SeminormedAddCommGroup E]
+    [NormedSpace 𝕜 E]
+    (A B : E →L[𝕜] E) (j : ℕ) (y : E)
+    {K theta L alpha : ℝ} {N : ℕ → ℝ}
+    (hpowerA : ∀ n : ℕ, ‖A ^ n‖ ≤ K * theta ^ n)
+    (hdiff : ‖A - B‖ ≤ L * alpha)
+    (hB_orbit : ∀ n : ℕ, ‖(B ^ n) y‖ ≤ N n) :
+    ‖(A ^ j) y - (B ^ j) y‖ ≤
+      SOptLib.shifted_orbit_duhamel_majorant K theta L alpha N j := by
+  induction j generalizing y N with
+  | zero => simp
+  | succ j ih =>
+      have hdecomp :
+          (A ^ (j + 1)) y - (B ^ (j + 1)) y =
+            (A ^ j) ((A - B) y) +
+              ((A ^ j) (B y) - (B ^ j) (B y)) := by
+        rw [pow_succ, pow_succ, ContinuousLinearMap.mul_apply,
+          ContinuousLinearMap.mul_apply]
+        rw [ContinuousLinearMap.sub_apply, map_sub]
+        abel
+      have hy_le_N0 : ‖y‖ ≤ N 0 := by
+        simpa using hB_orbit 0
+      have hdiff_rhs_nonneg : 0 ≤ L * alpha :=
+        (norm_nonneg (A - B)).trans hdiff
+      have hpower_rhs_nonneg : 0 ≤ K * theta ^ j :=
+        (norm_nonneg (A ^ j)).trans (hpowerA j)
+      have hdiff_action :
+          ‖(A - B) y‖ ≤ (L * alpha) * N 0 := by
+        calc
+          ‖(A - B) y‖ ≤ ‖A - B‖ * ‖y‖ := (A - B).le_opNorm y
+          _ ≤ (L * alpha) * N 0 :=
+            mul_le_mul hdiff hy_le_N0 (norm_nonneg y) hdiff_rhs_nonneg
+      have hu :
+          ‖(A ^ j) ((A - B) y)‖ ≤
+            (K * theta ^ j) * ((L * alpha) * N 0) := by
+        calc
+          ‖(A ^ j) ((A - B) y)‖ ≤
+              ‖A ^ j‖ * ‖(A - B) y‖ := (A ^ j).le_opNorm ((A - B) y)
+          _ ≤ (K * theta ^ j) * ((L * alpha) * N 0) :=
+            mul_le_mul (hpowerA j) hdiff_action (norm_nonneg ((A - B) y))
+              hpower_rhs_nonneg
+      have hB_orbit_tail :
+          ∀ n : ℕ, ‖(B ^ n) (B y)‖ ≤ N (n + 1) := by
+        intro n
+        simpa [pow_succ, ContinuousLinearMap.mul_apply] using hB_orbit (n + 1)
+      have hv :
+          ‖(A ^ j) (B y) - (B ^ j) (B y)‖ ≤
+            SOptLib.shifted_orbit_duhamel_majorant K theta L alpha
+              (fun k => N (k + 1)) j :=
+        ih (B y) hB_orbit_tail
+      calc
+        ‖(A ^ (j + 1)) y - (B ^ (j + 1)) y‖ =
+            ‖(A ^ j) ((A - B) y) +
+              ((A ^ j) (B y) - (B ^ j) (B y))‖ := by rw [hdecomp]
+        _ ≤ ‖(A ^ j) ((A - B) y)‖ +
+              ‖(A ^ j) (B y) - (B ^ j) (B y)‖ := norm_add_le _ _
+        _ ≤ (K * theta ^ j) * ((L * alpha) * N 0) +
+              SOptLib.shifted_orbit_duhamel_majorant K theta L alpha
+                (fun k => N (k + 1)) j := add_le_add hu hv
+        _ = SOptLib.shifted_orbit_duhamel_majorant K theta L alpha N (j + 1) := by
+          rfl
+
+end ContinuousLinearMap
+
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: geometric-orbit upper bound for a shifted-orbit Duhamel majorant;
+--   orig was `stablePowerActionDuhamelBudget_geometric_orbit_le`
+-- generality used: an arbitrary linear ordered field, five scalar coefficients,
+--   and a natural horizon; no normed space, measure, convexity, smoothness,
+--   probability, or finite-dimensional assumptions are used
+-- portable call pattern: stable-operator perturbation and linear-recurrence proofs
+--   specialize a shifted-orbit Duhamel majorant to a geometric envelope while
+--   changing the stability constant, decay factor, perturbation scale, stepsize,
+--   orbit amplitude, and lag
+-- counterargument checked: this is not paper-local traceability or a pure wrapper;
+--   it packages the nontrivial induction that shifts a geometric orbit, cancels
+--   one positive decay factor, and accumulates the resulting linear-in-lag bound
+-- coverage search: symbol query "shifted orbit Duhamel majorant geometric orbit
+--   upper bound linear horizon geometric decay" found the staged majorant and its
+--   finite-sum specification but no bound; Mathlib semantic search found generic
+--   geometric-sum and convolution lemmas whose signatures do not cover this
+--   shifted majorant specialization
+-- minimal hypotheses: positivity of the decay factor is needed for division and
+--   cancellation; nonnegativity of `L`, `alpha`, and `M` makes the zero-horizon
+--   bound monotone, while `K` needs no sign assumption because it occurs squared
+
+/-- On a geometric orbit, the shifted-orbit Duhamel majorant is bounded by a
+linear-in-horizon geometric response.
+
+The positive decay factor pays for the one missing power introduced by the
+right-recursive shift of the orbit envelope.
+
+Layer: Glue | Gap: Level 1 (geometric-orbit specialization of a shifted Duhamel majorant)
+Proof: induct on the horizon, rewrite the shifted geometric orbit with amplitude `theta * M`, apply the induction hypothesis, and cancel the positive decay factor by ordered-field arithmetic.
+Source: discrete Duhamel variation-of-constants bounds, Mathlib ordered-field powers, and natural-number induction
+Used in: stable operator-power perturbation bounds where a reference orbit decays geometrically and the accumulated response must be absorbed into a slightly slower geometric rate
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/13/proof/7
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, Appendix A.1 stable impulse estimate -/
+theorem shifted_orbit_duhamel_majorant_geometric_orbit_le
+    {R : Type*} [Field R] [LinearOrder R] [IsStrictOrderedRing R]
+    {K theta L alpha M : R} (j : ℕ)
+    (htheta_pos : 0 < theta) (hL : 0 ≤ L)
+    (halpha : 0 ≤ alpha) (hM : 0 ≤ M) :
+    shifted_orbit_duhamel_majorant K theta L alpha
+          (fun k => (K * theta ^ k) * M) j ≤
+      (((j : R) + 1) * ((K * K * L * M) / theta)) *
+        alpha * theta ^ j := by
+  induction j generalizing M with
+  | zero =>
+      have hcoef_nonneg : 0 ≤ ((K * K * L * M) / theta) := by
+        exact div_nonneg
+          (mul_nonneg (mul_nonneg (mul_self_nonneg K) hL) hM)
+          htheta_pos.le
+      have hrhs_nonneg :
+          0 ≤ (((0 : ℕ) : R) + 1) * ((K * K * L * M) / theta) *
+              alpha * theta ^ (0 : ℕ) := by
+        positivity
+      simpa using hrhs_nonneg
+  | succ j ih =>
+      have htheta_nonneg : 0 ≤ theta := htheta_pos.le
+      have htheta_ne : theta ≠ 0 := ne_of_gt htheta_pos
+      have hMtail : 0 ≤ theta * M := mul_nonneg htheta_nonneg hM
+      have htail_raw := ih (M := theta * M) hMtail
+      have htail :
+          shifted_orbit_duhamel_majorant K theta L alpha
+              (fun k => (K * theta ^ (k + 1)) * M) j ≤
+            (((j : R) + 1) * (K * K * L * M)) *
+              alpha * theta ^ j := by
+        have hfun :
+            (fun k : ℕ => (K * theta ^ (k + 1)) * M) =
+              (fun k : ℕ => (K * theta ^ k) * (theta * M)) := by
+          funext k
+          rw [pow_succ]
+          ring
+        calc
+          shifted_orbit_duhamel_majorant K theta L alpha
+              (fun k => (K * theta ^ (k + 1)) * M) j =
+              shifted_orbit_duhamel_majorant K theta L alpha
+                (fun k => (K * theta ^ k) * (theta * M)) j := by
+                rw [hfun]
+          _ ≤ (((j : R) + 1) * ((K * K * L * (theta * M)) / theta)) *
+                alpha * theta ^ j := htail_raw
+          _ = (((j : R) + 1) * (K * K * L * M)) *
+                alpha * theta ^ j := by
+                field_simp [htheta_ne]
+      calc
+        shifted_orbit_duhamel_majorant K theta L alpha
+            (fun k => (K * theta ^ k) * M) (j + 1) =
+            (K * theta ^ j) * ((L * alpha) * ((K * theta ^ (0 : ℕ)) * M)) +
+              shifted_orbit_duhamel_majorant K theta L alpha
+                (fun k => (K * theta ^ (k + 1)) * M) j := by
+              rfl
+        _ ≤ (K * K * L * M) * alpha * theta ^ j +
+              (((j : R) + 1) * (K * K * L * M)) *
+                alpha * theta ^ j := by
+              apply add_le_add
+              · ring_nf
+                exact le_rfl
+              · exact htail
+        _ =
+            ((((j + 1 : ℕ) : R) + 1) *
+                ((K * K * L * M) / theta)) *
+              alpha * theta ^ (j + 1) := by
+              field_simp [htheta_ne]
+              norm_num [Nat.cast_add, Nat.cast_one]
+              ring
+
+end SOptLib
+
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: direct-input plus shifted-orbit Duhamel majorant bound under a
+--   linear-times-geometric comparison; orig was
+--   `stablePowerActionDuhamelBudget_with_input_absorb`
+-- generality used: an arbitrary strictly ordered field, eight scalar parameters,
+--   and a natural horizon; no normed space, measure, probability, convexity,
+--   smoothness, or finite-dimensional assumptions are used
+-- portable call pattern: stable-operator perturbation and inhomogeneous linear-
+--   recurrence proofs combine a direct input perturbation with a geometric-orbit
+--   Duhamel response while changing all scalar coefficients and the enlarged rate
+-- counterargument checked: this is not a pure wrapper around the geometric-orbit
+--   bound, because it aligns the direct input with the linear horizon factor,
+--   combines both coefficients, and transports the common factor through a
+--   caller-supplied enlarged-rate comparison
+-- coverage search: symbol searches for "Duhamel majorant input perturbation plus
+--   geometric orbit bound absorbed into enlarged geometric rate" and "nonnegative
+--   coefficients sum bounds common factor upper bound geometric comparison" found
+--   the staged geometric-orbit bound but no theorem performing this combination;
+--   Mathlib semantic search returned generic geometric-sequence and geometric-sum
+--   bounds with different contracts
+-- minimal hypotheses: the comparison is pointwise at the requested horizon rather
+--   than universal; nonnegativity of the enlarged-rate constant and of the target
+--   rate are unnecessary, and positivity of `theta` supplies its nonnegativity and
+--   the denominator sign needed by the geometric-orbit bound
+
+/-- A direct geometric input and a shifted-orbit Duhamel majorant share an
+enlarged geometric upper bound.
+
+The linear horizon factor first absorbs the direct input term; the supplied
+comparison then replaces that common linear-times-geometric factor by the
+chosen enlarged geometric rate.
+
+Layer: Glue | Gap: Level 1 (direct-input and shifted-orbit Duhamel geometric absorption)
+Proof: apply the geometric-orbit majorant bound, align both summands under the common linear-times-geometric factor, collect their nonnegative coefficients, and use the supplied rate comparison.
+Source: discrete Duhamel variation-of-constants estimates and Mathlib ordered-field power inequalities
+Used in: stable impulse and perturbed linear-recurrence estimates that combine an initial-input perturbation with an accumulated operator-power perturbation before enlarging the decay rate
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/13/proof/7
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, Appendix A.1 stable impulse estimate -/
+theorem shifted_orbit_duhamel_majorant_add_input_le_geometric_of_linear_geometric_le
+    {R : Type*} [Field R] [LinearOrder R] [IsStrictOrderedRing R]
+    {K theta L inputBound orbitBound alpha theta1 geometricConstant : R}
+    (j : ℕ)
+    (hK : 0 ≤ K) (htheta_pos : 0 < theta) (hL : 0 ≤ L)
+    (hinputBound : 0 ≤ inputBound) (horbitBound : 0 ≤ orbitBound)
+    (halpha : 0 ≤ alpha)
+    (hgeom : ((j : R) + 1) * theta ^ j ≤
+      geometricConstant * theta1 ^ j) :
+    (K * theta ^ j) * (inputBound * alpha) +
+        shifted_orbit_duhamel_majorant K theta L alpha
+          (fun k => (K * theta ^ k) * orbitBound) j ≤
+      ((K * inputBound + (K * K * L * orbitBound) / theta) *
+          geometricConstant) * alpha * theta1 ^ j := by
+  have hpow_nonneg : 0 ≤ theta ^ j := pow_nonneg htheta_pos.le j
+  have hj_factor : theta ^ j ≤ ((j : R) + 1) * theta ^ j := by
+    have hj_one : 1 ≤ (j : R) + 1 := by
+      have hj_nonneg : (0 : R) ≤ (j : R) := Nat.cast_nonneg j
+      linarith
+    calc
+      theta ^ j = 1 * theta ^ j := by ring
+      _ ≤ ((j : R) + 1) * theta ^ j :=
+        mul_le_mul_of_nonneg_right hj_one hpow_nonneg
+  have hinput :
+      (K * theta ^ j) * (inputBound * alpha) ≤
+        (K * inputBound) * alpha * (((j : R) + 1) * theta ^ j) := by
+    have hcoef_nonneg : 0 ≤ (K * inputBound) * alpha :=
+      mul_nonneg (mul_nonneg hK hinputBound) halpha
+    calc
+      (K * theta ^ j) * (inputBound * alpha) =
+          (K * inputBound) * alpha * theta ^ j := by ring
+      _ ≤ (K * inputBound) * alpha * (((j : R) + 1) * theta ^ j) :=
+          mul_le_mul_of_nonneg_left hj_factor hcoef_nonneg
+  have hbudget_raw :=
+    shifted_orbit_duhamel_majorant_geometric_orbit_le
+      (K := K) (theta := theta) (L := L) (alpha := alpha)
+      (M := orbitBound) j htheta_pos hL halpha horbitBound
+  have hbudget :
+      shifted_orbit_duhamel_majorant K theta L alpha
+          (fun k => (K * theta ^ k) * orbitBound) j ≤
+        ((K * K * L * orbitBound) / theta) * alpha *
+          (((j : R) + 1) * theta ^ j) := by
+    calc
+      shifted_orbit_duhamel_majorant K theta L alpha
+          (fun k => (K * theta ^ k) * orbitBound) j ≤
+          (((j : R) + 1) * ((K * K * L * orbitBound) / theta)) *
+            alpha * theta ^ j := hbudget_raw
+      _ = ((K * K * L * orbitBound) / theta) * alpha *
+            (((j : R) + 1) * theta ^ j) := by ring
+  have hcoef_nonneg :
+      0 ≤ (K * inputBound + (K * K * L * orbitBound) / theta) *
+        alpha := by
+    have hdiv_nonneg : 0 ≤ (K * K * L * orbitBound) / theta := by
+      exact div_nonneg
+        (mul_nonneg (mul_nonneg (mul_nonneg hK hK) hL) horbitBound)
+        htheta_pos.le
+    exact mul_nonneg
+      (add_nonneg (mul_nonneg hK hinputBound) hdiv_nonneg) halpha
+  calc
+    (K * theta ^ j) * (inputBound * alpha) +
+        shifted_orbit_duhamel_majorant K theta L alpha
+          (fun k => (K * theta ^ k) * orbitBound) j ≤
+        (K * inputBound) * alpha * (((j : R) + 1) * theta ^ j) +
+          ((K * K * L * orbitBound) / theta) * alpha *
+            (((j : R) + 1) * theta ^ j) := add_le_add hinput hbudget
+    _ = (K * inputBound + (K * K * L * orbitBound) / theta) * alpha *
+          (((j : R) + 1) * theta ^ j) := by ring
+    _ ≤ (K * inputBound + (K * K * L * orbitBound) / theta) * alpha *
+          (geometricConstant * theta1 ^ j) :=
+      mul_le_mul_of_nonneg_left hgeom hcoef_nonneg
+    _ = ((K * inputBound + (K * K * L * orbitBound) / theta) *
+          geometricConstant) * alpha * theta1 ^ j := by ring
+
+end SOptLib
+
+
+-- Generalization plan (G0):
+-- concept/name: geometrically decaying scalar output of Lipschitz-perturbed
+--   operator powers; orig was
+--   `quadraticRestrictedPrimalAverageOutput_single_input_geometric_of_lipschitz`
+-- generality used: an arbitrary real normed space, a family of continuous linear
+--   endomorphisms, and a contractive continuous linear functional; no
+--   completeness, finite-dimensionality, measure, probability, convexity,
+--   smoothness, or oracle assumptions are used
+-- portable call pattern: stable linear-system, consensus, spectral-perturbation,
+--   and stochastic-optimization impulse proofs change the state space, operator
+--   family, scalar observation, inputs, and envelope constants while retaining
+--   the same alpha-times-geometric output conclusion
+-- counterargument checked: this is not paper-local traceability or a pure
+--   wrapper; it composes input and operator perturbations, base-output
+--   cancellation, a shifted-orbit Duhamel estimate, and enlarged-rate absorption
+--   into the reusable scalar-output contract needed by future stability proofs
+-- coverage search: symbol queries for "continuous linear map power applied input
+--   perturbation geometric bound Lipschitz operator base cancellation scalar
+--   functional" and "norm operator power difference action Duhamel Lipschitz
+--   geometric" found the staged power-action Duhamel and scalar absorption
+--   components but no combined theorem; Mathlib LeanSearch returned only generic
+--   Lipschitz and operator-norm action bounds
+-- minimal hypotheses: all bounds are pointwise at the parameter values and base
+--   orbit used; the output functional is required only to be contractive, and no
+--   global regularity of the operator family is assumed
+
+namespace ContinuousLinearMap
+
+/-- A contractive scalar output of a Lipschitz-perturbed stable operator power
+has an alpha-small geometrically decaying bound when the base output cancels.
+
+The input and operator perturbations may have different Lipschitz constants;
+the reference input enters only through its supplied geometric orbit envelope.
+
+Layer: Glue | Gap: Level 2 (scalar output bound for simultaneous operator and input perturbations)
+Proof: split the propagated-input difference into an input perturbation and a power-action perturbation, bound the latter by the shifted-orbit Duhamel majorant, absorb both terms into the enlarged geometric rate, and use cancellation plus contractivity of the scalar functional.
+Source: discrete Duhamel variation-of-constants estimates and Mathlib continuous-linear-map operator norm inequalities
+Used in: stable linear-system and spectral-perturbation impulse estimates where a base scalar observation cancels and parameter Lipschitz bounds supply an extra stepsize factor
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/13/proof/7
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, Appendix C.1 stable impulse estimate -/
+theorem abs_apply_pow_le_geometric_of_lipschitz
+    {E : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (F : ℝ → E →L[ℝ] E) (ell : E →L[ℝ] ℝ)
+    (x y : E) (j : ℕ)
+    {K theta LF LB MB alpha theta1 Ageo E0 : ℝ}
+    (hK : 0 ≤ K) (htheta_pos : 0 < theta) (hLF : 0 ≤ LF)
+    (hLB : 0 ≤ LB) (hMB : 0 ≤ MB) (halpha : 0 ≤ alpha)
+    (hE0 : 0 ≤ E0)
+    (hell : ‖ell‖ ≤ 1)
+    (hpower_alpha : ∀ n : ℕ, ‖F alpha ^ n‖ ≤ K * theta ^ n)
+    (hF_lip_alpha : ‖F alpha - F 0‖ ≤ LF * alpha)
+    (hinput_lip : ‖x - y‖ ≤ LB * alpha * E0)
+    (hbase_orbit : ∀ n : ℕ, ‖(F 0 ^ n) y‖ ≤ (K * theta ^ n) * (MB * E0))
+    (hzero : ell ((F 0 ^ j) y) = 0)
+    (hgeom : ((j : ℝ) + 1) * theta ^ j ≤ Ageo * theta1 ^ j) :
+    |ell ((F alpha ^ j) x)| ≤
+      ((K * LB + (K * K * LF * MB) / theta) * Ageo) *
+        alpha * (theta1 ^ j * E0) := by
+  have htheta_nonneg : 0 ≤ theta := htheta_pos.le
+  have hpower_rhs_nonneg : 0 ≤ K * theta ^ j :=
+    mul_nonneg hK (pow_nonneg htheta_nonneg j)
+  have hinput_term :
+      ‖(F alpha ^ j) x - (F alpha ^ j) y‖ ≤
+        (K * theta ^ j) * ((LB * E0) * alpha) := by
+    rw [← map_sub]
+    calc
+      ‖(F alpha ^ j) (x - y)‖ ≤ ‖F alpha ^ j‖ * ‖x - y‖ :=
+        (F alpha ^ j).le_opNorm (x - y)
+      _ ≤ (K * theta ^ j) * (LB * alpha * E0) :=
+        mul_le_mul (hpower_alpha j) hinput_lip (norm_nonneg (x - y))
+          hpower_rhs_nonneg
+      _ = (K * theta ^ j) * ((LB * E0) * alpha) := by ring
+  have hpower_term :
+      ‖(F alpha ^ j) y - (F 0 ^ j) y‖ ≤
+        SOptLib.shifted_orbit_duhamel_majorant K theta LF alpha
+          (fun k ↦ (K * theta ^ k) * (MB * E0)) j :=
+    norm_pow_apply_sub_pow_apply_le_shifted_orbit_duhamel_majorant
+      (F alpha) (F 0) j y hpower_alpha hF_lip_alpha hbase_orbit
+  have hdiff :
+      ‖(F alpha ^ j) x - (F 0 ^ j) y‖ ≤
+        (K * theta ^ j) * ((LB * E0) * alpha) +
+          SOptLib.shifted_orbit_duhamel_majorant K theta LF alpha
+            (fun k ↦ (K * theta ^ k) * (MB * E0)) j := by
+    calc
+      ‖(F alpha ^ j) x - (F 0 ^ j) y‖ =
+          ‖((F alpha ^ j) x - (F alpha ^ j) y) +
+            ((F alpha ^ j) y - (F 0 ^ j) y)‖ := by congr 1; abel
+      _ ≤ ‖(F alpha ^ j) x - (F alpha ^ j) y‖ +
+          ‖(F alpha ^ j) y - (F 0 ^ j) y‖ := norm_add_le _ _
+      _ ≤ (K * theta ^ j) * ((LB * E0) * alpha) +
+          SOptLib.shifted_orbit_duhamel_majorant K theta LF alpha
+            (fun k ↦ (K * theta ^ k) * (MB * E0)) j :=
+        add_le_add hinput_term hpower_term
+  have hbudget :
+      (K * theta ^ j) * ((LB * E0) * alpha) +
+          SOptLib.shifted_orbit_duhamel_majorant K theta LF alpha
+            (fun k ↦ (K * theta ^ k) * (MB * E0)) j ≤
+        ((K * LB + (K * K * LF * MB) / theta) * Ageo) *
+          alpha * (theta1 ^ j * E0) := by
+    have hraw :=
+      SOptLib.shifted_orbit_duhamel_majorant_add_input_le_geometric_of_linear_geometric_le
+        (K := K) (theta := theta) (L := LF) (inputBound := LB * E0)
+        (orbitBound := MB * E0) (alpha := alpha) (theta1 := theta1)
+        (geometricConstant := Ageo) j hK htheta_pos hLF
+        (mul_nonneg hLB hE0) (mul_nonneg hMB hE0) halpha hgeom
+    calc
+      (K * theta ^ j) * ((LB * E0) * alpha) +
+          SOptLib.shifted_orbit_duhamel_majorant K theta LF alpha
+            (fun k ↦ (K * theta ^ k) * (MB * E0)) j ≤
+        ((K * (LB * E0) + (K * K * LF * (MB * E0)) / theta) * Ageo) *
+          alpha * theta1 ^ j := hraw
+      _ = ((K * LB + (K * K * LF * MB) / theta) * Ageo) *
+          alpha * (theta1 ^ j * E0) := by
+        field_simp [ne_of_gt htheta_pos]
+  have htarget_nonneg :
+      0 ≤ ((K * LB + (K * K * LF * MB) / theta) * Ageo) *
+        alpha * (theta1 ^ j * E0) := by
+    exact (norm_nonneg _).trans (hdiff.trans hbudget)
+  calc
+    |ell ((F alpha ^ j) x)| =
+        ‖ell ((F alpha ^ j) x - (F 0 ^ j) y)‖ := by
+          rw [map_sub, hzero, sub_zero, Real.norm_eq_abs]
+    _ ≤ ‖ell‖ * ‖(F alpha ^ j) x - (F 0 ^ j) y‖ :=
+      ell.le_opNorm _
+    _ ≤ ‖ell‖ * (((K * LB + (K * K * LF * MB) / theta) * Ageo) *
+          alpha * (theta1 ^ j * E0)) :=
+      mul_le_mul_of_nonneg_left (hdiff.trans hbudget) (norm_nonneg ell)
+    _ ≤ 1 * (((K * LB + (K * K * LF * MB) / theta) * Ageo) *
+          alpha * (theta1 ^ j * E0)) :=
+      mul_le_mul_of_nonneg_right hell htarget_nonneg
+    _ = ((K * LB + (K * K * LF * MB) / theta) * Ageo) *
+          alpha * (theta1 ^ j * E0) := by ring
+
+end ContinuousLinearMap
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: finite squared-energy bound under a scaled geometric-impulse
+--   absolute-value bound; orig was
+--   `stable_output_square_sum_bound_of_geometric_impulse`
+-- generality used: arbitrary linear ordered field, scalar output and forcing
+--   sequences, two scale factors, a nonnegative contraction in the half-open unit
+--   interval, and nonnegative initial and forcing envelopes; no measure,
+--   probability, optimization, normed-space, or finite-dimensional assumptions
+-- portable call pattern: consensus, stable-filter, momentum, and stochastic-
+--   recursion proofs vary the output, forcing window, gain, stepsize, contraction,
+--   initial envelope, and horizon while retaining the same pointwise-to-energy step
+-- counterargument checked: this is not paper-local traceability or a pure wrapper;
+--   the existing geometric-convolution theorem accepts a nonnegative response
+--   recurrence, whereas this theorem additionally transports a scaled absolute-
+--   value domination into the exact squared-output budget
+-- coverage search: searches for `finite sum squares upper bound from pointwise
+--   absolute bound scaled geometric convolution impulse`, `sum square absolute
+--   values le scaled envelope square sum`, and `geometric convolution square sum
+--   bound nonnegative forcing` found
+--   `finite_sq_sum_le_of_le_geometric_initial_add_convolution` as a strict partial
+--   match and no Mathlib or SOptLib declaration with the complete contract
+-- minimal hypotheses: `0 < theta` is weakened to `0 ≤ theta`; signs of the two
+--   scale factors are unnecessary because the pointwise absolute-value bound itself
+--   forces its right-hand side nonnegative; all remaining sign hypotheses construct
+--   the nonnegative geometric envelope
+
+/-- A scaled pointwise geometric-impulse bound controls the finite sum of squared
+outputs by the initial and forcing energies.
+
+Layer: Glue | Gap: Level 1 (scaled geometric-impulse pointwise-to-energy bound)
+Proof: Apply the finite initial-plus-convolution squared-energy theorem to the
+  nonnegative impulse envelope, square the pointwise absolute-value domination,
+  and factor the two scalar squares through the finite sum.
+Source: discrete Young convolution inequality,
+  `finite_sq_sum_le_of_le_geometric_initial_add_convolution`, and Mathlib ordered-
+  field finite-sum algebra
+Used in: stable branches of consensus and stochastic-recursion estimates after a
+  pathwise geometric impulse estimate and before expectation or time averaging
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/4
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem sum_sq_le_of_abs_le_scaled_geometric_impulse
+    {R : Type*} [Field R] [LinearOrder R] [IsStrictOrderedRing R]
+    (out window : ℕ → R) (C alpha theta A : R) (N : ℕ)
+    (htheta_nonneg : 0 ≤ theta) (htheta_lt_one : theta < 1)
+    (hA_nonneg : 0 ≤ A)
+    (hwindow_nonneg : ∀ k ∈ Finset.range N, 0 ≤ window k)
+    (hout : ∀ t ∈ Finset.range (N + 1),
+      |out t| ≤
+        C * alpha *
+          (theta ^ t * A +
+            Finset.sum (Finset.range t) (fun j =>
+              theta ^ (t - 1 - j) * window j))) :
+    Finset.sum (Finset.range (N + 1)) (fun t => |out t| ^ 2) ≤
+      (C ^ 2 * alpha ^ 2) *
+        ((2 / (1 - theta ^ 2)) * A ^ 2 +
+          (2 / (1 - theta) ^ 2) *
+            Finset.sum (Finset.range N) (fun j => window j ^ 2)) := by
+  let env : ℕ → R := fun t =>
+    theta ^ t * A +
+      Finset.sum (Finset.range t) (fun j =>
+        theta ^ (t - 1 - j) * window j)
+  have henv_nonneg : ∀ t ∈ Finset.range (N + 1), 0 ≤ env t := by
+    intro t ht
+    dsimp [env]
+    exact add_nonneg
+      (mul_nonneg (pow_nonneg htheta_nonneg t) hA_nonneg)
+      (Finset.sum_nonneg fun j hj =>
+        mul_nonneg (pow_nonneg htheta_nonneg (t - 1 - j))
+          (hwindow_nonneg j (Finset.mem_range.mpr (by
+            have ht_le : t ≤ N := Nat.le_of_lt_succ (Finset.mem_range.mp ht)
+            exact lt_of_lt_of_le (Finset.mem_range.mp hj) ht_le))))
+  have henv_sum :=
+    finite_sq_sum_le_of_le_geometric_initial_add_convolution
+      (u := env) (z := window) (M := 1) (r := theta) N
+      henv_nonneg htheta_nonneg htheta_lt_one
+      (fun t _ => by simp [env])
+  have hcoef_nonneg : 0 ≤ C ^ 2 * alpha ^ 2 :=
+    mul_nonneg (sq_nonneg C) (sq_nonneg alpha)
+  have hpoint : ∀ t ∈ Finset.range (N + 1),
+      |out t| ^ 2 ≤ (C ^ 2 * alpha ^ 2) * env t ^ 2 := by
+    intro t ht
+    have hle : |out t| ≤ C * alpha * env t := by
+      simpa [env] using hout t ht
+    have hrhs_nonneg : 0 ≤ C * alpha * env t :=
+      (abs_nonneg (out t)).trans hle
+    calc
+      |out t| ^ 2 ≤ (C * alpha * env t) ^ 2 := by
+        nlinarith [abs_nonneg (out t)]
+      _ = (C ^ 2 * alpha ^ 2) * env t ^ 2 := by ring
+  calc
+    Finset.sum (Finset.range (N + 1)) (fun t => |out t| ^ 2) ≤
+        Finset.sum (Finset.range (N + 1)) (fun t =>
+          (C ^ 2 * alpha ^ 2) * env t ^ 2) :=
+      Finset.sum_le_sum hpoint
+    _ = (C ^ 2 * alpha ^ 2) *
+        Finset.sum (Finset.range (N + 1)) (fun t => env t ^ 2) := by
+      rw [Finset.mul_sum]
+    _ ≤ (C ^ 2 * alpha ^ 2) *
+        ((2 / (1 - theta ^ 2)) * A ^ 2 +
+          (2 / (1 - theta) ^ 2) *
+            Finset.sum (Finset.range N) (fun j => window j ^ 2)) :=
+      mul_le_mul_of_nonneg_left (by simpa [env] using henv_sum) hcoef_nonneg
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: finite dependent-product L2 norm of a complexification from real and imaginary parts; orig was stateFrobeniusNorm_complex_re_im
+-- generality used: an arbitrary finite index type and two real-valued functions; no measure, inner-product, convexity, smoothness, oracle, setup, or finite-dimensional assumptions are used
+-- portable call pattern: spectral, Fourier, and decentralized-state proofs assemble a complex finite state from changing real component functions and index types, then split its L2 norm into the two real component L2 norms
+-- counterargument checked: this is not paper-local traceability or a rename of a scalar fact; it lifts the scalar complex Pythagorean identity through a finite L2 product and packages the sum rearrangement and square-root step used repeatedly by complexified state arguments
+-- coverage search: queried "finite product L2 norm complex real imaginary parts equality square root sum squared norms", "dependentProductL2Norm complex re im", and "PiLp complex real imaginary norm"; Mathlib's `Complex.norm_add_mul_I`, `Complex.normSq_add_mul_I`, and `PiLp.norm_sq_eq_of_L2` cover scalar or product-energy pieces, while SOptLib's `dependentProductNormSq_eq_sum` exposes only raw coordinate energy, so no hit covers the complete equality
+-- minimal hypotheses: `[Fintype ι]` is the only non-data hypothesis and is needed for the finite `PiLp 2` norm; all source `Setup`, network-state, and nonemptiness assumptions were removed
+
+/-- The finite-product L2 norm of a complexification is the square root of the
+sum of the squared L2 norms of its real and imaginary components.
+
+Layer: Glue | Gap: Level 1 (finite-product complexification L2 norm identity)
+Proof: square both sides, expand each finite `PiLp 2` norm with
+  `PiLp.norm_sq_eq_of_L2`, apply the scalar complex norm-square identity
+  coordinatewise, and use nonnegativity to select the positive square root.
+Source: Mathlib finite `PiLp` L2 norm formulas and `Complex.normSq_add_mul_I`
+Used in: spectral and periodic directed-network arguments that combine real and
+  imaginary tracker coordinates into a complex state before comparing modes
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/algorithm_spec
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem dependentProductL2Norm_complex_re_im
+    {ι : Type*} [Fintype ι] (x y : ι → ℝ) :
+    ‖WithLp.toLp 2 (fun i : ι => (x i : ℂ) + (y i : ℂ) * Complex.I)‖ =
+      Real.sqrt
+        (‖WithLp.toLp 2 x‖ ^ 2 + ‖WithLp.toLp 2 y‖ ^ 2) := by
+  have hsq :
+      ‖WithLp.toLp 2
+          (fun i : ι => (x i : ℂ) + (y i : ℂ) * Complex.I)‖ ^ 2 =
+        (Real.sqrt
+          (‖WithLp.toLp 2 x‖ ^ 2 + ‖WithLp.toLp 2 y‖ ^ 2)) ^ 2 := by
+    rw [PiLp.norm_sq_eq_of_L2]
+    rw [Real.sq_sqrt (add_nonneg (sq_nonneg _) (sq_nonneg _))]
+    rw [PiLp.norm_sq_eq_of_L2, PiLp.norm_sq_eq_of_L2]
+    calc
+      (∑ i : ι, ‖(x i : ℂ) + (y i : ℂ) * Complex.I‖ ^ 2) =
+          ∑ i : ι, (‖x i‖ ^ 2 + ‖y i‖ ^ 2) := by
+            apply Finset.sum_congr rfl
+            intro i _hi
+            rw [Complex.sq_norm, Complex.normSq_add_mul_I]
+            simp [Real.norm_eq_abs, sq_abs]
+      _ = (∑ i : ι, ‖x i‖ ^ 2) + ∑ i : ι, ‖y i‖ ^ 2 := by
+            rw [Finset.sum_add_distrib]
+  rcases (sq_eq_sq_iff_eq_or_eq_neg.mp hsq) with h | h
+  · exact h
+  · nlinarith [norm_nonneg
+        (WithLp.toLp 2
+          (fun i : ι => (x i : ℂ) + (y i : ℂ) * Complex.I)),
+      Real.sqrt_nonneg
+        (‖WithLp.toLp 2 x‖ ^ 2 + ‖WithLp.toLp 2 y‖ ^ 2)]
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: finite dependent-product L2 seminorm bounded by the coordinate L1 sum; orig was stateFrobeniusNorm_le_stateL1Norm
+-- generality used: an arbitrary finite index type and dependent coordinate seminormed additive commutative groups; no scalar action, inner product, completeness, finite-dimensionality, measure, convexity, smoothness, or oracle assumptions
+-- portable call pattern: finite-network, block-coordinate, and product-state proofs change the finite index and coordinate spaces while converting the same raw dependent-product L2 seminorm into a sum of coordinate norms
+-- counterargument checked: Mathlib supplies the squared finite-sum inequality but not the complete PiLp L2-to-coordinate-L1 comparison; packaging the square-root and nonnegative-root steps avoids repeating this conversion in network and block proofs
+-- coverage search: `lean_search_symbols` queries "root sum squares finite family norms less than sum norms", "dependent product L2 seminorm bounded by sum coordinate norms", and "square root dependent product norm square less equal finite sum norms", plus LeanSearch for the full finite-family inequality, found `Finset.sum_sq_le_sq_sum_of_nonneg`, `PiLp.norm_eq_of_L2`, and related average/geometric-transfer results, all partial and no full duplicate
+-- minimal hypotheses: `[Fintype ι]` and coordinate `[SeminormedAddCommGroup (E i)]` instances are exactly what the finite `PiLp 2` seminorm and norm nonnegativity require
+
+/-- The L2 seminorm of a finite dependent family is at most the sum of its
+coordinate norms.
+
+Layer: Glue | Gap: Level 1 (finite dependent-product L2-to-L1 norm comparison)
+Proof: rewrite the `PiLp 2` norm as a square root, bound the sum of coordinate squares by the square of the nonnegative coordinate-norm sum, and take the nonnegative square root.
+Source: Mathlib `PiLp.norm_eq_of_L2`, `Finset.sum_sq_le_sq_sum_of_nonneg`, and real square-root monotonicity
+Used in: distributed consensus, gradient-tracking, and block-product estimates that pass from a Frobenius or stacked L2 state bound to a coordinate-sum bound before applying stochastic-matrix contraction
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/12/proof/3
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem dependentProductL2Seminorm_le_sum_norm
+    {ι : Type*} [Fintype ι]
+    {E : ι → Type*} [∀ i, SeminormedAddCommGroup (E i)]
+    (x : ∀ i, E i) :
+    ‖WithLp.toLp 2 x‖ ≤ ∑ i, ‖x i‖ := by
+  classical
+  rw [PiLp.norm_eq_of_L2]
+  have hsquares :
+      (∑ i, ‖x i‖ ^ 2) ≤ (∑ i, ‖x i‖) ^ 2 :=
+    Finset.sum_sq_le_sq_sum_of_nonneg (fun _ _ => norm_nonneg _)
+  calc
+    Real.sqrt (∑ i, ‖x i‖ ^ 2) ≤
+        Real.sqrt ((∑ i, ‖x i‖) ^ 2) := Real.sqrt_le_sqrt hsquares
+    _ = ∑ i, ‖x i‖ :=
+      Real.sqrt_sq (Finset.sum_nonneg fun _ _ => norm_nonneg _)
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: finite dependent-product coordinate L1 sum bounded by square-root cardinality times the L2 seminorm; orig was `stateL1Norm_le_sqrt_card_mul_stateFrobeniusNorm`
+-- generality used: an arbitrary finite index type and dependent coordinate seminormed additive commutative groups; no scalar action, inner product, completeness, finite-dimensionality, measure, convexity, smoothness, oracle, or algorithm assumptions
+-- portable call pattern: finite-network, block-coordinate, and product-state proofs change the finite index and coordinate spaces while converting a coordinate-norm sum into the sharp cardinality-scaled raw dependent-product L2 seminorm
+-- counterargument checked: Mathlib's `Real.sum_mul_le_sqrt_mul_sqrt` proves the scalar Cauchy--Schwarz core, but no existing declaration packages its specialization through the finite dependent `PiLp 2` norm; the result is the reusable converse comparison to `dependentProductL2Seminorm_le_sum_norm`, not paper-local traceability
+-- coverage search: queried `sum coordinate norms upper bound square root cardinality root sum squares`, `sum norm sqrt card dependentProductL2Seminorm`, and the full natural-language finite-family inequality; the top partial hits were Mathlib's `Real.sum_mul_le_sqrt_mul_sqrt` and `sq_sum_le_card_mul_sum_sq`, plus SOptLib's reverse comparison `dependentProductL2Seminorm_le_sum_norm`, with no full duplicate
+-- minimal hypotheses: `[Fintype ι]` and coordinate `[SeminormedAddCommGroup (E i)]` instances are exactly those needed by the finite `PiLp 2` seminorm; all stronger source assumptions were removed
+
+/-- The sum of coordinate norms in a finite dependent family is at most the
+square root of the index cardinality times its `PiLp 2` seminorm.
+
+Layer: Glue | Gap: Level 1 (finite dependent-product L1-to-L2 norm comparison)
+Proof: specialize finite scalar Cauchy--Schwarz to the constant-one family and the coordinate norms, then identify the root-sum-square factor with Mathlib's finite `PiLp 2` norm.
+Source: Mathlib `Real.sum_mul_le_sqrt_mul_sqrt` and `PiLp.norm_eq_of_L2`
+Used in: periodic directed-network contraction and corrected-lift estimates that convert a state coordinate-sum bound into a Frobenius bound with the sharp square-root node-count factor
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/0/proof/2
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem sum_norm_le_sqrt_card_mul_dependentProductL2Seminorm
+    {ι : Type*} [Fintype ι]
+    {E : ι → Type*} [∀ i, SeminormedAddCommGroup (E i)]
+    (x : ∀ i, E i) :
+    (∑ i, ‖x i‖) ≤
+      Real.sqrt (Fintype.card ι : ℝ) * ‖WithLp.toLp 2 x‖ := by
+  classical
+  simpa [PiLp.norm_eq_of_L2] using
+    (Real.sum_mul_le_sqrt_mul_sqrt (Finset.univ : Finset ι)
+      (fun _ : ι => (1 : ℝ)) (fun i : ι => ‖x i‖))
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: finite-path squared endpoint displacement controlled by path length and adjacent-increment energy; orig was `state_displacement_telescope`
+-- generality used: an arbitrary seminormed additive commutative group, a natural-indexed path, a start time, and a finite horizon; no scalar action, inner product, completeness, finite-dimensionality, measure, convexity, smoothness, oracle, or optimization assumptions
+-- portable call pattern: gradient, proximal, momentum, consensus, and distributed-state analyses change the normed-space-valued path, start time, and horizon while reusing the same endpoint-displacement estimate from one-step squared increments
+-- counterargument checked: this is not paper-local traceability or a pure rename because Mathlib supplies the telescope, norm triangle inequality, and scalar finite-sum Cauchy--Schwarz only as separate constituents; the floor-block lemma enlarges a remainder prefix to a positive full period, and the dependent-product operator lemma adds operator and Lipschitz structure
+-- coverage search: queried `finite path endpoint squared displacement bounded by length times sum squared adjacent increments`, `norm squared of sum bounded by cardinality times sum norm squared`, and the Mathlib semantic statement; top hits were `Finset.sum_range_sub`, `norm_sum_le`, `sq_sum_le_card_mul_sum_sq`, `norm_sq_sub_floor_block_le_period_mul_sum_increment_norm_sq`, and `dependent_product_operator_map_endpoint_sq_le_length_mul_path_energy`, all constituent or structurally different results rather than this exact contract
+-- minimal hypotheses: `SeminormedAddCommGroup E` is sufficient for finite vector telescoping and the norm triangle inequality; the horizon may be zero, so no positivity hypothesis is needed
+
+/-- The squared endpoint displacement of a finite path is at most its length
+times the sum of the squared norms of its adjacent increments.
+
+Layer: Glue | Gap: Level 1 (finite-path endpoint displacement from adjacent-increment energy)
+Proof: telescope the endpoint difference into the finite sum of adjacent increments, apply the norm triangle inequality, and then apply `sq_sum_le_card_mul_sum_sq` to the scalar norm sum.
+Source: Mathlib finite range-sum telescoping, seminormed additive groups, and the Chebyshev finite-sum square inequality
+Used in: finite-horizon iterative-method and distributed-state analyses that charge movement from a block or epoch start to the accumulated squared one-step path energy
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/main_theorem/proof/7
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem norm_sq_sub_le_length_mul_sum_norm_sq_step
+    {E : Type*} [SeminormedAddCommGroup E]
+    (x : ℕ → E) (s r : ℕ) :
+    ‖x (s + r) - x s‖ ^ 2 ≤
+      (r : ℝ) * ∑ j ∈ Finset.range r,
+        ‖x (s + j + 1) - x (s + j)‖ ^ 2 := by
+  have htel :
+      x (s + r) - x s =
+        ∑ j ∈ Finset.range r, (x (s + j + 1) - x (s + j)) := by
+    simpa [Nat.add_assoc] using
+      (Finset.sum_range_sub (fun j => x (s + j)) r).symm
+  have hnorm :
+      ‖x (s + r) - x s‖ ≤
+        ∑ j ∈ Finset.range r, ‖x (s + j + 1) - x (s + j)‖ := by
+    rw [htel]
+    exact norm_sum_le _ _
+  have hsquares := sq_sum_le_card_mul_sum_sq
+    (s := Finset.range r)
+    (f := fun j => ‖x (s + j + 1) - x (s + j)‖)
+  simp only [Finset.card_range] at hsquares
+  nlinarith [norm_nonneg (x (s + r) - x s)]
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: strict positivity of a stationary probability row for an irreducible nonnegative matrix; orig was `stationary_mem_stdSimplex_strictlyPositive`.
+-- generality used: arbitrary finite state type and strict partially ordered semiring, a matrix with pointwise nonnegative entries and strongly connected positive support, and a stationary row in Mathlib's standard simplex; no nonemptiness or decidable-equality parameter, row-sum, algorithm setup, measure, convexity, smoothness, oracle, normed-space, or finite-dimensional assumptions are used.
+-- portable call pattern: finite irreducible Markov-chain, consensus, push-sum, and distributed-optimization proofs change the state type, transition matrix, and stationary probability row while concluding that every stationary coordinate has positive mass.
+-- counterargument checked: this is not a paper-local wrapper or a duplicate; it packages the nontrivial seed-positive-coordinate and path-propagation argument, and Mathlib's irreducible-matrix API provides connectivity facts but no stationary-simplex strict-positivity theorem.
+-- coverage search: symbol queries for "stationary probability vector strictly positive irreducible finite matrix vecMul simplex", "matrix irreducible positive support path stationary coordinate positive", and "ReflTransGen positive matrix entry irreducible", plus LeanSearch for the full stationary-probability contract, found `Matrix.IsIrreducible`, `Matrix.isIrreducible_iff_exists_pow_pos`, and the staged `FiniteNetwork.IsStronglyConnectedPositiveSupport`, but no theorem with this conclusion.
+-- minimal hypotheses: row-stochasticity was weakened to pointwise entry nonnegativity because the proof uses no row sums; simplex membership supplies coordinate nonnegativity and positive total mass, and positive-support connectivity is exactly the path hypothesis used to propagate positivity.
+
+/-- Every coordinate of a stationary probability row is strictly positive when
+the nonnegative matrix has strongly connected positive support.
+
+Layer: Glue | Gap: Level 2 (strict positivity of an irreducible stationary probability row)
+Proof: obtain one positive coordinate from the simplex mass, show stationarity propagates positivity across each positive matrix entry, and induct along a positive-support path to every coordinate.
+Source: Mathlib standard simplex finite-sum positivity, finite matrix row action, and reflexive-transitive relation closures; finite irreducible Markov-chain stationary-distribution theory
+Used in: periodic push-pull and finite-state consensus proofs that strengthen a normalized nonnegative stationary Perron row to coordinatewise positive weights before uniqueness and contraction arguments
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/assumptions/9
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem Matrix.strictlyPositive_of_mem_stdSimplex_vecMul_eq_self_of_irreducible
+    {R Node : Type*} [Semiring R] [PartialOrder R] [IsStrictOrderedRing R]
+    [Fintype Node]
+    (A : Matrix Node Node R)
+    (hA_nonneg : ∀ i j : Node, 0 ≤ A i j)
+    (hirreducible : ∀ i j : Node,
+      Relation.ReflTransGen (fun u v : Node => 0 < A u v) i j)
+    {w : Node → R} (hw : w ∈ stdSimplex R Node)
+    (hstationary : Matrix.vecMul w A = w) :
+    ∀ i : Node, 0 < w i := by
+  classical
+  have hsumpos : 0 < ∑ i : Node, w i := by
+    rw [hw.2]
+    exact zero_lt_one
+  obtain ⟨i₀, _, hi₀⟩ :=
+    (Finset.sum_pos_iff_of_nonneg (fun i (_ : i ∈ Finset.univ) => hw.1 i)).mp hsumpos
+  intro j
+  have hstep : ∀ {u v : Node}, 0 < w u → 0 < A u v → 0 < w v := by
+    intro u v hwu huv
+    have hterm : 0 < w u * A u v := mul_pos hwu huv
+    have hle : w u * A u v ≤ ∑ k : Node, w k * A k v := by
+      exact Finset.single_le_sum
+        (fun k _ => mul_nonneg (hw.1 k) (hA_nonneg k v)) (Finset.mem_univ u)
+    have hcoord : (∑ k : Node, w k * A k v) = w v := by
+      simpa [Matrix.vecMul, dotProduct] using congrFun hstationary v
+    rw [← hcoord]
+    exact lt_of_lt_of_le hterm hle
+  have hpath := hirreducible i₀ j
+  induction hpath with
+  | refl => exact hi₀
+  | tail hpath huv ih => exact hstep ih huv
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: vanishing of a nonnegative stationary row from one zero coordinate under irreducible positive support; orig was `stationary_nonnegative_eq_zero_of_zero_coordinate`.
+-- generality used: arbitrary finite index type and strict partially ordered semiring, a pointwise nonnegative matrix with strongly connected positive support, and a pointwise nonnegative stationary row; no nonemptiness, decidable-equality parameter, stochastic row sums, normalization, algorithm setup, measure, convexity, smoothness, oracle, normed-space, or finite-dimensional assumptions are used.
+-- portable call pattern: irreducible finite-state Markov-chain, consensus, push-sum, and Perron-vector uniqueness proofs change the state type, transition matrix, stationary nonnegative row, and chosen zero coordinate while concluding that the entire row vanishes.
+-- counterargument checked: the result is not paper-local bookkeeping or a one-line wrapper; Mathlib's irreducible-matrix API supplies connectivity characterizations but no stationary-vector zero-propagation theorem, while the staged strict-positivity companion requires simplex normalization and therefore does not cover a stationary row of possibly zero total mass.
+-- coverage search: symbol queries for "nonnegative stationary vector zero coordinate irreducible matrix vecMul equal zero" and "zero propagates backward positive matrix entry stationary vector", plus LeanSearch for the full contract, found `Matrix.IsIrreducible`, `Matrix.isIrreducible_iff_exists_pow_pos`, and `Matrix.strictlyPositive_of_mem_stdSimplex_vecMul_eq_self_of_irreducible`; these provide connectivity or the distinct normalized-positive case, not this arbitrary-mass zero conclusion.
+-- minimal hypotheses: row-stochasticity was weakened to pointwise matrix nonnegativity because row sums are unused; the designated coordinate supplies inhabitation, and strict ordered-semiring structure is exactly what turns a nonnegative product bounded by zero with a positive factor into a zero vector coordinate.
+
+/-- A nonnegative stationary row of a nonnegative matrix with strongly connected
+positive support is identically zero if any one of its coordinates is zero.
+
+Layer: Glue | Gap: Level 2 (zero propagation for an irreducible stationary nonnegative row)
+Proof: stationarity and nonnegativity force a predecessor coordinate to vanish whenever it points positively into a zero coordinate; induction along a positive-support path from each index to the designated zero coordinate propagates vanishing to the whole row.
+Source: Mathlib finite matrix row action, ordered-semiring finite sums, and reflexive-transitive relation closures; finite irreducible nonnegative-matrix theory
+Used in: uniqueness proofs for periodic push-pull Perron rows and finite-state consensus stationary weights, where a nonnegative difference residual has one minimizing coordinate equal to zero
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/assumptions/9
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem Matrix.eq_zero_of_nonnegative_vecMul_eq_self_of_irreducible_of_apply_eq_zero
+    {R Node : Type*} [Semiring R] [PartialOrder R] [IsStrictOrderedRing R]
+    [Fintype Node]
+    (A : Matrix Node Node R)
+    (hA_nonneg : ∀ i j : Node, 0 ≤ A i j)
+    (hirreducible : ∀ i j : Node,
+      Relation.ReflTransGen (fun u v : Node => 0 < A u v) i j)
+    {d : Node → R} (hd_nonneg : ∀ i : Node, 0 ≤ d i)
+    (hstationary : Matrix.vecMul d A = d)
+    {i₀ : Node} (hi₀ : d i₀ = 0) :
+    d = 0 := by
+  classical
+  funext j
+  have hback : ∀ {u v : Node}, d v = 0 → 0 < A u v → d u = 0 := by
+    intro u v hdv huv
+    have hle : d u * A u v ≤ ∑ k : Node, d k * A k v := by
+      exact Finset.single_le_sum
+        (fun k _ => mul_nonneg (hd_nonneg k) (hA_nonneg k v)) (Finset.mem_univ u)
+    have hsum : (∑ k : Node, d k * A k v) = 0 := by
+      calc
+        (∑ k : Node, d k * A k v) = d v := by
+          simpa [Matrix.vecMul, dotProduct] using congrFun hstationary v
+        _ = 0 := hdv
+    have hmul_nonpos : d u * A u v ≤ 0 := hle.trans_eq hsum
+    by_contra hdu
+    have hdu_pos : 0 < d u := lt_of_le_of_ne (hd_nonneg u) (Ne.symm hdu)
+    exact (not_lt_of_ge hmul_nonpos) (mul_pos hdu_pos huv)
+  have hpath := hirreducible j i₀
+  induction hpath using Relation.ReflTransGen.head_induction_on with
+  | refl => exact hi₀
+  | @head a c hac hrest ih => exact hback ih hac
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: uniqueness of a stationary probability row for an irreducible nonnegative matrix; orig was `stationary_mem_stdSimplex_unique`.
+-- generality used: arbitrary ordered field and finite nonempty state type, a pointwise nonnegative matrix with strongly connected positive support, and two stationary rows in Mathlib's standard simplex; no stochastic row-sum, algorithm setup, measure, convexity, smoothness, oracle, normed-space, or finite-dimensional assumptions are used.
+-- portable call pattern: finite irreducible Markov-chain, consensus, push-sum, and distributed-optimization proofs change the state type, transition matrix, and stationary probability rows while concluding that the normalized stationary row is unique.
+-- counterargument checked: this is not paper-local traceability or a pure wrapper; the staged strict-positivity and zero-propagation lemmas supply two ingredients, while this theorem adds the nontrivial minimum-ratio residual construction and simplex-normalization argument needed for uniqueness.
+-- coverage search: symbol queries for "stationary probability row uniqueness irreducible nonnegative matrix vecMul standard simplex", "eq of mem stdSimplex vecMul eq self irreducible", and "stationary vector unique irreducible matrix", plus LeanSearch for the full fixed-probability-vector contract, found Mathlib's `Matrix.IsIrreducible` and `Matrix.isIrreducible_iff_exists_pow_pos` and the staged strict-positivity and zero-propagation lemmas, but no theorem proving equality of two stationary simplex rows.
+-- minimal hypotheses: source row-stochasticity is weakened to pointwise matrix nonnegativity; field division and linear order support the minimum coordinate-ratio argument, nonemptiness supplies a minimizing coordinate, and simplex normalization fixes the resulting proportionality constant.
+
+/-- Two stationary probability rows of a nonnegative matrix with strongly
+connected positive support are equal.
+
+Layer: Glue | Gap: Level 2 (uniqueness of an irreducible stationary probability row)
+Proof: minimize the coordinatewise ratio of the two stationary rows, subtract the resulting multiple to obtain a nonnegative stationary residual with a zero coordinate, apply irreducible zero propagation, and use simplex normalization to make the proportionality constant one.
+Source: Mathlib standard simplex and finite minimum APIs together with finite irreducible nonnegative-matrix stationary-distribution theory
+Used in: periodic push-pull, finite-state Markov-chain, and consensus proofs that identify two normalized left Perron rows fixed by the same irreducible communication matrix
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/assumptions/9
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem Matrix.eq_of_mem_stdSimplex_vecMul_eq_self_of_irreducible
+    {R Node : Type*} [Field R] [LinearOrder R] [IsStrictOrderedRing R]
+    [Fintype Node] [Nonempty Node]
+    (A : Matrix Node Node R)
+    (hA_nonneg : ∀ i j : Node, 0 ≤ A i j)
+    (hirreducible : ∀ i j : Node,
+      Relation.ReflTransGen (fun u v : Node => 0 < A u v) i j)
+    {w z : Node → R}
+    (hw : w ∈ stdSimplex R Node)
+    (hz : z ∈ stdSimplex R Node)
+    (hwstationary : Matrix.vecMul w A = w)
+    (hzstationary : Matrix.vecMul z A = z) :
+    w = z := by
+  classical
+  have hzpos :=
+    Matrix.strictlyPositive_of_mem_stdSimplex_vecMul_eq_self_of_irreducible
+      A hA_nonneg hirreducible hz hzstationary
+  obtain ⟨i₀, _, hmin⟩ := Finset.exists_min_image Finset.univ
+    (fun i : Node => w i / z i) Finset.univ_nonempty
+  let c : R := w i₀ / z i₀
+  let d : Node → R := fun i => w i - c * z i
+  have hd_nonneg : ∀ i : Node, 0 ≤ d i := by
+    intro i
+    have hratio : c ≤ w i / z i := hmin i (Finset.mem_univ i)
+    have hmul : c * z i ≤ w i := (le_div_iff₀ (hzpos i)).mp hratio
+    simpa [d] using sub_nonneg.mpr hmul
+  have hdi₀ : d i₀ = 0 := by
+    dsimp [d, c]
+    field_simp [ne_of_gt (hzpos i₀)]
+    ring
+  have hdstationary : Matrix.vecMul d A = d := by
+    funext j
+    have hwj : (∑ i : Node, w i * A i j) = w j := by
+      simpa [Matrix.vecMul, dotProduct] using congrFun hwstationary j
+    have hzj : (∑ i : Node, z i * A i j) = z j := by
+      simpa [Matrix.vecMul, dotProduct] using congrFun hzstationary j
+    simp only [Matrix.vecMul, dotProduct, d]
+    calc
+      (∑ i : Node, (w i - c * z i) * A i j) =
+          (∑ i : Node, w i * A i j) - c * ∑ i : Node, z i * A i j := by
+            simp_rw [sub_mul]
+            rw [Finset.sum_sub_distrib, Finset.mul_sum]
+            simp only [mul_assoc]
+      _ = w j - c * z j := by rw [hwj, hzj]
+  have hd_zero : d = 0 :=
+    Matrix.eq_zero_of_nonnegative_vecMul_eq_self_of_irreducible_of_apply_eq_zero
+      A hA_nonneg hirreducible hd_nonneg hdstationary hdi₀
+  have hw_eq_cz : ∀ i : Node, w i = c * z i := by
+    intro i
+    have hi := congrFun hd_zero i
+    simpa [d] using sub_eq_zero.mp hi
+  have hc : c = 1 := by
+    have hsum : (∑ i : Node, w i) = c * ∑ i : Node, z i := by
+      calc
+        (∑ i : Node, w i) = ∑ i : Node, c * z i :=
+          Finset.sum_congr rfl (fun i _ => hw_eq_cz i)
+        _ = c * ∑ i : Node, z i := by rw [Finset.mul_sum]
+    rw [hw.2, hz.2] at hsum
+    simpa using hsum.symm
+  funext i
+  simpa [hc] using hw_eq_cz i
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: existence and uniqueness of a strictly positive normalized stationary row for a finite irreducible row-stochastic matrix; orig was `rowStochastic_stronglyConnected_existsUnique_positive_stationary`.
+-- generality used: arbitrary finite nonempty decidable state type and a real row-stochastic matrix with strongly connected positive support; no algorithm setup, ambient normed space, finite-dimensionality, measure, convexity, smoothness, or oracle assumptions are used.
+-- portable call pattern: finite irreducible Markov-chain, consensus, push-sum, and distributed-optimization proofs change the state type and transition matrix while obtaining the same unique positive probability row fixed by right matrix action.
+-- counterargument checked: the theorem composes previously staged existence, strict-positivity, and uniqueness results, but is not an alpha-duplicate or paper-local wrapper because their combined Perron endpoint is the stable contract consumed directly by later algorithms.
+-- coverage search: symbol queries for "finite irreducible row stochastic real matrix unique strictly positive normalized stationary row vecMul" and "exists unique stationary probability vector irreducible matrix", plus LeanSearch queries for the same contract, found the three staged component theorems and Mathlib's `Matrix.IsIrreducible` API but no declaration with this combined existence-and-uniqueness conclusion.
+-- minimal hypotheses: row-stochasticity supplies entry nonnegativity and stationary-simplex existence, strong connectivity supplies positivity and uniqueness, and `[Fintype Node] [Nonempty Node] [DecidableEq Node]` are exactly the state-space instances required by Mathlib's row-stochastic matrix API.
+
+/-- A finite irreducible real row-stochastic matrix has a unique strictly
+positive normalized stationary row vector.
+
+Layer: Glue | Gap: Level 1 (positive stationary probability row existence and uniqueness)
+Proof: obtain a stationary row in the standard simplex, strengthen it to strict positivity using irreducibility, and apply irreducible stationary-simplex uniqueness after converting any competing positive normalized row back to simplex membership.
+Source: finite-state Markov-chain stationary-distribution theory, using Mathlib standard simplices and the staged matrix existence, strict-positivity, and uniqueness theorems
+Used in: periodic push-pull and finite-state consensus constructions that select the unique normalized positive left Perron weights of each irreducible row-stochastic period product
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/assumptions/9
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem Matrix.existsUnique_strictlyPositive_normalized_vecMul_eq_self_of_irreducible
+    {Node : Type*} [Fintype Node] [Nonempty Node] [DecidableEq Node]
+    (A : Matrix Node Node ℝ)
+    (hA : A ∈ Matrix.rowStochastic ℝ Node)
+    (hirreducible : ∀ i j : Node,
+      Relation.ReflTransGen (fun u v : Node => 0 < A u v) i j) :
+    ∃! w : Node → ℝ,
+      (∀ i : Node, 0 < w i) ∧ (∑ i : Node, w i) = 1 ∧
+        Matrix.vecMul w A = w := by
+  classical
+  obtain ⟨w, hw, hstationary⟩ :=
+    Matrix.exists_mem_stdSimplex_vecMul_eq_self_of_mem_rowStochastic A hA
+  refine ⟨w, ?_, ?_⟩
+  · exact ⟨
+      Matrix.strictlyPositive_of_mem_stdSimplex_vecMul_eq_self_of_irreducible
+        A hA.1 hirreducible hw hstationary,
+      hw.2, hstationary⟩
+  · intro z hz
+    have hzsimplex : z ∈ stdSimplex ℝ Node :=
+      ⟨fun i => le_of_lt (hz.1 i), hz.2.1⟩
+    exact Matrix.eq_of_mem_stdSimplex_vecMul_eq_self_of_irreducible
+      A hA.1 hirreducible hzsimplex hw hz.2.2 hstationary
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: existence and uniqueness of a strictly positive normalized right stationary vector for a finite irreducible column-stochastic matrix; orig was `columnStochastic_stronglyConnected_existsUnique_positive_stationary`.
+-- generality used: arbitrary finite nonempty decidable state type and a real column-stochastic matrix with strongly connected positive support; no algorithm setup, ambient normed space, measure, convexity, smoothness, oracle, or finite-dimensional assumptions are used.
+-- portable call pattern: push-sum, pull-consensus, finite-state Markov-chain, and distributed-optimization proofs change the state type and column-stochastic transition matrix while selecting the same unique positive probability vector fixed by left matrix action.
+-- counterargument checked: the staged row-stochastic theorem supplies the transposed result, but does not expose the distinct `Matrix.mulVec` contract needed by column-stochastic callers; packaging stochasticity, connectivity reversal, stationarity transport, and uniqueness transport avoids repeating this bridge at each right-Perron-vector call site.
+-- coverage search: symbol queries for "finite irreducible column stochastic real matrix unique strictly positive normalized stationary vector mulVec" and "transpose row stochastic irreducible strongly connected positive support mulVec vecMul stationary", plus LeanSearch for the full contract, found the staged row/`vecMul` theorem and Mathlib's stochastic-transpose and `mulVec`/`vecMul` transpose lemmas, but no declaration with this column/`mulVec` conclusion.
+-- minimal hypotheses: column-stochasticity and positive-support strong connectivity are exactly the transpose images of the row theorem's hypotheses; `[Fintype Node] [Nonempty Node] [DecidableEq Node]` are exactly the state-space instances required by Mathlib's column-stochastic matrix API.
+
+/-- A finite irreducible real column-stochastic matrix has a unique strictly
+positive normalized right stationary vector.
+
+Layer: Glue | Gap: Level 1 (positive right stationary probability vector existence and uniqueness)
+Proof: transpose the matrix, transport column stochasticity and positive-support connectivity to the row setting, apply the unique positive stationary-row theorem, and rewrite `vecMul` by the transpose as `mulVec`.
+Source: finite-state Perron--Frobenius and Markov-chain stationary-distribution theory, using Mathlib `Matrix.transpose_mem_rowStochastic_iff_mem_colStochastic` and `Matrix.vecMul_transpose`
+Used in: periodic push-pull and push-sum constructions that select the unique normalized positive right Perron weights of each irreducible column-stochastic period product
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/assumptions/9
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem Matrix.existsUnique_strictlyPositive_normalized_mulVec_eq_self_of_irreducible
+    {Node : Type*} [Fintype Node] [Nonempty Node] [DecidableEq Node]
+    (A : Matrix Node Node ℝ)
+    (hA : A ∈ Matrix.colStochastic ℝ Node)
+    (hirreducible : ∀ i j : Node,
+      Relation.ReflTransGen (fun u v : Node => 0 < A u v) i j) :
+    ∃! v : Node → ℝ,
+      (∀ i : Node, 0 < v i) ∧ (∑ i : Node, v i) = 1 ∧
+        Matrix.mulVec A v = v := by
+  classical
+  have htranspose_conn : ∀ i j : Node,
+      Relation.ReflTransGen (fun u v : Node => 0 < A.transpose u v) i j := by
+    intro i j
+    change Relation.ReflTransGen (fun u v : Node => 0 < A v u) i j
+    simpa only using (hirreducible j i).swap
+  obtain ⟨v, hv, hvunique⟩ :=
+    Matrix.existsUnique_strictlyPositive_normalized_vecMul_eq_self_of_irreducible
+      A.transpose
+      (Matrix.transpose_mem_rowStochastic_iff_mem_colStochastic.mpr hA)
+      htranspose_conn
+  refine ⟨v, ⟨hv.1, hv.2.1, ?_⟩, ?_⟩
+  · simpa only [Matrix.vecMul_transpose] using hv.2.2
+  · intro z hz
+    apply hvunique z
+    exact ⟨hz.1, hz.2.1, by simpa only [Matrix.vecMul_transpose] using hz.2.2⟩
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: reindexing a product-length natural range as equal consecutive
+--   blocks; the original name `sum_range_mul_eq_sum_blocks` already exposes
+--   the paper-free mathematical contract
+-- generality used: an arbitrary additive commutative monoid, a sequence indexed
+--   by natural numbers, and natural block count and block length; no measure,
+--   convexity, smoothness, oracle, order, or positivity assumptions are used
+-- portable call pattern: periodic, epoch, and mini-batch analyses flatten or
+--   unflatten complete-horizon sums while changing the summand, number of
+--   blocks, and block length
+-- counterargument checked: although the proof is short, this is not a pure
+--   rename or caller-side expression; it packages the recurring two-index
+--   reindexing equality, including zero block counts and zero block lengths
+-- coverage search: queries "finite sum over product length range equals nested
+--   sum over blocks and positions" and "sum range product nested sum blocks"
+--   found only the source declaration; Mathlib semantic search found the
+--   partial splitting lemma `Finset.sum_range_add`, but no theorem with this
+--   complete product-range equality, and SOptLib's catalog had no covering hit
+-- minimal hypotheses: `AddCommMonoid` is exactly the finite-sum structure used;
+--   all data parameters are unrestricted and no hypotheses can be dropped
+
+/-- A sum over a product-length natural range equals the nested sum over its
+consecutive equal-length blocks.
+
+Layer: Glue | Gap: Level 1 (product-range sum reindexing into equal blocks)
+Proof: induct on the block count, split the successor horizon with
+  `Finset.sum_range_add`, and identify the new block using
+  `Finset.sum_range_succ`.
+Source: Mathlib finite sums over natural ranges, especially
+  `Finset.sum_range_add` and `Finset.sum_range_succ`
+Used in: periodic, epoch, and mini-batch optimization estimates that convert a
+  complete dense horizon into block and within-block coordinates
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/assumptions/14
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem sum_range_mul_eq_sum_blocks
+    {M : Type*} [AddCommMonoid M] (f : ℕ → M) (K p : ℕ) :
+    ∑ t ∈ Finset.range (K * p), f t =
+      ∑ k ∈ Finset.range K, ∑ r ∈ Finset.range p, f (k * p + r) := by
+  induction K with
+  | zero => simp
+  | succ K ih =>
+      rw [Nat.succ_mul, Finset.sum_range_add, ih, Finset.sum_range_succ]
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: complete-block aggregation of a blockwise two-budget bound;
+--   orig was `allTimeAverageGradient_pathwise_energy_bound`
+-- generality used: two arbitrary sequences and two coefficients in an ordered
+--   non-unital non-associative semiring, with unrestricted natural block count
+--   and length; no measure, probability, convexity, smoothness, oracle,
+--   positivity, or finite-dimensional assumptions
+-- portable call pattern: epoch, periodic, and mini-batch analyses prove the
+--   same one-block observable bound by a block-start term and a within-block
+--   path-energy term, while changing both sequences, coefficients, block count,
+--   and block length before aggregating over the complete horizon
+-- counterargument checked: this is more than paper-local traceability or a
+--   pure wrapper because it packages the recurring composition of pointwise
+--   block bounds, coefficient distribution, and two complete-block
+--   reindexings; the existing reindexing theorem alone does not yield the
+--   inequality or assemble its two budgets
+-- coverage search: `lean_search_symbols` queries for a complete-range upper
+--   bound from per-block two-budget inequalities found only partial hits such
+--   as `sum_range_mul_eq_sum_blocks` and unrelated block-sum estimates;
+--   LeanSearch found `Finset.le_sum_schlomilch` and recurrence bounds, but no
+--   theorem with this contract, so coverage is partial rather than full
+-- minimal hypotheses: all data are unrestricted; the proof needs only the
+--   stated block inequalities, and neither coefficient nor sequence
+--   nonnegativity is required
+
+/-- A uniform two-budget bound on every complete block sums to the analogous
+bound over the complete horizon.
+
+The first budget samples `a` at each block start, while the second budget sums
+`b` throughout the block. Both the observable sum and the path-energy sum are
+flattened from block coordinates to the range of length `K * p`.
+
+Layer: Glue | Gap: Level 1 (complete-block aggregation of two-budget inequalities)
+Proof: sum the supplied inequality over all blocks, distribute the two finite
+  sums and constant factors, then flatten both nested sums with
+  `sum_range_mul_eq_sum_blocks`.
+Source: Mathlib finite-sum monotonicity and distributivity, together with the
+  product-range block reindexing theorem `sum_range_mul_eq_sum_blocks`
+Used in: periodic, epoch-based, and mini-batch stochastic-optimization analyses
+  that aggregate a block-start observable and within-block path energy into a
+  complete-horizon output-energy estimate
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/6/proof/17
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem sum_complete_blocks_le_of_block_sum_le
+    {R : Type*} [NonUnitalNonAssocSemiring R] [Preorder R]
+    [IsOrderedAddMonoid R]
+    (K p : ℕ) (a b : ℕ → R) (A B : R)
+    (hblock : ∀ k ∈ Finset.range K,
+      (∑ r ∈ Finset.range p, a (k * p + r)) ≤
+        A * a (k * p) + B * ∑ r ∈ Finset.range p, b (k * p + r)) :
+    (∑ t ∈ Finset.range (K * p), a t) ≤
+      A * ∑ k ∈ Finset.range K, a (k * p) +
+        B * ∑ t ∈ Finset.range (K * p), b t := by
+  rw [sum_range_mul_eq_sum_blocks a K p,
+    sum_range_mul_eq_sum_blocks b K p]
+  calc
+    (∑ k ∈ Finset.range K, ∑ r ∈ Finset.range p, a (k * p + r)) ≤
+        ∑ k ∈ Finset.range K,
+          (A * a (k * p) + B * ∑ r ∈ Finset.range p, b (k * p + r)) :=
+      Finset.sum_le_sum hblock
+    _ = A * ∑ k ∈ Finset.range K, a (k * p) +
+          B * ∑ k ∈ Finset.range K,
+            ∑ r ∈ Finset.range p, b (k * p + r) := by
+      simp only [Finset.sum_add_distrib, ← Finset.mul_sum]
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: normalized finite-sum bound inherited from a floor-division
+--   block majorant; orig was `finite_phase_average_l2_bound_of_block_majorant`
+-- generality used: ordered-semifield-valued natural-indexed sequences, a positive
+--   natural period, a nonnegative scalar majorant coefficient, and a block
+--   sequence nonnegative on the relevant finite horizon; no measure, norm,
+--   convexity, smoothness, oracle, or finite-dimensional assumptions are used
+-- portable call pattern: periodic, epoch, and mini-batch analyses transfer a
+--   normalized block-boundary error or energy budget to the dense iteration
+--   horizon while changing the period, sequences, scalar coefficient, and
+--   supplied block-average bound
+-- counterargument checked: this is not paper-local traceability or a one-line
+--   wrapper; it packages prefix enlargement, floor-division block reindexing,
+--   pointwise majorization, and normalized order scaling in one reusable step
+-- coverage search: queried `normalized finite sum upper bound floor division
+--   block majorant nonnegative period`, `sum range function t divided by p
+--   bounded by p times sum range`, and Mathlib semantic search for the precise
+--   floor-division sum bound; hits were unrelated or supplied only component
+--   facts, while `sum_range_mul_eq_sum_blocks` covers only the reindexing step
+-- minimal hypotheses: positivity of the period, nonnegativity of the majorant
+--   coefficient and block sequence, the pointwise majorant, and the normalized
+--   block bound are all used; the source hypothesis `forall t, 0 <= f t` is
+--   unused and has been removed
+
+/-- A normalized prefix dominated through floor-division blocks is bounded by
+the block average times the period and majorant coefficient.
+
+Layer: Glue | Gap: Level 1 (normalized floor-division block-majorant bound)
+Proof: enlarge the nonnegative floor-divided block prefix to a complete
+  product-length horizon, reindex it into equal blocks with
+  `sum_range_mul_eq_sum_blocks`, and apply the pointwise and normalized bounds.
+Source: Mathlib ordered finite sums and natural Euclidean division, together
+  with the product-range block reindexing theorem `sum_range_mul_eq_sum_blocks`
+Used in: periodic and epoch stochastic-optimization estimates that propagate a
+  block-boundary mean-square or energy budget to every iteration in the horizon
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/6
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem normalized_sum_le_period_mul_of_floor_div_majorant
+    {K : Type*} [Semifield K] [LinearOrder K] [IsStrictOrderedRing K]
+    (p T : ℕ) (f g : ℕ → K) (A B : K)
+    (hp : 0 < p)
+    (hA_nonneg : 0 ≤ A)
+    (hg_nonneg : ∀ k < T, 0 ≤ g k)
+    (hmajorant : ∀ t < T, f t ≤ A * g (t / p))
+    (hblock :
+      ((T : K)⁻¹) * Finset.sum (Finset.range T) g ≤ B) :
+    ((T : K)⁻¹) * Finset.sum (Finset.range T) f ≤
+      (A * (p : K)) * B := by
+  classical
+  have hT_le_Tp : T ≤ T * p := Nat.le_mul_of_pos_right T hp
+  have hprefix :
+      Finset.sum (Finset.range T) (fun t => g (t / p)) ≤
+        Finset.sum (Finset.range (T * p)) (fun t => g (t / p)) := by
+    apply Finset.sum_le_sum_of_subset_of_nonneg (Finset.range_mono hT_le_Tp)
+    intro t _ht_big _ht_small
+    exact hg_nonneg (t / p)
+      (Nat.div_lt_of_lt_mul (by simpa [Nat.mul_comm] using _ht_big))
+  have hblock_reindex :
+      Finset.sum (Finset.range (T * p)) (fun t => g (t / p)) =
+        (p : K) * Finset.sum (Finset.range T) g := by
+    calc
+      Finset.sum (Finset.range (T * p)) (fun t => g (t / p)) =
+          Finset.sum (Finset.range T) (fun k =>
+            Finset.sum (Finset.range p) (fun r => g ((k * p + r) / p))) := by
+            simpa using
+              sum_range_mul_eq_sum_blocks (fun t => g (t / p)) T p
+      _ = Finset.sum (Finset.range T) (fun k =>
+            Finset.sum (Finset.range p) (fun _r => g k)) := by
+            refine Finset.sum_congr rfl ?_
+            intro k _hk
+            refine Finset.sum_congr rfl ?_
+            intro r hr
+            have hr_lt : r < p := by simpa using hr
+            have hdiv : (k * p + r) / p = k := by
+              rw [Nat.mul_comm k p, Nat.add_comm (p * k) r]
+              rw [Nat.add_mul_div_left r k hp, Nat.div_eq_of_lt hr_lt,
+                zero_add]
+            simp [hdiv]
+      _ = Finset.sum (Finset.range T) (fun k => (p : K) * g k) := by
+            refine Finset.sum_congr rfl ?_
+            intro k _hk
+            rw [Finset.sum_const, Finset.card_range, nsmul_eq_mul]
+      _ = (p : K) * Finset.sum (Finset.range T) g := by
+            rw [← Finset.mul_sum]
+  have hsum :
+      Finset.sum (Finset.range T) f ≤
+        A * ((p : K) * Finset.sum (Finset.range T) g) := by
+    calc
+      Finset.sum (Finset.range T) f ≤
+          Finset.sum (Finset.range T) (fun t => A * g (t / p)) :=
+            Finset.sum_le_sum fun t ht => hmajorant t (by simpa using ht)
+      _ = A * Finset.sum (Finset.range T) (fun t => g (t / p)) := by
+            rw [← Finset.mul_sum]
+      _ ≤ A * Finset.sum (Finset.range (T * p)) (fun t => g (t / p)) :=
+            mul_le_mul_of_nonneg_left hprefix hA_nonneg
+      _ = A * ((p : K) * Finset.sum (Finset.range T) g) := by
+            rw [hblock_reindex]
+  have hTinv_nonneg : 0 ≤ (T : K)⁻¹ :=
+    inv_nonneg.mpr (Nat.cast_nonneg' T)
+  have hscale_nonneg : 0 ≤ A * (p : K) :=
+    mul_nonneg hA_nonneg (Nat.cast_nonneg' p)
+  calc
+    ((T : K)⁻¹) * Finset.sum (Finset.range T) f ≤
+        ((T : K)⁻¹) *
+          (A * ((p : K) * Finset.sum (Finset.range T) g)) :=
+          mul_le_mul_of_nonneg_left hsum hTinv_nonneg
+    _ = (A * (p : K)) *
+          (((T : K)⁻¹) * Finset.sum (Finset.range T) g) := by
+          ring
+    _ ≤ (A * (p : K)) * B :=
+          mul_le_mul_of_nonneg_left hblock hscale_nonneg
+
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: normalized finite-sum bound from a floor-division block
+--   majorant plus a separately budgeted remainder; orig was
+--   `finite_phase_average_l2_bound_of_block_majorant_add_remainder`
+-- generality used: ordered-semifield-valued natural-indexed sequences, a
+--   positive natural period, a nonnegative block coefficient, and a block
+--   sequence nonnegative on the relevant horizon; no measure, norm, convexity,
+--   smoothness, oracle, or finite-dimensional assumptions are used
+-- portable call pattern: periodic, epoch, and mini-batch analyses combine a
+--   floor-divided block-boundary energy budget with a within-block propagation
+--   remainder budget while changing the period, sequences, and both supplied
+--   normalized bounds
+-- counterargument checked: the theorem is not paper-local traceability and is
+--   not covered by the no-remainder block-majorant theorem; it packages the
+--   recurring composition of that transfer with an independent remainder
+--   budget under one pointwise additive majorant
+-- coverage search: queries `normalized finite sum upper bound floor division
+--   majorant plus remainder separate average bounds` and `sum upper bound of
+--   pointwise addition and normalized budgets` found the partial theorem
+--   `normalized_sum_le_period_mul_of_floor_div_majorant` and unrelated
+--   finite-average bounds, but no theorem with the combined contract
+-- minimal hypotheses: positivity of the period, nonnegativity of the block
+--   coefficient and block sequence on the finite horizon, the pointwise
+--   additive majorant, and the two normalized bounds are all used; global
+--   nonnegativity and the source's common `alpha ^ 2` factor are removed
+
+/-- A floor-divided block majorant plus a remainder inherits the sum of their
+normalized finite-horizon budgets.
+
+Layer: Glue | Gap: Level 1 (normalized floor-division majorant with remainder)
+Proof: apply `normalized_sum_le_period_mul_of_floor_div_majorant` to the block
+  component, sum the pointwise additive majorant, and add the independent
+  normalized remainder bound.
+Source: Mathlib ordered finite sums and ordered-semifield arithmetic, together
+  with the normalized floor-division block-majorant aggregation theorem
+Used in: periodic, epoch, and mini-batch stochastic-process estimates that add
+  a within-block propagation remainder to a transferred block-boundary energy
+  budget
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/14/proof/6
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+  Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem normalized_sum_le_period_mul_add_of_floor_div_majorant
+    {K : Type*} [Semifield K] [LinearOrder K] [IsStrictOrderedRing K]
+    (p T : ℕ) (f g r : ℕ → K) (A B R : K)
+    (hp : 0 < p)
+    (hA_nonneg : 0 ≤ A)
+    (hg_nonneg : ∀ k < T, 0 ≤ g k)
+    (hmajorant : ∀ t < T, f t ≤ A * g (t / p) + r t)
+    (hblock :
+      ((T : K)⁻¹) * Finset.sum (Finset.range T) g ≤ B)
+    (hremainder :
+      ((T : K)⁻¹) * Finset.sum (Finset.range T) r ≤ R) :
+    ((T : K)⁻¹) * Finset.sum (Finset.range T) f ≤
+      (A * (p : K)) * B + R := by
+  classical
+  let fblock : ℕ → K := fun t => A * g (t / p)
+  have hfblock_bound :
+      ((T : K)⁻¹) * Finset.sum (Finset.range T) fblock ≤
+        (A * (p : K)) * B := by
+    exact
+      normalized_sum_le_period_mul_of_floor_div_majorant
+        p T fblock g A B hp hA_nonneg hg_nonneg
+          (fun _t _ht => le_rfl) hblock
+  have hsum :
+      Finset.sum (Finset.range T) f ≤
+        Finset.sum (Finset.range T) fblock +
+          Finset.sum (Finset.range T) r := by
+    calc
+      Finset.sum (Finset.range T) f ≤
+          Finset.sum (Finset.range T) (fun t => fblock t + r t) := by
+            exact Finset.sum_le_sum fun t ht =>
+              hmajorant t (by simpa using ht)
+      _ = Finset.sum (Finset.range T) fblock +
+            Finset.sum (Finset.range T) r := by
+            rw [Finset.sum_add_distrib]
+  have hTinv_nonneg : 0 ≤ (T : K)⁻¹ :=
+    inv_nonneg.mpr (Nat.cast_nonneg' T)
+  calc
+    ((T : K)⁻¹) * Finset.sum (Finset.range T) f ≤
+        ((T : K)⁻¹) *
+          (Finset.sum (Finset.range T) fblock +
+            Finset.sum (Finset.range T) r) :=
+          mul_le_mul_of_nonneg_left hsum hTinv_nonneg
+    _ = ((T : K)⁻¹) * Finset.sum (Finset.range T) fblock +
+          ((T : K)⁻¹) * Finset.sum (Finset.range T) r := by
+          rw [mul_add]
+    _ ≤ (A * (p : K)) * B + R :=
+          add_le_add hfblock_bound hremainder
+
+
+/-! Promoted from Staging/sum_range_smul_eq_terminal_add_partial_sum_smul_sub_succ.lean. -/
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: finite Abel summation with scalar partial sums and an explicit
+--   terminal term; orig was `sum_range_smul_eq_terminal_add_abel`, renamed
+--   `sum_range_smul_eq_terminal_add_partial_sum_smul_sub_succ` to expose the
+--   conclusion and the orientation of the partial sums.
+-- generality used: an arbitrary semiring `R`, additive commutative group `E`,
+--   and `R`-module structure; no norm, inner product, completeness,
+--   finite-dimensionality, measure, convexity, smoothness, or oracle assumptions.
+-- portable call pattern: finite-horizon recurrence, oscillatory-sum, consensus,
+--   and distributed-optimization proofs vary the coefficient stream, vector
+--   stream, scalar ring, and horizon while retaining the same endpoint-explicit
+--   Abel identity.
+-- counterargument checked: this is not paper-local traceability or a caller-side
+--   expression; it packages a nontrivial induction and has the dual orientation
+--   to Mathlib's `Finset.sum_range_by_parts`, accumulating scalar coefficients
+--   and differencing vectors rather than accumulating vectors and differencing
+--   scalar coefficients.
+-- coverage search: queries "finite sum scalar multiplication equals terminal
+--   partial sum plus partial sums adjacent differences", "sum range partial
+--   sums adjacent differences terminal", and semantic Abel-summation searches
+--   found Mathlib's `Finset.sum_Ico_by_parts`, `Finset.sum_Ioc_by_parts`, and
+--   `Finset.sum_range_by_parts`; their full signatures have the opposite partial-
+--   sum orientation. SOptLib's `sum_Icc_coeff_mul_shifted_sub_eq_sum_coeff_sub_mul_sub_tail`
+--   is a commutative-ring scalar shifted-difference identity, not this
+--   module-valued range identity.
+-- minimal hypotheses: `Semiring R` supplies finite coefficient sums and their
+--   scalar action, while `AddCommGroup E` supplies adjacent differences; all
+--   source normed, inner-product, completeness, and finite-dimensional assumptions
+--   are unused.
+
+/-- A scalar-weighted finite range sum is its total coefficient times the last
+vector plus scalar partial sums times adjacent vector differences.
+
+Layer: Glue | Gap: Level 1 (endpoint-explicit module-valued Abel summation)
+Proof: induct on the range length, split the terminal summand and terminal
+partial-sum term, then normalize the resulting module expression.
+Source: Mathlib finite big operators and semiring module algebra, in the dual
+orientation to `Finset.sum_range_by_parts`
+Used in: periodic push-pull phase-error decomposition, where a zero-sum centered
+influence sequence cancels the terminal term and leaves adjacent gradient-table
+differences weighted by influence partial sums
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/6/proof/9
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem sum_range_smul_eq_terminal_add_partial_sum_smul_sub_succ
+    {R E : Type*} [Semiring R] [AddCommGroup E] [Module R E]
+    (d : ℕ → R) (z : ℕ → E) (n : ℕ) :
+    (∑ r ∈ Finset.range n, d r • z r) =
+      (∑ r ∈ Finset.range n, d r) • z (n - 1) +
+        ∑ r ∈ Finset.range (n - 1),
+          (∑ j ∈ Finset.range (r + 1), d j) • (z r - z (r + 1)) := by
+  induction n with
+  | zero => simp
+  | succ n ih =>
+      by_cases hn : n = 0
+      · subst n
+        simp
+      · have hnrepr : n = (n - 1) + 1 := by omega
+        have hpartial :
+            (∑ r ∈ Finset.range (n + 1), d r) =
+              (∑ r ∈ Finset.range n, d r) + d n := by
+          rw [Finset.sum_range_succ]
+        have habel :
+            (∑ r ∈ Finset.range n,
+              (∑ j ∈ Finset.range (r + 1), d j) •
+                (z r - z (r + 1))) =
+              (∑ r ∈ Finset.range (n - 1),
+                (∑ j ∈ Finset.range (r + 1), d j) •
+                  (z r - z (r + 1))) +
+                (∑ j ∈ Finset.range n, d j) •
+                  (z (n - 1) - z n) := by
+          conv_lhs => rw [hnrepr, Finset.sum_range_succ]
+          simp only [Nat.sub_add_cancel (Nat.one_le_iff_ne_zero.mpr hn)]
+        rw [Finset.sum_range_succ, ih, Nat.succ_sub_one, hpartial, habel]
+        simp only [add_smul, smul_sub]
+        abel
+
+/-! Promoted from Staging/ContinuousLinearEquiv_exists_transposed_bordered_equiv.lean. -/
+
+-- Generalization plan (G0):
+-- concept/name: invertibility of the coordinate transpose of a bordered operator;
+--   orig was `transposed_bordered_unit_eigenpair_jacobian_equiv`
+-- generality used: a complete nontrivially normed field, an arbitrary finite coordinate
+--   type, a square matrix, two border vectors, and an equivalence realizing the bordered map
+-- portable call pattern: finite-dimensional eigenpair and normalization arguments can vary the
+--   matrix, right/left vectors, and known bordered equivalence while reusing the same transpose step
+-- counterargument checked: this is not only a paper wrapper; it packages the nondegenerate-pairing
+--   kernel argument and the finite-dimensional continuous-equivalence upgrade for a block transpose
+-- coverage search: searches for transposed bordered operators and invertible linear-map transposes
+--   found only `Matrix.isUnit_transpose` and dual-map primitives, which do not expose this product-space
+--   bordered formula or turn an existing continuous equivalence into the required coordinate result
+-- minimal hypotheses: `CompleteSpace K` is needed by Mathlib's finite-dimensional continuity upgrade;
+--   no nonemptiness, eigenvector, eigenvalue, normalization, or spectral assumptions are used
+
+namespace ContinuousLinearEquiv
+
+/-- An invertible bordered matrix operator has an invertible coordinate transpose.
+
+The scalar/vector product pairing identifies the displayed second operator as the
+transpose of the supplied bordered equivalence.  The conclusion retains its explicit
+block formula, so callers do not need to choose coordinates on the product space.
+
+Layer: Glue | Gap: Level 1 (bordered-operator coordinate transpose invertibility)
+Proof: construct the displayed transpose as a linear endomorphism, annihilate its kernel by
+  testing against the surjective bordered equivalence under the product dot pairing, and use
+  finite-dimensional injectivity to obtain a continuous linear equivalence.
+Source: Mathlib finite dot products and matrix-vector products, together with
+  `LinearEquiv.ofInjectiveEndo` and `LinearEquiv.toContinuousLinearEquiv`
+Used in: finite-dimensional eigenbranch implicit-function arguments that transfer an
+  already-invertible right-eigenpair bordered Jacobian to its left-eigenpair transpose
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/12
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous
+  Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem exists_transposed_bordered_equiv
+    {K ι : Type*} [NontriviallyNormedField K] [CompleteSpace K] [Fintype ι]
+    (A : Matrix ι ι K) (right left : ι → K)
+    (bordered : (K × (ι → K)) ≃L[K] (K × (ι → K)))
+    (hbordered : ∀ x : K × (ι → K),
+      bordered x = (dotProduct left x.2,
+        fun i : ι => Matrix.mulVec A x.2 i - x.2 i - x.1 * right i)) :
+    ∃ e : (K × (ι → K)) ≃L[K] (K × (ι → K)),
+      ∀ x : K × (ι → K),
+        e x = (-dotProduct x.2 right,
+          fun j : ι => Matrix.vecMul x.2 A j - x.2 j + x.1 * left j) := by
+  classical
+  let T : (K × (ι → K)) →ₗ[K] (K × (ι → K)) :=
+    { toFun := fun x => (-dotProduct x.2 right,
+        fun j : ι => Matrix.vecMul x.2 A j - x.2 j + x.1 * left j)
+      map_add' := by
+        intro x y
+        ext j
+        · simp only [dotProduct, Prod.snd_add, Pi.add_apply, Prod.fst_add]
+          simp_rw [add_mul]
+          rw [Finset.sum_add_distrib]
+          ring
+        · simp only [Matrix.vecMul, dotProduct, Prod.snd_add, Pi.add_apply,
+            Prod.fst_add]
+          simp_rw [add_mul]
+          rw [Finset.sum_add_distrib]
+          ring
+      map_smul' := by
+        intro c x
+        ext j
+        · simp only [dotProduct, Prod.smul_snd, Pi.smul_apply, smul_eq_mul,
+            RingHom.id_apply]
+          change -(∑ i : ι, c * x.2 i * right i) =
+            c * -(∑ i : ι, x.2 i * right i)
+          rw [mul_neg, Finset.mul_sum]
+          apply congrArg Neg.neg
+          apply Finset.sum_congr rfl
+          intro i hi
+          ring
+        · simp only [Matrix.vecMul, dotProduct, Prod.smul_snd, Pi.smul_apply,
+            Prod.smul_fst, smul_eq_mul, RingHom.id_apply]
+          rw [show (∑ i : ι, c * x.2 i * A i j) =
+              c * ∑ i : ι, x.2 i * A i j by
+            rw [Finset.mul_sum]
+            apply Finset.sum_congr rfl
+            intro i hi
+            ring]
+          ring }
+  have hT_injective : Function.Injective T := by
+    have hker : ∀ x : K × (ι → K), T x = 0 → x = 0 := by
+      intro x hx
+      have hxfirst : -dotProduct x.2 right = 0 := congrArg Prod.fst hx
+      have hxsecond : (fun j : ι =>
+          Matrix.vecMul x.2 A j - x.2 j + x.1 * left j) = 0 :=
+        congrArg Prod.snd hx
+      have hmatrix (u v : ι → K) :
+          dotProduct u (Matrix.mulVec A v) = dotProduct (Matrix.vecMul u A) v := by
+        unfold dotProduct Matrix.mulVec Matrix.vecMul
+        calc
+          (∑ i : ι, u i * ∑ j : ι, A i j * v j) =
+              ∑ j : ι, (∑ i : ι, u i * A i j) * v j := by
+            simp_rw [Finset.mul_sum, Finset.sum_mul]
+            rw [Finset.sum_comm]
+            apply Finset.sum_congr rfl
+            intro j hj
+            apply Finset.sum_congr rfl
+            intro i hi
+            ring
+          _ = _ := rfl
+      have htranspose (z : K × (ι → K)) :
+          x.1 * dotProduct left z.2 +
+              dotProduct x.2
+                (fun i : ι => Matrix.mulVec A z.2 i - z.2 i - z.1 * right i) =
+            (-dotProduct x.2 right) * z.1 +
+              dotProduct
+                (fun j : ι => Matrix.vecMul x.2 A j - x.2 j + x.1 * left j) z.2 := by
+        change x.1 * (∑ j : ι, left j * z.2 j) +
+              ∑ i : ι, x.2 i * (Matrix.mulVec A z.2 i - z.2 i - z.1 * right i) =
+            (-∑ i : ι, x.2 i * right i) * z.1 +
+              ∑ j : ι, (Matrix.vecMul x.2 A j - x.2 j + x.1 * left j) * z.2 j
+        simp only [mul_sub, sub_mul, add_mul]
+        rw [Finset.sum_sub_distrib, Finset.sum_sub_distrib,
+          Finset.sum_add_distrib, Finset.sum_sub_distrib]
+        have hm := hmatrix x.2 z.2
+        unfold dotProduct at hm
+        rw [hm]
+        simp_rw [Finset.mul_sum]
+        rw [show (∑ i : ι, x.2 i * (z.1 * right i)) =
+            z.1 * ∑ i : ι, x.2 i * right i by
+          rw [Finset.mul_sum]
+          apply Finset.sum_congr rfl
+          intro i hi
+          ring]
+        ring_nf
+      have hpair (z : K × (ι → K)) :
+          x.1 * (bordered z).1 + dotProduct x.2 (bordered z).2 = 0 := by
+        rw [hbordered z, htranspose z, hxfirst]
+        rw [hxsecond]
+        simp [dotProduct]
+      have hxone : x.1 = 0 := by
+        have h := hpair (bordered.symm (1, 0))
+        rw [bordered.apply_symm_apply] at h
+        simpa [dotProduct] using h
+      have hxtwo : x.2 = 0 := by
+        funext i
+        have h := hpair (bordered.symm (0, fun j : ι => if j = i then 1 else 0))
+        rw [bordered.apply_symm_apply] at h
+        simpa [dotProduct] using h
+      exact Prod.ext hxone hxtwo
+    intro x y hxy
+    rw [← sub_eq_zero]
+    apply hker (x - y)
+    rw [T.map_sub, hxy, sub_self]
+  let e : (K × (ι → K)) ≃L[K] (K × (ι → K)) :=
+    (LinearEquiv.ofInjectiveEndo T hT_injective).toContinuousLinearEquiv
+  exact ⟨e, fun x => rfl⟩
+
+end ContinuousLinearEquiv
+
+/-! Promoted from Staging/exists_global_linear_bound_of_local_linear_and_uniform_bound.lean. -/
+
+-- Generalization plan (G0):
+-- concept/name: global linear bound obtained by gluing a local linear bound to
+--   a uniform bound across a positive cutoff; orig was
+--   `two_regime_linear_geometric_bound`
+-- generality used: an arbitrary index type and an arbitrary linearly ordered
+--   semifield; the response and nonnegative weight families are abstract, with no
+--   topology, norm, measure, convexity, completeness, or finite-dimensionality
+--   assumptions
+-- portable call pattern: perturbation and stability proofs first establish an
+--   `O(alpha)` response below a positive cutoff and a uniform weighted response
+--   on the full parameter interval; the response family, parameter endpoint,
+--   cutoff, weight sequence, and both coefficients may all change while the
+--   same global linear-in-parameter conclusion is obtained
+-- counterargument checked: this is not paper-local traceability or a caller-side
+--   expression because it packages a reusable two-regime division and maximum
+--   argument; it is not a pure wrapper around the linear-map shell lemmas,
+--   which require linear structure on the response rather than the two supplied
+--   pointwise bounds
+-- coverage search: queried `exists global linear bound local linear uniform
+--   bound positive cutoff maximum` and `local linear bound below a positive
+--   cutoff and uniform bound imply global linear bound`; SOptLib
+--   `Finite.exists_uniform_local_linear_bound` only uniformizes finitely many
+--   local estimates, while Mathlib `LinearMap.bound_of_ball_bound` and
+--   `LinearMap.bound_of_shell` concern linear maps and do not cover this contract
+-- minimal hypotheses: positivity of the cutoff and nonnegativity of the weights
+--   are exactly what the cutoff division and coefficient enlargements use;
+--   neither input coefficient needs a nonnegativity assumption because the
+--   uniform coefficient is first enlarged by `max Cuniform 0`
+
+/-- A local linear bound and a uniform weighted bound give one global linear
+weighted bound across a positive cutoff.
+
+For parameters at most `delta`, the local estimate is used directly. Above
+`delta`, the uniform coefficient is divided by `delta` and absorbed into the
+parameter; a maximum of the two coefficients works in both regimes.
+
+Layer: Glue | Gap: Level 1 (two-regime local-to-global linear bound)
+Proof: enlarge the uniform coefficient to be nonnegative, divide it by the positive cutoff, and take its maximum with the local coefficient; split at the cutoff and use monotonicity of multiplication by nonnegative factors.
+Source: Mathlib ordered-field division, lattice maxima, and multiplication monotonicity
+Used in: stable-impulse perturbation estimates that combine a small-stepsize linear response with a full-interval uniform geometric response
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/13/proof/7
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem exists_global_linear_bound_of_local_linear_and_uniform_bound
+    {ι R : Type*} [Semifield R] [LinearOrder R] [IsStrictOrderedRing R]
+    (response : R → ι → R) (weight : ι → R)
+    {alphaMax delta Clocal Cuniform : R}
+    (hdelta_pos : 0 < delta)
+    (hweight_nonneg : ∀ i, 0 ≤ weight i)
+    (hlocal :
+      ∀ alpha i, 0 ≤ alpha → alpha ≤ alphaMax → alpha ≤ delta →
+        response alpha i ≤ Clocal * alpha * weight i)
+    (huniform :
+      ∀ alpha i, 0 ≤ alpha → alpha ≤ alphaMax →
+        response alpha i ≤ Cuniform * weight i) :
+    ∃ C : R, 0 ≤ C ∧
+      ∀ alpha i, 0 ≤ alpha → alpha ≤ alphaMax →
+        response alpha i ≤ C * alpha * weight i := by
+  let Ctail : R := max Cuniform 0 / delta
+  let C : R := max Clocal Ctail
+  have hCuniform_le : Cuniform ≤ max Cuniform 0 := le_max_left _ _
+  have hCtail_nonneg : 0 ≤ Ctail := by
+    exact div_nonneg (le_max_right _ _) hdelta_pos.le
+  have hC_nonneg : 0 ≤ C := hCtail_nonneg.trans (le_max_right _ _)
+  refine ⟨C, hC_nonneg, ?_⟩
+  intro alpha i halpha_nonneg halpha_le
+  have hweight_i_nonneg : 0 ≤ weight i := hweight_nonneg i
+  have hfactor_nonneg : 0 ≤ alpha * weight i :=
+    mul_nonneg halpha_nonneg hweight_i_nonneg
+  by_cases hlocal_alpha : alpha ≤ delta
+  · calc
+      response alpha i ≤ Clocal * alpha * weight i :=
+        hlocal alpha i halpha_nonneg halpha_le hlocal_alpha
+      _ = Clocal * (alpha * weight i) := by ring
+      _ ≤ C * (alpha * weight i) :=
+        mul_le_mul_of_nonneg_right (le_max_left Clocal Ctail) hfactor_nonneg
+      _ = C * alpha * weight i := by ring
+  · have hdelta_le_alpha : delta ≤ alpha :=
+      le_of_lt (lt_of_not_ge hlocal_alpha)
+    have hcutoff_coef : max Cuniform 0 ≤ Ctail * alpha := by
+      have hquot_nonneg : 0 ≤ max Cuniform 0 / delta :=
+        div_nonneg (le_max_right _ _) hdelta_pos.le
+      calc
+        max Cuniform 0 = (max Cuniform 0 / delta) * delta := by
+          field_simp [ne_of_gt hdelta_pos]
+        _ ≤ (max Cuniform 0 / delta) * alpha :=
+          mul_le_mul_of_nonneg_left hdelta_le_alpha hquot_nonneg
+        _ = Ctail * alpha := by rfl
+    calc
+      response alpha i ≤ Cuniform * weight i :=
+        huniform alpha i halpha_nonneg halpha_le
+      _ ≤ max Cuniform 0 * weight i :=
+        mul_le_mul_of_nonneg_right hCuniform_le hweight_i_nonneg
+      _ ≤ (Ctail * alpha) * weight i :=
+        mul_le_mul_of_nonneg_right hcutoff_coef hweight_i_nonneg
+      _ = Ctail * (alpha * weight i) := by ring
+      _ ≤ C * (alpha * weight i) :=
+        mul_le_mul_of_nonneg_right (le_max_right Clocal Ctail) hfactor_nonneg
+      _ = C * alpha * weight i := by ring
+
+/-! Promoted from Staging/Matrix_vecMul_pos_of_nonneg_of_pos_diagonal.lean. -/
+
+-- Generalization plan (G0):
+-- concept/name: strict-positivity preservation by right multiplication with a nonnegative matrix having a positive diagonal; orig was vecMul_pos_of_nonneg_of_positiveDiagonal.
+-- generality used: arbitrary finite row-index type and scalar non-unital non-associative semiring with a preorder, additive monotonicity, nonnegative-product monotonicity, and strict positivity of products; no stochasticity, normalization, connectivity, measure, topology, norm, convexity, smoothness, oracle, or finite-dimensional assumptions.
+-- portable call pattern: finite-state Markov, consensus, gossip, and Perron proofs change the finite state type, ordered scalar type, nonnegative transition or mixing matrix, and strictly positive row while using the same coordinatewise strict-positivity conclusion after one `Matrix.vecMul` step.
+-- counterargument checked: this is not paper-local traceability or a pure wrapper; it combines positivity of the diagonal contribution with nonnegativity of every summand to derive strict positivity of the full finite sum, and neither Mathlib nor SOptLib provides that one-step contract.
+-- coverage search: `lean_search_symbols` queries "matrix vecMul coordinatewise positive vector nonnegative entries positive diagonal strictly positive" and "vecMul strictly positive nonnegative positive diagonal" found only the distinct irreducible stationary-vector theorem and positive-diagonal product closure; LeanSearch for the full preservation contract found `Matrix.vecMul` and diagonal-matrix formulas but no theorem with this conclusion, so coverage is partial.
+-- minimal hypotheses: `[Fintype Node]` forms each finite dot product; `[NonUnitalNonAssocSemiring R] [Preorder R] [AddLeftMono R] [PosMulMono R]` prove all summands nonnegative, and `[PosMulStrictMono R]` makes the self-indexed summand positive; decidable equality is introduced only inside the proof.
+
+/-- A nonnegative square matrix with positive diagonal maps a coordinatewise
+strictly positive row vector to a coordinatewise strictly positive row vector.
+
+Layer: Glue | Gap: Level 1 (strict-positivity preservation by finite matrix row action)
+Proof: at each output coordinate, select the diagonal summand; it is strictly positive, while every summand in the defining finite dot product is nonnegative, so the selected term is bounded by the full sum.
+Source: Mathlib finite matrix row multiplication (`Matrix.vecMul`), ordered-semiring multiplication, and `Finset.single_le_sum`
+Used in: finite-state Markov, consensus, and periodic Perron constructions that transport positive weights through one nonnegative mixing step with positive self-weights
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/assumptions/9
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem Matrix.vecMul_pos_of_nonneg_of_pos_diagonal
+    {Node R : Type*} [Fintype Node]
+    [NonUnitalNonAssocSemiring R] [Preorder R] [AddLeftMono R]
+    [PosMulMono R] [PosMulStrictMono R]
+    (A : Matrix Node Node R) (x : Node -> R)
+    (hA_nonneg : forall i j : Node, 0 <= A i j)
+    (hA_diag : forall i : Node, 0 < A i i)
+    (hx_pos : forall i : Node, 0 < x i) :
+    forall j : Node, 0 < Matrix.vecMul x A j := by
+  classical
+  intro j
+  have hterm : 0 < x j * A j j := mul_pos (hx_pos j) (hA_diag j)
+  have hle : x j * A j j <= ∑ i : Node, x i * A i j := by
+    exact Finset.single_le_sum
+      (fun i _ => mul_nonneg (hx_pos i).le (hA_nonneg i j))
+      (Finset.mem_univ j)
+  exact hterm.trans_le (by simpa [Matrix.vecMul, dotProduct] using hle)
+
+/-! Promoted from Staging/norm_sq_finset_sum_smul_le_sum_sq_mul_sum_norm_sq.lean. -/
+
+open scoped BigOperators
+
+-- Generalization plan (G0):
+-- concept/name: norm_sq_finset_sum_smul_le_sum_sq_mul_sum_norm_sq exposes the
+--   weighted finite-vector Cauchy--Schwarz inequality; orig was
+--   weightedState_sq_le_rowNormSq_mul_frobeniusNormSq.
+-- generality used: an arbitrary finite index set, a seminormed additive
+--   commutative group, and a real normed-space structure; no inner product,
+--   completeness, finite-dimensionality, or ambient Fintype is used.
+-- portable call pattern: distributed averaging, ensemble aggregation, and
+--   finite-batch proofs bound a real-weighted vector sum while changing the
+--   index set, scalar weights, and vector family.
+-- counterargument checked: this is not paper-local notation or a pure wrapper;
+--   Mathlib supplies the scalar Cauchy--Schwarz inequality but not its
+--   composition with the norm bound for a weighted vector sum.
+-- coverage search: symbol queries for `norm finset sum smul upper bound Cauchy
+--   Schwarz` found only SOptLib's equal-weight finite-average specialization;
+--   LeanSearch found Mathlib `Finset.sum_mul_sq_le_sq_mul_sq`, which is the
+--   scalar final step and does not cover the vector-valued conclusion.
+-- minimal hypotheses: all already minimal for real scalar multiplication and
+--   the seminorm triangle inequality.
+
+/-- The squared norm of a finite real-weighted vector sum is bounded by the
+product of the scalar squared-weight energy and the vector squared-norm energy.
+
+Layer: Glue | Gap: Level 1 (weighted finite-vector Cauchy--Schwarz bound)
+Proof: bound the norm of the vector sum by the sum of the weighted component
+  norms, square that inequality, and apply `Finset.sum_mul_sq_le_sq_mul_sq`.
+Source: Mathlib seminormed-module finite-sum triangle inequality and finite-sum Cauchy--Schwarz inequality
+Used in: distributed consensus weighted-center bounds and finite ensemble or mini-batch aggregation estimates
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/6/proof/15
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem norm_sq_finset_sum_smul_le_sum_sq_mul_sum_norm_sq
+    {ι E : Type*} [SeminormedAddCommGroup E] [NormedSpace ℝ E]
+    (s : Finset ι) (a : ι → ℝ) (x : ι → E) :
+    ‖∑ i ∈ s, a i • x i‖ ^ 2 ≤
+      (∑ i ∈ s, a i ^ 2) * ∑ i ∈ s, ‖x i‖ ^ 2 := by
+  classical
+  have hnorm :
+      ‖∑ i ∈ s, a i • x i‖ ≤ ∑ i ∈ s, |a i| * ‖x i‖ := by
+    calc
+      ‖∑ i ∈ s, a i • x i‖ ≤ ∑ i ∈ s, ‖a i • x i‖ :=
+        norm_sum_le _ _
+      _ = ∑ i ∈ s, |a i| * ‖x i‖ := by
+        apply Finset.sum_congr rfl
+        intro i _hi
+        rw [norm_smul, Real.norm_eq_abs]
+  have hsum_nonneg : 0 ≤ ∑ i ∈ s, |a i| * ‖x i‖ := by positivity
+  have hsquare :=
+    (sq_le_sq₀ (norm_nonneg _) hsum_nonneg).2 hnorm
+  exact hsquare.trans (by
+    simpa [sq_abs] using
+      (Finset.sum_mul_sq_le_sq_mul_sq s (fun i => |a i|) (fun i => ‖x i‖)))
+
+/-! Promoted from Staging/Matrix_neumann_resolvent_remainder_entry_norm_le_on_sphere.lean. -/
+
+open scoped Matrix.Norms.Operator
+
+-- Generalization plan (G0):
+-- concept/name: entrywise geometric bound for a finite Neumann resolvent
+--   remainder on a sphere; orig was `zero_center_neumann_remainder_entry_norm_bound`
+-- generality used: an arbitrary finite coordinate type, a square matrix over a
+--   normed field, a sphere radius, a uniform resolvent bound, and a truncation index;
+--   no algorithm setup, real-matrix origin, measure, or finite-dimensional carrier
+-- portable call pattern: matrix Cauchy-power, transfer-operator, and stable-system
+--   proofs can change the matrix, contour radius, uniform inverse bound, truncation,
+--   and selected coordinates while retaining the same geometric tail estimate
+-- counterargument checked: this is not paper-local traceability or a one-line
+--   wrapper; it composes entrywise control, operator-norm submultiplicativity,
+--   power control, and the sphere identity into the reusable Neumann-tail bound
+-- coverage search: symbol queries for `matrix Neumann resolvent remainder entry
+--   norm upper bound on sphere` and `matrix product entry norm bounded by operator
+--   norm product`, plus Mathlib semantic search, found only the component results
+--   `Matrix.norm_entry_le_linfty_opNorm`, `Matrix.linfty_opNorm_mul`, and
+--   `norm_pow_le`; no Mathlib or SOptLib declaration states the complete contract
+-- minimal hypotheses: `Fintype`, `DecidableEq`, and `NormedField` suffice;
+--   nonnegativity of the bound follows pointwise, while positivity of the radius
+--   and a real-matrix origin from the source are unused
+
+namespace Matrix
+
+/-- An entry of the finite Neumann resolvent remainder on a sphere is bounded
+by the uniform resolvent norm times the corresponding geometric power.
+
+Layer: Glue | Gap: Level 1 (entrywise Neumann resolvent tail on a sphere)
+Proof: bound the selected entry by the induced `L∞` operator norm, apply
+  submultiplicativity and the matrix-power norm bound, then use the sphere
+  identity to rewrite the inverse scalar power as a radius power.
+Source: Mathlib finite-matrix induced `L∞` operator norms, nonsingular matrix inverses, and normed-ring power inequalities
+Used in: matrix Cauchy-power and stable-resolvent arguments that turn a uniform contour resolvent bound into a coordinatewise geometric truncation estimate
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/12/proof/3
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem neumann_resolvent_remainder_entry_norm_le_on_sphere
+    {ι 𝕜 : Type*} [Fintype ι] [DecidableEq ι] [NormedField 𝕜]
+    (A : Matrix ι ι 𝕜) (R M : ℝ)
+    (hM_bound :
+      ∀ z : 𝕜, ‖z‖ = R →
+        ‖(z • (1 : Matrix ι ι 𝕜) - A)⁻¹‖ ≤ M)
+    (N : ℕ) (i k : ι) :
+    ∀ z ∈ Metric.sphere (0 : 𝕜) R,
+      ‖(((z⁻¹) ^ (N + 1) •
+          ((z • (1 : Matrix ι ι 𝕜) - A)⁻¹ * A ^ (N + 1))) i k)‖ ≤
+        M * (‖A‖ / R) ^ (N + 1) := by
+  intro z hzSphere
+  have hz_norm : ‖z‖ = R := by
+    simpa [Metric.mem_sphere, dist_eq_norm] using hzSphere
+  have hscalar_norm :
+      ‖(z⁻¹) ^ (N + 1)‖ = (R⁻¹) ^ (N + 1) := by
+    rw [norm_pow, norm_inv, hz_norm]
+  have hM_nonneg : 0 ≤ M :=
+    (norm_nonneg ((z • (1 : Matrix ι ι 𝕜) - A)⁻¹)).trans
+      (hM_bound z hz_norm)
+  let Rz : Matrix ι ι 𝕜 := (z • (1 : Matrix ι ι 𝕜) - A)⁻¹
+  have hentry :
+      ‖(Rz * A ^ (N + 1)) i k‖ ≤ ‖Rz * A ^ (N + 1)‖ :=
+    Matrix.norm_entry_le_linfty_opNorm (Rz * A ^ (N + 1)) i k
+  have hprod :
+      ‖Rz * A ^ (N + 1)‖ ≤ M * ‖A‖ ^ (N + 1) := by
+    have hmul : ‖Rz * A ^ (N + 1)‖ ≤ ‖Rz‖ * ‖A ^ (N + 1)‖ :=
+      Matrix.linfty_opNorm_mul Rz (A ^ (N + 1))
+    have hpow : ‖A ^ (N + 1)‖ ≤ ‖A‖ ^ (N + 1) :=
+      norm_pow_le' A (Nat.zero_lt_succ N)
+    have hRz_bound : ‖Rz‖ ≤ M := by
+      simpa [Rz] using hM_bound z hz_norm
+    exact hmul.trans
+      (mul_le_mul hRz_bound hpow (norm_nonneg _) hM_nonneg)
+  have hentry_prod :
+      ‖(Rz * A ^ (N + 1)) i k‖ ≤ M * ‖A‖ ^ (N + 1) :=
+    hentry.trans hprod
+  calc
+    ‖(((z⁻¹) ^ (N + 1) • (Rz * A ^ (N + 1))) i k)‖ =
+        ‖(z⁻¹) ^ (N + 1)‖ * ‖(Rz * A ^ (N + 1)) i k‖ := by
+          simp
+    _ ≤ ‖(z⁻¹) ^ (N + 1)‖ * (M * ‖A‖ ^ (N + 1)) :=
+      mul_le_mul_of_nonneg_left hentry_prod (norm_nonneg _)
+    _ = M * (‖A‖ / R) ^ (N + 1) := by
+      rw [hscalar_norm, div_eq_mul_inv, mul_pow]
+      ring
+
+end Matrix
+
+/-! Promoted from
+`Staging/norm_sq_finset_sum_weighted_family_le_product_energies.lean` and
+`Staging/norm_sq_finset_sum_weighted_map_sub_le_weight_energy_mul_lipschitz_sq_mul_state_energy.lean`. -/
+
+open scoped BigOperators
+
+/-- The squared norm of a finite sum of independently weighted finite vector
+families is bounded by the product of their total scalar and vector energies.
+
+Layer: Glue | Gap: Level 1 (nested weighted-family product-energy bound)
+Proof: flatten the outer finite set and inner finite type to their product and
+  apply the weighted finite-vector Cauchy--Schwarz inequality.
+Source: Mathlib finite-set products and finite-sum Cauchy--Schwarz, via
+  `norm_sq_finset_sum_smul_le_sum_sq_mul_sum_norm_sq`
+Used in: periodic distributed-gradient Abel bounds and block or mini-batch
+  aggregation steps that must avoid an extra outer-cardinality factor
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/6/proof
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed
+Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem norm_sq_finset_sum_weighted_family_le_product_energies
+    {ρ ι E : Type*} [Fintype ι]
+    [SeminormedAddCommGroup E] [NormedSpace ℝ E]
+    (s : Finset ρ) (a : ρ → ι → ℝ) (x : ρ → ι → E) :
+    ‖∑ r ∈ s, ∑ i, a r i • x r i‖ ^ 2 ≤
+      (∑ r ∈ s, ∑ i, a r i ^ 2) *
+        ∑ r ∈ s, ∑ i, ‖x r i‖ ^ 2 := by
+  classical
+  simpa [Finset.sum_product] using
+    (norm_sq_finset_sum_smul_le_sum_sq_mul_sum_norm_sq
+      (s := s.product (Finset.univ : Finset ι))
+      (a := fun ri : ρ × ι => a ri.1 ri.2)
+      (x := fun ri : ρ × ι => x ri.1 ri.2))
+
+/-- A finite sum of weighted coordinatewise map differences has squared norm at
+most the total squared-weight energy times the squared common Lipschitz bound
+times the total squared input-difference energy.
+
+Layer: Glue | Gap: Level 1 (weighted coordinatewise Lipschitz difference energy bound)
+Proof: apply the nested weighted-family Cauchy--Schwarz bound, square and sum the pointwise map estimates, then multiply by the nonnegative weight energy.
+Source: Mathlib finite-sum order and norm-square inequalities, via `norm_sq_finset_sum_weighted_family_le_product_energies`
+Used in: periodic distributed-gradient Abel terms and block or control residuals where weighted transformed state increments must be charged to input displacement energy without an extra phase-cardinality factor
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/6/proof/13
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, TimeVaryingStochasticPushPull -/
+theorem norm_sq_finset_sum_weighted_map_sub_le_weight_energy_mul_lipschitz_sq_mul_state_energy
+    {rho iota E F : Type*} [Fintype iota]
+    [SeminormedAddGroup E]
+    [SeminormedAddCommGroup F] [NormedSpace Real F]
+    (s : Finset rho) (w : rho -> iota -> Real) (f : iota -> E -> F)
+    (X Y : rho -> iota -> E) (L : Real)
+    (hL : 0 <= L)
+    (hf : forall r, r ∈ s -> forall i,
+      ‖f i (X r i) - f i (Y r i)‖ <= L * ‖X r i - Y r i‖) :
+    ‖∑ r ∈ s, ∑ i, w r i • (f i (X r i) - f i (Y r i))‖ ^ 2 <=
+      (∑ r ∈ s, ∑ i, w r i ^ 2) * L ^ 2 *
+        ∑ r ∈ s, ∑ i, ‖X r i - Y r i‖ ^ 2 := by
+  classical
+  have hweighted := norm_sq_finset_sum_weighted_family_le_product_energies
+    s w (fun r i => f i (X r i) - f i (Y r i))
+  have hmap :
+      (∑ r ∈ s, ∑ i, ‖f i (X r i) - f i (Y r i)‖ ^ 2) <=
+        L ^ 2 * ∑ r ∈ s, ∑ i, ‖X r i - Y r i‖ ^ 2 := by
+    rw [Finset.mul_sum]
+    apply Finset.sum_le_sum
+    intro r hr
+    rw [Finset.mul_sum]
+    apply Finset.sum_le_sum
+    intro i _hi
+    have hsq := (sq_le_sq₀ (norm_nonneg _)
+      (mul_nonneg hL (norm_nonneg _))).2 (hf r hr i)
+    simpa [mul_pow] using hsq
+  calc
+    ‖∑ r ∈ s, ∑ i, w r i • (f i (X r i) - f i (Y r i))‖ ^ 2 <=
+        (∑ r ∈ s, ∑ i, w r i ^ 2) *
+          ∑ r ∈ s, ∑ i, ‖f i (X r i) - f i (Y r i)‖ ^ 2 := hweighted
+    _ <= (∑ r ∈ s, ∑ i, w r i ^ 2) *
+          (L ^ 2 * ∑ r ∈ s, ∑ i, ‖X r i - Y r i‖ ^ 2) :=
+      mul_le_mul_of_nonneg_left hmap (by positivity)
+    _ = _ := by ring

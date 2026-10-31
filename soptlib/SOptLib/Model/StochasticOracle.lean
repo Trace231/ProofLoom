@@ -10,6 +10,9 @@ import SOptLib.Model.Filtration
 import SOptLib.Model.Iterates
 import SOptLib.Model.Selection
 import Mathlib.Analysis.InnerProductSpace.Basic
+import SOptLib.Model.ConditionalExpectation
+import SOptLib.Model.Objective
+import SOptLib.Model.BlockSampling
 
 open MeasureTheory ProbabilityTheory
 open scoped BigOperators ENNReal InnerProductSpace
@@ -3823,5 +3826,636 @@ theorem finiteComponentInitialGradientSecondMomentBound_def
             sigma0 ^ 2 ∧
         0 ≤ sigma0 := by
   rfl
+
+end SOptLib
+
+-- Phase 4 merged from focused staging declarations.
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: adaptive centered oracle residual process; orig was
+--   `AdaptiveOracleProcess`, renamed to `AdaptiveCenteredOracleProcess` to
+--   expose the paper-free time-indexed residual process contract.
+-- generality used: arbitrary measurable sample space, arbitrary time index,
+--   arbitrary real Banach-valued residuals with a measurable-space structure,
+--   arbitrary base measure, past/current sigma-algebras, residual process, and
+--   time-dependent variance budget; no objective, gradient, convexity,
+--   smoothness, independence, probability, or finite-dimensional assumption is
+--   used by the predicate itself.
+-- portable call pattern: adaptive stochastic gradient, mirror-descent,
+--   variance-reduction, and stochastic approximation proofs can supply their
+--   residual process, strict-past and current-observation sigma-algebras, base
+--   law, and variance budget while keeping the conditional centering,
+--   second-moment, and observability conclusions unchanged.
+-- counterargument checked: not merely paper traceability because downstream
+--   martingale-noise proofs repeatedly pass exactly this three-part process
+--   boundary; not a pure wrapper over Mathlib because Mathlib has no
+--   stochastic-optimization residual-process predicate bundling these fields.
+-- coverage search: searched `conditional expectation equality mean zero
+--   process second moment measurable`, `adaptive centered residual process
+--   conditional mean zero second moment observability`, `expectationLe squared
+--   norm second moment bound`, and CATALOG/SOptLib/Staging for centered
+--   residual process terms; relevant hits were
+--   `SOptLib.ConditionalExpectation.conditionalExpectationEq`,
+--   `SOptLib.expectationLe`, and several mini-batch second-moment theorems,
+--   none of which packages this process-level contract.
+-- minimal hypotheses: kept only the typeclasses required by
+--   `conditionalExpectationEq`, squared norms, and `Measurable`; probability,
+--   Hilbert, finite-dimensional, oracle-kernel, and objective assumptions were
+--   dropped.
+
+/-- Time-indexed centered residual process with conditional mean zero,
+second-moment control, and current-observation measurability.
+
+For each time `t`, the residual `delta t` has conditional expectation zero with
+respect to the past sigma-algebra, its squared norm has expectation at most
+`varianceBound t`, and the residual is observable at the current sigma-algebra.
+
+Layer: Model | Concept: Adaptive centered oracle process
+Proof: (definitional construction; bundles conditional centering,
+  second-moment bounds, and current-observation measurability for a residual
+  process)
+Source: Mathlib conditional expectation, Bochner expectation, norm, and
+  measurability APIs as wrapped by SOptLib conditional-expectation and
+  expectation-bound predicates
+Used in: stochastic accelerated-gradient martingale-noise setup where generated
+  oracle errors are projected into conditional centering, variance, and
+  observability facts
+Book citation: book/FOML/NonconvexStochasticAcceleratedGD.json#/assumptions/3
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic accelerated gradient descent
+  (Algorithm 6.4 and Theorem 6.12) -/
+def AdaptiveCenteredOracleProcess
+    {Ω T E : Type*} [MeasurableSpace Ω]
+    [NormedAddCommGroup E] [NormedSpace ℝ E] [CompleteSpace E] [MeasurableSpace E]
+    (μ : Measure Ω) (past current : T → MeasurableSpace Ω)
+    (delta : T → Ω → E) (varianceBound : T → ℝ) : Prop :=
+  (∀ t : T,
+    ConditionalExpectation.conditionalExpectationEq μ (past t) (delta t) (0 : Ω → E)) ∧
+  (∀ t : T, expectationLe μ (fun ω => ‖delta t ω‖ ^ 2) (varianceBound t)) ∧
+  (∀ t : T, Measurable[current t] (delta t))
+
+/-- The adaptive centered oracle process predicate unfolds to conditional
+centering, second-moment control, and current-observation measurability at every
+time.
+
+Layer: Model | Gap: Level 0 (adaptive centered residual process unfolding)
+Proof: by rfl after unfolding `AdaptiveCenteredOracleProcess`.
+Source: Mathlib conditional expectation, Bochner expectation, norm, and
+  measurability APIs as wrapped by SOptLib conditional-expectation and
+  expectation-bound predicates
+Used in: exposing stochastic accelerated-gradient generated oracle errors as
+  separate martingale-noise hypotheses
+Book citation: book/FOML/NonconvexStochasticAcceleratedGD.json#/assumptions/3
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic accelerated gradient descent
+  (Algorithm 6.4 and Theorem 6.12) -/
+@[simp]
+theorem AdaptiveCenteredOracleProcess_def
+    {Ω T E : Type*} [MeasurableSpace Ω]
+    [NormedAddCommGroup E] [NormedSpace ℝ E] [CompleteSpace E] [MeasurableSpace E]
+    (μ : Measure Ω) (past current : T → MeasurableSpace Ω)
+    (delta : T → Ω → E) (varianceBound : T → ℝ) :
+    AdaptiveCenteredOracleProcess μ past current delta varianceBound ↔
+      (∀ t : T,
+        ConditionalExpectation.conditionalExpectationEq μ (past t) (delta t)
+          (0 : Ω → E)) ∧
+      (∀ t : T, expectationLe μ (fun ω => ‖delta t ω‖ ^ 2) (varianceBound t)) ∧
+      (∀ t : T, Measurable[current t] (delta t)) := by
+  rfl
+
+end SOptLib
+
+-- Phase 4 batch 1 merge from Staging/splitBlockOracleRunSample.lean (law)
+namespace SOptLib
+
+/-- The canonical split block/oracle run law.
+
+For a block-index marginal `blockLaw` and an oracle-sample marginal
+`oracleLaw`, this is the product of the iid block stream law and the iid oracle
+stream law on `split_block_oracle_run_sample I S`.
+
+Layer: Model | Concept: split block/oracle run law
+Proof: (definitional construction; product of two iid Nat-indexed stream laws)
+Source: SOptLib iid stream law and Mathlib product measure APIs
+Used in: stochastic block mirror descent construction of a run law from independent block-index and oracle-sample streams
+Book citation: book/book/FOML/NonconvexStochasticBlockMirrorDescent.json#/algorithm_spec/steps/1
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for Machine Learning, nonconvex stochastic block mirror descent -/
+noncomputable def split_block_oracle_run_law
+    {I S : Type*} [MeasurableSpace I] [MeasurableSpace S]
+    (blockLaw : Measure I) (oracleLaw : Measure S) :
+    Measure (split_block_oracle_run_sample I S) :=
+  (iidStreamLaw blockLaw).prod (iidStreamLaw oracleLaw)
+
+/-- The split block/oracle run law unfolds to the product of the two iid stream laws. -/
+@[simp]
+theorem split_block_oracle_run_law_def
+    {I S : Type*} [MeasurableSpace I] [MeasurableSpace S]
+    (blockLaw : Measure I) (oracleLaw : Measure S) :
+    split_block_oracle_run_law blockLaw oracleLaw =
+      (iidStreamLaw blockLaw).prod (iidStreamLaw oracleLaw) := rfl
+
+/-- The split block/oracle run law is a probability measure when both marginals are. -/
+@[instance]
+theorem split_block_oracle_run_law_is_probability_measure
+    {I S : Type*} [MeasurableSpace I] [MeasurableSpace S]
+    (blockLaw : Measure I) (oracleLaw : Measure S)
+    [IsProbabilityMeasure blockLaw] [IsProbabilityMeasure oracleLaw] :
+    IsProbabilityMeasure (split_block_oracle_run_law blockLaw oracleLaw) := by
+  unfold split_block_oracle_run_law
+  infer_instance
+
+/-- The first stream projection of the split run law has the iid block-stream law. -/
+theorem split_block_oracle_run_law_map_fst
+    {I S : Type*} [MeasurableSpace I] [MeasurableSpace S]
+    (blockLaw : Measure I) (oracleLaw : Measure S)
+    [IsProbabilityMeasure oracleLaw] :
+    Measure.map Prod.fst (split_block_oracle_run_law blockLaw oracleLaw) =
+      iidStreamLaw blockLaw := by
+  rw [split_block_oracle_run_law_def, Measure.map_fst_prod, measure_univ, one_smul]
+
+/-- The second stream projection of the split run law has the iid oracle-stream law. -/
+theorem split_block_oracle_run_law_map_snd
+    {I S : Type*} [MeasurableSpace I] [MeasurableSpace S]
+    (blockLaw : Measure I) (oracleLaw : Measure S)
+    [IsProbabilityMeasure blockLaw] :
+    Measure.map Prod.snd (split_block_oracle_run_law blockLaw oracleLaw) =
+      iidStreamLaw oracleLaw := by
+  classical
+  haveI : SFinite (iidStreamLaw oracleLaw) := by
+    unfold iidStreamLaw
+    by_cases h : ∀ _ : ℕ, IsProbabilityMeasure oracleLaw
+    · letI : ∀ _ : ℕ, IsProbabilityMeasure oracleLaw := h
+      infer_instance
+    · rw [Measure.infinitePi, dif_neg h]
+      infer_instance
+  rw [split_block_oracle_run_law_def, Measure.map_snd_prod, measure_univ, one_smul]
+
+/-- Every block coordinate `ω.1 k` has marginal law `blockLaw`. -/
+theorem split_block_oracle_run_law_map_block_eval
+    {I S : Type*} [MeasurableSpace I] [MeasurableSpace S]
+    (blockLaw : Measure I) (oracleLaw : Measure S)
+    [IsProbabilityMeasure blockLaw] [IsProbabilityMeasure oracleLaw] (k : Nat) :
+    Measure.map (fun omega : split_block_oracle_run_sample I S => omega.1 k)
+        (split_block_oracle_run_law blockLaw oracleLaw) = blockLaw := by
+  change Measure.map ((fun stream : Nat -> I => stream k) ∘ Prod.fst)
+      (split_block_oracle_run_law blockLaw oracleLaw) = blockLaw
+  rw [← Measure.map_map]
+  · rw [split_block_oracle_run_law_map_fst]
+    exact iidStreamLaw_map_eval blockLaw k
+  · exact measurable_pi_apply k
+  · exact measurable_fst
+
+/-- Every oracle coordinate `ω.2 k` has marginal law `oracleLaw`. -/
+theorem split_block_oracle_run_law_map_oracle_eval
+    {I S : Type*} [MeasurableSpace I] [MeasurableSpace S]
+    (blockLaw : Measure I) (oracleLaw : Measure S)
+    [IsProbabilityMeasure blockLaw] [IsProbabilityMeasure oracleLaw] (k : Nat) :
+    Measure.map (fun omega : split_block_oracle_run_sample I S => omega.2 k)
+        (split_block_oracle_run_law blockLaw oracleLaw) = oracleLaw := by
+  change Measure.map ((fun stream : Nat -> S => stream k) ∘ Prod.snd)
+      (split_block_oracle_run_law blockLaw oracleLaw) = oracleLaw
+  rw [← Measure.map_map]
+  · rw [split_block_oracle_run_law_map_snd]
+    exact iidStreamLaw_map_eval oracleLaw k
+  · exact measurable_pi_apply k
+  · exact measurable_snd
+
+/-- The split block/oracle run law is a probability measure with the expected
+one-time block and oracle marginals. -/
+theorem split_block_oracle_run_law_spec
+    {I S : Type*} [MeasurableSpace I] [MeasurableSpace S]
+    (blockLaw : Measure I) (oracleLaw : Measure S)
+    [IsProbabilityMeasure blockLaw] [IsProbabilityMeasure oracleLaw] :
+    IsProbabilityMeasure (split_block_oracle_run_law blockLaw oracleLaw) ∧
+      (∀ k : Nat,
+        Measure.map (fun omega : split_block_oracle_run_sample I S => omega.1 k)
+          (split_block_oracle_run_law blockLaw oracleLaw) = blockLaw) ∧
+      (∀ k : Nat,
+        Measure.map (fun omega : split_block_oracle_run_sample I S => omega.2 k)
+          (split_block_oracle_run_law blockLaw oracleLaw) = oracleLaw) := by
+  exact ⟨inferInstance, split_block_oracle_run_law_map_block_eval blockLaw oracleLaw,
+    split_block_oracle_run_law_map_oracle_eval blockLaw oracleLaw⟩
+
+end SOptLib
+
+
+namespace SOptLib
+
+
+-- Generalization plan (G0):
+-- concept/name: fixed-query unbiased bounded-variance stochastic oracle; orig
+--   was SFOAssumption13.
+-- generality used: arbitrary query type X, sampled space S with a measurable
+--   space, normed real vector codomain E with measurable codomain structure,
+--   sample law P, stochastic kernel G, deterministic target field, and variance
+--   scale sigma; no objective, gradient, smoothness, convexity, or
+--   finite-dimensional assumptions are needed.
+-- portable call pattern: stochastic gradient, zeroth-order smoothing, and
+--   variance-reduced oracle proofs can replace the objective gradient by any
+--   target field and the sample gradient by any fixed-query oracle kernel while
+--   keeping measurable fibers, Bochner mean unbiasedness, and centered
+--   second-moment control.
+-- counterargument checked: not paper-local traceability because the same
+--   fixed-query oracle contract feeds random-query variance transfer and
+--   mini-batch residual bounds; not a pure duplicate of
+--   BoundedVarianceUnbiasedOracleOn, which is carrier/set-based, fixes queries
+--   in the vector codomain, uses an explicit dual-norm gauge, and adds joint
+--   residual measurability.
+-- coverage search: searched "fixed query stochastic oracle measurable
+--   integrable unbiased variance bounded centered second moment" and "oracle
+--   mean unbiased variance bounded centered second moment integrable"; top hits
+--   included SOptLib.BoundedVarianceUnbiasedOracleOn and random-query variance
+--   transfer lemmas, all partial rather than this global fixed-query ambient
+--   norm predicate over an arbitrary query type.
+-- minimal hypotheses: the codomain measurable-space instance is needed for
+--   Measurable fibers; the normed real vector structure is needed for Bochner
+--   integration and residual subtraction; probability and nonnegativity of
+--   sigma are caller-side assumptions, not needed by the predicate.
+
+/-- Fixed-query stochastic oracle assumptions with unbiased mean and bounded
+centered second moment.
+
+For every deterministic query, the sampled oracle fiber is measurable and
+integrable, its Bochner mean equals the deterministic target field, and its
+squared norm residual around that target is integrable with expectation at most
+`sigma ^ 2`.
+
+Layer: Model | Concept: Fixed-query unbiased bounded-variance stochastic oracle
+Proof: (definitional construction; conjunction of measurable fibers, Bochner
+  integrability, unbiased mean equality, and centered norm-square moment bound)
+Source: Stochastic first-order oracle assumptions, Mathlib Bochner integral
+  notation, and normed-space residual second-moment predicates
+Used in: randomized stochastic gradient-free proofs when Assumption 13 turns
+  sample gradients into unbiased fixed-query oracle values with a uniform
+  centered second-moment budget before the finite-difference oracle estimates
+Book citation: book/FOML/StochasticZerothOrder.json#/assumptions
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic gradient-free method -/
+def FixedQueryUnbiasedVarianceOracle
+    {X S E : Type*} [MeasurableSpace S] [MeasurableSpace E]
+    [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (P : Measure S) (G : X → S → E) (target : X → E) (sigma : ℝ) : Prop :=
+  (∀ x : X, Measurable (fun ξ => G x ξ)) ∧
+    (∀ x : X, Integrable (fun ξ => G x ξ) P) ∧
+    (∀ x : X, Integrable (fun ξ => ‖G x ξ - target x‖ ^ (2 : ℕ)) P) ∧
+    (∀ x : X, (∫ ξ, G x ξ ∂P) = target x) ∧
+    (∀ x : X, (∫ ξ, ‖G x ξ - target x‖ ^ (2 : ℕ) ∂P) ≤ sigma ^ (2 : ℕ))
+
+@[simp]
+theorem FixedQueryUnbiasedVarianceOracle_def
+    {X S E : Type*} [MeasurableSpace S] [MeasurableSpace E]
+    [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (P : Measure S) (G : X → S → E) (target : X → E) (sigma : ℝ) :
+    FixedQueryUnbiasedVarianceOracle P G target sigma ↔
+      (∀ x : X, Measurable (fun ξ => G x ξ)) ∧
+        (∀ x : X, Integrable (fun ξ => G x ξ) P) ∧
+        (∀ x : X, Integrable (fun ξ => ‖G x ξ - target x‖ ^ (2 : ℕ)) P) ∧
+        (∀ x : X, (∫ ξ, G x ξ ∂P) = target x) ∧
+        (∀ x : X, (∫ ξ, ‖G x ξ - target x‖ ^ (2 : ℕ) ∂P) ≤
+          sigma ^ (2 : ℕ)) := by
+  rfl
+
+theorem FixedQueryUnbiasedVarianceOracle.measurable
+    {X S E : Type*} [MeasurableSpace S] [MeasurableSpace E]
+    [NormedAddCommGroup E] [NormedSpace ℝ E]
+    {P : Measure S} {G : X → S → E} {target : X → E} {sigma : ℝ}
+    (h : FixedQueryUnbiasedVarianceOracle P G target sigma) (x : X) :
+    Measurable (fun ξ => G x ξ) :=
+  h.1 x
+
+theorem FixedQueryUnbiasedVarianceOracle.integrable
+    {X S E : Type*} [MeasurableSpace S] [MeasurableSpace E]
+    [NormedAddCommGroup E] [NormedSpace ℝ E]
+    {P : Measure S} {G : X → S → E} {target : X → E} {sigma : ℝ}
+    (h : FixedQueryUnbiasedVarianceOracle P G target sigma) (x : X) :
+    Integrable (fun ξ => G x ξ) P :=
+  h.2.1 x
+
+theorem FixedQueryUnbiasedVarianceOracle.centered_sq_integrable
+    {X S E : Type*} [MeasurableSpace S] [MeasurableSpace E]
+    [NormedAddCommGroup E] [NormedSpace ℝ E]
+    {P : Measure S} {G : X → S → E} {target : X → E} {sigma : ℝ}
+    (h : FixedQueryUnbiasedVarianceOracle P G target sigma) (x : X) :
+    Integrable (fun ξ => ‖G x ξ - target x‖ ^ (2 : ℕ)) P :=
+  h.2.2.1 x
+
+theorem FixedQueryUnbiasedVarianceOracle.mean_eq
+    {X S E : Type*} [MeasurableSpace S] [MeasurableSpace E]
+    [NormedAddCommGroup E] [NormedSpace ℝ E]
+    {P : Measure S} {G : X → S → E} {target : X → E} {sigma : ℝ}
+    (h : FixedQueryUnbiasedVarianceOracle P G target sigma) (x : X) :
+    (∫ ξ, G x ξ ∂P) = target x :=
+  h.2.2.2.1 x
+
+theorem FixedQueryUnbiasedVarianceOracle.variance_bound
+    {X S E : Type*} [MeasurableSpace S] [MeasurableSpace E]
+    [NormedAddCommGroup E] [NormedSpace ℝ E]
+    {P : Measure S} {G : X → S → E} {target : X → E} {sigma : ℝ}
+    (h : FixedQueryUnbiasedVarianceOracle P G target sigma) (x : X) :
+    (∫ ξ, ‖G x ξ - target x‖ ^ (2 : ℕ) ∂P) ≤ sigma ^ (2 : ℕ) :=
+  h.2.2.2.2 x
+
+
+
+
+-- Generalization plan (G0):
+-- concept/name: forward finite-difference zeroth-order oracle; orig was
+--   `rsgfOracle`, renamed away from the paper acronym while keeping the
+--   stochastic-optimization domain term `oracle`.
+-- generality used: arbitrary real normed vector space E and arbitrary sample
+--   type Sample; no measure, filtration, convexity, smoothness, integrability,
+--   positivity, or finite-dimensional hypotheses are needed to name the
+--   pointwise finite-difference oracle value.
+-- portable call pattern: randomized gradient-free, Gaussian random-search, and
+--   stochastic zeroth-order algorithms can instantiate the objective kernel,
+--   smoothing scale, query point, sample, and search direction while reusing the
+--   same two-query scaled directional estimator before unbiasedness and moment
+--   proofs.
+-- counterargument checked: not merely paper-local traceability because the
+--   same pointwise oracle atom is reused across zeroth-order methods; not only
+--   a caller-side expression because downstream measurability, expectation, and
+--   second-moment lemmas benefit from a stable named oracle. Mathlib `fwdDiff`
+--   covers only the additive difference operator `f (x + h) - f x`, not the
+--   sampled kernel, scale division, and returned direction vector.
+-- coverage search: searched `forward finite difference zeroth order oracle`,
+--   `finite difference oracle sampled direction output equality`, project
+--   grep for `forwardDifference`/`finite difference`, and LeanSearch for
+--   `forward finite difference oracle zeroth order stochastic optimization`.
+--   Top exact hits were private `rsgfOracle` lemmas in the algorithm file;
+--   public SOptLib hits were unrelated oracle-difference moment/scalarization
+--   facts, and Mathlib hits were `fwdDiff` APIs with only partial coverage.
+-- minimal hypotheses: the body only needs addition on E, real scalar
+--   multiplication on E, and real-valued subtraction/division. Normed-space
+--   assumptions are needed only for API facts that mention norms.
+
+/-- Forward finite-difference zeroth-order oracle from two sampled function
+queries.
+
+For a sample objective kernel `F`, query point `x`, sample `xi`, search
+direction `u`, and scale `mu`, this names the estimator
+`((F (x + mu • u) xi - F x xi) / mu) • u`.
+
+Layer: Model | Concept: forward finite-difference oracle
+Proof: (definitional construction; scaled two-query sampled objective
+  difference returned in the queried direction)
+Source: stochastic zeroth-order finite-difference oracle models and Mathlib
+  real module scalar-action primitives
+Used in: randomized stochastic gradient-free proofs when the two sampled
+  zeroth-order function queries are packaged as the oracle value before
+  unbiasedness, measurability, and second-moment estimates
+Book citation: book/FOML/StochasticZerothOrder.json#/assumptions/5
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic gradient-free method -/
+noncomputable def forwardDifferenceOracle
+    {E Sample : Type*} [AddCommMonoid E] [Module ℝ E]
+    (F : E → Sample → ℝ) (mu : ℝ) (x : E) (xi : Sample) (u : E) : E :=
+  ((F (x + mu • u) xi - F x xi) / mu) • u
+
+/-- The forward finite-difference oracle unfolds to its scaled two-query
+sampled objective formula.
+
+Layer: Model | Gap: Level 0 (forward finite-difference oracle unfolding)
+Proof: by rfl after unfolding `forwardDifferenceOracle`.
+Source: stochastic zeroth-order finite-difference oracle models and Mathlib
+  real module scalar-action primitives
+Used in: randomized stochastic gradient-free proofs when rewriting the named
+  oracle value back to the sampled finite-difference expression for
+  integration, measurability, and second-moment calculations
+Book citation: book/FOML/StochasticZerothOrder.json#/assumptions/5
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic gradient-free method -/
+@[simp]
+theorem forwardDifferenceOracle_def
+    {E Sample : Type*} [AddCommMonoid E] [Module ℝ E]
+    (F : E → Sample → ℝ) (mu : ℝ) (x : E) (xi : Sample) (u : E) :
+    forwardDifferenceOracle F mu x xi u =
+      ((F (x + mu • u) xi - F x xi) / mu) • u := by
+  rfl
+
+/-- The norm of a forward finite-difference oracle value is the absolute
+scaled sampled function difference times the search-direction norm.
+
+Layer: Model | Gap: Level 0 (forward finite-difference oracle norm formula)
+Proof: unfold `forwardDifferenceOracle` and use Mathlib's scalar norm formula.
+Source: stochastic zeroth-order finite-difference oracle models and Mathlib
+  real normed-space scalar norm APIs
+Used in: second-moment and domination estimates for finite-difference
+  zeroth-order oracle values
+Book citation: book/FOML/StochasticZerothOrder.json#/assumptions/5
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic gradient-free method -/
+theorem norm_forwardDifferenceOracle
+    {E Sample : Type*} [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (F : E → Sample → ℝ) (mu : ℝ) (x : E) (xi : Sample) (u : E) :
+    ‖forwardDifferenceOracle F mu x xi u‖ =
+      |(F (x + mu • u) xi - F x xi) / mu| * ‖u‖ := by
+  rw [forwardDifferenceOracle, norm_smul, Real.norm_eq_abs]
+
+/-- The forward finite-difference oracle returns zero in the zero search
+direction.
+
+Layer: Model | Gap: Level 0 (forward finite-difference oracle zero direction)
+Proof: unfold `forwardDifferenceOracle` and simplify the zero scalar action.
+Source: stochastic zeroth-order finite-difference oracle models and Mathlib
+  real module scalar-action APIs
+Used in: endpoint and degenerate-direction simplifications for zeroth-order
+  oracle estimates
+Book citation: book/FOML/StochasticZerothOrder.json#/assumptions/5
+Origin algorithm: Lan, First-order and Stochastic Optimization Methods for
+  Machine Learning, randomized stochastic gradient-free method -/
+@[simp]
+theorem forwardDifferenceOracle_zero_direction
+    {E Sample : Type*} [AddCommMonoid E] [Module ℝ E]
+    (F : E → Sample → ℝ) (mu : ℝ) (x : E) (xi : Sample) :
+    forwardDifferenceOracle F mu x xi (0 : E) = 0 := by
+  simp [forwardDifferenceOracle]
+
+
+end SOptLib
+
+/-! Phase 4 batch 6: `ExactVarianceIidCenteredFamily`. -/
+
+-- Generalization plan (G0):
+-- concept/name: exact-variance iid centered random family; orig was
+--   ExactVarianceIidAdditiveNoise, whose oracle-specific conjunct remains paper-local
+-- generality used: arbitrary two-axis index and measurable sample/target types, an arbitrary
+--   measure, and a real normed additive target; no probability, finite-measure, Hilbert, or
+--   finite-dimensional assumption
+-- portable call pattern: stochastic lower-bound and sharpness constructions can change the
+--   sample space, coordinate index, target space, law, and positive scale while retaining the
+--   iid, centered, exact squared-norm second-moment family contract
+-- counterargument checked: this is a hypothesis bundle, but its jointly recurring contract is
+--   used throughout exact-variance diagonalization and lower-bound arguments; it is not a
+--   caller-side formula or a wrapper around one existing Mathlib or SOptLib predicate
+-- coverage search: searched "iid identically distributed centered random family exact squared
+--   norm second moment positive scale" and "iIndepFun IdentDistrib integral norm squared exact
+--   moment"; Mathlib IdentDistrib/iIndepFun and SOptLib iidStreamLaw provide components or
+--   constructors, while no hit covers the complete contract
+-- minimal hypotheses: retained target measurability for iIndepFun and IdentDistrib; removed
+--   IsFiniteMeasure, IsProbabilityMeasure, InnerProductSpace, CompleteSpace, and
+--   FiniteDimensional assumptions because the definitional contract uses none
+
+open MeasureTheory ProbabilityTheory
+
+namespace SOptLib
+
+/-- A positive-scale iid centered family whose squared norms have exactly the prescribed
+second moment at every coordinate.
+
+Layer: Model | Concept: exact-variance iid centered random family
+Proof: (definitional construction; conjunction of positive scale, joint independence, identical laws, zero Bochner means, and exact squared-norm moments)
+Source: Mathlib probability independence and identical-distribution predicates together with Bochner integration
+Used in: exact stochastic lower-bound and sharpness constructions where independent centered noise coordinates diagonalize finite linear-combination second moments
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/17/statement_math
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks - TimeVaryingStochasticPushPull -/
+def exactVarianceIidCenteredFamily
+    {I J Ω E : Type*} [MeasurableSpace Ω] [MeasurableSpace E]
+    [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (μ : Measure Ω) (ξ : I → J → Ω → E) (σ : ℝ) : Prop :=
+  0 < σ ∧
+    iIndepFun (fun ij : I × J => ξ ij.1 ij.2) μ ∧
+      (∀ i j i' j', IdentDistrib (ξ i j) (ξ i' j') μ μ) ∧
+        (∀ i j, ∫ ω, ξ i j ω ∂μ = 0) ∧
+          ∀ i j, ∫ ω, ‖ξ i j ω‖ ^ 2 ∂μ = σ ^ 2
+
+/-- The exact-variance iid centered-family predicate unfolds to positivity, independence,
+identical distribution, zero means, and exact squared-norm second moments.
+
+Layer: Model | Gap: Level 0 (exact-variance iid centered-family specification)
+Proof: by rfl after unfolding `exactVarianceIidCenteredFamily`
+Source: Mathlib probability independence and identical-distribution predicates together with Bochner integration
+Used in: projecting the reusable iid exact-moment clauses from additive-noise oracle assumptions before second-moment diagonalization
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/17/statement_math
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks - TimeVaryingStochasticPushPull -/
+@[simp]
+theorem exactVarianceIidCenteredFamily_def
+    {I J Ω E : Type*} [MeasurableSpace Ω] [MeasurableSpace E]
+    [NormedAddCommGroup E] [NormedSpace ℝ E]
+    (μ : Measure Ω) (ξ : I → J → Ω → E) (σ : ℝ) :
+    exactVarianceIidCenteredFamily μ ξ σ ↔
+      0 < σ ∧
+        iIndepFun (fun ij : I × J => ξ ij.1 ij.2) μ ∧
+          (∀ i j i' j', IdentDistrib (ξ i j) (ξ i' j') μ μ) ∧
+            (∀ i j, ∫ ω, ξ i j ω ∂μ = 0) ∧
+              ∀ i j, ∫ ω, ‖ξ i j ω‖ ^ 2 ∂μ = σ ^ 2 := by
+  rfl
+
+/-- Every squared-norm moment recorded by an exact-variance iid centered family is
+well-defined.  Positivity of the common scale makes the prescribed integral nonzero, while
+the Bochner integral of a non-integrable function is zero.
+
+Layer: Model | Gap: Level 0 (exact second-moment well-definedness)
+Proof: combine the positive-scale and exact-moment clauses, then use Mathlib's
+`Integrable.of_integral_ne_zero` criterion
+Source: Mathlib Bochner integration together with the exact-variance iid centered-family contract
+Used in: finite covariance expansions and sharp stochastic lower-bound constructions, before
+commuting integrals through finite sums
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/17/statement_math
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks - TimeVaryingStochasticPushPull -/
+theorem exactVarianceIidCenteredFamily.integrable_sq_norm
+    {I J Ω E : Type*} [MeasurableSpace Ω] [MeasurableSpace E]
+    [NormedAddCommGroup E] [NormedSpace ℝ E]
+    {μ : Measure Ω} {ξ : I → J → Ω → E} {σ : ℝ}
+    (hξ : exactVarianceIidCenteredFamily μ ξ σ) (i : I) (j : J) :
+    Integrable (fun ω => ‖ξ i j ω‖ ^ 2) μ := by
+  apply Integrable.of_integral_ne_zero
+  rw [hξ.2.2.2.2 i j]
+  exact pow_ne_zero 2 (ne_of_gt hξ.1)
+
+end SOptLib
+
+/-! Phase 4 batch 6: `IndependentSymmetricTwoPointRealProcess`. -/
+
+open MeasureTheory ProbabilityTheory
+
+namespace SOptLib
+
+-- Generalization plan (G0):
+-- concept/name: independent symmetric two-atom real process; orig was `HalfRademacherNoise`, renamed to expose the amplitude-parametric probability model
+-- generality used: arbitrary sample type with a measurable space, arbitrary measure, Nat-indexed real process, and arbitrary real amplitude; no probability, measurability, integrability, or nonzero-amplitude assumption is added
+-- portable call pattern: lower-bound and stochastic-noise examples instantiate the predicate with different amplitudes, measures, and independent processes while retaining equal real mass at the two symmetric atoms
+-- counterargument checked: although this is a conjunction-valued predicate, it names a recurring noise-model contract rather than paper traceability; the amplitude parameter and paired independence/marginal API make it reusable across Rademacher-scaled constructions
+-- coverage search: `independent symmetric real two point process` and `iIndepFun coordinate atom real measure`; SOptLib hits cover independent streams and finite-block freshness only, while Mathlib LeanSearch returned general IID existence and strong-law results, so coverage is partial rather than duplicative
+-- minimal hypotheses: all already minimal; the source uses only a measurable sample space, an arbitrary measure, `iIndepFun`, and the two coordinate atom-mass equalities
+
+/-- A real process is independent and has mass one half at each of the symmetric
+atoms `a` and `-a` at every time.
+
+This predicate intentionally does not assert that the ambient measure is a
+probability measure or that the two atoms exhaust it; those properties are not
+part of the underlying contract.
+
+Layer: Model | Concept: independent symmetric two-atom real process
+Proof: (definitional construction; conjunction of indexed functional independence and the two symmetric coordinate atom-mass equalities)
+Source: Mathlib probability independence via `ProbabilityTheory.iIndepFun` and real-valued measure evaluation via `Measure.real`
+Used in: stochastic lower-bound and noise-model constructions that scale independent symmetric signs by a chosen real amplitude
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/10/proof/0
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, predictable-feedback counterexample -/
+def IndependentSymmetricTwoPointRealProcess
+    {Omega : Type*} [MeasurableSpace Omega]
+    (mu : Measure Omega) (xi : Nat -> Omega -> Real) (a : Real) : Prop :=
+  iIndepFun xi mu /\
+    forall t : Nat,
+      mu.real {omega : Omega | xi t omega = a} = 1 / 2 /\
+        mu.real {omega : Omega | xi t omega = -a} = 1 / 2
+
+/-- The independent symmetric two-atom process predicate unfolds to indexed
+independence and the two coordinate atom-mass equalities.
+
+Layer: Model | Gap: Level 0 (independent symmetric two-atom process specification)
+Proof: by rfl after unfolding `IndependentSymmetricTwoPointRealProcess`.
+Source: Mathlib probability independence via `ProbabilityTheory.iIndepFun` and real-valued measure evaluation via `Measure.real`
+Used in: stochastic lower-bound and noise-model proofs that project independence or either symmetric atom mass from the bundled process contract
+Book citation: book/TimeVaryingPushPull/TimeVaryingPushPull.json#/key_lemmas/10/proof/0
+Origin algorithm: Feiming Wang, Stochastic Push--Pull Gradient Tracking on Fixed Exogenous Periodic Directed Networks, predictable-feedback counterexample -/
+@[simp]
+theorem IndependentSymmetricTwoPointRealProcess_def
+    {Omega : Type*} [MeasurableSpace Omega]
+    (mu : Measure Omega) (xi : Nat -> Omega -> Real) (a : Real) :
+    IndependentSymmetricTwoPointRealProcess mu xi a <->
+      iIndepFun xi mu /\
+        forall t : Nat,
+          mu.real {omega : Omega | xi t omega = a} = 1 / 2 /\
+            mu.real {omega : Omega | xi t omega = -a} = 1 / 2 := by
+  rfl
+
+/-- The coordinates of an independent symmetric two-point real process are
+jointly independent. -/
+theorem IndependentSymmetricTwoPointRealProcess.iIndepFun
+    {Omega : Type*} [MeasurableSpace Omega]
+    {mu : Measure Omega} {xi : Nat -> Omega -> Real} {a : Real}
+    (h : IndependentSymmetricTwoPointRealProcess mu xi a) :
+    ProbabilityTheory.iIndepFun xi mu :=
+  h.1
+
+/-- Each coordinate of an independent symmetric two-point real process has
+mass one half at its positive-amplitude atom. -/
+theorem IndependentSymmetricTwoPointRealProcess.mass_eq
+    {Omega : Type*} [MeasurableSpace Omega]
+    {mu : Measure Omega} {xi : Nat -> Omega -> Real} {a : Real}
+    (h : IndependentSymmetricTwoPointRealProcess mu xi a) (t : Nat) :
+    mu.real {omega : Omega | xi t omega = a} = 1 / 2 :=
+  (h.2 t).1
+
+/-- Each coordinate of an independent symmetric two-point real process has
+mass one half at its negative-amplitude atom. -/
+theorem IndependentSymmetricTwoPointRealProcess.neg_mass_eq
+    {Omega : Type*} [MeasurableSpace Omega]
+    {mu : Measure Omega} {xi : Nat -> Omega -> Real} {a : Real}
+    (h : IndependentSymmetricTwoPointRealProcess mu xi a) (t : Nat) :
+    mu.real {omega : Omega | xi t omega = -a} = 1 / 2 :=
+  (h.2 t).2
+
+/-- Negating the amplitude preserves the independent symmetric two-point
+process contract. -/
+theorem IndependentSymmetricTwoPointRealProcess.neg
+    {Omega : Type*} [MeasurableSpace Omega]
+    {mu : Measure Omega} {xi : Nat -> Omega -> Real} {a : Real}
+    (h : IndependentSymmetricTwoPointRealProcess mu xi a) :
+    IndependentSymmetricTwoPointRealProcess mu xi (-a) := by
+  refine ⟨h.iIndepFun, fun t => ⟨h.neg_mass_eq t, ?_⟩⟩
+  simpa only [neg_neg] using h.mass_eq t
 
 end SOptLib
