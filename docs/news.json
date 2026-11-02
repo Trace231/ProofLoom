@@ -1,22 +1,52 @@
 [
   {
     "date": "2026-11-02",
-    "title": "GeneralPushPull, ADMM, and RSGD formalizations released.",
-    "url": "https://github.com/Trace231/ProofLoom/commit/474de82d6973d6f2c5804f72c137e0cbf5299755"
+    "title": "GeneralPushPull — a new Lean formalization of stochastic push–pull optimization over directed networks.",
+    "url": "https://github.com/Trace231/ProofLoom/tree/474de82d6973d6f2c5804f72c137e0cbf5299755/formalizations/GeneralPushPull"
+  },
+  {
+    "date": "2026-11-02",
+    "title": "ADMM — alternating minimization for linearly constrained convex problems, with objective and feasibility residual bounds.",
+    "url": "https://github.com/Trace231/ProofLoom/tree/474de82d6973d6f2c5804f72c137e0cbf5299755/formalizations/ADMM"
+  },
+  {
+    "date": "2026-11-02",
+    "title": "RSGD — stochastic gradient optimization with randomized output selection and expected gradient-norm bounds.",
+    "url": "https://github.com/Trace231/ProofLoom/tree/474de82d6973d6f2c5804f72c137e0cbf5299755/formalizations/RSGD"
   },
   {
     "date": "2026-10-31",
-    "title": "MARINA and TimeVaryingPushPull formalizations released.",
-    "url": "https://github.com/Trace231/ProofLoom/commit/b424bf980787582bf570bf0e817e95b415416bac"
+    "title": "MARINA — a new formalization of distributed optimization with compressed gradient estimators.",
+    "url": "https://github.com/Trace231/ProofLoom/tree/b424bf980787582bf570bf0e817e95b415416bac/formalizations/MARINA"
+  },
+  {
+    "date": "2026-10-31",
+    "title": "TimeVaryingPushPull — decentralized gradient tracking over time-varying directed networks.",
+    "url": "https://github.com/Trace231/ProofLoom/tree/b424bf980787582bf570bf0e817e95b415416bac/formalizations/TimeVaryingPushPull"
+  },
+  {
+    "date": "2026-10-31",
+    "title": "SOptLib snapshot update — network matrices, tensor and operator-mean models, plus reusable sampling and descent lemmas.",
+    "url": "https://github.com/Trace231/ProofLoom/tree/b424bf980787582bf570bf0e817e95b415416bac/soptlib"
   },
   {
     "date": "2026-10-22",
-    "title": "Muon, SDCS, and Shampoo formalizations released.",
-    "url": "https://github.com/Trace231/ProofLoom/commit/0a0d099005c8b9d524fce4220cc56b794aabe1b4"
+    "title": "Muon — matrix-parameter optimization, including a formal counterexample and corrected complexity results.",
+    "url": "https://github.com/Trace231/ProofLoom/tree/0a0d099005c8b9d524fce4220cc56b794aabe1b4/formalizations/Muon"
+  },
+  {
+    "date": "2026-10-22",
+    "title": "SDCS — stochastic decentralized communication sliding, with expected bounds and completed library extraction.",
+    "url": "https://github.com/Trace231/ProofLoom/tree/0a0d099005c8b9d524fce4220cc56b794aabe1b4/formalizations/SDCS"
+  },
+  {
+    "date": "2026-10-22",
+    "title": "Shampoo — matrix, tensor, and diagonal preconditioning, with formal regret bounds under explicit hypotheses.",
+    "url": "https://github.com/Trace231/ProofLoom/tree/0a0d099005c8b9d524fce4220cc56b794aabe1b4/formalizations/Shampoo"
   },
   {
     "date": "2026-09-29",
-    "title": "ProofLoom is open source: formalization artifacts, SOptLib, and the project homepage.",
-    "url": "https://github.com/Trace231/ProofLoom/commit/73ae8602072b42cb915ff32bac3f3e4835157e36"
+    "title": "SOptLib initial snapshot — reusable probability, stochastic-oracle, Bregman, descent, and complexity infrastructure.",
+    "url": "https://github.com/Trace231/ProofLoom/tree/73ae8602072b42cb915ff32bac3f3e4835157e36/soptlib"
   }
 ]
