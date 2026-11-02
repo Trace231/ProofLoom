@@ -1,3 +1,5 @@
+[![News](docs/assets/news-board.svg)](https://trace231.github.io/ProofLoom/news.html)
+
 [![ProofLoom — Algorithms in ML, FORMALIZED. Melon Group / PKU CMLR.](docs/assets/proofloom-galaxy.png)](https://trace231.github.io/ProofLoom/ "Visit the ProofLoom homepage")
 
 <p align="center">
