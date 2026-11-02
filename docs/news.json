@@ -1,1 +1,22 @@
-[]
+[
+  {
+    "date": "2026-11-02",
+    "title": "GeneralPushPull, ADMM, and RSGD formalizations released.",
+    "url": "https://github.com/Trace231/ProofLoom/commit/474de82d6973d6f2c5804f72c137e0cbf5299755"
+  },
+  {
+    "date": "2026-10-31",
+    "title": "MARINA and TimeVaryingPushPull formalizations released.",
+    "url": "https://github.com/Trace231/ProofLoom/commit/b424bf980787582bf570bf0e817e95b415416bac"
+  },
+  {
+    "date": "2026-10-22",
+    "title": "Muon, SDCS, and Shampoo formalizations released.",
+    "url": "https://github.com/Trace231/ProofLoom/commit/0a0d099005c8b9d524fce4220cc56b794aabe1b4"
+  },
+  {
+    "date": "2026-09-29",
+    "title": "ProofLoom is open source: formalization artifacts, SOptLib, and the project homepage.",
+    "url": "https://github.com/Trace231/ProofLoom/commit/73ae8602072b42cb915ff32bac3f3e4835157e36"
+  }
+]
