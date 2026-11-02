@@ -1,0 +1,41 @@
+name: Sync latest news card
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/news.json
+      - docs/assets/news-board.svg
+      - scripts/update_news_card.py
+      - .github/workflows/news-card.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: latest-news-card
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Generate the README card from the newest announcement
+        run: python scripts/update_news_card.py
+      - name: Commit the refreshed card when the announcement changes
+        run: |
+          git add README.md docs/assets/news-latest.svg
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Sync README with the latest announcement"
+          git push origin HEAD:main
