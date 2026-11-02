@@ -1,13 +1,13 @@
 [
   {
     "date": "2026-11-02",
-    "title": "GeneralPushPull makes the network constants explicit",
+    "title": "We formalized GeneralPushPull",
     "url": "https://github.com/Trace231/ProofLoom/tree/474de82d6973d6f2c5804f72c137e0cbf5299755/formalizations/GeneralPushPull",
     "summary": "The new development opens up κₜ (network gain), Dₜ (zero-sum influence operator), bₜ (closed-loop noise influence), and qₜ = ‖bₜ‖². Each quantity is constructed in Lean, making the route from the network dynamics to the effective node count explicit."
   },
   {
     "date": "2026-11-02",
-    "title": "ADMM: from alternating updates to a feasibility guarantee",
+    "title": "We formalized ADMM",
     "url": "https://github.com/Trace231/ProofLoom/tree/474de82d6973d6f2c5804f72c137e0cbf5299755/formalizations/ADMM",
     "summary": "Two minimization steps and a multiplier update become one connected argument. Starting from Lan’s Section 3.7, the development follows subproblem optimality through telescoping bounds to objective error and constraint residuals.",
     "source": {
@@ -17,7 +17,7 @@
   },
   {
     "date": "2026-11-02",
-    "title": "RSGD: putting the random output inside the proof",
+    "title": "We formalized RSGD",
     "url": "https://github.com/Trace231/ProofLoom/tree/474de82d6973d6f2c5804f72c137e0cbf5299755/formalizations/RSGD",
     "summary": "A randomly selected iterate changes what an expectation must mean. The development makes the sampling history and output law explicit, connecting stochastic gradient updates to the expected gradient-norm bound in Lan’s Section 6.1.",
     "source": {
@@ -27,7 +27,7 @@
   },
   {
     "date": "2026-10-31",
-    "title": "MARINA: compressed communication, carefully tracked randomness",
+    "title": "We formalized the MARINA algorithm family",
     "url": "https://github.com/Trace231/ProofLoom/tree/b424bf980787582bf570bf0e817e95b415416bac/formalizations/MARINA",
     "summary": "Gradient differences save communication; adaptive queries make the probability argument harder. The formalization builds the generated estimator process and tracks the measurability and integrability needed for its expectations and variance recurrences.",
     "source": {
@@ -37,7 +37,7 @@
   },
   {
     "date": "2026-10-31",
-    "title": "Push–Pull on changing networks: the effective node count matters",
+    "title": "We formalized stochastic Push–Pull on time-varying digraphs",
     "url": "https://github.com/Trace231/ProofLoom/tree/b424bf980787582bf570bf0e817e95b415416bac/formalizations/TimeVaryingPushPull",
     "summary": "Based on On the Limits of Stochastic Push-Pull over Time-Varying Digraphs. The development tracks periodic Perron weights and influence operators behind n_eff, including a period-two construction showing how temporal variation can break linear speedup.",
     "source": {
@@ -47,13 +47,13 @@
   },
   {
     "date": "2026-10-31",
-    "title": "SOptLib grows with the mathematics these proofs need",
+    "title": "We expanded SOptLib with network and tensor mathematics",
     "url": "https://github.com/Trace231/ProofLoom/tree/b424bf980787582bf570bf0e817e95b415416bac/soptlib",
     "summary": "The October snapshot adds network-matrix theory for Push–Pull and tensor/operator-mean tools for adaptive preconditioning. Sampling identities, estimator-error recurrences, and descent lemmas become reusable parts of the shared library."
   },
   {
     "date": "2026-10-22",
-    "title": "Muon: a counterexample becomes a corrected proof",
+    "title": "We formalized Muon and its corrected complexity results",
     "url": "https://github.com/Trace231/ProofLoom/tree/0a0d099005c8b9d524fce4220cc56b794aabe1b4/formalizations/Muon",
     "summary": "Formalizing the matrix optimizer exposed a counterexample to the printed Appendix B.4 branch. The released development proves corrected complexity results with an explicit cross-control condition, recording exactly where the source argument needs repair.",
     "source": {
@@ -63,7 +63,7 @@
   },
   {
     "date": "2026-10-22",
-    "title": "SDCS: less communication, a richer proof",
+    "title": "We formalized SDCS and extracted reusable library results",
     "url": "https://github.com/Trace231/ProofLoom/tree/0a0d099005c8b9d524fce4220cc56b794aabe1b4/formalizations/SDCS",
     "summary": "Stochastic decentralized communication sliding couples local optimization with network consensus. The development connects the two expected bounds of Lan’s Theorem 8.11 and completes library extraction, with the source corrections and hypotheses recorded alongside the proofs.",
     "source": {
@@ -73,7 +73,7 @@
   },
   {
     "date": "2026-10-22",
-    "title": "Shampoo: a tensor optimizer meets operator theory",
+    "title": "We formalized Shampoo’s matrix, tensor, and diagonal variants",
     "url": "https://github.com/Trace231/ProofLoom/tree/0a0d099005c8b9d524fce4220cc56b794aabe1b4/formalizations/Shampoo",
     "summary": "The preconditioners are real matrices; a needed Mathlib inverse-order theorem lives in the C*-algebra interface. We bridge the representations for inverse-order and fractional-power inequalities, then connect matrix, tensor, and diagonal regret bounds under explicit hypotheses.",
     "source": {
@@ -83,7 +83,7 @@
   },
   {
     "date": "2026-09-29",
-    "title": "SOptLib: the first shared foundation",
+    "title": "We released the first canonical SOptLib snapshot",
     "url": "https://github.com/Trace231/ProofLoom/tree/73ae8602072b42cb915ff32bac3f3e4835157e36/soptlib",
     "summary": "Proofs start sharing the mathematics that used to sit between the lines: sampling histories, stochastic oracles, Bregman geometry, and descent and complexity lemmas. The initial canonical snapshot brings that infrastructure together for later developments."
   }
