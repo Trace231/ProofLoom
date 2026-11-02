@@ -1,5 +1,5 @@
 <!-- proofloom:latest-news:start -->
-[![News — 2026-11-02: We formalized GeneralPushPull](docs/assets/news-latest.svg?v=edc78e85e34e)](https://trace231.github.io/ProofLoom/news.html)
+[![News — 2026-11-02: We formalized GeneralPushPull!](docs/assets/news-latest.svg?v=5ea308eca159)](https://trace231.github.io/ProofLoom/news.html)
 <!-- proofloom:latest-news:end -->
 
 [![ProofLoom — Algorithms in ML, FORMALIZED. Melon Group / PKU CMLR.](docs/assets/proofloom-galaxy.png)](https://trace231.github.io/ProofLoom/ "Visit the ProofLoom homepage")
