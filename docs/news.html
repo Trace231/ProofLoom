@@ -28,6 +28,9 @@
     .entry { display: grid; grid-template-columns: 108px minmax(0, 1fr); gap: 24px; padding: 27px 0; }
     time { color: #c5af8b; font: 11px/1.9 ui-monospace, monospace; padding-top: 3px; letter-spacing: .3px; }
     .entry p { margin: 0; overflow-wrap: anywhere; }
+    .entry h2 { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.7; overflow-wrap: anywhere; }
+    .entry .summary { margin-top: 9px; color: #adb8c7; font-size: 13px; line-height: 1.85; }
+    .entry .source { margin-top: 11px; color: #c5af8b; font-size: 11px; line-height: 1.8; }
     .entry a:hover { color: #ead4ae; }
     @media (max-width: 600px) {
       .shell { width: calc(100% - 28px); padding-top: 24px; }
@@ -50,11 +53,22 @@
     </main>
   </div>
   <script>
-    // Entries in news.json: { "date": "YYYY-MM-DD", "title": "...", "url": "..." }.
-    // Leave the array empty until an announcement is ready to publish.
+    // Entries have date, title, url, and optional summary and source: { label, url }.
     const feed = document.getElementById('feed');
     let lastContent;
     let loading = false;
+
+    function linkedText(label, href) {
+      let url;
+      try { url = new URL(href, location.href); } catch {}
+      if (typeof href !== 'string' || !['https:', 'http:'].includes(url?.protocol)) {
+        return document.createTextNode(label);
+      }
+      const link = document.createElement('a');
+      link.href = url.href;
+      link.textContent = label;
+      return link;
+    }
 
     async function refresh() {
       if (loading) return;
@@ -75,18 +89,23 @@
             const date = document.createElement('time');
             date.dateTime = entry.date;
             date.textContent = entry.date;
-            const text = document.createElement('p');
-            let url;
-            try { url = new URL(entry.url, location.href); } catch {}
-            if (typeof entry.url === 'string' && ['https:', 'http:'].includes(url?.protocol)) {
-              const link = document.createElement('a');
-              link.href = url.href;
-              link.textContent = entry.title;
-              text.append(link);
-            } else {
-              text.textContent = entry.title;
+            const copy = document.createElement('div');
+            const title = document.createElement('h2');
+            title.append(linkedText(entry.title, entry.url));
+            copy.append(title);
+            if (typeof entry.summary === 'string' && entry.summary) {
+              const summary = document.createElement('p');
+              summary.className = 'summary';
+              summary.textContent = entry.summary;
+              copy.append(summary);
             }
-            article.append(date, text);
+            if (entry.source && typeof entry.source.label === 'string') {
+              const source = document.createElement('p');
+              source.className = 'source';
+              source.append(linkedText(entry.source.label, entry.source.url));
+              copy.append(source);
+            }
+            article.append(date, copy);
             fragment.append(article);
           });
         const scrollTop = feed.scrollTop;
